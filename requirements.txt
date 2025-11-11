@@ -1,0 +1,23 @@
+# cognisom Core Dependencies
+
+# Scientific computing
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Visualization
+matplotlib>=3.7.0
+
+# Data handling
+pandas>=2.0.0
+
+# Testing
+pytest>=7.3.0
+pytest-cov>=4.1.0
+
+# Development
+jupyter>=1.0.0
+ipython>=8.12.0
+
+# Optional: GPU support (install separately if you have NVIDIA GPU)
+# torch>=2.0.0  # Uncomment if you have CUDA-capable GPU
+# cupy-cuda12x>=12.0.0  # Uncomment for CUDA 12.x support
