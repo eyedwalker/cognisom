@@ -31,15 +31,29 @@ class CognisomApp:
         self.engine = SimulationEngine(self.config)
         self.menu.engine = self.engine
         
-        # TODO: Register modules here when they're ready
-        # self.engine.register_module('molecular', MolecularModule)
-        # self.engine.register_module('cellular', CellularModule)
+        # Register available modules
+        from modules import MolecularModule
+        from modules.cellular_module import CellularModule
+        
+        if self.config.modules_enabled.get('molecular', True):
+            self.engine.register_module('molecular', MolecularModule, {
+                'transcription_rate': 0.5,
+                'exosome_release_rate': 0.1
+            })
+        
+        if self.config.modules_enabled.get('cellular', True):
+            self.engine.register_module('cellular', CellularModule, {
+                'n_normal_cells': 80,
+                'n_cancer_cells': 20
+            })
+        
+        # TODO: Add more modules as they're ready
         # self.engine.register_module('immune', ImmuneModule)
         # self.engine.register_module('vascular', VascularModule)
         # self.engine.register_module('lymphatic', LymphaticModule)
         # self.engine.register_module('spatial', SpatialModule)
         
-        print("✓ Engine initialized (modules will be added soon)")
+        print("✓ Engine initialized with modules")
         print()
     
     def run_simulation(self, scenario='quick_start'):
@@ -48,13 +62,32 @@ class CognisomApp:
             self.initialize_engine()
         
         print(f"\nRunning {scenario} scenario...")
-        print("(Full simulation coming soon - modules being integrated)")
+        
+        # Initialize modules
+        self.engine.initialize()
+        
+        # Add cells to molecular tracking
+        if 'molecular' in self.engine.modules and 'cellular' in self.engine.modules:
+            molecular = self.engine.modules['molecular']
+            cellular = self.engine.modules['cellular']
+            
+            for cell_id in cellular.cells.keys():
+                molecular.add_cell(cell_id)
+        
+        # Run simulation
+        duration = 2.0 if scenario == 'quick_start' else self.config.duration
+        self.engine.run(duration=duration)
+        
+        # Show results
+        print("\nSimulation Results:")
+        state = self.engine.get_state()
+        for module_name, module_state in state.items():
+            if module_name not in ['time', 'step_count', 'running']:
+                print(f"\n{module_name}:")
+                for key, value in module_state.items():
+                    print(f"  {key}: {value}")
+        
         print()
-        
-        # TODO: Initialize and run based on scenario
-        # self.engine.initialize()
-        # self.engine.run()
-        
         input("Press Enter to continue...")
     
     def configure_settings(self):
