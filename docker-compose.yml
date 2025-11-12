@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  cognisom-api:
+    build: .
+    container_name: cognisom-api
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=production
+    volumes:
+      - ./data:/app/data
+      - ./exports:/app/exports
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  cognisom-web:
+    image: nginx:alpine
+    container_name: cognisom-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+    depends_on:
+      - cognisom-api
+    restart: unless-stopped
+
+volumes:
+  data:
+  exports:

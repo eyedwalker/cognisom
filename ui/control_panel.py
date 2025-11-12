@@ -290,7 +290,10 @@ VASCULAR
   Capillaries: {state['vascular']['n_capillaries']}
   Avg O2: {state['vascular']['avg_cell_O2']:.3f}
   Hypoxic Regions: {state['vascular']['hypoxic_regions']}
-
+"""
+            
+            if 'lymphatic' in state:
+                stats += f"""
 LYMPHATIC
   Vessels: {state['lymphatic']['n_vessels']}
   Metastases: {state['lymphatic']['total_metastases']}
@@ -340,6 +343,10 @@ MORPHOGEN
 
 # Test
 if __name__ == '__main__':
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    
     from core import SimulationEngine, SimulationConfig
     from modules import CellularModule, ImmuneModule, VascularModule
     
