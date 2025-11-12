@@ -66,6 +66,57 @@ class Simulation:
         # Create output directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
     
+    @property
+    def time(self):
+        """Current simulation time (alias for current_time)"""
+        return self.current_time
+    
+    def step(self):
+        """
+        Perform a single simulation step
+        
+        Returns:
+            dict: Step statistics
+        """
+        self.current_time += self.dt
+        self.step_count += 1
+        
+        # Update all cells
+        new_cells = []
+        dead_cells = []
+        
+        for cell in self.cells:
+            # Step the cell
+            daughter = cell.step(self.dt)
+            
+            # Check for division
+            if daughter is not None:
+                new_cells.append(daughter)
+                self.events['divisions'] += 1
+            
+            # Check for death
+            if not cell.is_alive():
+                dead_cells.append(cell)
+                self.events['deaths'] += 1
+        
+        # Add new cells
+        self.cells.extend(new_cells)
+        
+        # Remove dead cells
+        for dead_cell in dead_cells:
+            self.cells.remove(dead_cell)
+        
+        # Safety check
+        if len(self.cells) > self.max_cells:
+            print(f"\n⚠️  Max cell limit reached ({self.max_cells})")
+        
+        return {
+            'time': self.current_time,
+            'n_cells': len(self.cells),
+            'divisions': self.events['divisions'],
+            'deaths': self.events['deaths']
+        }
+    
     def run(self, verbose: bool = True, save_interval: int = 100):
         """
         Run the simulation
