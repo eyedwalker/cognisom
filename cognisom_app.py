@@ -32,7 +32,7 @@ class CognisomApp:
         self.menu.engine = self.engine
         
         # Register available modules
-        from modules import MolecularModule, CellularModule, ImmuneModule
+        from modules import MolecularModule, CellularModule, ImmuneModule, VascularModule
         
         if self.config.modules_enabled.get('molecular', True):
             self.engine.register_module('molecular', MolecularModule, {
@@ -53,8 +53,13 @@ class CognisomApp:
                 'n_macrophages': 8
             })
         
+        if self.config.modules_enabled.get('vascular', True):
+            self.engine.register_module('vascular', VascularModule, {
+                'n_capillaries': 8,
+                'exchange_rate': 1.0
+            })
+        
         # TODO: Add more modules as they're ready
-        # self.engine.register_module('vascular', VascularModule)
         # self.engine.register_module('lymphatic', LymphaticModule)
         # self.engine.register_module('spatial', SpatialModule)
         
@@ -86,6 +91,13 @@ class CognisomApp:
             
             # Link immune to cellular for target access
             immune.set_cellular_module(cellular)
+        
+        if 'vascular' in self.engine.modules and 'cellular' in self.engine.modules:
+            vascular = self.engine.modules['vascular']
+            cellular = self.engine.modules['cellular']
+            
+            # Link vascular to cellular for exchange
+            vascular.set_cellular_module(cellular)
         
         # Run simulation
         duration = 2.0 if scenario == 'quick_start' else self.config.duration

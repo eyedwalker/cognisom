@@ -8,9 +8,11 @@ Simulation modules for cognisom platform.
 from .molecular_module import MolecularModule
 from .cellular_module import CellularModule
 from .immune_module import ImmuneModule
+from .vascular_module import VascularModule
 
 __all__ = [
     'MolecularModule',
     'CellularModule',
-    'ImmuneModule'
+    'ImmuneModule',
+    'VascularModule'
 ]
