@@ -32,8 +32,7 @@ class CognisomApp:
         self.menu.engine = self.engine
         
         # Register available modules
-        from modules import MolecularModule
-        from modules.cellular_module import CellularModule
+        from modules import MolecularModule, CellularModule, ImmuneModule
         
         if self.config.modules_enabled.get('molecular', True):
             self.engine.register_module('molecular', MolecularModule, {
@@ -47,8 +46,14 @@ class CognisomApp:
                 'n_cancer_cells': 20
             })
         
+        if self.config.modules_enabled.get('immune', True):
+            self.engine.register_module('immune', ImmuneModule, {
+                'n_t_cells': 15,
+                'n_nk_cells': 10,
+                'n_macrophages': 8
+            })
+        
         # TODO: Add more modules as they're ready
-        # self.engine.register_module('immune', ImmuneModule)
         # self.engine.register_module('vascular', VascularModule)
         # self.engine.register_module('lymphatic', LymphaticModule)
         # self.engine.register_module('spatial', SpatialModule)
@@ -66,13 +71,21 @@ class CognisomApp:
         # Initialize modules
         self.engine.initialize()
         
-        # Add cells to molecular tracking
+        # Link modules
         if 'molecular' in self.engine.modules and 'cellular' in self.engine.modules:
             molecular = self.engine.modules['molecular']
             cellular = self.engine.modules['cellular']
             
+            # Add cells to molecular tracking
             for cell_id in cellular.cells.keys():
                 molecular.add_cell(cell_id)
+        
+        if 'immune' in self.engine.modules and 'cellular' in self.engine.modules:
+            immune = self.engine.modules['immune']
+            cellular = self.engine.modules['cellular']
+            
+            # Link immune to cellular for target access
+            immune.set_cellular_module(cellular)
         
         # Run simulation
         duration = 2.0 if scenario == 'quick_start' else self.config.duration
