@@ -255,24 +255,102 @@ class SimulationEngine:
         print("✓ Reset complete")
     
     def get_state(self) -> Dict[str, Any]:
-        """
-        Get current state from all modules
-        
-        Returns:
-        --------
-        dict : Complete simulation state
-        """
+        """Get current simulation state"""
         state = {
             'time': self.time,
             'step_count': self.step_count,
             'running': self.running
         }
         
+        # Get state from all modules
         for name, module in self.modules.items():
-            if module.enabled:
-                state[name] = module.get_state()
+            state[name] = module.get_state()
         
         return state
+    
+    def export_to_csv(self, filename: str):
+        """Export simulation data to CSV"""
+        import csv
+        
+        state = self.get_state()
+        
+        # Flatten nested dict
+        flat_data = {'time': state['time'], 'step_count': state['step_count']}
+        
+        for module_name, module_state in state.items():
+            if module_name not in ['time', 'step_count', 'running']:
+                for key, value in module_state.items():
+                    if isinstance(value, (int, float, str)):
+                        flat_data[f"{module_name}.{key}"] = value
+        
+        # Write to CSV
+        with open(filename, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=flat_data.keys())
+            writer.writeheader()
+            writer.writerow(flat_data)
+        
+        print(f"✓ Data exported to {filename}")
+    
+    def export_to_json(self, filename: str):
+        """Export simulation data to JSON"""
+        import json
+        
+        state = self.get_state()
+        
+        # Convert numpy types to native Python
+        def convert(obj):
+            if hasattr(obj, 'tolist'):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {k: convert(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert(item) for item in obj]
+            return obj
+        
+        state = convert(state)
+        
+        # Write to JSON
+        with open(filename, 'w') as f:
+            json.dump(state, f, indent=2)
+        
+        print(f"✓ Data exported to {filename}")
+    
+    def export_time_series(self, filename: str, history: list):
+        """Export time series data to CSV"""
+        import csv
+        
+        if not history:
+            print("⚠ No history data to export")
+            return
+        
+        # Get all keys from first entry
+        keys = set()
+        for entry in history:
+            for module_name, module_state in entry.items():
+                if module_name not in ['time', 'step_count', 'running']:
+                    for key in module_state.keys():
+                        if isinstance(module_state[key], (int, float, str)):
+                            keys.add(f"{module_name}.{key}")
+        
+        keys = ['time', 'step_count'] + sorted(keys)
+        
+        # Write to CSV
+        with open(filename, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=keys)
+            writer.writeheader()
+            
+            for entry in history:
+                row = {'time': entry['time'], 'step_count': entry['step_count']}
+                
+                for module_name, module_state in entry.items():
+                    if module_name not in ['time', 'step_count', 'running']:
+                        for key, value in module_state.items():
+                            if isinstance(value, (int, float, str)):
+                                row[f"{module_name}.{key}"] = value
+                
+                writer.writerow(row)
+        
+        print(f"✓ Time series exported to {filename} ({len(history)} entries)")
     
     def set_parameter(self, module_name: str, param_name: str, value: Any):
         """
