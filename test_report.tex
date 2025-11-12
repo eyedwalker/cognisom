@@ -1,0 +1,206 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Multi-Scale Cellular Simulation Results}
+\author{cognisom Platform}
+\date{2025-11-12 10:13:01}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents results from a multi-scale cellular simulation using the cognisom platform, 
+integrating molecular, cellular, immune, vascular, lymphatic, spatial, epigenetic, circadian, 
+and morphogen modules.
+\end{abstract}
+
+\section{Methods}
+
+The simulation was performed using the cognisom platform with the following configuration:
+\begin{itemize}
+    \item Duration: 0.50 hours
+    \item Time step: 0.01 hours
+    \item Total steps: 50
+\end{itemize}
+
+\section{Results}
+
+\subsection{Molecular}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n genes & 3 \\
+n cells tracked & 12 \\
+n exosomes & 0 \\
+n active exosomes & 0 \\
+total released & 0 \\
+total uptaken & 0 \\
+total mutations & 0 \\
+total transcriptions & 10 \\
+\bottomrule
+\end{tabular}
+\caption{Molecular module results}
+\end{table}
+
+\subsection{Cellular}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n cells & 12 \\
+n cancer & 2 \\
+n normal & 10 \\
+total divisions & 0 \\
+total deaths & 1 \\
+total transformations & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Cellular module results}
+\end{table}
+
+\subsection{Immune}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n immune cells & 16 \\
+n activated & 0 \\
+n t cells & 5 \\
+n nk cells & 3 \\
+n macrophages & 8 \\
+total kills & 1 \\
+total activations & 1 \\
+total recruited & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Immune module results}
+\end{table}
+
+\subsection{Vascular}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n capillaries & 4 \\
+hypoxic regions & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Vascular module results}
+\end{table}
+
+\subsection{Lymphatic}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n vessels & 2 \\
+total fluid drained & 0.009999999999999995 \\
+total immune trafficked & 0 \\
+total metastases & 0 \\
+immune in vessels & 0 \\
+cancer in vessels & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Lymphatic module results}
+\end{table}
+
+\subsection{Spatial}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+resolution & 10.0 \\
+n fields & 3 \\
+\bottomrule
+\end{tabular}
+\caption{Spatial module results}
+\end{table}
+
+\subsection{Epigenetic}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n cells tracked & 13 \\
+avg methylation & 0.07230769230769231 \\
+silenced genes & 6 \\
+active genes & 59 \\
+total silencing events & 0 \\
+total activation events & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Epigenetic module results}
+\end{table}
+
+\subsection{Circadian}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+master phase & 0.5000000000000002 \\
+master time of day & night \\
+n clocks & 12 \\
+synchrony & 0.3730314946637347 \\
+avg phase & 9.057050267392034 \\
+avg amplitude & 1.0 \\
+total peaks & 0 \\
+total troughs & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Circadian module results}
+\end{table}
+
+\subsection{Morphogen}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+n gradients & 3 \\
+n cells tracked & 12 \\
+total fates determined & 13 \\
+\bottomrule
+\end{tabular}
+\caption{Morphogen module results}
+\end{table}
+
+
+\section{Discussion}
+
+[Add your discussion here]
+
+\section{Conclusions}
+
+[Add your conclusions here]
+
+\end{document}

@@ -1,0 +1,126 @@
+{
+  "time": 0.5000000000000002,
+  "step_count": 50,
+  "running": true,
+  "molecular": {
+    "n_genes": 3,
+    "n_cells_tracked": 12,
+    "n_exosomes": 0,
+    "n_active_exosomes": 0,
+    "total_released": 0,
+    "total_uptaken": 0,
+    "total_mutations": 0,
+    "total_transcriptions": 10,
+    "exosome_stats": {
+      "total_exosomes": 0,
+      "active": 0,
+      "uptaken": 0,
+      "degraded": 0,
+      "oncogenic_active": 0,
+      "total_released": 0
+    }
+  },
+  "cellular": {
+    "n_cells": 12,
+    "n_cancer": 2,
+    "n_normal": 10,
+    "total_divisions": 0,
+    "total_deaths": 1,
+    "total_transformations": 0,
+    "avg_oxygen": 0.1400526463985443,
+    "avg_glucose": 4.8757758140563965
+  },
+  "immune": {
+    "n_immune_cells": 16,
+    "n_activated": 0,
+    "n_t_cells": 5,
+    "n_nk_cells": 3,
+    "n_macrophages": 8,
+    "total_kills": 1,
+    "total_activations": 1,
+    "total_recruited": 0
+  },
+  "vascular": {
+    "n_capillaries": 4,
+    "total_length": 240.7816162109375,
+    "avg_cell_O2": 0.1400526463985443,
+    "avg_cell_glucose": 4.8757758140563965,
+    "total_O2_delivered": 0.010631547309458256,
+    "total_glucose_delivered": 0.00930902548134327,
+    "total_waste_removed": 0.004954591393470764,
+    "hypoxic_regions": 0
+  },
+  "lymphatic": {
+    "n_vessels": 2,
+    "total_length": 60.38465118408203,
+    "total_fluid_drained": 0.009999999999999995,
+    "total_immune_trafficked": 0,
+    "total_metastases": 0,
+    "immune_in_vessels": 0,
+    "cancer_in_vessels": 0
+  },
+  "spatial": {
+    "grid_size": [
+      20,
+      20,
+      10
+    ],
+    "resolution": 10.0,
+    "n_fields": 3,
+    "fields": {
+      "oxygen": {
+        "mean": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "n_sources": 0,
+        "n_sinks": 0
+      },
+      "glucose": {
+        "mean": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "n_sources": 0,
+        "n_sinks": 0
+      },
+      "cytokine": {
+        "mean": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "n_sources": 0,
+        "n_sinks": 0
+      }
+    }
+  },
+  "epigenetic": {
+    "n_cells_tracked": 13,
+    "avg_methylation": 0.07230769230769231,
+    "silenced_genes": 6,
+    "active_genes": 59,
+    "total_silencing_events": 0,
+    "total_activation_events": 0
+  },
+  "circadian": {
+    "master_phase": 0.5000000000000002,
+    "master_time_of_day": "night",
+    "n_clocks": 12,
+    "synchrony": 0.3730314946637347,
+    "avg_phase": 9.057050267392034,
+    "avg_amplitude": 1.0,
+    "total_peaks": 0,
+    "total_troughs": 0
+  },
+  "morphogen": {
+    "n_gradients": 3,
+    "n_cells_tracked": 12,
+    "total_fates_determined": 13,
+    "fate_distribution": {
+      "middle": 1,
+      "anterior": 12
+    },
+    "gradient_names": [
+      "BMP",
+      "Shh",
+      "Wnt"
+    ]
+  }
+}
