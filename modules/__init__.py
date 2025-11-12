@@ -11,6 +11,9 @@ from .immune_module import ImmuneModule
 from .vascular_module import VascularModule
 from .lymphatic_module import LymphaticModule
 from .spatial_module import SpatialModule
+from .epigenetic_module import EpigeneticModule
+from .circadian_module import CircadianModule
+from .morphogen_module import MorphogenModule
 
 __all__ = [
     'MolecularModule',
@@ -18,5 +21,8 @@ __all__ = [
     'ImmuneModule',
     'VascularModule',
     'LymphaticModule',
-    'SpatialModule'
+    'SpatialModule',
+    'EpigeneticModule',
+    'CircadianModule',
+    'MorphogenModule'
 ]
