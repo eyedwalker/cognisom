@@ -32,7 +32,8 @@ class CognisomApp:
         self.menu.engine = self.engine
         
         # Register available modules
-        from modules import MolecularModule, CellularModule, ImmuneModule, VascularModule
+        from modules import (MolecularModule, CellularModule, ImmuneModule, 
+                           VascularModule, LymphaticModule, SpatialModule)
         
         if self.config.modules_enabled.get('molecular', True):
             self.engine.register_module('molecular', MolecularModule, {
@@ -59,9 +60,17 @@ class CognisomApp:
                 'exchange_rate': 1.0
             })
         
-        # TODO: Add more modules as they're ready
-        # self.engine.register_module('lymphatic', LymphaticModule)
-        # self.engine.register_module('spatial', SpatialModule)
+        if self.config.modules_enabled.get('lymphatic', True):
+            self.engine.register_module('lymphatic', LymphaticModule, {
+                'n_vessels': 4,
+                'metastasis_probability': 0.001
+            })
+        
+        if self.config.modules_enabled.get('spatial', True):
+            self.engine.register_module('spatial', SpatialModule, {
+                'grid_size': (20, 20, 10),
+                'resolution': 10.0
+            })
         
         print("✓ Engine initialized with modules")
         print()
@@ -98,6 +107,15 @@ class CognisomApp:
             
             # Link vascular to cellular for exchange
             vascular.set_cellular_module(cellular)
+        
+        if 'lymphatic' in self.engine.modules:
+            lymphatic = self.engine.modules['lymphatic']
+            
+            if 'cellular' in self.engine.modules:
+                lymphatic.set_cellular_module(self.engine.modules['cellular'])
+            
+            if 'immune' in self.engine.modules:
+                lymphatic.set_immune_module(self.engine.modules['immune'])
         
         # Run simulation
         duration = 2.0 if scenario == 'quick_start' else self.config.duration
