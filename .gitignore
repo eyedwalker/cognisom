@@ -20,6 +20,20 @@ wheels/
 .installed.cfg
 *.egg
 
+# Secrets and API keys
+.env
+.env.*
+*.key
+secrets/
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/terraform.tfvars
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/.terraform.tfstate.lock.info
+
 # Virtual environments
 venv/
 env/

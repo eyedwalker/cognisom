@@ -1,0 +1,33 @@
+FROM nvcr.io/nvidia/pytorch:24.01-py3
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install CuPy (GPU array library — drop-in NumPy replacement on CUDA)
+# The pytorch base image already has CUDA 12.x, so use cupy-cuda12x
+RUN pip install --no-cache-dir cupy-cuda12x>=13.0.0
+
+# Python dependencies
+COPY requirements.txt requirements.gpu.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements.gpu.txt
+
+# Copy application
+COPY . .
+
+# Verify GPU backend loads
+RUN python -c "from cognisom.gpu.backend import get_backend; b = get_backend(); print(b.summary())"
+
+EXPOSE 5000 8501
+
+ENV PYTHONUNBUFFERED=1
+ENV FLASK_APP=api/rest_server.py
+ENV COGNISOM_GPU=1
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:5000/api/health')"
+
+ENTRYPOINT ["bash", "entrypoint.sh"]

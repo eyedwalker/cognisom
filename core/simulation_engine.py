@@ -143,6 +143,19 @@ class SimulationEngine:
                 module.initialize()
         
         self.initialized = True
+
+        # GPU acceleration (patches module update methods in-place)
+        self._gpu_orchestrator = None
+        if self.config.use_gpu:
+            try:
+                from cognisom.gpu.orchestrator import GPUOrchestrator
+                self._gpu_orchestrator = GPUOrchestrator()
+                report = self._gpu_orchestrator.accelerate(self)
+                print(report.summary())
+            except Exception as e:
+                print(f"GPU acceleration unavailable: {e}")
+                print("Continuing with CPU fallback")
+
         print()
         print("✓ All modules initialized")
         print()

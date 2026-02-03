@@ -79,10 +79,10 @@ resource "aws_autoscaling_group" "gpu" {
     }
 
     instances_distribution {
-      on_demand_base_capacity                  = 0
-      on_demand_percentage_above_base_capacity = 0
+      # Use on-demand for reliable capacity (spot often unavailable for GPU)
+      on_demand_base_capacity                  = 1
+      on_demand_percentage_above_base_capacity = 100
       spot_allocation_strategy                 = "capacity-optimized"
-      spot_max_price                           = var.gpu_spot_max_price
     }
   }
 

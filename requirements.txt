@@ -34,6 +34,9 @@ plotly>=5.18.0
 feedparser>=6.0.0
 python-dateutil>=2.8.0
 
+# Graph analysis
+networkx>=3.0
+
 # Environment
 python-dotenv>=1.0.0
 

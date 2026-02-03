@@ -212,17 +212,21 @@ class CompleteVisualizer:
             # Determine color
             if cell.cell_type == 'cancer':
                 # Color by methylation if available
-                if epigenetic and cell_id in epigenetic.cell_identities:
-                    methylation = epigenetic.cell_identities[cell_id].get('CDKN2A', {}).methylation_level
-                    color = plt.cm.Reds(methylation)
+                if epigenetic and hasattr(epigenetic, 'cell_states') and cell_id in epigenetic.cell_states:
+                    cell_state = epigenetic.cell_states[cell_id]
+                    if 'CDKN2A' in cell_state:
+                        methylation = cell_state['CDKN2A'].methylation_level
+                        color = plt.cm.Reds(methylation)
+                    else:
+                        color = 'red'
                 else:
                     color = 'red'
                 marker = '*'
                 size = 50
             else:
                 # Color by fate if available
-                if morphogen and cell_id in morphogen.cell_identities:
-                    fate = morphogen.cell_identities[cell_id].cell_fate
+                if morphogen and hasattr(morphogen, 'cell_fates') and cell_id in morphogen.cell_fates:
+                    fate = morphogen.cell_fates[cell_id]
                     if fate == 'posterior':
                         color = 'darkgreen'
                     elif fate == 'middle':
