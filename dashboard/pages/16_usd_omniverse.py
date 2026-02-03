@@ -196,23 +196,33 @@ with tab2:
     with col1:
         st.markdown("### Connection Settings")
 
+        import os
+
+        # Auto-detect AWS deployment
+        is_aws = os.environ.get("OMNIVERSE_URL") is not None
+        aws_url = os.environ.get("OMNIVERSE_URL", "omniverse://localhost:3019/cognisom")
+
         # Deployment mode presets
+        deploy_options = ["AWS GPU (Auto)", "Local Docker", "Local Omniverse", "Omniverse Cloud"] if is_aws else \
+                         ["Local Docker", "Local Omniverse", "Omniverse Cloud"]
+
         deploy_mode = st.radio(
             "Deployment Mode",
-            ["Docker (Recommended)", "Local Omniverse", "Omniverse Cloud"],
+            deploy_options,
             horizontal=True,
             help="Select where Nucleus is running"
         )
 
         url_presets = {
-            "Docker (Recommended)": "omniverse://nucleus:3019/cognisom",
+            "AWS GPU (Auto)": aws_url,
+            "Local Docker": "omniverse://nucleus:3019/cognisom",
             "Local Omniverse": "omniverse://localhost/cognisom",
             "Omniverse Cloud": "omniverse://cloud.nvidia.com/your-org/cognisom",
         }
 
         omni_url = st.text_input(
             "Omniverse URL",
-            value=url_presets.get(deploy_mode, "omniverse://localhost/cognisom"),
+            value=url_presets.get(deploy_mode, aws_url if is_aws else "omniverse://localhost/cognisom"),
             help="URL to Omniverse Nucleus server"
         )
 
@@ -223,7 +233,9 @@ with tab2:
         )
 
         # Show deployment-specific instructions
-        if deploy_mode == "Docker (Recommended)":
+        if is_aws and deploy_mode == "AWS GPU (Auto)":
+            st.success("Running on AWS with GPU — Nucleus is ready!")
+        elif deploy_mode == "Local Docker":
             with st.expander("Docker Setup Instructions", expanded=True):
                 st.markdown("""
                 **Start Nucleus container:**
