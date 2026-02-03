@@ -249,67 +249,171 @@ with tab_live3d:
 
     st.divider()
 
-    # ── Detailed Cell View ──────────────────────────────────────────
-    st.markdown("### 🔬 Detailed Cell View")
-    st.caption("View internal cell structure: membrane, nucleus, mitochondria, ER")
+    # ── Detailed Cell View with Prim Editor ───────────────────────────
+    st.markdown("### 🔬 Detailed Cell View — Prim Editor")
+    st.info("""
+    **How to use this editor:**
+    1. Select a cell type to set the base colors
+    2. Toggle organelles on/off in the visibility panel
+    3. Adjust size, position, and color of each organelle type
+    4. The 3D view updates in real-time with your changes
+    5. Use mouse to rotate, scroll to zoom, right-click to pan
+    """)
 
-    col_cell1, col_cell2 = st.columns(2)
-    with col_cell1:
+    # ── Row 1: Cell Type and Membrane Settings ──
+    st.markdown("#### Cell Membrane")
+    col_type, col_mem_size, col_mem_opacity, col_mem_color = st.columns(4)
+
+    with col_type:
         cell_type_detail = st.selectbox(
             "Cell Type",
             ["Cancer Cell", "Normal Cell", "T Cell", "Dividing Cell"],
             key="detail_cell_type"
         )
-    with col_cell2:
-        show_organelles = st.multiselect(
-            "Show Organelles",
-            ["Nucleus", "Mitochondria", "ER", "Golgi", "Ribosomes"],
-            default=["Nucleus", "Mitochondria"],
-            key="detail_organelles"
-        )
 
-    # Cell detail colors
-    cell_colors = {
-        "Cancer Cell": {"membrane": "0xff4444", "nucleus": "0x990000"},
-        "Normal Cell": {"membrane": "0x4488ff", "nucleus": "0x002266"},
-        "T Cell": {"membrane": "0x44ff66", "nucleus": "0x006622"},
-        "Dividing Cell": {"membrane": "0xff44ff", "nucleus": "0x660066"},
+    # Default colors based on cell type
+    cell_presets = {
+        "Cancer Cell": {"membrane": "#ff4444", "nucleus": "#990000"},
+        "Normal Cell": {"membrane": "#4488ff", "nucleus": "#002266"},
+        "T Cell": {"membrane": "#44ff66", "nucleus": "#006622"},
+        "Dividing Cell": {"membrane": "#ff44ff", "nucleus": "#660066"},
     }
-    colors = cell_colors[cell_type_detail]
+    preset = cell_presets[cell_type_detail]
 
-    # Build organelle config
+    with col_mem_size:
+        membrane_radius = st.slider("Membrane Radius", 5.0, 15.0, 10.0, 0.5, key="mem_radius")
+    with col_mem_opacity:
+        membrane_opacity = st.slider("Membrane Opacity", 0.1, 0.8, 0.3, 0.05, key="mem_opacity")
+    with col_mem_color:
+        membrane_color = st.color_picker("Membrane Color", preset["membrane"], key="mem_color")
+
+    # ── Row 2: Organelle Visibility ──
+    st.markdown("#### Organelle Visibility")
+    col_v1, col_v2, col_v3, col_v4, col_v5 = st.columns(5)
+    show_nucleus = col_v1.checkbox("Nucleus", True, key="show_nucleus")
+    show_mitochondria = col_v2.checkbox("Mitochondria", True, key="show_mito")
+    show_er = col_v3.checkbox("ER", True, key="show_er")
+    show_golgi = col_v4.checkbox("Golgi", True, key="show_golgi")
+    show_ribosomes = col_v5.checkbox("Ribosomes", False, key="show_ribo")
+
+    # ── Row 3: Organelle Properties Editor ──
+    st.markdown("#### Organelle Properties")
+
+    # Initialize organelle config
     organelle_config = []
-    if "Nucleus" in show_organelles:
-        organelle_config.append({"type": "nucleus", "color": colors["nucleus"], "radius": 3.0, "x": 0, "y": 0, "z": 0})
-    if "Mitochondria" in show_organelles:
-        for i in range(8):
-            import math as m
-            angle = i * m.pi / 4
+
+    # Nucleus settings
+    if show_nucleus:
+        with st.expander("Nucleus Settings", expanded=False):
+            col_n1, col_n2, col_n3, col_n4 = st.columns(4)
+            nuc_radius = col_n1.slider("Radius", 1.0, 5.0, 3.0, 0.1, key="nuc_radius")
+            nuc_x = col_n2.slider("X Position", -5.0, 5.0, 0.0, 0.1, key="nuc_x")
+            nuc_y = col_n3.slider("Y Position", -5.0, 5.0, 0.0, 0.1, key="nuc_y")
+            nuc_color = col_n4.color_picker("Color", preset["nucleus"], key="nuc_color")
+        organelle_config.append({
+            "type": "nucleus", "color": nuc_color, "radius": nuc_radius,
+            "x": nuc_x, "y": nuc_y, "z": 0
+        })
+
+    # Mitochondria settings
+    if show_mitochondria:
+        with st.expander("Mitochondria Settings", expanded=False):
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            mito_count = col_m1.slider("Count", 4, 16, 8, key="mito_count")
+            mito_size = col_m2.slider("Size", 0.3, 1.5, 0.6, 0.1, key="mito_size")
+            mito_distance = col_m3.slider("Distance from center", 3.0, 8.0, 5.0, 0.5, key="mito_dist")
+            mito_color = col_m4.color_picker("Color", "#ff8800", key="mito_color")
+
+        import math as m
+        for i in range(mito_count):
+            angle = i * 2 * m.pi / mito_count
             organelle_config.append({
-                "type": "mitochondria", "color": "0xff8800",
-                "radius": 0.6, "length": 1.5,
-                "x": m.cos(angle) * 5, "y": m.sin(angle) * 5, "z": (i % 3 - 1) * 2
+                "type": "mitochondria", "color": mito_color,
+                "radius": mito_size, "length": mito_size * 2.5,
+                "x": m.cos(angle) * mito_distance,
+                "y": m.sin(angle) * mito_distance,
+                "z": (i % 3 - 1) * 2
             })
-    if "ER" in show_organelles:
-        organelle_config.append({"type": "er", "color": "0x8844ff", "x": -3, "y": 2, "z": 0})
-    if "Golgi" in show_organelles:
-        organelle_config.append({"type": "golgi", "color": "0xffcc00", "x": 4, "y": -2, "z": 1})
-    if "Ribosomes" in show_organelles:
-        for i in range(20):
-            import random
+
+    # ER settings
+    if show_er:
+        with st.expander("Endoplasmic Reticulum Settings", expanded=False):
+            col_e1, col_e2, col_e3, col_e4 = st.columns(4)
+            er_x = col_e1.slider("X Position", -6.0, 6.0, -3.0, 0.5, key="er_x")
+            er_y = col_e2.slider("Y Position", -6.0, 6.0, 2.0, 0.5, key="er_y")
+            er_scale = col_e3.slider("Scale", 0.5, 2.0, 1.0, 0.1, key="er_scale")
+            er_color = col_e4.color_picker("Color", "#8844ff", key="er_color")
+        organelle_config.append({
+            "type": "er", "color": er_color, "x": er_x, "y": er_y, "z": 0, "scale": er_scale
+        })
+
+    # Golgi settings
+    if show_golgi:
+        with st.expander("Golgi Apparatus Settings", expanded=False):
+            col_g1, col_g2, col_g3, col_g4 = st.columns(4)
+            golgi_x = col_g1.slider("X Position", -6.0, 6.0, 4.0, 0.5, key="golgi_x")
+            golgi_y = col_g2.slider("Y Position", -6.0, 6.0, -2.0, 0.5, key="golgi_y")
+            golgi_stacks = col_g3.slider("Stack Count", 3, 8, 5, key="golgi_stacks")
+            golgi_color = col_g4.color_picker("Color", "#ffcc00", key="golgi_color")
+        organelle_config.append({
+            "type": "golgi", "color": golgi_color,
+            "x": golgi_x, "y": golgi_y, "z": 1, "stacks": golgi_stacks
+        })
+
+    # Ribosome settings
+    if show_ribosomes:
+        with st.expander("Ribosome Settings", expanded=False):
+            col_r1, col_r2, col_r3 = st.columns(3)
+            ribo_count = col_r1.slider("Count", 10, 50, 20, key="ribo_count")
+            ribo_size = col_r2.slider("Size", 0.1, 0.5, 0.2, 0.05, key="ribo_size")
+            ribo_color = col_r3.color_picker("Color", "#00ffff", key="ribo_color")
+
+        import random
+        random.seed(42)  # Consistent positions
+        for i in range(ribo_count):
             organelle_config.append({
-                "type": "ribosome", "color": "0x00ffff", "radius": 0.2,
+                "type": "ribosome", "color": ribo_color, "radius": ribo_size,
                 "x": random.uniform(-6, 6), "y": random.uniform(-6, 6), "z": random.uniform(-4, 4)
             })
 
+    # ── Prim Hierarchy Display ──
+    with st.expander("Prim Hierarchy (USD-style)", expanded=False):
+        st.markdown("```")
+        st.text(f"""/Cell_{cell_type_detail.replace(' ', '')}
+  /Membrane (Sphere, r={membrane_radius:.1f}, opacity={membrane_opacity:.2f})
+  /InnerMembrane (Sphere, r={membrane_radius - 0.5:.1f})
+  /Cytoplasm (Points, count=500)""")
+        if show_nucleus:
+            st.text(f"  /Nucleus (Sphere, r={nuc_radius:.1f})")
+            st.text("    /Nucleolus (Sphere, r=1.0)")
+            st.text("    /NuclearPores (Points, count=30)")
+        if show_mitochondria:
+            st.text(f"  /Mitochondria (Group, count={mito_count})")
+            for i in range(min(3, mito_count)):
+                st.text(f"    /Mito_{i:02d} (Capsule)")
+        if show_er:
+            st.text("  /EndoplasmicReticulum (TubeGroup)")
+        if show_golgi:
+            st.text(f"  /GolgiApparatus (TorusStack, count={golgi_stacks})")
+        if show_ribosomes:
+            st.text(f"  /Ribosomes (SphereGroup, count={ribo_count})")
+        st.markdown("```")
+
     organelles_json = json.dumps(organelle_config)
+
+    # Convert hex colors to int for JS
+    def hex_to_js(hex_color):
+        """Convert #RRGGBB to 0xRRGGBB"""
+        return "0x" + hex_color.lstrip("#")
+
+    membrane_color_js = hex_to_js(membrane_color)
 
     detail_html = f'''
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body {{ margin: 0; overflow: hidden; background: linear-gradient(135deg, #0a0a20 0%, #1a1a3a 100%); }}
+            body {{ margin: 0; overflow: hidden; background: #0a0a20; }}
             canvas {{ display: block; }}
             #cell-info {{
                 position: absolute;
@@ -318,227 +422,348 @@ with tab_live3d:
                 color: #fff;
                 font-family: 'Segoe UI', sans-serif;
                 font-size: 14px;
-                background: rgba(0,0,0,0.7);
+                background: rgba(0,0,0,0.8);
                 padding: 12px 16px;
                 border-radius: 8px;
-                border: 1px solid rgba(255,255,255,0.1);
+                border: 1px solid rgba(100,100,255,0.3);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             }}
-            #cell-info h3 {{ margin: 0 0 8px 0; font-size: 16px; }}
-            #organelle-list {{
+            #cell-info h3 {{ margin: 0 0 8px 0; font-size: 16px; color: #88aaff; }}
+            #stats {{
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                color: #aaa;
+                font-family: monospace;
+                font-size: 11px;
+                background: rgba(0,0,0,0.7);
+                padding: 8px 12px;
+                border-radius: 6px;
+            }}
+            #legend {{
                 position: absolute;
                 bottom: 10px;
                 right: 10px;
                 color: #fff;
                 font-family: monospace;
                 font-size: 11px;
-                background: rgba(0,0,0,0.7);
-                padding: 10px;
+                background: rgba(0,0,0,0.8);
+                padding: 10px 14px;
                 border-radius: 6px;
+                border: 1px solid rgba(255,255,255,0.1);
             }}
+            .leg-item {{ display: flex; align-items: center; margin: 4px 0; }}
+            .leg-dot {{ width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }}
         </style>
     </head>
     <body>
         <div id="cell-info">
             <h3>{cell_type_detail}</h3>
-            <div>Diameter: ~20 μm</div>
-            <div>Drag to rotate | Scroll to zoom</div>
+            <div>Diameter: {membrane_radius * 2:.0f} μm</div>
+            <div>Organelles: {len(organelle_config)}</div>
+            <div style="margin-top:8px;font-size:11px;color:#888">
+                Drag to rotate | Scroll to zoom | Right-click to pan
+            </div>
         </div>
-        <div id="organelle-list">
-            <div style="color:#ff8800">● Mitochondria</div>
-            <div style="color:#8844ff">● Endoplasmic Reticulum</div>
-            <div style="color:#ffcc00">● Golgi Apparatus</div>
-            <div style="color:#00ffff">● Ribosomes</div>
+        <div id="stats">Loading...</div>
+        <div id="legend">
+            <div style="font-weight:bold;margin-bottom:6px;color:#88aaff">Organelles</div>
+            <div class="leg-item"><div class="leg-dot" style="background:{membrane_color}"></div>Membrane</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#ff8800"></div>Mitochondria</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#8844ff"></div>ER</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#ffcc00"></div>Golgi</div>
+            <div class="leg-item"><div class="leg-dot" style="background:#00ffff"></div>Ribosomes</div>
         </div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
         <script>
-            const membraneColor = {colors["membrane"]};
+            const MEMBRANE_COLOR = {membrane_color_js};
+            const MEMBRANE_RADIUS = {membrane_radius};
+            const MEMBRANE_OPACITY = {membrane_opacity};
             const organelles = {organelles_json};
 
-            // Scene
+            // Helper to parse color (handles both hex string and 0x format)
+            function parseColor(c) {{
+                if (typeof c === 'string' && c.startsWith('#')) {{
+                    return parseInt(c.slice(1), 16);
+                }}
+                if (typeof c === 'string' && c.startsWith('0x')) {{
+                    return parseInt(c, 16);
+                }}
+                return parseInt(c) || 0x888888;
+            }}
+
+            // Scene setup
             const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a20);
 
-            const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(20, 15, 20);
+            const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+            camera.position.set(25, 18, 25);
+            camera.lookAt(0, 0, 0);
 
-            const renderer = new THREE.WebGLRenderer({{ antialias: true, alpha: true }});
+            const renderer = new THREE.WebGLRenderer({{ antialias: true }});
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setClearColor(0x0a0a20, 1);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.body.appendChild(renderer.domElement);
 
             // Controls
             const controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 0.3;
+            controls.autoRotateSpeed = 0.5;
+            controls.target.set(0, 0, 0);
 
-            // Lighting
-            scene.add(new THREE.AmbientLight(0x404060, 0.6));
+            // Lighting - enhanced for better visibility
+            const ambientLight = new THREE.AmbientLight(0x606080, 0.8);
+            scene.add(ambientLight);
 
-            const keyLight = new THREE.DirectionalLight(0xffffff, 1);
-            keyLight.position.set(10, 20, 15);
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            keyLight.position.set(15, 25, 20);
             scene.add(keyLight);
 
-            const fillLight = new THREE.DirectionalLight(0x4488ff, 0.4);
-            fillLight.position.set(-10, 5, -10);
+            const fillLight = new THREE.DirectionalLight(0x4488ff, 0.6);
+            fillLight.position.set(-15, 10, -15);
             scene.add(fillLight);
 
-            const rimLight = new THREE.PointLight(0xff4488, 0.5, 50);
-            rimLight.position.set(0, -10, 15);
-            scene.add(rimLight);
+            const backLight = new THREE.DirectionalLight(0xff8844, 0.4);
+            backLight.position.set(0, -15, -20);
+            scene.add(backLight);
 
-            // Cell membrane (outer, translucent)
-            const membraneGeom = new THREE.SphereGeometry(10, 64, 64);
-            const membraneMat = new THREE.MeshPhysicalMaterial({{
-                color: membraneColor,
+            const pointLight = new THREE.PointLight(0xffffff, 0.5, 50);
+            pointLight.position.set(0, 0, 0);
+            scene.add(pointLight);
+
+            // ============ CELL MEMBRANE ============
+            // Outer membrane (translucent, visible from outside)
+            const membraneGeom = new THREE.SphereGeometry(MEMBRANE_RADIUS, 64, 64);
+            const membraneMat = new THREE.MeshStandardMaterial({{
+                color: MEMBRANE_COLOR,
                 transparent: true,
-                opacity: 0.25,
-                roughness: 0.2,
+                opacity: MEMBRANE_OPACITY,
+                roughness: 0.3,
                 metalness: 0.1,
-                side: THREE.DoubleSide,
-                depthWrite: false,
+                side: THREE.FrontSide,
             }});
             const membrane = new THREE.Mesh(membraneGeom, membraneMat);
             scene.add(membrane);
 
-            // Inner membrane layer
-            const innerMembraneGeom = new THREE.SphereGeometry(9.5, 48, 48);
-            const innerMembraneMat = new THREE.MeshPhongMaterial({{
-                color: membraneColor,
+            // Inner membrane glow
+            const innerGeom = new THREE.SphereGeometry(MEMBRANE_RADIUS * 0.98, 48, 48);
+            const innerMat = new THREE.MeshBasicMaterial({{
+                color: MEMBRANE_COLOR,
                 transparent: true,
-                opacity: 0.1,
+                opacity: 0.08,
                 side: THREE.BackSide,
             }});
-            scene.add(new THREE.Mesh(innerMembraneGeom, innerMembraneMat));
+            scene.add(new THREE.Mesh(innerGeom, innerMat));
 
-            // Cytoplasm particles
+            // ============ CYTOPLASM PARTICLES ============
             const cytoGeom = new THREE.BufferGeometry();
-            const cytoCount = 500;
-            const cytoPos = new Float32Array(cytoCount * 3);
+            const cytoCount = 600;
+            const cytoPositions = new Float32Array(cytoCount * 3);
+            const maxR = MEMBRANE_RADIUS * 0.85;
             for (let i = 0; i < cytoCount; i++) {{
-                const r = Math.random() * 8;
+                const r = Math.random() * maxR;
                 const theta = Math.random() * Math.PI * 2;
-                const phi = Math.random() * Math.PI;
-                cytoPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-                cytoPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-                cytoPos[i*3+2] = r * Math.cos(phi);
+                const phi = Math.acos(2 * Math.random() - 1);
+                cytoPositions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                cytoPositions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+                cytoPositions[i*3+2] = r * Math.cos(phi);
             }}
-            cytoGeom.setAttribute('position', new THREE.BufferAttribute(cytoPos, 3));
-            const cytoMat = new THREE.PointsMaterial({{ color: 0x88aacc, size: 0.08, transparent: true, opacity: 0.4 }});
+            cytoGeom.setAttribute('position', new THREE.BufferAttribute(cytoPositions, 3));
+            const cytoMat = new THREE.PointsMaterial({{
+                color: 0xaaccee,
+                size: 0.12,
+                transparent: true,
+                opacity: 0.5
+            }});
             scene.add(new THREE.Points(cytoGeom, cytoMat));
 
-            // Organelles
-            organelles.forEach(org => {{
+            // ============ ORGANELLES ============
+            const organelleMeshes = [];
+
+            organelles.forEach((org, idx) => {{
                 let mesh;
+                const color = parseColor(org.color);
 
                 if (org.type === 'nucleus') {{
-                    // Nucleus with nuclear envelope
+                    // Main nucleus sphere
                     const nucGeom = new THREE.SphereGeometry(org.radius, 32, 32);
-                    const nucMat = new THREE.MeshPhongMaterial({{
-                        color: parseInt(org.color),
-                        shininess: 30,
-                        transparent: true,
-                        opacity: 0.9,
+                    const nucMat = new THREE.MeshStandardMaterial({{
+                        color: color,
+                        roughness: 0.4,
+                        metalness: 0.1,
                     }});
                     mesh = new THREE.Mesh(nucGeom, nucMat);
 
-                    // Nucleolus
-                    const nuclGeom = new THREE.SphereGeometry(1.0, 16, 16);
-                    const nuclMat = new THREE.MeshPhongMaterial({{ color: 0xffcc88 }});
+                    // Nucleolus (bright spot inside)
+                    const nuclGeom = new THREE.SphereGeometry(org.radius * 0.35, 16, 16);
+                    const nuclMat = new THREE.MeshStandardMaterial({{
+                        color: 0xffcc88,
+                        roughness: 0.3,
+                        emissive: 0x332200,
+                        emissiveIntensity: 0.3,
+                    }});
                     const nucleolus = new THREE.Mesh(nuclGeom, nuclMat);
-                    nucleolus.position.set(0.5, 0.5, 0);
+                    nucleolus.position.set(org.radius * 0.3, org.radius * 0.2, 0);
                     mesh.add(nucleolus);
 
-                    // Nuclear pores (dots on surface)
-                    for (let i = 0; i < 30; i++) {{
-                        const poreGeom = new THREE.SphereGeometry(0.15, 8, 8);
-                        const poreMat = new THREE.MeshBasicMaterial({{ color: 0x444466 }});
+                    // Nuclear pores
+                    for (let i = 0; i < 25; i++) {{
+                        const poreGeom = new THREE.SphereGeometry(0.12, 6, 6);
+                        const poreMat = new THREE.MeshBasicMaterial({{ color: 0x333344 }});
                         const pore = new THREE.Mesh(poreGeom, poreMat);
                         const t = Math.random() * Math.PI * 2;
-                        const p = Math.random() * Math.PI;
+                        const p = Math.acos(2 * Math.random() - 1);
+                        const pr = org.radius * 1.01;
                         pore.position.set(
-                            org.radius * Math.sin(p) * Math.cos(t),
-                            org.radius * Math.sin(p) * Math.sin(t),
-                            org.radius * Math.cos(p)
+                            pr * Math.sin(p) * Math.cos(t),
+                            pr * Math.sin(p) * Math.sin(t),
+                            pr * Math.cos(p)
                         );
                         mesh.add(pore);
                     }}
 
                 }} else if (org.type === 'mitochondria') {{
-                    // Elongated shape
-                    const mitoGeom = new THREE.CapsuleGeometry(org.radius, org.length, 8, 16);
-                    const mitoMat = new THREE.MeshPhongMaterial({{
-                        color: parseInt(org.color),
-                        shininess: 60,
+                    // Use SphereGeometry stretched as capsule (CapsuleGeometry may not exist in r128)
+                    const mitoGeom = new THREE.SphereGeometry(org.radius, 12, 12);
+                    mitoGeom.scale(1, 2.5, 1);  // Elongate
+                    const mitoMat = new THREE.MeshStandardMaterial({{
+                        color: color,
+                        roughness: 0.5,
+                        metalness: 0.1,
                     }});
                     mesh = new THREE.Mesh(mitoGeom, mitoMat);
-                    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
 
-                    // Cristae lines
-                    for (let i = 0; i < 3; i++) {{
-                        const lineGeom = new THREE.BoxGeometry(0.05, org.length * 0.6, org.radius * 1.5);
-                        const lineMat = new THREE.MeshBasicMaterial({{ color: 0xcc6600 }});
-                        const line = new THREE.Mesh(lineGeom, lineMat);
-                        line.position.x = (i - 1) * 0.3;
-                        mesh.add(line);
+                    // Random rotation
+                    mesh.rotation.set(
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI,
+                        Math.random() * Math.PI
+                    );
+
+                    // Inner cristae
+                    for (let i = 0; i < 2; i++) {{
+                        const cristaGeom = new THREE.PlaneGeometry(org.radius * 1.5, org.radius * 0.8);
+                        const cristaMat = new THREE.MeshBasicMaterial({{
+                            color: 0xcc6600,
+                            side: THREE.DoubleSide,
+                            transparent: true,
+                            opacity: 0.6
+                        }});
+                        const crista = new THREE.Mesh(cristaGeom, cristaMat);
+                        crista.rotation.y = Math.PI / 2;
+                        crista.position.x = (i - 0.5) * org.radius * 0.6;
+                        mesh.add(crista);
                     }}
 
                 }} else if (org.type === 'er') {{
-                    // Rough ER as wavy tubes
+                    // ER as curved tubes
                     const group = new THREE.Group();
-                    for (let i = 0; i < 5; i++) {{
-                        const curve = new THREE.CatmullRomCurve3([
-                            new THREE.Vector3(-3 + i * 0.5, -2, 0),
-                            new THREE.Vector3(-2 + i * 0.5, 0, 1),
-                            new THREE.Vector3(-1 + i * 0.5, 2, 0),
-                            new THREE.Vector3(0 + i * 0.5, 0, -1),
-                        ]);
-                        const tubeGeom = new THREE.TubeGeometry(curve, 20, 0.2, 8, false);
-                        const tubeMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color), transparent: true, opacity: 0.7 }});
+                    const scale = org.scale || 1.0;
+
+                    for (let i = 0; i < 6; i++) {{
+                        const points = [];
+                        for (let j = 0; j <= 12; j++) {{
+                            const t = j / 12;
+                            points.push(new THREE.Vector3(
+                                (i - 2.5) * 0.4 * scale,
+                                (t - 0.5) * 4 * scale,
+                                Math.sin(t * Math.PI * 2 + i * 0.5) * 0.8 * scale
+                            ));
+                        }}
+                        const curve = new THREE.CatmullRomCurve3(points);
+                        const tubeGeom = new THREE.TubeGeometry(curve, 16, 0.15 * scale, 8, false);
+                        const tubeMat = new THREE.MeshStandardMaterial({{
+                            color: color,
+                            roughness: 0.4,
+                            transparent: true,
+                            opacity: 0.8
+                        }});
                         group.add(new THREE.Mesh(tubeGeom, tubeMat));
                     }}
                     mesh = group;
 
                 }} else if (org.type === 'golgi') {{
-                    // Stacked discs
+                    // Stacked curved discs
                     const group = new THREE.Group();
-                    for (let i = 0; i < 5; i++) {{
-                        const discGeom = new THREE.TorusGeometry(1.5 - i * 0.15, 0.3, 8, 24);
-                        const discMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color) }});
+                    const stacks = org.stacks || 5;
+
+                    for (let i = 0; i < stacks; i++) {{
+                        const discGeom = new THREE.TorusGeometry(1.4 - i * 0.12, 0.25, 8, 20);
+                        const discMat = new THREE.MeshStandardMaterial({{
+                            color: color,
+                            roughness: 0.4,
+                        }});
                         const disc = new THREE.Mesh(discGeom, discMat);
-                        disc.position.z = i * 0.4;
+                        disc.position.z = i * 0.35;
                         disc.rotation.x = Math.PI / 2;
+                        // Slight curve
+                        disc.position.y = Math.sin(i * 0.3) * 0.3;
                         group.add(disc);
                     }}
                     mesh = group;
 
                 }} else if (org.type === 'ribosome') {{
                     const riboGeom = new THREE.SphereGeometry(org.radius, 8, 8);
-                    const riboMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color) }});
+                    const riboMat = new THREE.MeshStandardMaterial({{
+                        color: color,
+                        roughness: 0.3,
+                        emissive: color,
+                        emissiveIntensity: 0.2,
+                    }});
                     mesh = new THREE.Mesh(riboGeom, riboMat);
                 }}
 
                 if (mesh) {{
-                    mesh.position.set(org.x, org.y, org.z);
+                    mesh.position.set(org.x || 0, org.y || 0, org.z || 0);
+                    mesh.userData = {{ type: org.type, index: idx }};
                     scene.add(mesh);
+                    organelleMeshes.push(mesh);
                 }}
             }});
 
-            // Animation
+            // Stats update
+            const statsEl = document.getElementById('stats');
+            let frameCount = 0;
+            let lastTime = performance.now();
+            let fps = 60;
+
+            // Animation loop
             let time = 0;
             function animate() {{
                 requestAnimationFrame(animate);
-                time += 0.01;
+                time += 0.016;
 
-                // Gentle membrane pulse
-                membrane.scale.setScalar(1 + Math.sin(time) * 0.01);
+                // Gentle membrane breathing
+                const breathe = 1 + Math.sin(time * 0.5) * 0.008;
+                membrane.scale.setScalar(breathe);
+
+                // Subtle organelle movement
+                organelleMeshes.forEach((m, i) => {{
+                    if (m.userData.type === 'mitochondria') {{
+                        m.rotation.z += 0.002;
+                    }}
+                }});
 
                 controls.update();
                 renderer.render(scene, camera);
+
+                // FPS counter
+                frameCount++;
+                const now = performance.now();
+                if (now - lastTime >= 1000) {{
+                    fps = Math.round(frameCount * 1000 / (now - lastTime));
+                    frameCount = 0;
+                    lastTime = now;
+                    statsEl.textContent = `FPS: ${{fps}} | Meshes: ${{scene.children.length}}`;
+                }}
             }}
+
             animate();
 
+            // Resize handler
             window.addEventListener('resize', () => {{
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
@@ -549,9 +774,32 @@ with tab_live3d:
     </html>
     '''
 
-    components.html(detail_html, height=500)
+    components.html(detail_html, height=550)
 
-    st.caption("**Detailed cell view** showing internal structures. Drag to rotate, scroll to zoom.")
+    # Export configuration button
+    col_exp1, col_exp2 = st.columns(2)
+    with col_exp1:
+        if st.button("Export Cell Configuration as JSON", key="export_cell_config"):
+            config_data = {
+                "cell_type": cell_type_detail,
+                "membrane": {
+                    "radius": membrane_radius,
+                    "opacity": membrane_opacity,
+                    "color": membrane_color,
+                },
+                "organelles": organelle_config,
+            }
+            st.download_button(
+                "Download cell_config.json",
+                json.dumps(config_data, indent=2),
+                file_name="cell_config.json",
+                mime="application/json",
+                key="dl_cell_config"
+            )
+    with col_exp2:
+        st.caption("Export your customized cell configuration for use in simulations or external 3D tools.")
+
+    st.caption("**Detailed cell view** — Interactive 3D visualization with customizable organelles.")
 
 
 # ────────────────────────────────────────────────────────────────
