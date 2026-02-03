@@ -83,7 +83,7 @@ resource "aws_ecs_task_definition" "cpu" {
   }])
 }
 
-# ─── GPU Task Definition (EC2) ───────────────────────────────
+# ─── GPU Task Definition (EC2) with Omniverse Nucleus ────────
 resource "aws_ecs_task_definition" "gpu" {
   count  = var.enable_gpu ? 1 : 0
   family = "${var.project_name}-gpu"
@@ -95,30 +95,74 @@ resource "aws_ecs_task_definition" "gpu" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([{
-    name      = "cognisom"
-    image     = local.ecr_image
-    essential = true
+  container_definitions = jsonencode([
+    # Main Cognisom application
+    {
+      name      = "cognisom"
+      image     = local.ecr_image
+      essential = true
+      memory    = 8192
 
-    portMappings = [
-      { containerPort = var.flask_port, hostPort = var.flask_port, protocol = "tcp" },
-      { containerPort = var.streamlit_port, hostPort = var.streamlit_port, protocol = "tcp" },
-    ]
+      portMappings = [
+        { containerPort = var.flask_port, hostPort = var.flask_port, protocol = "tcp" },
+        { containerPort = var.streamlit_port, hostPort = var.streamlit_port, protocol = "tcp" },
+      ]
 
-    resourceRequirements = [{ type = "GPU", value = "1" }]
+      resourceRequirements = [{ type = "GPU", value = "1" }]
 
-    environment    = local.container_environment
-    secrets        = local.container_secrets
-    logConfiguration = local.container_log_config
+      environment = concat(local.container_environment, [
+        { name = "OMNIVERSE_URL", value = "omniverse://localhost:3019/cognisom" },
+      ])
+      secrets          = local.container_secrets
+      logConfiguration = local.container_log_config
 
-    healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:${var.flask_port}/api/health || exit 1"]
-      interval    = 30
-      timeout     = 10
-      retries     = 3
-      startPeriod = 60
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:${var.flask_port}/api/health || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 60
+      }
+
+      links = ["nucleus"]
+    },
+
+    # Omniverse Nucleus sidecar for 3D visualization
+    {
+      name      = "nucleus"
+      image     = "nvcr.io/nvidia/omniverse/nucleus:2024.1"
+      essential = false
+      memory    = 4096
+
+      portMappings = [
+        { containerPort = 3009, hostPort = 3009, protocol = "tcp" },  # Web UI
+        { containerPort = 3019, hostPort = 3019, protocol = "tcp" },  # API
+        { containerPort = 3030, hostPort = 3030, protocol = "tcp" },  # Collaboration
+      ]
+
+      environment = [
+        { name = "ACCEPT_EULA", value = "Y" },
+        { name = "SECURITY_ENABLED", value = "false" },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "nucleus"
+        }
+      }
+
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:3009/health || exit 1"]
+        interval    = 30
+        timeout     = 10
+        retries     = 3
+        startPeriod = 120
+      }
     }
-  }])
+  ])
 }
 
 # ─── CPU Service (Fargate) ───────────────────────────────────

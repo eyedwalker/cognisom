@@ -90,6 +90,31 @@ resource "aws_security_group" "gpu_instances" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  # Omniverse Nucleus ports (for demo/visualization)
+  ingress {
+    description     = "Nucleus Web UI"
+    from_port       = 3009
+    to_port         = 3009
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Nucleus API"
+    from_port       = 3019
+    to_port         = 3019
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Nucleus Collaboration"
+    from_port       = 3030
+    to_port         = 3030
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
