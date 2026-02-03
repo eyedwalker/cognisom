@@ -453,3 +453,107 @@ class SceneExporter:
         out.write_text(json.dumps(scene, indent=2, default=str))
         logger.info(f"JSON scene exported: {out}")
         return str(out)
+
+    # ─── USD Export ─────────────────────────────────────────────
+
+    @staticmethod
+    def cells_to_usd(
+        cells: List[Dict[str, Any]],
+        output_path: str,
+        scene_name: str = "cognisom_cells",
+    ) -> str:
+        """Export cells as a real USD file using OpenUSD (pxr).
+
+        Creates actual USD geometry viewable in:
+        - NVIDIA Omniverse
+        - usdview (pip install usd-core)
+        - Blender, Houdini, Maya
+
+        Args:
+            cells: List of cell dicts with 'position', 'cell_type'.
+            output_path: Path to write .usda file.
+            scene_name: Name for the USD stage.
+
+        Returns:
+            Path to written file.
+        """
+        try:
+            from pxr import Usd, UsdGeom, UsdShade, Gf, Sdf, UsdLux
+        except ImportError:
+            logger.error("OpenUSD not available. Install with: pip install usd-core")
+            return ""
+
+        out = Path(output_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        # Create stage
+        stage = Usd.Stage.CreateNew(str(out))
+        stage.SetMetadata("documentation", f"Cognisom cell export: {len(cells)} cells")
+        stage.SetStartTimeCode(0)
+        stage.SetEndTimeCode(1)
+
+        # Create scene hierarchy
+        UsdGeom.Xform.Define(stage, "/World")
+        UsdGeom.Xform.Define(stage, "/World/Cells")
+        UsdGeom.Xform.Define(stage, "/World/Lights")
+
+        # Add dome light
+        dome = UsdLux.DomeLight.Define(stage, "/World/Lights/DomeLight")
+        dome.GetIntensityAttr().Set(500.0)
+
+        # Cell type colors
+        type_colors = {
+            "normal": (0.3, 0.6, 0.9),      # blue
+            "cancer": (0.9, 0.2, 0.2),      # red
+            "t_cell": (0.2, 0.9, 0.3),      # green
+            "nk_cell": (0.9, 0.9, 0.2),     # yellow
+            "macrophage": (0.9, 0.5, 0.2),  # orange
+            "stem": (0.4, 0.9, 0.5),        # light green
+            "progenitor": (0.5, 0.7, 0.9),  # light blue
+            "differentiated": (0.9, 0.6, 0.3), # orange
+            "dividing": (0.9, 0.3, 0.9),    # magenta
+            "immune": (0.2, 0.9, 0.3),      # green
+            "dead": (0.5, 0.5, 0.5),        # gray
+        }
+
+        # Create material for each cell type used
+        used_types = set(c.get("cell_type", "normal") for c in cells)
+        materials = {}
+
+        for ct in used_types:
+            mat_path = f"/World/Materials/{ct}_material"
+            material = UsdShade.Material.Define(stage, mat_path)
+            shader = UsdShade.Shader.Define(stage, f"{mat_path}/Shader")
+            shader.CreateIdAttr("UsdPreviewSurface")
+
+            color = type_colors.get(ct, (0.5, 0.5, 0.5))
+            shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color))
+            shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.5)
+            shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.1)
+
+            material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+            materials[ct] = material
+
+        # Create cells
+        for i, cell in enumerate(cells):
+            pos = cell.get("position", [0, 0, 0])
+            ct = cell.get("cell_type", "normal")
+            alive = cell.get("alive", True)
+            radius = cell.get("volume", 1.0) if "volume" in cell else 1.5
+
+            cell_path = f"/World/Cells/Cell_{i:05d}"
+            sphere = UsdGeom.Sphere.Define(stage, cell_path)
+            sphere.GetRadiusAttr().Set(radius)
+
+            # Position
+            xform = UsdGeom.Xformable(sphere)
+            xform.AddTranslateOp().Set(Gf.Vec3d(pos[0], pos[1], pos[2]))
+
+            # Material
+            mat_to_use = ct if alive else "dead"
+            if mat_to_use in materials:
+                UsdShade.MaterialBindingAPI(sphere).Bind(materials[mat_to_use])
+
+        stage.Save()
+        logger.info(f"USD exported: {out} ({len(cells)} cells)")
+        return str(out)

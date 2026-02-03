@@ -24,9 +24,9 @@ st.caption("Interactive 3D viewers and scientific inspection tools")
 
 # ── Tabs ─────────────────────────────────────────────────────────
 
-tab_cells, tab_fields, tab_network, tab_inspect, tab_lineage, tab_export = st.tabs([
+tab_cells, tab_fields, tab_network, tab_inspect, tab_lineage, tab_omniverse, tab_export = st.tabs([
     "Cell Population", "Spatial Fields", "Interaction Network",
-    "Scientific Inspector", "Lineage Tree", "Export",
+    "Scientific Inspector", "Lineage Tree", "Omniverse/USD", "Export",
 ])
 
 
@@ -776,7 +776,266 @@ with tab_lineage:
 
 
 # ────────────────────────────────────────────────────────────────
-# TAB 6: Export
+# TAB 6: Omniverse/USD (REAL 3D)
+# ────────────────────────────────────────────────────────────────
+
+with tab_omniverse:
+    st.subheader("NVIDIA Omniverse / OpenUSD")
+    st.caption("Real 3D scene generation using OpenUSD - No mocks, actual USD files")
+
+    # Check USD availability
+    try:
+        from pxr import Usd, UsdGeom, Gf
+        USD_AVAILABLE = True
+    except ImportError:
+        USD_AVAILABLE = False
+
+    if not USD_AVAILABLE:
+        st.error("OpenUSD not installed. Install with: `pip install usd-core`")
+        st.code("pip install usd-core", language="bash")
+        st.stop()
+
+    st.success("OpenUSD (pxr) is available - Real USD operations enabled")
+
+    # Import real connector
+    try:
+        from cognisom.omniverse.real_connector import (
+            RealOmniverseConnector, CellVisualization, SimulationFrame
+        )
+        CONNECTOR_AVAILABLE = True
+    except ImportError as e:
+        st.error(f"Real connector not available: {e}")
+        CONNECTOR_AVAILABLE = False
+
+    if CONNECTOR_AVAILABLE:
+        st.divider()
+
+        # ── Scene Generation ────────────────────────────────────────
+        st.markdown("### Generate USD Scene")
+
+        col_cfg, col_gen = st.columns([2, 1])
+
+        with col_cfg:
+            scene_name = st.text_input("Scene Name", value="cognisom_simulation", key="usd_scene_name")
+
+            st.markdown("**Cell Configuration**")
+            col_a, col_b, col_c = st.columns(3)
+            n_stem = col_a.slider("Stem Cells", 5, 50, 15, key="usd_n_stem")
+            n_prog = col_b.slider("Progenitor", 10, 100, 30, key="usd_n_prog")
+            n_diff = col_c.slider("Differentiated", 10, 100, 40, key="usd_n_diff")
+            n_div = col_a.slider("Dividing", 2, 30, 8, key="usd_n_div")
+
+            cluster_radius = col_b.slider("Cluster Radius", 10, 50, 25, key="usd_radius")
+
+        with col_gen:
+            st.markdown("**Output Directory**")
+            output_dir = st.text_input("Path", value="data/simulation/usd", key="usd_output")
+
+            generate_btn = st.button("Generate USD Scene", type="primary", key="gen_usd")
+
+        if generate_btn:
+            import math
+            import random
+
+            with st.spinner("Creating real USD stage..."):
+                # Initialize connector
+                connector = RealOmniverseConnector(output_dir)
+
+                if connector.create_stage(scene_name):
+                    # Cell type configurations
+                    cell_types = {
+                        "stem": {"color": (0.2, 0.9, 0.3), "count": n_stem},
+                        "progenitor": {"color": (0.3, 0.6, 0.9), "count": n_prog},
+                        "differentiated": {"color": (0.9, 0.5, 0.2), "count": n_diff},
+                        "dividing": {"color": (0.9, 0.2, 0.9), "count": n_div},
+                    }
+
+                    random.seed(42)
+                    total_cells = 0
+
+                    for cell_type, cfg in cell_types.items():
+                        for i in range(cfg["count"]):
+                            # Spherical distribution
+                            theta = random.uniform(0, 2 * math.pi)
+                            phi = random.uniform(0, math.pi)
+                            r = random.uniform(3, cluster_radius)
+
+                            x = r * math.sin(phi) * math.cos(theta)
+                            y = r * math.sin(phi) * math.sin(theta) + 10
+                            z = r * math.cos(phi)
+
+                            cell = CellVisualization(
+                                cell_id=f"{cell_type}_{i:03d}",
+                                position=(x, y, z),
+                                radius=random.uniform(0.8, 2.0),
+                                color=cfg["color"],
+                                cell_type=cell_type,
+                                metabolic_state=random.uniform(0.5, 1.0),
+                            )
+                            connector.add_cell(cell)
+                            total_cells += 1
+
+                    connector.save()
+
+                    st.success(f"Created USD scene with {total_cells} cells")
+
+                    # Store connector info
+                    st.session_state["usd_connector"] = connector.get_info()
+                    st.session_state["usd_stage_path"] = str(connector.stage_path)
+
+                else:
+                    st.error("Failed to create USD stage")
+
+        # ── Display Current Scene ───────────────────────────────────
+        if "usd_stage_path" in st.session_state:
+            st.divider()
+            st.markdown("### Current USD Scene")
+
+            stage_path = st.session_state["usd_stage_path"]
+            connector_info = st.session_state.get("usd_connector", {})
+
+            col_info, col_actions = st.columns([2, 1])
+
+            with col_info:
+                st.write(f"**File:** `{stage_path}`")
+                st.write(f"**Cells:** {connector_info.get('cell_count', 'N/A')}")
+                st.write(f"**Frames:** {connector_info.get('frame_count', 'N/A')}")
+                st.write(f"**Real USD:** {connector_info.get('is_real', False)}")
+
+            with col_actions:
+                # Download USD file
+                from pathlib import Path
+                usd_path = Path(stage_path)
+                if usd_path.exists():
+                    with open(usd_path, 'r') as f:
+                        usd_content = f.read()
+                    st.download_button(
+                        "Download .usda",
+                        usd_content,
+                        file_name=usd_path.name,
+                        mime="text/plain",
+                        key="dl_usda",
+                    )
+
+            # Preview USD content
+            with st.expander("Preview USD File (first 100 lines)"):
+                from pathlib import Path
+                usd_path = Path(stage_path)
+                if usd_path.exists():
+                    with open(usd_path, 'r') as f:
+                        lines = f.readlines()[:100]
+                    st.code("".join(lines), language="python")
+                else:
+                    st.warning("USD file not found")
+
+        # ── Viewer Options ──────────────────────────────────────────
+        st.divider()
+        st.markdown("### View USD Files")
+
+        st.markdown("""
+        Your generated USD files can be viewed in:
+
+        | Application | Platform | Notes |
+        |-------------|----------|-------|
+        | **NVIDIA Omniverse** | Windows/Linux | Full Omniverse experience |
+        | **usdview** | All | `pip install usd-core` then `usdview file.usda` |
+        | **Blender** | All | File > Import > USD |
+        | **Houdini** | All | Native USD support |
+        | **Maya** | All | With USD plugin |
+        | **Three.js** | Web | Using USD loader |
+
+        **Quick View Command:**
+        ```bash
+        # If you have usd-core installed
+        python -m pxr.Usdviewq data/simulation/usd/cognisom_simulation.usda
+        ```
+        """)
+
+        # ── Animation Generation ────────────────────────────────────
+        st.divider()
+        st.markdown("### Generate Animation Sequence")
+
+        n_frames = st.slider("Number of Frames", 10, 100, 24, key="usd_n_frames")
+
+        if st.button("Generate Animated Sequence", key="gen_anim"):
+            import math
+            import random
+
+            with st.spinner(f"Generating {n_frames} frame animation..."):
+                connector = RealOmniverseConnector(output_dir)
+
+                if connector.create_stage(f"{scene_name}_animated"):
+                    random.seed(42)
+
+                    # Create initial cells
+                    cells_data = []
+                    for i in range(50):
+                        cell_type = random.choice(["stem", "progenitor", "differentiated"])
+                        colors = {
+                            "stem": (0.2, 0.9, 0.3),
+                            "progenitor": (0.3, 0.6, 0.9),
+                            "differentiated": (0.9, 0.5, 0.2),
+                        }
+
+                        theta = random.uniform(0, 2 * math.pi)
+                        phi = random.uniform(0, math.pi)
+                        r = random.uniform(5, 20)
+
+                        cells_data.append({
+                            "id": f"cell_{i:03d}",
+                            "base_pos": (
+                                r * math.sin(phi) * math.cos(theta),
+                                r * math.sin(phi) * math.sin(theta) + 10,
+                                r * math.cos(phi)
+                            ),
+                            "color": colors[cell_type],
+                            "cell_type": cell_type,
+                            "phase": random.uniform(0, 2 * math.pi),
+                        })
+
+                    # Generate frames
+                    progress = st.progress(0)
+                    for frame in range(n_frames):
+                        cells = []
+                        for cd in cells_data:
+                            # Animate position (oscillation)
+                            t = frame / n_frames * 2 * math.pi
+                            offset = math.sin(t + cd["phase"]) * 2
+
+                            pos = (
+                                cd["base_pos"][0] + offset * 0.5,
+                                cd["base_pos"][1] + offset,
+                                cd["base_pos"][2] + offset * 0.3,
+                            )
+
+                            cell = CellVisualization(
+                                cell_id=cd["id"],
+                                position=pos,
+                                radius=1.0 + math.sin(t + cd["phase"]) * 0.2,
+                                color=cd["color"],
+                                cell_type=cd["cell_type"],
+                                metabolic_state=0.5 + 0.5 * math.sin(t + cd["phase"]),
+                            )
+                            cells.append(cell)
+
+                        sim_frame = SimulationFrame(
+                            timestamp=frame / 24.0,  # 24 fps
+                            cells=cells,
+                        )
+                        connector.render_frame(sim_frame)
+                        progress.progress((frame + 1) / n_frames)
+
+                    connector.save()
+                    st.success(f"Created animated USD with {n_frames} frames at {connector.stage_path}")
+                    st.session_state["usd_anim_path"] = str(connector.stage_path)
+
+        if "usd_anim_path" in st.session_state:
+            st.write(f"**Animated Scene:** `{st.session_state['usd_anim_path']}`")
+            st.info("Open in Omniverse or usdview to play the animation timeline")
+
+
+# ────────────────────────────────────────────────────────────────
+# TAB 7: Export
 # ────────────────────────────────────────────────────────────────
 
 with tab_export:
