@@ -601,5 +601,5 @@ with tab5:
         st.error(f"Agent eval module not available: {e}")
 
 # Footer
-st.divider()
-st.caption("Cognisom Data Flywheel | Continuous Learning & Optimization | eyentelligence inc.")
+from cognisom.dashboard.footer import render_footer
+render_footer()

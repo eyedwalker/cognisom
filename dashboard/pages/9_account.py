@@ -177,3 +177,7 @@ else:
             'curl -H "X-API-Key: YOUR_KEY" http://localhost:5000/api/health',
             language="bash",
         )
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

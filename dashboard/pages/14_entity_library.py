@@ -568,3 +568,7 @@ with tab_import:
                     st.error("Expected a JSON array of entities")
             except Exception as e:
                 st.error(f"Import failed: {e}")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

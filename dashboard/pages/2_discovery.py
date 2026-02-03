@@ -386,3 +386,7 @@ if run_btn or st.session_state.get("discovery_ran"):
 else:
     st.info("Configure parameters above and click **Run Discovery Pipeline** to generate "
             "molecules and visualize structures.")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

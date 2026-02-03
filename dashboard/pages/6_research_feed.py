@@ -208,3 +208,7 @@ if items:
         file_name=f"cognisom_research_feed_{datetime.utcnow():%Y%m%d}.json",
         mime="application/json",
     )
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

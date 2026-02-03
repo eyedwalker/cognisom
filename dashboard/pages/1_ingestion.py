@@ -385,3 +385,7 @@ if run_btn or st.session_state.get("ingestion_ran"):
 
 else:
     st.info("Click **Run Pipeline** to process synthetic prostate tissue data and visualize results.")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

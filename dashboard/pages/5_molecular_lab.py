@@ -670,3 +670,7 @@ with tab_dna:
                         c3.metric("Log-likelihood ratio", f"{result.get('log_likelihood_ratio', 0):.4f}")
                     except Exception as e:
                         st.error(f"Error: {e}")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

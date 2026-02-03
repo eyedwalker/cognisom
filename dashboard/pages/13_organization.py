@@ -173,5 +173,6 @@ if tab_all_orgs is not None:
                             else:
                                 st.error(msg)
 
-st.sidebar.markdown("---")
-st.sidebar.caption("eyentelligence inc.")
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

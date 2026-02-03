@@ -244,3 +244,7 @@ cmds = {
 for desc, cmd in cmds.items():
     st.markdown(f"**{desc}**")
     st.code(cmd, language="bash")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

@@ -518,3 +518,7 @@ with tab_synth:
             xaxis_title="Cell Type", yaxis_title="Proportion",
         )
         st.plotly_chart(fig, use_container_width=True)
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

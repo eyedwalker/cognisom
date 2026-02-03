@@ -588,5 +588,5 @@ with tab4:
     """)
 
 # Footer
-st.divider()
-st.caption("Cognisom USD & Omniverse | OpenUSD + NVIDIA Omniverse | eyentelligence inc.")
+from cognisom.dashboard.footer import render_footer
+render_footer()

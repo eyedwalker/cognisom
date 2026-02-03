@@ -563,5 +563,5 @@ with tab5:
                 st.info("No Reactome results")
 
 # Footer
-st.divider()
-st.caption("Cognisom External Databases | KEGG, PubChem, STRING, Reactome | eyentelligence inc.")
+from cognisom.dashboard.footer import render_footer
+render_footer()

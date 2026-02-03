@@ -1069,14 +1069,16 @@ NVIDIA NIMs <span class="arch-dim">──────></span> Drug Discovery Pip
     streamlit_login_gate()
 
     # ── Footer ────────────────────────────────────────────────────
+    from cognisom.dashboard.footer import render_footer, VERSION, BUILD_DATE
     if _has_inception_badge:
         footer_b1, footer_b2, footer_b3 = st.columns([3, 1, 3])
         with footer_b2:
             st.image(str(_inception_png_path), width=140)
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="nvidia-footer">
-        eyentelligence inc. | Cognisom v0.2.0<br>
+        eyentelligence inc. | Cognisom v{VERSION} | Built {BUILD_DATE}<br>
+        NVIDIA Inception Program Member<br>
         &copy; 2026 NVIDIA, the NVIDIA logo, and NVIDIA Inception are trademarks
         and/or registered trademarks of NVIDIA Corporation in the U.S. and other countries.
     </div>
@@ -1243,5 +1245,7 @@ NVIDIA NIMs ────> Drug Discovery Pipeline ──> Drug Params ──┘ 
         st.info("No data directory yet. Use the **Ingestion** page to generate synthetic data.")
 
     st.sidebar.markdown("---")
+    from cognisom.dashboard.footer import VERSION, BUILD_DATE
     st.sidebar.caption("eyentelligence inc.")
-    st.sidebar.caption("v0.1.0 | GPU-Accelerated HDT")
+    st.sidebar.caption(f"v{VERSION} | Built {BUILD_DATE}")
+    st.sidebar.caption("NVIDIA Inception Member")

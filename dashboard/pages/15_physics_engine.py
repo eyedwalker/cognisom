@@ -600,5 +600,5 @@ with tab4:
     """)
 
 # Footer
-st.divider()
-st.caption("Cognisom Physics Engine | NVIDIA Warp Accelerated | eyentelligence inc.")
+from cognisom.dashboard.footer import render_footer
+render_footer()

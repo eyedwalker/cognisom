@@ -433,3 +433,7 @@ with tab_custom:
             mime="application/json",
             key="dl_custom",
         )
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

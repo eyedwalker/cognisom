@@ -916,3 +916,7 @@ with tab_export:
                         mime="application/octet-stream",
                         key="dl_vtk_multi",
                     )
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

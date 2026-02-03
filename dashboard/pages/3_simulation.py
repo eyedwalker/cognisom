@@ -419,3 +419,7 @@ else:
                 if mod == "desc":
                     continue
                 st.markdown(f"**{mod}**: `{params}`")
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

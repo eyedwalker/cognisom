@@ -262,3 +262,7 @@ with tab_settings:
 7. Enable rate limiting on API endpoints
 8. Back up `data/auth/` directory regularly
 """)
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()

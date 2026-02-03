@@ -222,3 +222,7 @@ with tab_add:
                 ))
                 st.success(f"Added **{name}** to subscriptions!")
                 st.rerun()
+
+# Footer
+from cognisom.dashboard.footer import render_footer
+render_footer()
