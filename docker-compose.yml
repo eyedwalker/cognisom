@@ -1,14 +1,21 @@
 version: '3.8'
 
 services:
-  cognisom-api:
-    build: .
-    container_name: cognisom-api
+  # Full platform: Flask API + Streamlit dashboard
+  cognisom:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: cognisom
     ports:
-      - "5000:5000"
+      - "5000:5000"     # Flask API
+      - "8501:8501"     # Streamlit dashboard
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - CORS_ORIGINS=http://localhost:8501,http://localhost:8080
     volumes:
       - ./data:/app/data
       - ./exports:/app/exports
@@ -18,19 +25,47 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s
 
-  cognisom-web:
+  # Optional: nginx reverse proxy (for production domain / TLS)
+  nginx:
     image: nginx:alpine
-    container_name: cognisom-web
+    container_name: cognisom-proxy
     ports:
-      - "8080:80"
+      - "80:80"
     volumes:
-      - ./web:/usr/share/nginx/html:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - cognisom-api
+      - cognisom
     restart: unless-stopped
+    profiles:
+      - production
+
+  # ─── Omniverse Nucleus (3D scene collaboration) ───────────────
+  # Enable with: docker-compose --profile omniverse up -d
+  # Requires NGC_API_KEY in .env for image pull
+  nucleus:
+    image: nvcr.io/nvidia/omniverse/nucleus:2024.1
+    container_name: cognisom-nucleus
+    ports:
+      - "3009:3009"   # Web UI
+      - "3019:3019"   # API
+      - "3030:3030"   # Collaboration
+      - "3100:3100"   # Auth
+    environment:
+      - ACCEPT_EULA=Y
+      - SECURITY_ENABLED=false  # For demo; enable in production
+    volumes:
+      - nucleus_data:/var/lib/omniverse/nucleus
+      - ./exports:/omniverse/library  # Shared USD exports
+    restart: unless-stopped
+    profiles:
+      - omniverse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
-  data:
-  exports:
+  nucleus_data:
