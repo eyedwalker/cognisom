@@ -181,171 +181,195 @@ prim = create_prim("{selected_prim}",
                 st.table(values)
 
 # ─────────────────────────────────────────────────────────────────────────
-# Tab 2: Omniverse Connection
+# Tab 2: Real USD Generation (NO MOCKS)
 # ─────────────────────────────────────────────────────────────────────────
 with tab2:
-    st.subheader("Omniverse Connection")
-    st.markdown("Connect to NVIDIA Omniverse for real-time 3D visualization.")
+    st.subheader("🎬 Real USD Generation")
+    st.success("**Real Mode** — Generates actual OpenUSD files using the `pxr` module. No mocks!")
 
     # Initialize session state
-    if "omni_connector" not in st.session_state:
-        st.session_state.omni_connector = None
+    if "real_connector" not in st.session_state:
+        st.session_state.real_connector = None
+    if "usd_stage_path" not in st.session_state:
+        st.session_state.usd_stage_path = None
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        st.markdown("### Connection Settings")
+        st.markdown("### Create USD Scene")
 
-        import os
-
-        # Auto-detect AWS deployment
-        is_aws = os.environ.get("OMNIVERSE_URL") is not None
-        aws_url = os.environ.get("OMNIVERSE_URL", "omniverse://localhost:3019/cognisom")
-
-        # Deployment mode presets
-        deploy_options = ["AWS GPU (Auto)", "Local Docker", "Local Omniverse", "Omniverse Cloud"] if is_aws else \
-                         ["Local Docker", "Local Omniverse", "Omniverse Cloud"]
-
-        deploy_mode = st.radio(
-            "Deployment Mode",
-            deploy_options,
-            horizontal=True,
-            help="Select where Nucleus is running"
+        scene_name = st.text_input(
+            "Scene Name",
+            value="cognisom_cells",
+            help="Name for the USD scene file"
         )
 
-        url_presets = {
-            "AWS GPU (Auto)": aws_url,
-            "Local Docker": "omniverse://nucleus:3019/cognisom",
-            "Local Omniverse": "omniverse://localhost/cognisom",
-            "Omniverse Cloud": "omniverse://cloud.nvidia.com/your-org/cognisom",
-        }
-
-        omni_url = st.text_input(
-            "Omniverse URL",
-            value=url_presets.get(deploy_mode, aws_url if is_aws else "omniverse://localhost/cognisom"),
-            help="URL to Omniverse Nucleus server"
+        output_dir = st.text_input(
+            "Output Directory",
+            value="exports/usd",
+            help="Directory for generated USD files"
         )
 
-        stage_name = st.text_input(
-            "Stage Name",
-            value="cognisom_simulation.usd",
-            help="USD stage file name"
-        )
+        st.divider()
+        st.markdown("### Cell Configuration")
 
-        # Show deployment-specific instructions
-        if is_aws and deploy_mode == "AWS GPU (Auto)":
-            st.success("Running on AWS with GPU — Nucleus is ready!")
-        elif deploy_mode == "Local Docker":
-            with st.expander("Docker Setup Instructions", expanded=True):
-                st.markdown("""
-                **Start Nucleus container:**
-                ```bash
-                # From project root:
-                docker-compose --profile omniverse up -d nucleus
+        num_cells = st.slider("Number of Cells", 10, 500, 100)
+        scene_size = st.slider("Scene Size (μm)", 100, 1000, 300)
 
-                # Check status:
-                docker logs cognisom-nucleus
-                ```
-
-                **Nucleus Web UI:** http://localhost:3009
-                """)
-
-        col_btn1, col_btn2 = st.columns(2)
-
-        with col_btn1:
-            if st.button("🔌 Connect", type="primary", use_container_width=True):
-                try:
-                    from cognisom.omniverse.connector import OmniverseConnector, ConnectionConfig
-
-                    config = ConnectionConfig(
-                        url=omni_url,
-                        stage_name=stage_name,
-                    )
-
-                    connector = OmniverseConnector(config)
-                    success = connector.connect()
-
-                    if success:
-                        st.session_state.omni_connector = connector
-                        st.success("Connected to Omniverse!")
-                    else:
-                        st.error("Connection failed")
-
-                except ImportError as e:
-                    st.error(f"Omniverse module not available: {e}")
-                except Exception as e:
-                    st.error(f"Connection error: {e}")
-
-        with col_btn2:
-            if st.button("🔌 Disconnect", use_container_width=True):
-                if st.session_state.omni_connector:
-                    st.session_state.omni_connector.disconnect()
-                    st.session_state.omni_connector = None
-                    st.info("Disconnected")
+        col_ct1, col_ct2 = st.columns(2)
+        with col_ct1:
+            include_cancer = st.checkbox("Cancer Cells", value=True)
+            include_tcells = st.checkbox("T Cells", value=True)
+        with col_ct2:
+            include_normal = st.checkbox("Normal Cells", value=True)
+            include_nk = st.checkbox("NK Cells", value=True)
 
         st.divider()
 
-        # Advanced settings
-        with st.expander("Advanced Settings"):
-            auto_reconnect = st.checkbox("Auto-reconnect", value=True)
-            heartbeat = st.slider("Heartbeat Interval (s)", 5, 60, 10)
-            timeout = st.slider("Connection Timeout (s)", 10, 120, 30)
+        if st.button("🎬 Generate Real USD", type="primary", use_container_width=True):
+            with st.spinner("Creating real USD scene..."):
+                try:
+                    from cognisom.omniverse.real_connector import (
+                        RealOmniverseConnector, CellVisualization
+                    )
+                    import numpy as np
+                    import os
+
+                    # Create output directory
+                    os.makedirs(output_dir, exist_ok=True)
+
+                    # Initialize real connector
+                    connector = RealOmniverseConnector(output_dir=output_dir)
+                    st.session_state.real_connector = connector
+
+                    # Create stage
+                    if connector.create_stage(scene_name):
+                        st.success(f"✅ Created USD stage: {scene_name}")
+
+                        # Build cell type list
+                        cell_types = []
+                        if include_cancer:
+                            cell_types.append("cancer")
+                        if include_tcells:
+                            cell_types.append("tcell")
+                        if include_normal:
+                            cell_types.append("normal")
+                        if include_nk:
+                            cell_types.append("nk_cell")
+
+                        if not cell_types:
+                            cell_types = ["cancer"]
+
+                        # Generate cells
+                        cells_added = 0
+                        for i in range(num_cells):
+                            cell = CellVisualization(
+                                cell_id=f"cell_{i:04d}",
+                                position=(
+                                    np.random.uniform(0, scene_size),
+                                    np.random.uniform(0, scene_size),
+                                    np.random.uniform(0, scene_size * 0.3),
+                                ),
+                                radius=np.random.uniform(3.0, 8.0),
+                                cell_type=np.random.choice(cell_types),
+                                color=None,  # auto-assigned by type
+                                metadata={
+                                    "age": float(np.random.uniform(0, 48)),
+                                    "phase": np.random.choice(["G1", "S", "G2", "M"]),
+                                }
+                            )
+                            if connector.add_cell(cell):
+                                cells_added += 1
+
+                        # Save
+                        connector.save_stage()
+                        st.session_state.usd_stage_path = connector._stage_path
+
+                        st.success(f"✅ Added {cells_added} cells to scene")
+                        st.info(f"📁 File: `{connector._stage_path}`")
+
+                    else:
+                        st.error("Failed to create USD stage")
+
+                except ImportError as e:
+                    st.error(f"OpenUSD (pxr) not installed: {e}")
+                    st.markdown("""
+                    **Install OpenUSD:**
+                    ```bash
+                    pip install usd-core
+                    ```
+                    """)
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
 
     with col2:
-        st.markdown("### Connection Status")
+        st.markdown("### Status")
 
-        connector = st.session_state.omni_connector
+        connector = st.session_state.real_connector
+        stage_path = st.session_state.usd_stage_path
 
-        if connector:
-            info = connector.get_info()
+        if connector and stage_path:
+            import os
 
-            # Status indicator
-            status = info.get("status", "unknown")
-            status_colors = {
-                "connected": "🟢",
-                "authenticated": "🟢",
-                "disconnected": "🔴",
-                "connecting": "🟡",
-                "reconnecting": "🟡",
-                "error": "🔴",
-            }
+            st.markdown("🟢 **Real USD Mode Active**")
 
-            st.markdown(f"**Status:** {status_colors.get(status, '⚪')} {status.title()}")
+            st.metric("Mode", "REAL (pxr)")
+            st.metric("Stage File", os.path.basename(str(stage_path)))
 
-            # Connection info
-            col_s1, col_s2 = st.columns(2)
-            with col_s1:
-                st.metric("Connection Attempts", info.get("connection_attempts", 0))
-            with col_s2:
-                simulated = "Yes" if info.get("simulated") else "No"
-                st.metric("Simulated Mode", simulated)
+            # Show file info
+            if os.path.exists(stage_path):
+                file_size = os.path.getsize(stage_path)
+                st.metric("File Size", f"{file_size:,} bytes")
 
-            st.markdown(f"**URL:** `{info.get('url', 'N/A')}`")
-            st.markdown(f"**Stage:** `{info.get('stage_name', 'N/A')}`")
-            st.markdown(f"**Has Stage:** {'Yes' if info.get('has_stage') else 'No'}")
+                # Download button
+                with open(stage_path, 'r') as f:
+                    usd_content = f.read()
 
-            # Event history
-            st.markdown("### Recent Events")
-            events = connector.get_event_history(limit=10)
-            if events:
-                for event in reversed(events):
-                    st.text(f"[{event.event_type}] {event.message}")
-            else:
-                st.info("No events yet")
+                st.download_button(
+                    label="📥 Download .usda",
+                    data=usd_content,
+                    file_name=os.path.basename(str(stage_path)),
+                    mime="text/plain",
+                )
+
+                # Preview
+                st.markdown("### USD Preview")
+                with st.expander("View USD Source", expanded=True):
+                    # Show first 100 lines
+                    lines = usd_content.split('\n')[:100]
+                    st.code('\n'.join(lines), language="python")
+                    if len(usd_content.split('\n')) > 100:
+                        st.info(f"... and {len(usd_content.split(chr(10))) - 100} more lines")
+
+            st.divider()
+            st.markdown("### View in 3D")
+            st.markdown("""
+            Open your `.usda` file in:
+            - **NVIDIA Omniverse** (Create, View, or Code)
+            - **Pixar usdview** (`usdview file.usda`)
+            - **Blender** (with USD addon)
+            - **Apple Reality Composer Pro**
+            """)
 
         else:
-            st.info("Not connected to Omniverse")
+            st.info("No USD scene generated yet")
 
             st.markdown("""
-            **Requirements:**
-            - NVIDIA Omniverse Kit installed
-            - Nucleus server running
-            - `omni.client` Python package
+            ### How This Works
 
-            **Without Omniverse:**
-            - Runs in simulation mode
-            - Mock USD stage for testing
-            - No real-time visualization
+            This page uses **real OpenUSD** (`pxr` module) to generate
+            actual `.usda` files — **no mocks or simulations**.
+
+            **What you get:**
+            - ✅ Real USD geometry (spheres, materials)
+            - ✅ Actual lighting and camera setup
+            - ✅ Proper scene hierarchy
+            - ✅ Downloadable .usda files
+            - ✅ Opens in Omniverse, usdview, Blender
+
+            **No Nucleus required** — files are generated locally.
             """)
 
 # ─────────────────────────────────────────────────────────────────────────
