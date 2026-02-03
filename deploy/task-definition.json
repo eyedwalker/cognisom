@@ -1,0 +1,48 @@
+{
+  "family": "cognisom",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "cognisom",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/cognisom:latest",
+      "essential": true,
+      "portMappings": [
+        {"containerPort": 8501, "protocol": "tcp"},
+        {"containerPort": 5000, "protocol": "tcp"}
+      ],
+      "environment": [
+        {"name": "FLASK_DEBUG", "value": "false"},
+        {"name": "CORS_ORIGINS", "value": "*"}
+      ],
+      "secrets": [
+        {
+          "name": "NVIDIA_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognisom/nvidia-api-key"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cognisom/flask-secret"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cognisom",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

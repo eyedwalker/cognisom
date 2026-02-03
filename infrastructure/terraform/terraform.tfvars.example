@@ -1,0 +1,20 @@
+# Cognisom AWS Deployment Configuration
+# Copy this file to terraform.tfvars and fill in your values.
+
+# ─── Required ────────────────────────────────────────────────
+nvidia_api_key = ""   # From build.nvidia.com
+ngc_api_key    = ""   # From ngc.nvidia.com
+secret_key     = ""   # Any random string for Flask sessions
+
+# ─── GPU Toggle ──────────────────────────────────────────────
+# false = ECS Fargate CPU (~$83/month)
+# true  = EC2 g4dn.xlarge GPU spot (~$170/month)
+enable_gpu = false
+
+# ─── Optional overrides ─────────────────────────────────────
+# aws_region        = "us-east-1"
+# domain_name       = "cognisom.com"
+# gpu_instance_type = "g4dn.xlarge"
+# gpu_spot_max_price = "0.30"
+# container_cpu     = 1024     # 1 vCPU
+# container_memory  = 2048     # 2 GB

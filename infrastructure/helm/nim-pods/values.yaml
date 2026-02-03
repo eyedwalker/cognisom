@@ -1,0 +1,280 @@
+# NVIDIA NIM Pods Configuration
+# ==============================
+
+# Global settings
+global:
+  imageRegistry: nvcr.io/nim
+  imagePullSecrets:
+    - name: ngc-secret
+  nvidiaApiKey: ""  # Set via --set or secret
+
+# NGC Pull Secret (required for NVIDIA containers)
+ngcSecret:
+  create: true
+  name: ngc-secret
+  dockerConfigJson: ""  # Base64 encoded .docker/config.json
+
+# ─── DiffDock NIM ─────────────────────────────────────────────────────
+# Molecular docking prediction
+diffdock:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvidia/diffdock
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  env:
+    - name: NIM_MODEL_PROFILE
+      value: "default"
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: gp3
+
+# ─── GenMol NIM ───────────────────────────────────────────────────────
+# Small molecule generation
+genmol:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvidia/genmol
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  env:
+    - name: NIM_MODEL_PROFILE
+      value: "default"
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# ─── RFdiffusion NIM ──────────────────────────────────────────────────
+# Protein structure generation
+rfdiffusion:
+  enabled: false  # Enable when needed
+  replicaCount: 1
+
+  image:
+    repository: nvidia/rfdiffusion
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 16000m
+      memory: 64Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# ─── NeMo Retriever (Embedding) ───────────────────────────────────────
+# Text embedding for RAG
+embedding:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvidia/nemo-retriever-embedding-microservice
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  env:
+    - name: MODEL_NAME
+      value: "NV-Embed-QA"
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# ─── NeMo Retriever (Reranking) ───────────────────────────────────────
+# Reranking for RAG
+reranking:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvidia/nemo-retriever-reranking-microservice
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+# ─── LLM NIM (Nemotron) ───────────────────────────────────────────────
+# Large language model for agent orchestration
+llm:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvidia/nemotron-3-8b-chat-4k-rlhf
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 32Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 8000m
+      memory: 64Gi
+      nvidia.com/gpu: 1
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  env:
+    - name: NIM_MODEL_PROFILE
+      value: "throughput"
+    - name: NIM_MAX_BATCH_SIZE
+      value: "32"
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  # Use A10G or larger for LLM
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                  - g5.xlarge
+                  - g5.2xlarge
+                  - g5.4xlarge
+                  - g5.12xlarge
+                  - p4d.24xlarge
+
+# ─── Service Account ──────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: nim-pods
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+
+# ─── Autoscaling ──────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 0
+  maxReplicas: 4
+  targetGPUUtilization: 70
+  scaleDownDelay: 300  # 5 min cooldown
+
+# ─── Pod Disruption Budget ────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 0  # Allow scale to zero
+
+# ─── Resource Quotas ──────────────────────────────────────────────────
+resourceQuota:
+  enabled: true
+  hard:
+    requests.nvidia.com/gpu: "4"
+    limits.nvidia.com/gpu: "4"

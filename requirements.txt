@@ -21,6 +21,19 @@ ipython>=8.12.0
 # Web framework
 flask>=2.3.0
 flask-cors>=4.0.0
+requests>=2.31.0
+gunicorn>=21.2.0
+
+# Dashboard
+streamlit>=1.30.0
+plotly>=5.18.0
+
+# Research feed
+feedparser>=6.0.0
+python-dateutil>=2.8.0
+
+# Environment
+python-dotenv>=1.0.0
 
 # Optional: GPU support (install separately if you have NVIDIA GPU)
 # torch>=2.0.0  # Uncomment if you have CUDA-capable GPU

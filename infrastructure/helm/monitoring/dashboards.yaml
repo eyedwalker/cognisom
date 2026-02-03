@@ -1,0 +1,292 @@
+# Cognisom Grafana Dashboards
+# ============================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cognisom-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  cognisom-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Cognisom Overview",
+        "tags": ["cognisom"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "API Requests/sec",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"cognisom-api\"}[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ]
+          },
+          {
+            "title": "API Latency (p95)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"cognisom-api\"}[5m])) by (le))",
+                "legendFormat": "p95 latency"
+              }
+            ]
+          },
+          {
+            "title": "Active Simulations",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "cognisom_active_simulations",
+                "legendFormat": "Active"
+              }
+            ]
+          },
+          {
+            "title": "Total Cells Simulated",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(cognisom_simulation_cells_total)",
+                "legendFormat": "Cells"
+              }
+            ]
+          },
+          {
+            "title": "GPU Utilization",
+            "type": "gauge",
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "avg(DCGM_FI_DEV_GPU_UTIL)",
+                "legendFormat": "GPU %"
+              }
+            ],
+            "options": {
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 70},
+                  {"color": "red", "value": 90}
+                ]
+              }
+            }
+          },
+          {
+            "title": "Memory Usage",
+            "type": "gauge",
+            "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"cognisom\"}) / sum(machine_memory_bytes) * 100",
+                "legendFormat": "Memory %"
+              }
+            ]
+          }
+        ],
+        "refresh": "30s",
+        "schemaVersion": 38
+      }
+    }
+
+  nim-performance.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "NIM Performance",
+        "tags": ["cognisom", "nim", "nvidia"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "NIM Request Latency",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(nim_request_duration_seconds_bucket[5m])) by (le, service))",
+                "legendFormat": "{{service}} p95"
+              }
+            ]
+          },
+          {
+            "title": "NIM Throughput",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(nim_requests_total[5m])) by (service)",
+                "legendFormat": "{{service}}"
+              }
+            ]
+          },
+          {
+            "title": "GPU Memory by NIM",
+            "type": "bargauge",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(DCGM_FI_DEV_FB_USED) by (pod)",
+                "legendFormat": "{{pod}}"
+              }
+            ]
+          },
+          {
+            "title": "NIM Pod Status",
+            "type": "table",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "kube_pod_status_ready{namespace=\"nim\"}",
+                "legendFormat": "{{pod}}"
+              }
+            ]
+          }
+        ],
+        "refresh": "30s",
+        "schemaVersion": 38
+      }
+    }
+
+  gpu-metrics.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "GPU Metrics",
+        "tags": ["cognisom", "gpu", "nvidia"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "GPU Utilization",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "DCGM_FI_DEV_GPU_UTIL",
+                "legendFormat": "{{gpu}} - {{Hostname}}"
+              }
+            ]
+          },
+          {
+            "title": "GPU Memory Used",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "DCGM_FI_DEV_FB_USED",
+                "legendFormat": "{{gpu}} - {{Hostname}}"
+              }
+            ]
+          },
+          {
+            "title": "GPU Temperature",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "DCGM_FI_DEV_GPU_TEMP",
+                "legendFormat": "{{gpu}} - {{Hostname}}"
+              }
+            ],
+            "yAxes": [{"max": 100}]
+          },
+          {
+            "title": "GPU Power Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "DCGM_FI_DEV_POWER_USAGE",
+                "legendFormat": "{{gpu}} - {{Hostname}}"
+              }
+            ]
+          },
+          {
+            "title": "Total GPU Hours (Cost Tracking)",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 8, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "cognisom:gpu_hours:total",
+                "legendFormat": "GPU Hours"
+              }
+            ]
+          },
+          {
+            "title": "Spot Instance Ratio",
+            "type": "gauge",
+            "gridPos": {"h": 4, "w": 8, "x": 8, "y": 16},
+            "targets": [
+              {
+                "expr": "cognisom:spot_savings_ratio * 100",
+                "legendFormat": "Spot %"
+              }
+            ]
+          }
+        ],
+        "refresh": "30s",
+        "schemaVersion": 38
+      }
+    }
+
+  cost-tracking.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Cost Tracking",
+        "tags": ["cognisom", "cost"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Estimated Daily GPU Cost",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(increase(DCGM_FI_DEV_GPU_UTIL[24h])) / 100 * 1.006",
+                "legendFormat": "USD (g5.xlarge spot)"
+              }
+            ],
+            "options": {
+              "prefix": "$"
+            }
+          },
+          {
+            "title": "Node Count by Type",
+            "type": "piechart",
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(kube_node_labels) by (label_node_kubernetes_io_instance_type)",
+                "legendFormat": "{{label_node_kubernetes_io_instance_type}}"
+              }
+            ]
+          },
+          {
+            "title": "Resource Utilization Efficiency",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(container_cpu_usage_seconds_total) / sum(kube_node_status_capacity{resource=\"cpu\"}) * 100",
+                "legendFormat": "CPU %"
+              },
+              {
+                "expr": "sum(container_memory_working_set_bytes) / sum(kube_node_status_capacity{resource=\"memory\"}) * 100",
+                "legendFormat": "Memory %"
+              }
+            ]
+          }
+        ],
+        "refresh": "1h",
+        "schemaVersion": 38
+      }
+    }

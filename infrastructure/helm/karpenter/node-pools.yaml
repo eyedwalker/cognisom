@@ -1,0 +1,240 @@
+# Karpenter NodePools for Cognisom
+# =================================
+#
+# These NodePools define how Karpenter provisions nodes for different workloads.
+# Apply with: kubectl apply -f node-pools.yaml
+
+---
+# GPU NodePool for NIM and simulation workloads
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: gpu-nodes
+spec:
+  template:
+    metadata:
+      labels:
+        node.kubernetes.io/purpose: gpu
+        nvidia.com/gpu.present: "true"
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - g5.xlarge      # 1x A10G, 24GB VRAM
+            - g5.2xlarge     # 1x A10G, 24GB VRAM, more CPU/RAM
+            - g5.4xlarge     # 1x A10G, 24GB VRAM, more CPU/RAM
+            - g5.12xlarge    # 4x A10G, 96GB total VRAM
+      nodeClassRef:
+        name: gpu-node-class
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+
+  # Scale to zero when idle
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 5m
+
+  # Limits
+  limits:
+    cpu: 96
+    memory: 384Gi
+    nvidia.com/gpu: 8
+
+  # Weighted selection (prefer spot)
+  weight: 100
+
+---
+# CPU NodePool for inference and general workloads
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: cpu-inference
+spec:
+  template:
+    metadata:
+      labels:
+        node.kubernetes.io/purpose: inference
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]  # Spot only for cost savings
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - t3.large
+            - t3.xlarge
+            - m5.large
+            - m5.xlarge
+            - c5.large
+            - c5.xlarge
+      nodeClassRef:
+        name: cpu-node-class
+
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 2m
+
+  limits:
+    cpu: 48
+    memory: 192Gi
+
+  weight: 50
+
+---
+# High-memory NodePool for LLM inference
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: llm-inference
+spec:
+  template:
+    metadata:
+      labels:
+        node.kubernetes.io/purpose: llm
+        nvidia.com/gpu.present: "true"
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]  # On-demand for reliability
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - g5.12xlarge    # 4x A10G for larger models
+            - g5.48xlarge    # 8x A10G for 70B+ models
+            - p4d.24xlarge   # 8x A100 for production LLM
+      nodeClassRef:
+        name: gpu-node-class
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+        - key: workload-type
+          value: llm
+          effect: NoSchedule
+
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30m  # Longer cooldown for LLM nodes
+
+  limits:
+    cpu: 192
+    memory: 1536Gi
+    nvidia.com/gpu: 16
+
+  weight: 10  # Lower priority, provision only when needed
+
+---
+# EC2NodeClass for GPU nodes
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: gpu-node-class
+spec:
+  amiFamily: AL2
+  role: cognisom-prod-eks-node-role  # Update with actual role name
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: cognisom-prod-eks
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: cognisom-prod-eks
+
+  # GPU AMI with NVIDIA drivers
+  amiSelectorTerms:
+    - alias: al2-nvidia
+
+  # User data for GPU setup
+  userData: |
+    #!/bin/bash
+    set -e
+
+    # Install NVIDIA Container Toolkit
+    yum install -y nvidia-container-toolkit
+    nvidia-ctk runtime configure --runtime=containerd
+    systemctl restart containerd
+
+    # Configure for Kubernetes
+    cat <<EOF >> /etc/containerd/config.toml
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+        BinaryName = "/usr/bin/nvidia-container-runtime"
+    EOF
+
+  # Block device mappings
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+
+  # Instance store for model caching
+  instanceStorePolicy: RAID0
+
+  tags:
+    Environment: production
+    ManagedBy: karpenter
+    Project: cognisom
+
+---
+# EC2NodeClass for CPU nodes
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: cpu-node-class
+spec:
+  amiFamily: AL2
+  role: cognisom-prod-eks-node-role  # Update with actual role name
+
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: cognisom-prod-eks
+
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: cognisom-prod-eks
+
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 50Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+
+  tags:
+    Environment: production
+    ManagedBy: karpenter
+    Project: cognisom

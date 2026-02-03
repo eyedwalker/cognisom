@@ -1,0 +1,21 @@
+# AWS App Runner service configuration
+# Deploy with: aws apprunner create-service --cli-input-json file://deploy/apprunner-service.json
+
+version: 1.0
+runtime: python311
+build:
+  commands:
+    build:
+      - pip install -r requirements.txt
+  env:
+    - name: PYTHONUNBUFFERED
+      value: "1"
+run:
+  command: bash entrypoint.sh
+  network:
+    port: 8501
+  env:
+    - name: FLASK_DEBUG
+      value: "false"
+    - name: PORT
+      value: "5000"
