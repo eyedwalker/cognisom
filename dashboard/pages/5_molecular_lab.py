@@ -159,17 +159,41 @@ with tab_molstar:
         viewer_height = st.slider("Viewer height", 400, 800, 600, 50, key="molstar_height")
 
     with ms_col2:
-        # Embed Mol* via iframe
+        # Documentation
+        with st.expander("📖 How to use Mol* viewer", expanded=False):
+            st.markdown("""
+            **What this does:**
+            Interactive 3D molecular viewer for proteins and other biomolecules.
+
+            **Sources:**
+            - **RCSB PDB**: Experimentally determined structures (X-ray, cryo-EM, NMR)
+            - **AlphaFold DB**: AI-predicted structures for most human proteins
+
+            **Controls:**
+            - Left-click + drag: Rotate
+            - Scroll: Zoom
+            - Right-click + drag: Pan
+            - Click atoms: Select and get info
+            """)
+
+        # Embed Mol* via iframe with better attributes
         molstar_html = f"""
         <iframe
             src="{embed_url}"
             width="100%"
             height="{viewer_height}px"
-            style="border: 1px solid #ddd; border-radius: 8px;"
+            style="border: 1px solid #444; border-radius: 8px; background: #1a1a2e;"
             allow="fullscreen"
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
         ></iframe>
+        <p style="color: #888; font-size: 12px; margin-top: 5px;">
+            If the viewer doesn't load, try refreshing or
+            <a href="{embed_url}" target="_blank" style="color: #ff6b6b;">open in new tab</a>.
+        </p>
         """
-        components.html(molstar_html, height=viewer_height + 20)
+        components.html(molstar_html, height=viewer_height + 50)
 
         st.caption(
             "Mol* is developed by PDBe and RCSB PDB. "
@@ -382,10 +406,47 @@ with tab_structure_pred:
         "**OpenFold3** or **Boltz-2** (via NVIDIA NIMs). Optionally runs MSA-Search first."
     )
 
+    # Documentation expander
+    with st.expander("📖 How to use & where to get sequences", expanded=False):
+        st.markdown("""
+        **What this does:**
+        Predicts the 3D structure of a protein from its amino acid sequence using AI (similar to AlphaFold).
+
+        **When to use:**
+        - You have a novel protein sequence without a known structure
+        - You want to model mutant proteins
+        - You need a structure for docking studies
+
+        **Where to get amino acid sequences:**
+        - [UniProt](https://www.uniprot.org) - Search by gene name (e.g., TP53, AR, BRCA1)
+        - [NCBI Protein](https://www.ncbi.nlm.nih.gov/protein) - Search by accession
+        - [Ensembl](https://www.ensembl.org) - Human genome browser
+
+        **Input format:**
+        Single-letter amino acid codes, e.g.: `MKTAYIAKQRQISFVKSHFSRQDILDLWIYHT...`
+        """)
+
     sp_method = st.radio("Method", ["OpenFold3", "Boltz-2"], horizontal=True, key="sp_method")
+
+    # Example sequences
+    st.markdown("**Quick-load example sequences:**")
+    example_proteins = {
+        "p53 (tumor suppressor)": "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD",
+        "Insulin (hormone)": "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN",
+        "GFP (fluorescent protein)": "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTLVTTLTYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLVNRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLADHYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITLGMDELYK",
+    }
+    ex_col1, ex_col2, ex_col3 = st.columns(3)
+    seq_to_use = ""
+    for i, (name, seq) in enumerate(example_proteins.items()):
+        col = [ex_col1, ex_col2, ex_col3][i % 3]
+        with col:
+            if st.button(name, key=f"ex_prot_{i}", use_container_width=True):
+                seq_to_use = seq
+
     sp_seq = st.text_area(
         "Amino acid sequence",
         height=120,
+        value=seq_to_use,
         placeholder="MKTAYIAKQRQISFVKSHFSRQDILDLWIYHT…",
         key="sp_seq",
         help="Single-letter amino acid codes. Max ~1000 residues.",
@@ -428,9 +489,46 @@ with tab_embeddings:
         "Compare two sequences or score a mutation's impact."
     )
 
+    # Documentation
+    with st.expander("📖 How to use & what embeddings mean", expanded=False):
+        st.markdown("""
+        **What this does:**
+        Converts a protein sequence into a numerical vector (embedding) that captures its biological properties.
+
+        **When to use:**
+        - **Compare proteins**: Find how similar two proteins are functionally
+        - **Score mutations**: See if a mutation significantly changes the protein
+        - **Clustering**: Group similar proteins together
+        - **ML input**: Use embeddings as features for machine learning
+
+        **Output:**
+        - **Cosine similarity** near 1.0 = very similar proteins
+        - **Cosine similarity** near 0 = unrelated proteins
+
+        **Example applications:**
+        - Compare wild-type vs mutant p53
+        - Find proteins similar to a drug target
+        - Analyze evolutionary relationships
+        """)
+
     emb_mode = st.radio("Mode", ["Single embedding", "Compare two sequences"], horizontal=True, key="emb_mode")
 
+    # Example sequences for comparison
+    st.markdown("**Example: p53 wild-type vs mutant (R175H)**")
+    p53_wt = "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD"
+    p53_r175h = p53_wt[:174] + "H" + p53_wt[175:]  # R175H mutation
+
+    ex_btn_col1, ex_btn_col2 = st.columns(2)
+    with ex_btn_col1:
+        if st.button("Load p53 WT", key="emb_p53_wt", use_container_width=True):
+            st.session_state["emb_seq1_val"] = p53_wt
+    with ex_btn_col2:
+        if st.button("Load p53 WT + R175H mutant", key="emb_p53_both", use_container_width=True):
+            st.session_state["emb_seq1_val"] = p53_wt
+            st.session_state["emb_seq2_val"] = p53_r175h
+
     emb_seq1 = st.text_area("Sequence 1", height=100, key="emb_seq1",
+                             value=st.session_state.get("emb_seq1_val", ""),
                              placeholder="MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPS…")
 
     emb_seq2 = ""
@@ -479,12 +577,50 @@ with tab_dna:
         "Generate DNA or score mutations at the nucleotide level."
     )
 
+    # Documentation
+    with st.expander("📖 How to use & where to get DNA sequences", expanded=False):
+        st.markdown("""
+        **What this does:**
+        - **Generate DNA**: Extend a seed sequence with biologically plausible DNA
+        - **Score mutation**: Evaluate if a nucleotide change is likely deleterious
+
+        **When to use:**
+        - Design synthetic promoters or regulatory elements
+        - Predict effects of SNPs (Single Nucleotide Polymorphisms)
+        - Generate sequences for synthetic biology
+
+        **Where to get DNA sequences:**
+        - [NCBI Gene](https://www.ncbi.nlm.nih.gov/gene) - Search by gene name
+        - [Ensembl](https://www.ensembl.org) - Human genome browser
+        - [UCSC Genome Browser](https://genome.ucsc.edu) - Get specific regions
+
+        **Input format:**
+        Standard nucleotides: A, T, G, C (uppercase)
+        """)
+
     dna_mode = st.radio("Mode", ["Generate DNA", "Score mutation"], horizontal=True, key="dna_mode")
+
+    # Example DNA sequences
+    example_dna = {
+        "TP53 promoter (partial)": "ATGGAGGAGCCGCAGTCAGATCCTAGCGTCGAGCCCCCTCTGAGTCAGGAAACATTTTCAGACCTATGGAAACTACTTCCTGAAAACAACGTTCTGTCC",
+        "AR exon 1 (partial)": "ATGGAAGTGCAGTTAGGGCTGGGAAGGGTCTACCCTCGGCCGCCGTCCAAGACCTACCGAGGAGCTTTCCAGAATCTGTTCCAGAGCGTGCGCGAAGTG",
+        "BRCA1 exon 11 (partial)": "ATGATTCTGCCCTGTGAGGGAAATAATGACCTCTATTACTGGCACTTAATATTAAATAAAAGTTTAGGCATACATTGCTAACGGACAGTATAAGGGGAA",
+    }
+
+    st.markdown("**Quick-load example sequences:**")
+    dna_col1, dna_col2, dna_col3 = st.columns(3)
+    selected_dna = ""
+    for i, (name, seq) in enumerate(example_dna.items()):
+        col = [dna_col1, dna_col2, dna_col3][i % 3]
+        with col:
+            if st.button(name, key=f"dna_ex_{i}", use_container_width=True):
+                selected_dna = seq
 
     if dna_mode == "Generate DNA":
         dna_prompt = st.text_area(
             "DNA prompt sequence",
             height=100,
+            value=selected_dna,
             placeholder="ATGCGATCGATCGATCG…",
             key="dna_prompt",
             help="Seed sequence; the model will extend it.",

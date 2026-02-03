@@ -63,8 +63,9 @@ with cfg2:
     generator = st.radio(
         "Molecule generator",
         ["MolMIM", "GenMol"],
-        help="MolMIM: interpolation-based. GenMol: fragment-based (newer).",
+        help="MolMIM: interpolation-based (more stable). GenMol: fragment-based.",
         horizontal=True,
+        index=0,  # Default to MolMIM which is more stable
     )
     num_molecules = st.slider("Molecules to generate", 1, 20, 5)
     run_protein = st.checkbox("Run RFdiffusion protein binder design", value=True,
@@ -109,7 +110,16 @@ if run_btn or st.session_state.get("discovery_ran"):
                     molecules = client.generate(scaffold, num_molecules=num_molecules)
                 st.session_state["molmim_results"] = molecules
             except Exception as e:
-                st.error(f"MolMIM failed: {e}")
+                error_msg = str(e)
+                if "400" in error_msg:
+                    st.error(f"{gen_label} API error: The NIM endpoint may have changed or require different parameters. Try switching to MolMIM if using GenMol.")
+                elif "401" in error_msg or "403" in error_msg:
+                    st.error("Authentication error: Check your NVIDIA_API_KEY in .env file.")
+                elif "429" in error_msg:
+                    st.error("Rate limited: You've exceeded the free API quota. Wait a few minutes.")
+                else:
+                    st.error(f"{gen_label} failed: {error_msg}")
+                st.info("💡 **Tip:** Go to Admin page to verify your NVIDIA API key is set correctly.")
                 st.stop()
 
         # ── Step 2: Drug Bridge ──
