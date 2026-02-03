@@ -4,6 +4,14 @@
 # HTTP client for NIM API calls
 requests>=2.31.0
 
+# ─── NVIDIA Warp (Differentiable Physics) ───────────────────────
+# Real GPU-accelerated physics simulation
+warp-lang>=1.0.0
+
+# ─── NVIDIA USD Tools ───────────────────────────────────────────
+# For Bio-USD scene export (Omniverse-compatible)
+# usd-core>=24.0  # Install from NVIDIA if needed
+
 # NVIDIA NeMo Agent Toolkit (orchestration)
 # nvidia-nat
 

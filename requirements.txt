@@ -9,6 +9,7 @@ matplotlib>=3.7.0
 
 # Data handling
 pandas>=2.0.0
+anndata>=0.10.0
 
 # Testing
 pytest>=7.3.0
