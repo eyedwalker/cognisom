@@ -24,10 +24,241 @@ st.caption("Interactive 3D viewers and scientific inspection tools")
 
 # ── Tabs ─────────────────────────────────────────────────────────
 
-tab_cells, tab_fields, tab_network, tab_inspect, tab_lineage, tab_omniverse, tab_export = st.tabs([
-    "Cell Population", "Spatial Fields", "Interaction Network",
+tab_live3d, tab_cells, tab_fields, tab_network, tab_inspect, tab_lineage, tab_omniverse, tab_export = st.tabs([
+    "🎬 Live 3D", "Cell Population", "Spatial Fields", "Interaction Network",
     "Scientific Inspector", "Lineage Tree", "Omniverse/USD", "Export",
 ])
+
+# ────────────────────────────────────────────────────────────────
+# TAB 0: Live 3D Viewer (In-Browser, No Installation)
+# ────────────────────────────────────────────────────────────────
+
+with tab_live3d:
+    st.subheader("Live 3D Cell Simulation")
+    st.success("**In-Browser 3D** — No software installation required. Works on any device.")
+
+    # Configuration
+    col_cfg1, col_cfg2, col_cfg3 = st.columns(3)
+    with col_cfg1:
+        n_cells_3d = st.slider("Number of Cells", 20, 300, 100, key="live3d_n")
+    with col_cfg2:
+        animation_speed = st.slider("Animation Speed", 0.1, 2.0, 0.5, key="live3d_speed")
+    with col_cfg3:
+        auto_rotate = st.checkbox("Auto-Rotate Camera", value=True, key="live3d_rotate")
+
+    col_ct1, col_ct2, col_ct3, col_ct4 = st.columns(4)
+    with col_ct1:
+        show_cancer = st.checkbox("Cancer Cells", value=True, key="live3d_cancer")
+    with col_ct2:
+        show_normal = st.checkbox("Normal Cells", value=True, key="live3d_normal")
+    with col_ct3:
+        show_tcells = st.checkbox("T Cells", value=True, key="live3d_tcells")
+    with col_ct4:
+        show_dividing = st.checkbox("Dividing", value=True, key="live3d_dividing")
+
+    # Build cell configuration for Three.js
+    import random
+    import math
+
+    random.seed(42)
+    cells_js = []
+
+    cell_configs = []
+    if show_cancer:
+        cell_configs.append({"type": "cancer", "color": "0xff3333", "count": int(n_cells_3d * 0.3)})
+    if show_normal:
+        cell_configs.append({"type": "normal", "color": "0x3399ff", "count": int(n_cells_3d * 0.4)})
+    if show_tcells:
+        cell_configs.append({"type": "tcell", "color": "0x33ff66", "count": int(n_cells_3d * 0.2)})
+    if show_dividing:
+        cell_configs.append({"type": "dividing", "color": "0xff33ff", "count": int(n_cells_3d * 0.1)})
+
+    for cfg in cell_configs:
+        for i in range(cfg["count"]):
+            theta = random.uniform(0, 2 * math.pi)
+            phi = random.uniform(0, math.pi)
+            r = random.uniform(5, 30)
+            cells_js.append({
+                "x": r * math.sin(phi) * math.cos(theta),
+                "y": r * math.sin(phi) * math.sin(theta),
+                "z": r * math.cos(phi),
+                "radius": random.uniform(0.8, 2.0),
+                "color": cfg["color"],
+                "type": cfg["type"],
+                "phase": random.uniform(0, 2 * math.pi),
+            })
+
+    cells_json = json.dumps(cells_js)
+    auto_rotate_js = "true" if auto_rotate else "false"
+
+    # Three.js HTML component
+    threejs_html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; overflow: hidden; background: #0a0a15; }}
+            canvas {{ display: block; }}
+            #info {{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                color: #fff;
+                font-family: monospace;
+                font-size: 12px;
+                background: rgba(0,0,0,0.5);
+                padding: 8px 12px;
+                border-radius: 4px;
+            }}
+            #legend {{
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                color: #fff;
+                font-family: monospace;
+                font-size: 11px;
+                background: rgba(0,0,0,0.5);
+                padding: 8px 12px;
+                border-radius: 4px;
+            }}
+            .legend-item {{ display: flex; align-items: center; margin: 4px 0; }}
+            .legend-color {{ width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }}
+        </style>
+    </head>
+    <body>
+        <div id="info">Cells: {len(cells_js)} | Drag to rotate | Scroll to zoom</div>
+        <div id="legend">
+            <div class="legend-item"><div class="legend-color" style="background:#ff3333"></div>Cancer</div>
+            <div class="legend-item"><div class="legend-color" style="background:#3399ff"></div>Normal</div>
+            <div class="legend-item"><div class="legend-color" style="background:#33ff66"></div>T Cell</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ff33ff"></div>Dividing</div>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        <script>
+            const cells = {cells_json};
+            const animSpeed = {animation_speed};
+            const autoRotate = {auto_rotate_js};
+
+            // Scene setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a15);
+
+            const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(50, 30, 50);
+
+            const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = autoRotate;
+            controls.autoRotateSpeed = 0.5;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(50, 50, 50);
+            scene.add(directionalLight);
+
+            const pointLight = new THREE.PointLight(0x4488ff, 0.5, 100);
+            pointLight.position.set(-20, 20, -20);
+            scene.add(pointLight);
+
+            // Cell meshes
+            const cellMeshes = [];
+            const geometry = new THREE.SphereGeometry(1, 16, 16);
+
+            cells.forEach((cell, i) => {{
+                const material = new THREE.MeshPhongMaterial({{
+                    color: parseInt(cell.color),
+                    shininess: 80,
+                    transparent: true,
+                    opacity: 0.85,
+                }});
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(cell.x, cell.y, cell.z);
+                mesh.scale.setScalar(cell.radius);
+                mesh.userData = {{ basePos: {{ x: cell.x, y: cell.y, z: cell.z }}, phase: cell.phase, type: cell.type }};
+                scene.add(mesh);
+                cellMeshes.push(mesh);
+            }});
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(80, 20, 0x333355, 0x222233);
+            gridHelper.position.y = -20;
+            scene.add(gridHelper);
+
+            // Axes helper (subtle)
+            const axesHelper = new THREE.AxesHelper(10);
+            axesHelper.position.set(-35, -19, -35);
+            scene.add(axesHelper);
+
+            // Animation loop
+            let time = 0;
+            function animate() {{
+                requestAnimationFrame(animate);
+                time += 0.016 * animSpeed;
+
+                // Animate cells
+                cellMeshes.forEach((mesh, i) => {{
+                    const base = mesh.userData.basePos;
+                    const phase = mesh.userData.phase;
+
+                    // Gentle oscillation
+                    const offset = Math.sin(time * 2 + phase) * 0.5;
+                    mesh.position.x = base.x + offset * 0.3;
+                    mesh.position.y = base.y + offset;
+                    mesh.position.z = base.z + offset * 0.2;
+
+                    // Pulsing for dividing cells
+                    if (mesh.userData.type === 'dividing') {{
+                        const pulse = 1 + Math.sin(time * 4 + phase) * 0.15;
+                        mesh.scale.setScalar(mesh.scale.x * 0.95 + pulse * 0.05);
+                    }}
+                }});
+
+                controls.update();
+                renderer.render(scene, camera);
+            }}
+
+            animate();
+
+            // Resize handler
+            window.addEventListener('resize', () => {{
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }});
+        </script>
+    </body>
+    </html>
+    '''
+
+    import streamlit.components.v1 as components
+    components.html(threejs_html, height=600)
+
+    st.caption("**Controls:** Click and drag to rotate • Scroll to zoom • Right-click to pan")
+
+    st.divider()
+    st.markdown("### What You're Seeing")
+    st.markdown(f"""
+    This is a **real-time 3D simulation** of {len(cells_js)} cells:
+    - **Cancer cells** (red) — Tumor cells with abnormal growth
+    - **Normal cells** (blue) — Healthy tissue cells
+    - **T cells** (green) — Immune cells attacking cancer
+    - **Dividing cells** (magenta) — Cells undergoing mitosis (pulsing)
+
+    The cells gently oscillate to simulate biological motion. In the full simulation,
+    movement is driven by actual metabolic gradients and cell-cell interactions.
+    """)
 
 
 # ────────────────────────────────────────────────────────────────
