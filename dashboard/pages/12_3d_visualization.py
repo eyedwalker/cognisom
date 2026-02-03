@@ -248,17 +248,310 @@ with tab_live3d:
     st.caption("**Controls:** Click and drag to rotate • Scroll to zoom • Right-click to pan")
 
     st.divider()
-    st.markdown("### What You're Seeing")
-    st.markdown(f"""
-    This is a **real-time 3D simulation** of {len(cells_js)} cells:
-    - **Cancer cells** (red) — Tumor cells with abnormal growth
-    - **Normal cells** (blue) — Healthy tissue cells
-    - **T cells** (green) — Immune cells attacking cancer
-    - **Dividing cells** (magenta) — Cells undergoing mitosis (pulsing)
 
-    The cells gently oscillate to simulate biological motion. In the full simulation,
-    movement is driven by actual metabolic gradients and cell-cell interactions.
-    """)
+    # ── Detailed Cell View ──────────────────────────────────────────
+    st.markdown("### 🔬 Detailed Cell View")
+    st.caption("View internal cell structure: membrane, nucleus, mitochondria, ER")
+
+    col_cell1, col_cell2 = st.columns(2)
+    with col_cell1:
+        cell_type_detail = st.selectbox(
+            "Cell Type",
+            ["Cancer Cell", "Normal Cell", "T Cell", "Dividing Cell"],
+            key="detail_cell_type"
+        )
+    with col_cell2:
+        show_organelles = st.multiselect(
+            "Show Organelles",
+            ["Nucleus", "Mitochondria", "ER", "Golgi", "Ribosomes"],
+            default=["Nucleus", "Mitochondria"],
+            key="detail_organelles"
+        )
+
+    # Cell detail colors
+    cell_colors = {
+        "Cancer Cell": {"membrane": "0xff4444", "nucleus": "0x990000"},
+        "Normal Cell": {"membrane": "0x4488ff", "nucleus": "0x002266"},
+        "T Cell": {"membrane": "0x44ff66", "nucleus": "0x006622"},
+        "Dividing Cell": {"membrane": "0xff44ff", "nucleus": "0x660066"},
+    }
+    colors = cell_colors[cell_type_detail]
+
+    # Build organelle config
+    organelle_config = []
+    if "Nucleus" in show_organelles:
+        organelle_config.append({"type": "nucleus", "color": colors["nucleus"], "radius": 3.0, "x": 0, "y": 0, "z": 0})
+    if "Mitochondria" in show_organelles:
+        for i in range(8):
+            import math as m
+            angle = i * m.pi / 4
+            organelle_config.append({
+                "type": "mitochondria", "color": "0xff8800",
+                "radius": 0.6, "length": 1.5,
+                "x": m.cos(angle) * 5, "y": m.sin(angle) * 5, "z": (i % 3 - 1) * 2
+            })
+    if "ER" in show_organelles:
+        organelle_config.append({"type": "er", "color": "0x8844ff", "x": -3, "y": 2, "z": 0})
+    if "Golgi" in show_organelles:
+        organelle_config.append({"type": "golgi", "color": "0xffcc00", "x": 4, "y": -2, "z": 1})
+    if "Ribosomes" in show_organelles:
+        for i in range(20):
+            import random
+            organelle_config.append({
+                "type": "ribosome", "color": "0x00ffff", "radius": 0.2,
+                "x": random.uniform(-6, 6), "y": random.uniform(-6, 6), "z": random.uniform(-4, 4)
+            })
+
+    organelles_json = json.dumps(organelle_config)
+
+    detail_html = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; overflow: hidden; background: linear-gradient(135deg, #0a0a20 0%, #1a1a3a 100%); }}
+            canvas {{ display: block; }}
+            #cell-info {{
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                color: #fff;
+                font-family: 'Segoe UI', sans-serif;
+                font-size: 14px;
+                background: rgba(0,0,0,0.7);
+                padding: 12px 16px;
+                border-radius: 8px;
+                border: 1px solid rgba(255,255,255,0.1);
+            }}
+            #cell-info h3 {{ margin: 0 0 8px 0; font-size: 16px; }}
+            #organelle-list {{
+                position: absolute;
+                bottom: 10px;
+                right: 10px;
+                color: #fff;
+                font-family: monospace;
+                font-size: 11px;
+                background: rgba(0,0,0,0.7);
+                padding: 10px;
+                border-radius: 6px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="cell-info">
+            <h3>{cell_type_detail}</h3>
+            <div>Diameter: ~20 μm</div>
+            <div>Drag to rotate | Scroll to zoom</div>
+        </div>
+        <div id="organelle-list">
+            <div style="color:#ff8800">● Mitochondria</div>
+            <div style="color:#8844ff">● Endoplasmic Reticulum</div>
+            <div style="color:#ffcc00">● Golgi Apparatus</div>
+            <div style="color:#00ffff">● Ribosomes</div>
+        </div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        <script>
+            const membraneColor = {colors["membrane"]};
+            const organelles = {organelles_json};
+
+            // Scene
+            const scene = new THREE.Scene();
+
+            const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(20, 15, 20);
+
+            const renderer = new THREE.WebGLRenderer({{ antialias: true, alpha: true }});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setClearColor(0x0a0a20, 1);
+            document.body.appendChild(renderer.domElement);
+
+            // Controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.3;
+
+            // Lighting
+            scene.add(new THREE.AmbientLight(0x404060, 0.6));
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+            keyLight.position.set(10, 20, 15);
+            scene.add(keyLight);
+
+            const fillLight = new THREE.DirectionalLight(0x4488ff, 0.4);
+            fillLight.position.set(-10, 5, -10);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.PointLight(0xff4488, 0.5, 50);
+            rimLight.position.set(0, -10, 15);
+            scene.add(rimLight);
+
+            // Cell membrane (outer, translucent)
+            const membraneGeom = new THREE.SphereGeometry(10, 64, 64);
+            const membraneMat = new THREE.MeshPhysicalMaterial({{
+                color: membraneColor,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.2,
+                metalness: 0.1,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+            }});
+            const membrane = new THREE.Mesh(membraneGeom, membraneMat);
+            scene.add(membrane);
+
+            // Inner membrane layer
+            const innerMembraneGeom = new THREE.SphereGeometry(9.5, 48, 48);
+            const innerMembraneMat = new THREE.MeshPhongMaterial({{
+                color: membraneColor,
+                transparent: true,
+                opacity: 0.1,
+                side: THREE.BackSide,
+            }});
+            scene.add(new THREE.Mesh(innerMembraneGeom, innerMembraneMat));
+
+            // Cytoplasm particles
+            const cytoGeom = new THREE.BufferGeometry();
+            const cytoCount = 500;
+            const cytoPos = new Float32Array(cytoCount * 3);
+            for (let i = 0; i < cytoCount; i++) {{
+                const r = Math.random() * 8;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                cytoPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                cytoPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+                cytoPos[i*3+2] = r * Math.cos(phi);
+            }}
+            cytoGeom.setAttribute('position', new THREE.BufferAttribute(cytoPos, 3));
+            const cytoMat = new THREE.PointsMaterial({{ color: 0x88aacc, size: 0.08, transparent: true, opacity: 0.4 }});
+            scene.add(new THREE.Points(cytoGeom, cytoMat));
+
+            // Organelles
+            organelles.forEach(org => {{
+                let mesh;
+
+                if (org.type === 'nucleus') {{
+                    // Nucleus with nuclear envelope
+                    const nucGeom = new THREE.SphereGeometry(org.radius, 32, 32);
+                    const nucMat = new THREE.MeshPhongMaterial({{
+                        color: parseInt(org.color),
+                        shininess: 30,
+                        transparent: true,
+                        opacity: 0.9,
+                    }});
+                    mesh = new THREE.Mesh(nucGeom, nucMat);
+
+                    // Nucleolus
+                    const nuclGeom = new THREE.SphereGeometry(1.0, 16, 16);
+                    const nuclMat = new THREE.MeshPhongMaterial({{ color: 0xffcc88 }});
+                    const nucleolus = new THREE.Mesh(nuclGeom, nuclMat);
+                    nucleolus.position.set(0.5, 0.5, 0);
+                    mesh.add(nucleolus);
+
+                    // Nuclear pores (dots on surface)
+                    for (let i = 0; i < 30; i++) {{
+                        const poreGeom = new THREE.SphereGeometry(0.15, 8, 8);
+                        const poreMat = new THREE.MeshBasicMaterial({{ color: 0x444466 }});
+                        const pore = new THREE.Mesh(poreGeom, poreMat);
+                        const t = Math.random() * Math.PI * 2;
+                        const p = Math.random() * Math.PI;
+                        pore.position.set(
+                            org.radius * Math.sin(p) * Math.cos(t),
+                            org.radius * Math.sin(p) * Math.sin(t),
+                            org.radius * Math.cos(p)
+                        );
+                        mesh.add(pore);
+                    }}
+
+                }} else if (org.type === 'mitochondria') {{
+                    // Elongated shape
+                    const mitoGeom = new THREE.CapsuleGeometry(org.radius, org.length, 8, 16);
+                    const mitoMat = new THREE.MeshPhongMaterial({{
+                        color: parseInt(org.color),
+                        shininess: 60,
+                    }});
+                    mesh = new THREE.Mesh(mitoGeom, mitoMat);
+                    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+
+                    // Cristae lines
+                    for (let i = 0; i < 3; i++) {{
+                        const lineGeom = new THREE.BoxGeometry(0.05, org.length * 0.6, org.radius * 1.5);
+                        const lineMat = new THREE.MeshBasicMaterial({{ color: 0xcc6600 }});
+                        const line = new THREE.Mesh(lineGeom, lineMat);
+                        line.position.x = (i - 1) * 0.3;
+                        mesh.add(line);
+                    }}
+
+                }} else if (org.type === 'er') {{
+                    // Rough ER as wavy tubes
+                    const group = new THREE.Group();
+                    for (let i = 0; i < 5; i++) {{
+                        const curve = new THREE.CatmullRomCurve3([
+                            new THREE.Vector3(-3 + i * 0.5, -2, 0),
+                            new THREE.Vector3(-2 + i * 0.5, 0, 1),
+                            new THREE.Vector3(-1 + i * 0.5, 2, 0),
+                            new THREE.Vector3(0 + i * 0.5, 0, -1),
+                        ]);
+                        const tubeGeom = new THREE.TubeGeometry(curve, 20, 0.2, 8, false);
+                        const tubeMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color), transparent: true, opacity: 0.7 }});
+                        group.add(new THREE.Mesh(tubeGeom, tubeMat));
+                    }}
+                    mesh = group;
+
+                }} else if (org.type === 'golgi') {{
+                    // Stacked discs
+                    const group = new THREE.Group();
+                    for (let i = 0; i < 5; i++) {{
+                        const discGeom = new THREE.TorusGeometry(1.5 - i * 0.15, 0.3, 8, 24);
+                        const discMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color) }});
+                        const disc = new THREE.Mesh(discGeom, discMat);
+                        disc.position.z = i * 0.4;
+                        disc.rotation.x = Math.PI / 2;
+                        group.add(disc);
+                    }}
+                    mesh = group;
+
+                }} else if (org.type === 'ribosome') {{
+                    const riboGeom = new THREE.SphereGeometry(org.radius, 8, 8);
+                    const riboMat = new THREE.MeshPhongMaterial({{ color: parseInt(org.color) }});
+                    mesh = new THREE.Mesh(riboGeom, riboMat);
+                }}
+
+                if (mesh) {{
+                    mesh.position.set(org.x, org.y, org.z);
+                    scene.add(mesh);
+                }}
+            }});
+
+            // Animation
+            let time = 0;
+            function animate() {{
+                requestAnimationFrame(animate);
+                time += 0.01;
+
+                // Gentle membrane pulse
+                membrane.scale.setScalar(1 + Math.sin(time) * 0.01);
+
+                controls.update();
+                renderer.render(scene, camera);
+            }}
+            animate();
+
+            window.addEventListener('resize', () => {{
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }});
+        </script>
+    </body>
+    </html>
+    '''
+
+    components.html(detail_html, height=500)
+
+    st.caption("**Detailed cell view** showing internal structures. Drag to rotate, scroll to zoom.")
 
 
 # ────────────────────────────────────────────────────────────────
