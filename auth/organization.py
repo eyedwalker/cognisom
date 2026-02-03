@@ -54,6 +54,7 @@ TIER_PAGE_ACCESS: Dict[SubscriptionTier, List[str]] = {
         "12_3d_visualization",
         "13_organization",
         "14_entity_library",
+        "18_external_databases",  # UniProt, KEGG, ChEMBL integrations
     ],
     SubscriptionTier.ENTERPRISE: [
         "app",
@@ -71,6 +72,10 @@ TIER_PAGE_ACCESS: Dict[SubscriptionTier, List[str]] = {
         "12_3d_visualization",
         "13_organization",
         "14_entity_library",
+        "15_physics_engine",      # GPU physics simulation (Warp)
+        "16_usd_omniverse",       # USD/Omniverse 3D integration
+        "17_flywheel_monitor",    # Research flywheel monitoring
+        "18_external_databases",  # UniProt, KEGG, ChEMBL integrations
     ],
 }
 
