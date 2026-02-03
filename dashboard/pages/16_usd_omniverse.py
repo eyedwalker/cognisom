@@ -196,9 +196,23 @@ with tab2:
     with col1:
         st.markdown("### Connection Settings")
 
+        # Deployment mode presets
+        deploy_mode = st.radio(
+            "Deployment Mode",
+            ["Docker (Recommended)", "Local Omniverse", "Omniverse Cloud"],
+            horizontal=True,
+            help="Select where Nucleus is running"
+        )
+
+        url_presets = {
+            "Docker (Recommended)": "omniverse://nucleus:3019/cognisom",
+            "Local Omniverse": "omniverse://localhost/cognisom",
+            "Omniverse Cloud": "omniverse://cloud.nvidia.com/your-org/cognisom",
+        }
+
         omni_url = st.text_input(
             "Omniverse URL",
-            value="omniverse://localhost/cognisom",
+            value=url_presets.get(deploy_mode, "omniverse://localhost/cognisom"),
             help="URL to Omniverse Nucleus server"
         )
 
@@ -207,6 +221,22 @@ with tab2:
             value="cognisom_simulation.usd",
             help="USD stage file name"
         )
+
+        # Show deployment-specific instructions
+        if deploy_mode == "Docker (Recommended)":
+            with st.expander("Docker Setup Instructions", expanded=True):
+                st.markdown("""
+                **Start Nucleus container:**
+                ```bash
+                # From project root:
+                docker-compose --profile omniverse up -d nucleus
+
+                # Check status:
+                docker logs cognisom-nucleus
+                ```
+
+                **Nucleus Web UI:** http://localhost:3009
+                """)
 
         col_btn1, col_btn2 = st.columns(2)
 
