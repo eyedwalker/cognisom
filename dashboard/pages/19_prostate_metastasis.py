@@ -172,16 +172,25 @@ tab_organ, tab_tissue, tab_metastasis, tab_exosomes, tab_bone, tab_simulation = 
 ])
 
 # ─────────────────────────────────────────────────────────────────────────
-# TAB 1: ORGAN ANATOMY
+# TAB 1: ORGAN ANATOMY — MULTI-SCALE ZOOM
 # ─────────────────────────────────────────────────────────────────────────
 
 with tab_organ:
-    st.subheader("Prostate Organ Anatomy")
+    st.subheader("🔬 Multi-Scale Prostate Visualization")
+    st.info("**Scroll to zoom** — Go from organ level down to individual cells!")
+
+    # Zoom level selector
+    zoom_level = st.select_slider(
+        "Zoom Level",
+        options=["Organ (cm)", "Tissue (mm)", "Cellular (μm)", "Subcellular (nm)"],
+        value="Organ (cm)",
+        key="organ_zoom"
+    )
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        # Interactive 3D prostate
+        # Multi-scale 3D visualization
         organ_html = '''
         <!DOCTYPE html>
         <html>
@@ -189,149 +198,324 @@ with tab_organ:
             <style>
                 body { margin: 0; overflow: hidden; font-family: system-ui; }
                 #info { position: absolute; top: 10px; left: 10px; color: white;
-                        background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; }
+                        background: rgba(0,0,0,0.85); padding: 15px; border-radius: 8px;
+                        max-width: 280px; }
+                #zoom-info { position: absolute; bottom: 10px; left: 10px; color: #00ff88;
+                        background: rgba(0,0,0,0.85); padding: 10px; border-radius: 5px;
+                        font-family: monospace; font-size: 14px; }
                 #labels { position: absolute; top: 10px; right: 10px; color: white;
-                         background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; font-size: 12px; }
+                         background: rgba(0,0,0,0.85); padding: 10px; border-radius: 5px; font-size: 11px; }
+                #controls { position: absolute; bottom: 10px; right: 10px; color: white;
+                         background: rgba(0,0,0,0.85); padding: 10px; border-radius: 5px; font-size: 11px; }
             </style>
         </head>
         <body>
-            <div id="info">🖱 Click zones to learn more</div>
+            <div id="info">
+                <strong>🔬 Multi-Scale View</strong><br><br>
+                <span style="color: #00ff88;">Scroll</span> to zoom in/out<br>
+                <span style="color: #00ff88;">Drag</span> to rotate<br>
+                <span style="color: #00ff88;">Right-drag</span> to pan<br><br>
+                <em>Zoom in to see cellular detail!</em>
+            </div>
+            <div id="zoom-info">Scale: ORGAN</div>
             <div id="labels">
-                <div style="margin-bottom: 5px;"><span style="color: #4a9eff;">●</span> Peripheral Zone (70%)</div>
-                <div style="margin-bottom: 5px;"><span style="color: #7eb3ff;">●</span> Central Zone (25%)</div>
-                <div style="margin-bottom: 5px;"><span style="color: #a8c8ff;">●</span> Transition Zone (5%)</div>
-                <div style="margin-bottom: 5px;"><span style="color: #ffcc00;">━</span> Urethra</div>
-                <div style="margin-bottom: 5px;"><span style="color: #ff6666;">━</span> Neurovascular Bundles</div>
-                <div style="margin-bottom: 5px;"><span style="color: #0066ff;">━</span> Blood Vessels</div>
-                <div><span style="color: #00ccff;">━</span> Lymphatics</div>
+                <div style="margin-bottom: 3px;"><span style="color: #4a9eff;">●</span> Peripheral Zone</div>
+                <div style="margin-bottom: 3px;"><span style="color: #7eb3ff;">●</span> Central Zone</div>
+                <div style="margin-bottom: 3px;"><span style="color: #ffcc00;">━</span> Urethra</div>
+                <div style="margin-bottom: 3px;"><span style="color: #ff3333;">●</span> Tumor</div>
+                <div style="margin-bottom: 3px;"><span style="color: #66ff66;">●</span> Normal Cells</div>
+                <div><span style="color: #00ffff;">●</span> Immune Cells</div>
+            </div>
+            <div id="controls">
+                Press <b>1-4</b> for zoom presets<br>
+                Press <b>R</b> to reset view
             </div>
 
             <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
             <script>
                 const scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x1a1a2e);
+                scene.background = new THREE.Color(0x0a0a1a);
 
-                const camera = new THREE.PerspectiveCamera(60, window.innerWidth / 500, 0.1, 1000);
-                camera.position.set(0, 0, 80);
+                const camera = new THREE.PerspectiveCamera(60, window.innerWidth / 550, 0.01, 2000);
+                camera.position.set(0, 20, 120);
 
-                const renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(window.innerWidth, 500);
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(window.innerWidth, 550);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true;
                 document.body.appendChild(renderer.domElement);
 
-                // Lighting
-                const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+                // Enhanced lighting for realism
+                const ambient = new THREE.AmbientLight(0xffffff, 0.3);
                 scene.add(ambient);
-                const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-                directional.position.set(50, 50, 50);
-                scene.add(directional);
 
-                // Prostate zones (nested ellipsoids)
-                // Peripheral zone (outer, largest)
-                const peripheralGeom = new THREE.SphereGeometry(25, 32, 32);
+                const key = new THREE.DirectionalLight(0xffffff, 1.0);
+                key.position.set(50, 80, 50);
+                key.castShadow = true;
+                scene.add(key);
+
+                const fill = new THREE.DirectionalLight(0x4488ff, 0.4);
+                fill.position.set(-50, 30, -30);
+                scene.add(fill);
+
+                const rim = new THREE.DirectionalLight(0xff8844, 0.3);
+                rim.position.set(0, -50, -50);
+                scene.add(rim);
+
+                // === ORGAN LEVEL OBJECTS ===
+                const organGroup = new THREE.Group();
+                organGroup.name = 'organ';
+
+                // Peripheral zone with subsurface scattering look
+                const peripheralGeom = new THREE.SphereGeometry(25, 64, 64);
                 peripheralGeom.scale(1.2, 0.8, 1);
                 const peripheralMat = new THREE.MeshStandardMaterial({
-                    color: 0x4a9eff, transparent: true, opacity: 0.4
+                    color: 0x4a9eff, transparent: true, opacity: 0.5,
+                    roughness: 0.8, metalness: 0.0
                 });
                 const peripheral = new THREE.Mesh(peripheralGeom, peripheralMat);
-                peripheral.name = 'peripheral';
-                scene.add(peripheral);
+                organGroup.add(peripheral);
 
                 // Central zone
-                const centralGeom = new THREE.SphereGeometry(18, 32, 32);
+                const centralGeom = new THREE.SphereGeometry(18, 48, 48);
                 centralGeom.scale(1.1, 0.7, 0.9);
                 const centralMat = new THREE.MeshStandardMaterial({
-                    color: 0x7eb3ff, transparent: true, opacity: 0.5
+                    color: 0x7eb3ff, transparent: true, opacity: 0.6, roughness: 0.7
                 });
                 const central = new THREE.Mesh(centralGeom, centralMat);
-                central.name = 'central';
-                scene.add(central);
+                organGroup.add(central);
 
-                // Transition zone (around urethra)
-                const transitionGeom = new THREE.SphereGeometry(10, 32, 32);
-                transitionGeom.scale(1.0, 0.6, 0.8);
-                const transitionMat = new THREE.MeshStandardMaterial({
-                    color: 0xa8c8ff, transparent: true, opacity: 0.6
-                });
-                const transition = new THREE.Mesh(transitionGeom, transitionMat);
-                transition.name = 'transition';
-                scene.add(transition);
-
-                // Urethra (tube through center)
-                const urethraGeom = new THREE.CylinderGeometry(2, 2, 50, 16);
-                const urethraMat = new THREE.MeshStandardMaterial({ color: 0xffcc00 });
+                // Urethra
+                const urethraGeom = new THREE.CylinderGeometry(2, 2, 50, 32);
+                const urethraMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.5 });
                 const urethra = new THREE.Mesh(urethraGeom, urethraMat);
-                urethra.name = 'urethra';
-                scene.add(urethra);
+                organGroup.add(urethra);
 
-                // Neurovascular bundles (two cylinders on sides)
+                // Neurovascular bundles
                 for (let side of [-1, 1]) {
                     const nvbGeom = new THREE.CylinderGeometry(3, 3, 35, 16);
-                    const nvbMat = new THREE.MeshStandardMaterial({ color: 0xff6666 });
+                    const nvbMat = new THREE.MeshStandardMaterial({ color: 0xff6666, roughness: 0.6 });
                     const nvb = new THREE.Mesh(nvbGeom, nvbMat);
                     nvb.position.set(side * 28, 0, 0);
-                    nvb.name = 'nvb';
-                    scene.add(nvb);
+                    organGroup.add(nvb);
                 }
 
-                // Blood vessels (arteries/veins)
+                // Blood vessels
                 function createVessel(start, end, color, radius) {
                     const dir = new THREE.Vector3().subVectors(end, start);
-                    const length = dir.length();
-                    const geom = new THREE.CylinderGeometry(radius, radius, length, 8);
-                    const mat = new THREE.MeshStandardMaterial({ color: color });
+                    const len = dir.length();
+                    const geom = new THREE.CylinderGeometry(radius, radius, len, 12);
+                    const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 });
                     const vessel = new THREE.Mesh(geom, mat);
-
-                    const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-                    vessel.position.copy(midpoint);
+                    const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                    vessel.position.copy(mid);
                     vessel.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
                     return vessel;
                 }
 
-                // Arterial supply (inferior vesical, internal pudendal)
-                const vessels = [
-                    [new THREE.Vector3(-30, 25, 0), new THREE.Vector3(-20, 0, 0), 0x0066ff, 1.5],
-                    [new THREE.Vector3(30, 25, 0), new THREE.Vector3(20, 0, 0), 0x0066ff, 1.5],
-                    [new THREE.Vector3(-20, 0, 0), new THREE.Vector3(-10, -15, 0), 0x0066ff, 1],
-                    [new THREE.Vector3(20, 0, 0), new THREE.Vector3(10, -15, 0), 0x0066ff, 1],
-                ];
-                vessels.forEach(v => scene.add(createVessel(v[0], v[1], v[2], v[3])));
+                [[new THREE.Vector3(-30, 25, 0), new THREE.Vector3(-20, 0, 0), 0x3366ff, 1.5],
+                 [new THREE.Vector3(30, 25, 0), new THREE.Vector3(20, 0, 0), 0x3366ff, 1.5],
+                 [new THREE.Vector3(-25, -20, 5), new THREE.Vector3(-35, -30, 10), 0x00ccff, 2],
+                 [new THREE.Vector3(25, -20, 5), new THREE.Vector3(35, -30, 10), 0x00ccff, 2],
+                ].forEach(v => organGroup.add(createVessel(v[0], v[1], v[2], v[3])));
 
-                // Lymphatics (larger, blue-green)
-                const lymphatics = [
-                    [new THREE.Vector3(-25, -20, 5), new THREE.Vector3(-35, -30, 10), 0x00ccff, 2],
-                    [new THREE.Vector3(25, -20, 5), new THREE.Vector3(35, -30, 10), 0x00ccff, 2],
-                    [new THREE.Vector3(0, -20, 10), new THREE.Vector3(0, -35, 15), 0x00ccff, 2.5],
-                ];
-                lymphatics.forEach(v => scene.add(createVessel(v[0], v[1], v[2], v[3])));
+                scene.add(organGroup);
 
-                // Tumor (red mass in peripheral zone)
-                const tumorGeom = new THREE.SphereGeometry(6, 16, 16);
-                const tumorMat = new THREE.MeshStandardMaterial({ color: 0xff3333 });
-                const tumor = new THREE.Mesh(tumorGeom, tumorMat);
-                tumor.position.set(15, -8, 10);
-                tumor.name = 'tumor';
-                scene.add(tumor);
+                // === TUMOR WITH CELLS (visible when zoomed) ===
+                const tumorGroup = new THREE.Group();
+                tumorGroup.name = 'tumor';
+                tumorGroup.position.set(15, -8, 10);
 
-                // Rotation
-                let rotationSpeed = 0.002;
+                // Tumor mass (outer)
+                const tumorGeom = new THREE.SphereGeometry(6, 32, 32);
+                const tumorMat = new THREE.MeshStandardMaterial({
+                    color: 0xff3333, transparent: true, opacity: 0.4, roughness: 0.7
+                });
+                const tumorOuter = new THREE.Mesh(tumorGeom, tumorMat);
+                tumorGroup.add(tumorOuter);
+
+                // Individual cancer cells inside tumor (visible when zoomed)
+                const cellGroup = new THREE.Group();
+                cellGroup.name = 'cells';
+
+                for (let i = 0; i < 200; i++) {
+                    const r = Math.random() * 5;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    const x = r * Math.sin(phi) * Math.cos(theta);
+                    const y = r * Math.sin(phi) * Math.sin(theta);
+                    const z = r * Math.cos(phi);
+
+                    const cellSize = 0.3 + Math.random() * 0.3;
+                    const cellGeom = new THREE.SphereGeometry(cellSize, 12, 12);
+
+                    // Cancer cells are red, with some variation
+                    const hue = 0.0 + Math.random() * 0.05;
+                    const cellMat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(hue, 0.8, 0.5),
+                        roughness: 0.6
+                    });
+                    const cell = new THREE.Mesh(cellGeom, cellMat);
+                    cell.position.set(x, y, z);
+
+                    // Add nucleus
+                    const nucleusGeom = new THREE.SphereGeometry(cellSize * 0.5, 8, 8);
+                    const nucleusMat = new THREE.MeshStandardMaterial({ color: 0x440000 });
+                    const nucleus = new THREE.Mesh(nucleusGeom, nucleusMat);
+                    cell.add(nucleus);
+
+                    cellGroup.add(cell);
+                }
+                tumorGroup.add(cellGroup);
+
+                // Immune cells around tumor
+                const immuneGroup = new THREE.Group();
+                immuneGroup.name = 'immune';
+
+                for (let i = 0; i < 30; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 6 + Math.random() * 3;
+                    const x = Math.cos(angle) * dist;
+                    const y = (Math.random() - 0.5) * 8;
+                    const z = Math.sin(angle) * dist;
+
+                    const immuneGeom = new THREE.SphereGeometry(0.4, 8, 8);
+                    const types = [0x00ffff, 0xff00ff, 0xffaa00]; // T cell, NK, macrophage
+                    const immuneMat = new THREE.MeshStandardMaterial({
+                        color: types[Math.floor(Math.random() * 3)]
+                    });
+                    const immune = new THREE.Mesh(immuneGeom, immuneMat);
+                    immune.position.set(x, y, z);
+                    immuneGroup.add(immune);
+                }
+                tumorGroup.add(immuneGroup);
+
+                scene.add(tumorGroup);
+
+                // === MOUSE CONTROLS ===
+                let isDragging = false;
+                let previousMousePosition = { x: 0, y: 0 };
+                let targetRotationX = 0, targetRotationY = 0;
+                let currentZoom = 120;
+                let targetZoom = 120;
+
+                renderer.domElement.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                });
+
+                renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.clientX - previousMousePosition.x;
+                        const deltaY = e.clientY - previousMousePosition.y;
+                        targetRotationY += deltaX * 0.005;
+                        targetRotationX += deltaY * 0.005;
+                        previousMousePosition = { x: e.clientX, y: e.clientY };
+                    }
+                });
+
+                renderer.domElement.addEventListener('mouseup', () => { isDragging = false; });
+                renderer.domElement.addEventListener('mouseleave', () => { isDragging = false; });
+
+                // Zoom with scroll
+                renderer.domElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    targetZoom += e.deltaY * 0.1;
+                    targetZoom = Math.max(5, Math.min(200, targetZoom));
+                });
+
+                // Keyboard presets
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === '1') targetZoom = 120; // Organ
+                    if (e.key === '2') targetZoom = 50;  // Tissue
+                    if (e.key === '3') targetZoom = 15;  // Cellular
+                    if (e.key === '4') targetZoom = 5;   // Subcellular
+                    if (e.key === 'r' || e.key === 'R') {
+                        targetZoom = 120;
+                        targetRotationX = 0;
+                        targetRotationY = 0;
+                    }
+                });
+
+                // Update zoom info display
+                function getScaleLabel(zoom) {
+                    if (zoom > 80) return 'ORGAN (cm scale)';
+                    if (zoom > 30) return 'TISSUE (mm scale)';
+                    if (zoom > 10) return 'CELLULAR (μm scale)';
+                    return 'SUBCELLULAR (nm scale)';
+                }
+
+                // Animation
                 function animate() {
                     requestAnimationFrame(animate);
-                    scene.rotation.y += rotationSpeed;
+
+                    // Smooth camera movement
+                    currentZoom += (targetZoom - currentZoom) * 0.1;
+                    camera.position.z = currentZoom;
+
+                    // Apply rotation
+                    scene.rotation.x += (targetRotationX - scene.rotation.x) * 0.1;
+                    scene.rotation.y += (targetRotationY - scene.rotation.y) * 0.1;
+
+                    // Level of detail based on zoom
+                    const zoomRatio = currentZoom / 120;
+
+                    // Organ becomes transparent when zoomed in
+                    peripheralMat.opacity = Math.min(0.5, zoomRatio * 0.5);
+                    centralMat.opacity = Math.min(0.6, zoomRatio * 0.6);
+                    tumorMat.opacity = Math.min(0.4, zoomRatio * 0.4);
+
+                    // Cells become visible when zoomed in
+                    cellGroup.visible = currentZoom < 60;
+                    immuneGroup.visible = currentZoom < 60;
+
+                    // Scale cells for visibility
+                    if (currentZoom < 60) {
+                        const cellScale = Math.max(0.5, (60 - currentZoom) / 30);
+                        cellGroup.scale.setScalar(cellScale);
+                        immuneGroup.scale.setScalar(cellScale);
+                    }
+
+                    // Update zoom label
+                    document.getElementById('zoom-info').textContent = 'Scale: ' + getScaleLabel(currentZoom);
+
                     renderer.render(scene, camera);
                 }
                 animate();
 
-                // Mouse interaction
-                document.addEventListener('click', () => {
-                    rotationSpeed = rotationSpeed === 0 ? 0.002 : 0;
+                // Handle resize
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / 550;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, 550);
                 });
             </script>
         </body>
         </html>
         '''
-        components.html(organ_html, height=520)
+        components.html(organ_html, height=570)
 
     with col2:
+        st.markdown("### 🎮 Zoom Controls")
+        st.success("""
+        **Interactive Controls:**
+        - **Scroll wheel** → Zoom in/out
+        - **Drag** → Rotate view
+        - **Keys 1-4** → Jump to zoom level
+        - **Key R** → Reset view
+        """)
+
+        st.markdown("### 🔬 Zoom Levels")
+        st.markdown("""
+        | Level | Scale | What You See |
+        |-------|-------|--------------|
+        | **1** | cm | Whole organ |
+        | **2** | mm | Tissue zones |
+        | **3** | μm | Individual cells |
+        | **4** | nm | Cell nuclei |
+        """)
+
+        st.divider()
         st.markdown("### Prostate Zones")
         for zone, data in PROSTATE_ANATOMY["zones"].items():
             with st.expander(f"**{zone.title()} Zone** ({data['volume_pct']}%)"):
@@ -339,15 +523,12 @@ with tab_organ:
                 st.warning(f"Cancer Risk: {data['cancer_risk']}")
 
         st.divider()
-        st.markdown("### Key Structures")
-        for struct, data in PROSTATE_ANATOMY["structures"].items():
-            st.markdown(f"**{struct.replace('_', ' ').title()}**: {data['description']}")
-
-        st.divider()
         st.info("""
-        **Metastasis Routes:**
-        1. **Lymphatic** → Obturator, internal iliac, presacral nodes
-        2. **Hematogenous** → Batson's plexus (valveless) → Spine, pelvis, femur
+        **Zoom in to see:**
+        - 🔴 Cancer cells (red spheres with nuclei)
+        - 🔵 T cells (cyan)
+        - 🟣 NK cells (magenta)
+        - 🟠 Macrophages (orange)
         """)
 
 # ─────────────────────────────────────────────────────────────────────────
