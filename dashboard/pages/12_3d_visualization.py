@@ -35,7 +35,300 @@ tab_live3d, tab_cells, tab_fields, tab_network, tab_inspect, tab_lineage, tab_om
 
 with tab_live3d:
     st.subheader("Live 3D Cell Simulation")
-    st.success("**In-Browser 3D** — No software installation required. Works on any device.")
+
+    # ══════════════════════════════════════════════════════════════════
+    # REAL PHYSICS ENGINE SIMULATION
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("### 🔬 Physics Engine Simulation")
+    st.info("""
+    **Real Simulation** — Runs the actual Cognisom physics engine with:
+    - Cell mechanics (repulsion, adhesion, chemotaxis)
+    - Metabolism (O₂, glucose, ATP dynamics)
+    - Cell cycle (G1→S→G2→M phases)
+    - Immune response (T cells, NK cells, macrophages)
+    """)
+
+    with st.expander("⚙️ Simulation Configuration", expanded=True):
+        col_s1, col_s2, col_s3 = st.columns(3)
+
+        with col_s1:
+            from cognisom.dashboard.engine_runner import SCENARIOS
+            scenario = st.selectbox(
+                "Scenario",
+                list(SCENARIOS.keys()),
+                help="Pre-configured biological scenarios"
+            )
+            st.caption(SCENARIOS[scenario]["desc"])
+
+        with col_s2:
+            sim_duration = st.slider("Duration (hours)", 1.0, 24.0, 6.0, 0.5, key="sim_dur")
+            sim_dt = st.select_slider("Time step (hours)", [0.01, 0.02, 0.05, 0.1], value=0.05, key="sim_dt")
+
+        with col_s3:
+            st.markdown("**Modules**")
+            mod_cellular = st.checkbox("Cellular", True, key="mod_cell")
+            mod_immune = st.checkbox("Immune", True, key="mod_imm")
+            mod_vascular = st.checkbox("Vascular", True, key="mod_vasc")
+            mod_spatial = st.checkbox("Spatial Fields", True, key="mod_spat")
+
+    # Run simulation button
+    col_run1, col_run2 = st.columns([1, 3])
+    with col_run1:
+        run_sim = st.button("▶ Run Physics Simulation", type="primary", key="run_physics_sim")
+
+    if run_sim:
+        from cognisom.dashboard.engine_runner import EngineRunner
+
+        # Configure modules
+        modules_enabled = {
+            "cellular": mod_cellular,
+            "immune": mod_immune,
+            "vascular": mod_vascular,
+            "spatial": mod_spatial,
+            "lymphatic": True,
+            "molecular": True,
+            "epigenetic": False,  # Faster without these
+            "circadian": False,
+            "morphogen": False,
+        }
+
+        with st.spinner(f"Running {scenario} simulation for {sim_duration}h..."):
+            runner = EngineRunner(
+                dt=sim_dt,
+                duration=sim_duration,
+                scenario=scenario,
+                modules_enabled=modules_enabled,
+            )
+
+            # Progress bar
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            def update_progress(current, total):
+                progress_bar.progress(current / total)
+                status_text.text(f"Step {current}/{total} — t={current * sim_dt:.2f}h")
+
+            runner.run(progress_callback=update_progress)
+            status_text.text("Simulation complete!")
+
+            # Store results in session state
+            st.session_state["sim_runner"] = runner
+            st.session_state["sim_time_series"] = runner.get_time_series()
+            st.session_state["sim_cell_snapshots"] = runner.cell_snapshots
+            st.session_state["sim_events"] = runner.event_log
+            st.session_state["sim_final_state"] = runner.get_final_state()
+
+    # Display results if available
+    if "sim_runner" in st.session_state:
+        runner = st.session_state["sim_runner"]
+        ts = st.session_state["sim_time_series"]
+        events = st.session_state["sim_events"]
+        final_state = st.session_state["sim_final_state"]
+
+        st.success(f"**Simulation complete** — {len(runner.history)} time points recorded")
+
+        # ── Key Metrics ──
+        st.markdown("#### 📊 Simulation Results")
+        col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
+
+        col_m1.metric("Final Cells", ts["n_cells"][-1] if ts["n_cells"] else 0)
+        col_m2.metric("Cancer Cells", ts["n_cancer"][-1] if ts["n_cancer"] else 0)
+        col_m3.metric("Total Divisions", ts["total_divisions"][-1] if ts["total_divisions"] else 0)
+        col_m4.metric("Total Deaths", ts["total_deaths"][-1] if ts["total_deaths"] else 0)
+        col_m5.metric("Immune Kills", ts["total_kills"][-1] if ts["total_kills"] else 0)
+
+        # ── Time Series Plots ──
+        st.markdown("#### 📈 Population Dynamics")
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+
+        fig = make_subplots(rows=2, cols=2,
+                            subplot_titles=("Cell Populations", "Metabolism", "Immune Response", "Events"))
+
+        # Cell populations
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["n_cancer"], name="Cancer", line=dict(color="#e74c3c")), row=1, col=1)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["n_normal"], name="Normal", line=dict(color="#3498db")), row=1, col=1)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["n_immune"], name="Immune", line=dict(color="#2ecc71")), row=1, col=1)
+
+        # Metabolism
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["avg_oxygen"], name="Avg O₂", line=dict(color="#e67e22")), row=1, col=2)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["avg_glucose"], name="Avg Glucose", line=dict(color="#9b59b6")), row=1, col=2)
+
+        # Immune
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["n_t_cells"], name="T Cells", line=dict(color="#27ae60")), row=2, col=1)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["n_nk_cells"], name="NK Cells", line=dict(color="#f39c12")), row=2, col=1)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["total_kills"], name="Kills", line=dict(color="#c0392b")), row=2, col=1)
+
+        # Events (cumulative)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["total_divisions"], name="Divisions", line=dict(color="#3498db")), row=2, col=2)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["total_deaths"], name="Deaths", line=dict(color="#95a5a6")), row=2, col=2)
+        fig.add_trace(go.Scatter(x=ts["time"], y=ts["total_metastases"], name="Metastases", line=dict(color="#8e44ad")), row=2, col=2)
+
+        fig.update_layout(height=500, showlegend=True, margin=dict(t=40, b=20))
+        fig.update_xaxes(title_text="Time (hours)")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ── Cell State Table ──
+        st.markdown("#### 🧬 Cell States (Final Snapshot)")
+        final_snap = runner.get_cell_snapshot_at(-1)
+        if final_snap and final_snap.cell_positions is not None:
+            import pandas as pd
+
+            cell_df = pd.DataFrame({
+                "Cell ID": final_snap.cell_ids[:50],  # Limit for display
+                "Type": final_snap.cell_types[:50],
+                "Phase": final_snap.cell_phases[:50],
+                "O₂": [f"{o:.3f}" for o in final_snap.cell_oxygen[:50]],
+                "MHC-I": [f"{m:.2f}" for m in final_snap.cell_mhc1[:50]],
+                "X": [f"{p[0]:.1f}" for p in final_snap.cell_positions[:50]],
+                "Y": [f"{p[1]:.1f}" for p in final_snap.cell_positions[:50]],
+                "Z": [f"{p[2]:.1f}" for p in final_snap.cell_positions[:50]],
+            })
+            st.dataframe(cell_df, use_container_width=True, height=200)
+
+            # Download full data
+            full_df = pd.DataFrame({
+                "cell_id": final_snap.cell_ids,
+                "type": final_snap.cell_types,
+                "phase": final_snap.cell_phases,
+                "oxygen": final_snap.cell_oxygen,
+                "mhc1": final_snap.cell_mhc1,
+                "x": [p[0] for p in final_snap.cell_positions],
+                "y": [p[1] for p in final_snap.cell_positions],
+                "z": [p[2] for p in final_snap.cell_positions],
+            })
+            csv = full_df.to_csv(index=False)
+            st.download_button(
+                "📥 Download Cell Data (CSV)",
+                csv,
+                file_name="cognisom_cell_data.csv",
+                mime="text/csv",
+                key="dl_cell_csv"
+            )
+
+        # ── Event Log ──
+        st.markdown("#### 📋 Key Events")
+        key_events = runner.get_key_events()[:20]  # Limit
+        if key_events:
+            for ev in key_events:
+                event_type = str(ev["event"]).split(".")[-1]
+                st.text(f"t={ev['time']:.2f}h — {event_type}")
+        else:
+            st.info("No major events recorded")
+
+        # ── 3D Visualization from Engine ──
+        st.markdown("#### 🎬 3D View (Engine Data)")
+        if final_snap and final_snap.cell_positions is not None:
+            # Build cell data from actual engine
+            engine_cells = []
+            for i, pos in enumerate(final_snap.cell_positions):
+                ctype = final_snap.cell_types[i] if i < len(final_snap.cell_types) else "normal"
+                colors = {"cancer": "0xff3333", "normal": "0x3399ff", "immune": "0x33ff66"}
+                engine_cells.append({
+                    "x": float(pos[0]),
+                    "y": float(pos[1]),
+                    "z": float(pos[2]),
+                    "color": colors.get(ctype, "0x888888"),
+                    "type": ctype,
+                    "radius": 3.0,
+                })
+
+            # Add immune cells
+            if final_snap.immune_positions is not None:
+                for i, pos in enumerate(final_snap.immune_positions):
+                    itype = final_snap.immune_types[i] if i < len(final_snap.immune_types) else "T_cell"
+                    colors = {"T_cell": "0x33ff66", "NK_cell": "0xffff33", "macrophage": "0xff8833"}
+                    engine_cells.append({
+                        "x": float(pos[0]),
+                        "y": float(pos[1]),
+                        "z": float(pos[2]),
+                        "color": colors.get(itype, "0x33ff66"),
+                        "type": itype,
+                        "radius": 2.5,
+                    })
+
+            engine_cells_json = json.dumps(engine_cells)
+
+            engine_viz_html = f'''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{ margin: 0; overflow: hidden; background: #0a0a15; }}
+                    #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 6px; }}
+                </style>
+            </head>
+            <body>
+                <div id="info">
+                    <div style="color:#88ff88;font-weight:bold">REAL ENGINE DATA</div>
+                    <div>Cells: {len(engine_cells)}</div>
+                    <div>Time: {ts["time"][-1]:.2f}h</div>
+                </div>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+                <script>
+                    const cells = {engine_cells_json};
+
+                    const scene = new THREE.Scene();
+                    scene.background = new THREE.Color(0x0a0a15);
+
+                    const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 2000);
+                    camera.position.set(300, 200, 300);
+
+                    const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    document.body.appendChild(renderer.domElement);
+
+                    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                    controls.enableDamping = true;
+
+                    scene.add(new THREE.AmbientLight(0x404050, 0.6));
+                    scene.add(new THREE.DirectionalLight(0xffffff, 1.0)).position.set(200, 300, 200);
+
+                    const sphereGeo = new THREE.SphereGeometry(1, 12, 12);
+
+                    cells.forEach(c => {{
+                        const mat = new THREE.MeshStandardMaterial({{
+                            color: parseInt(c.color),
+                            roughness: 0.5,
+                        }});
+                        const mesh = new THREE.Mesh(sphereGeo, mat);
+                        mesh.position.set(c.x, c.z, c.y);  // Swap Y/Z for display
+                        mesh.scale.setScalar(c.radius);
+                        scene.add(mesh);
+                    }});
+
+                    // Grid
+                    const grid = new THREE.GridHelper(400, 20, 0x333355, 0x222233);
+                    grid.position.y = -10;
+                    scene.add(grid);
+
+                    function animate() {{
+                        requestAnimationFrame(animate);
+                        controls.update();
+                        renderer.render(scene, camera);
+                    }}
+                    animate();
+
+                    window.addEventListener('resize', () => {{
+                        camera.aspect = window.innerWidth / window.innerHeight;
+                        camera.updateProjectionMatrix();
+                        renderer.setSize(window.innerWidth, window.innerHeight);
+                    }});
+                </script>
+            </body>
+            </html>
+            '''
+            components.html(engine_viz_html, height=400)
+            st.caption("**Real engine data** — Cell positions from the physics simulation, not animated demos")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # DEMO VISUALIZATION (for quick preview without running engine)
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("### 🎨 Demo Visualization (No Engine)")
+    st.success("**In-Browser 3D** — Quick preview without running the simulation engine.")
 
     # Configuration
     col_cfg1, col_cfg2, col_cfg3 = st.columns(3)
