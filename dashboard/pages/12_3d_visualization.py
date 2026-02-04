@@ -801,6 +801,1258 @@ with tab_live3d:
 
     st.caption("**Detailed cell view** — Interactive 3D visualization with customizable organelles.")
 
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # BIOLOGICAL PROCESSES SIMULATIONS
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown("## 🧬 Biological Process Simulations")
+    st.info("Select a biological process to visualize realistic cellular dynamics")
+
+    process_type = st.selectbox(
+        "Select Process",
+        [
+            "Tissue Microenvironment (500+ cells)",
+            "Central Dogma: DNA → RNA → Protein",
+            "Viral Infection Cycle",
+            "Apoptosis (Programmed Cell Death)",
+            "Phagocytosis (Immune Response)",
+        ],
+        key="bio_process_select"
+    )
+
+    # ── Process-specific controls ──
+    if process_type == "Tissue Microenvironment (500+ cells)":
+        st.markdown("### Tumor Microenvironment")
+        col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+        tissue_cells = col_t1.slider("Total Cells", 200, 1000, 500, 50, key="tissue_n")
+        cancer_pct = col_t2.slider("Cancer %", 10, 80, 40, key="cancer_pct")
+        immune_pct = col_t3.slider("Immune %", 5, 40, 20, key="immune_pct")
+        hypoxic_core = col_t4.checkbox("Hypoxic Core", True, key="hypoxic")
+
+    elif process_type == "Central Dogma: DNA → RNA → Protein":
+        st.markdown("### Gene Expression: Transcription & Translation")
+        col_d1, col_d2, col_d3 = st.columns(3)
+        gene_name = col_d1.selectbox("Gene", ["TP53", "MYC", "BRCA1", "HER2", "EGFR"], key="gene_sel")
+        show_ribosomes = col_d2.checkbox("Show Ribosomes", True, key="show_ribo_cd")
+        animation_phase = col_d3.slider("Animation Phase", 0.0, 1.0, 0.5, 0.01, key="anim_phase")
+
+    elif process_type == "Viral Infection Cycle":
+        st.markdown("### Viral Entry, Replication & Lysis")
+        col_v1, col_v2, col_v3 = st.columns(3)
+        virus_type = col_v1.selectbox("Virus Type", ["SARS-CoV-2", "HIV", "Influenza", "Bacteriophage"], key="virus_type")
+        infection_stage = col_v2.selectbox("Stage", ["Entry", "Replication", "Assembly", "Lysis"], key="inf_stage")
+        virus_count = col_v3.slider("Viral Particles", 5, 50, 20, key="virus_n")
+
+    elif process_type == "Apoptosis (Programmed Cell Death)":
+        st.markdown("### Programmed Cell Death Cascade")
+        col_a1, col_a2, col_a3 = st.columns(3)
+        apoptosis_stage = col_a1.selectbox(
+            "Stage",
+            ["Healthy", "Initiation", "Chromatin Condensation", "Membrane Blebbing", "Apoptotic Bodies"],
+            key="apop_stage"
+        )
+        trigger = col_a2.selectbox("Trigger", ["DNA Damage", "Death Receptor", "Mitochondrial"], key="apop_trigger")
+        show_caspases = col_a3.checkbox("Show Caspase Cascade", True, key="show_casp")
+
+    elif process_type == "Phagocytosis (Immune Response)":
+        st.markdown("### Macrophage Engulfing Pathogen")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        phago_stage = col_p1.selectbox(
+            "Stage",
+            ["Recognition", "Attachment", "Engulfment", "Phagosome Formation", "Digestion"],
+            key="phago_stage"
+        )
+        target_type = col_p2.selectbox("Target", ["Bacteria", "Apoptotic Cell", "Cancer Cell"], key="phago_target")
+        show_lysosomes = col_p3.checkbox("Show Lysosomes", True, key="show_lyso")
+
+    # ── Build the Three.js visualization ──
+    import random
+    import math
+
+    if process_type == "Tissue Microenvironment (500+ cells)":
+        random.seed(42)
+        tissue_data = []
+        normal_count = int(tissue_cells * (100 - cancer_pct - immune_pct) / 100)
+        cancer_count = int(tissue_cells * cancer_pct / 100)
+        immune_count = tissue_cells - normal_count - cancer_count
+
+        # Generate cells in tumor pattern
+        for i in range(cancer_count):
+            # Cancer cells cluster in center
+            r = random.gauss(0, 15)
+            theta = random.uniform(0, 2 * math.pi)
+            phi = random.uniform(0, math.pi)
+            tissue_data.append({
+                "x": r * math.sin(phi) * math.cos(theta),
+                "y": r * math.sin(phi) * math.sin(theta),
+                "z": r * math.cos(phi),
+                "type": "cancer",
+                "color": "0xff3333",
+                "radius": random.uniform(1.5, 2.5),
+                "hypoxic": abs(r) < 8 if hypoxic_core else False,
+            })
+
+        for i in range(normal_count):
+            # Normal cells form outer tissue
+            r = random.uniform(20, 40)
+            theta = random.uniform(0, 2 * math.pi)
+            phi = random.uniform(0, math.pi)
+            tissue_data.append({
+                "x": r * math.sin(phi) * math.cos(theta),
+                "y": r * math.sin(phi) * math.sin(theta),
+                "z": r * math.cos(phi),
+                "type": "normal",
+                "color": "0x4488ff",
+                "radius": random.uniform(1.0, 1.8),
+                "hypoxic": False,
+            })
+
+        for i in range(immune_count):
+            # Immune cells infiltrating
+            r = random.uniform(5, 35)
+            theta = random.uniform(0, 2 * math.pi)
+            phi = random.uniform(0, math.pi)
+            tissue_data.append({
+                "x": r * math.sin(phi) * math.cos(theta),
+                "y": r * math.sin(phi) * math.sin(theta),
+                "z": r * math.cos(phi),
+                "type": random.choice(["t_cell", "macrophage", "nk_cell"]),
+                "color": random.choice(["0x33ff66", "0xffaa33", "0xffff33"]),
+                "radius": random.uniform(0.8, 1.5),
+                "hypoxic": False,
+            })
+
+        tissue_json = json.dumps(tissue_data)
+
+        process_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; overflow: hidden; background: #050510; }}
+                #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.8); padding: 12px; border-radius: 8px; }}
+                #legend {{ position: absolute; bottom: 10px; right: 10px; color: #fff; font-family: monospace; font-size: 11px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 6px; }}
+                .leg-item {{ display: flex; align-items: center; margin: 3px 0; }}
+                .leg-dot {{ width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }}
+            </style>
+        </head>
+        <body>
+            <div id="info">
+                <div style="font-size:14px;font-weight:bold;margin-bottom:8px;color:#ff6666">Tumor Microenvironment</div>
+                <div>Cells: {tissue_cells}</div>
+                <div>Cancer: {cancer_count} ({cancer_pct}%)</div>
+                <div>Immune: {immune_count}</div>
+                <div>Normal: {normal_count}</div>
+                {"<div style='color:#8844ff'>⚠ Hypoxic Core Active</div>" if hypoxic_core else ""}
+            </div>
+            <div id="legend">
+                <div style="font-weight:bold;margin-bottom:6px">Cell Types</div>
+                <div class="leg-item"><div class="leg-dot" style="background:#ff3333"></div>Cancer</div>
+                <div class="leg-item"><div class="leg-dot" style="background:#4488ff"></div>Normal</div>
+                <div class="leg-item"><div class="leg-dot" style="background:#33ff66"></div>T Cell</div>
+                <div class="leg-item"><div class="leg-dot" style="background:#ffaa33"></div>Macrophage</div>
+                <div class="leg-item"><div class="leg-dot" style="background:#ffff33"></div>NK Cell</div>
+                {"<div class='leg-item'><div class='leg-dot' style='background:#660066'></div>Hypoxic</div>" if hypoxic_core else ""}
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+            <script>
+                const cells = {tissue_json};
+                const hypoxicCore = {'true' if hypoxic_core else 'false'};
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x050510);
+                scene.fog = new THREE.Fog(0x050510, 60, 120);
+
+                const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
+                camera.position.set(60, 45, 60);
+
+                const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                document.body.appendChild(renderer.domElement);
+
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.3;
+
+                // Lighting
+                scene.add(new THREE.AmbientLight(0x404060, 0.6));
+                const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+                sun.position.set(30, 50, 30);
+                scene.add(sun);
+                scene.add(new THREE.PointLight(0xff4444, 0.5, 80));
+
+                // Hypoxic core glow
+                if (hypoxicCore) {{
+                    const coreGlow = new THREE.PointLight(0x660066, 1.5, 20);
+                    coreGlow.position.set(0, 0, 0);
+                    scene.add(coreGlow);
+                }}
+
+                // Create cells
+                const cellMeshes = [];
+                const sphereGeo = new THREE.SphereGeometry(1, 12, 12);
+
+                cells.forEach((c, i) => {{
+                    let color = parseInt(c.color);
+                    if (c.hypoxic) color = 0x660066;
+
+                    const mat = new THREE.MeshStandardMaterial({{
+                        color: color,
+                        roughness: 0.5,
+                        metalness: 0.1,
+                        transparent: c.type === 'normal',
+                        opacity: c.type === 'normal' ? 0.7 : 1.0,
+                    }});
+
+                    const mesh = new THREE.Mesh(sphereGeo, mat);
+                    mesh.position.set(c.x, c.y, c.z);
+                    mesh.scale.setScalar(c.radius);
+                    mesh.userData = {{ type: c.type, phase: Math.random() * Math.PI * 2 }};
+                    scene.add(mesh);
+                    cellMeshes.push(mesh);
+                }});
+
+                // Blood vessels (tubes)
+                for (let v = 0; v < 5; v++) {{
+                    const points = [];
+                    const startAngle = v * Math.PI * 2 / 5;
+                    for (let t = 0; t <= 20; t++) {{
+                        const tt = t / 20;
+                        const r = 15 + tt * 25;
+                        points.push(new THREE.Vector3(
+                            Math.cos(startAngle + tt * 2) * r,
+                            (tt - 0.5) * 40 + Math.sin(tt * 4) * 5,
+                            Math.sin(startAngle + tt * 2) * r
+                        ));
+                    }}
+                    const curve = new THREE.CatmullRomCurve3(points);
+                    const tubeGeo = new THREE.TubeGeometry(curve, 30, 0.8, 8, false);
+                    const tubeMat = new THREE.MeshStandardMaterial({{ color: 0x880022, roughness: 0.3 }});
+                    scene.add(new THREE.Mesh(tubeGeo, tubeMat));
+                }}
+
+                let time = 0;
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    time += 0.016;
+
+                    cellMeshes.forEach((m, i) => {{
+                        const phase = m.userData.phase;
+                        // Gentle movement
+                        m.position.x += Math.sin(time + phase) * 0.01;
+                        m.position.y += Math.cos(time * 0.7 + phase) * 0.01;
+
+                        // Cancer cells divide (pulse)
+                        if (m.userData.type === 'cancer') {{
+                            const pulse = 1 + Math.sin(time * 2 + phase) * 0.05;
+                            m.scale.setScalar(m.scale.x * 0.99 + pulse * 0.01 * cells[i].radius);
+                        }}
+                        // Immune cells move more
+                        if (m.userData.type === 't_cell' || m.userData.type === 'macrophage') {{
+                            m.position.x += Math.sin(time * 3 + phase) * 0.03;
+                            m.position.z += Math.cos(time * 3 + phase) * 0.03;
+                        }}
+                    }});
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }}
+                animate();
+
+                window.addEventListener('resize', () => {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }});
+            </script>
+        </body>
+        </html>
+        '''
+
+    elif process_type == "Central Dogma: DNA → RNA → Protein":
+        phase = animation_phase
+        process_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; overflow: hidden; background: #0a0a20; }}
+                #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 13px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; max-width: 280px; }}
+                #stage {{ position: absolute; top: 10px; right: 10px; color: #fff; font-family: monospace; font-size: 18px; background: linear-gradient(135deg, #1a1a4a, #2a2a6a); padding: 15px 25px; border-radius: 10px; border: 2px solid #4488ff; }}
+            </style>
+        </head>
+        <body>
+            <div id="info">
+                <div style="font-size:16px;font-weight:bold;color:#88aaff;margin-bottom:10px">🧬 Gene: {gene_name}</div>
+                <div style="margin-bottom:8px"><span style="color:#ff8844">DNA</span> → <span style="color:#44ff88">mRNA</span> → <span style="color:#ff44aa">Protein</span></div>
+                <div style="font-size:11px;color:#888;margin-top:10px">
+                    {"📖 Transcription: DNA → mRNA in nucleus" if phase < 0.4 else ""}
+                    {"🔄 mRNA Export: Through nuclear pore" if 0.4 <= phase < 0.6 else ""}
+                    {"🔧 Translation: Ribosome reads mRNA" if phase >= 0.6 else ""}
+                </div>
+            </div>
+            <div id="stage">
+                {"TRANSCRIPTION" if phase < 0.4 else "EXPORT" if phase < 0.6 else "TRANSLATION"}
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+            <script>
+                const phase = {phase};
+                const showRibosomes = {'true' if show_ribosomes else 'false'};
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a20);
+
+                const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 200);
+                camera.position.set(0, 15, 35);
+
+                const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                // Lighting
+                scene.add(new THREE.AmbientLight(0x404060, 0.8));
+                scene.add(new THREE.DirectionalLight(0xffffff, 1.0)).position.set(10, 20, 15);
+
+                // ═══════ NUCLEUS ═══════
+                const nucleusGeo = new THREE.SphereGeometry(8, 48, 48);
+                const nucleusMat = new THREE.MeshStandardMaterial({{
+                    color: 0x334488,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide,
+                }});
+                const nucleus = new THREE.Mesh(nucleusGeo, nucleusMat);
+                scene.add(nucleus);
+
+                // Nuclear envelope (inner)
+                const envGeo = new THREE.SphereGeometry(7.8, 32, 32);
+                const envMat = new THREE.MeshBasicMaterial({{ color: 0x223366, transparent: true, opacity: 0.1, side: THREE.BackSide }});
+                scene.add(new THREE.Mesh(envGeo, envMat));
+
+                // ═══════ DNA DOUBLE HELIX ═══════
+                const dnaGroup = new THREE.Group();
+                const helixTurns = 4;
+                const helixRadius = 1.5;
+                const helixHeight = 10;
+
+                for (let strand = 0; strand < 2; strand++) {{
+                    const points = [];
+                    for (let i = 0; i <= 100; i++) {{
+                        const t = i / 100;
+                        const angle = t * helixTurns * Math.PI * 2 + strand * Math.PI;
+                        points.push(new THREE.Vector3(
+                            Math.cos(angle) * helixRadius,
+                            (t - 0.5) * helixHeight,
+                            Math.sin(angle) * helixRadius
+                        ));
+                    }}
+                    const curve = new THREE.CatmullRomCurve3(points);
+                    const tubeGeo = new THREE.TubeGeometry(curve, 80, 0.15, 8, false);
+                    const tubeMat = new THREE.MeshStandardMaterial({{ color: strand === 0 ? 0xff6644 : 0xff8866, roughness: 0.4 }});
+                    dnaGroup.add(new THREE.Mesh(tubeGeo, tubeMat));
+                }}
+
+                // Base pairs
+                for (let i = 0; i < 40; i++) {{
+                    const t = i / 40;
+                    const angle = t * helixTurns * Math.PI * 2;
+                    const y = (t - 0.5) * helixHeight;
+
+                    const pairGeo = new THREE.CylinderGeometry(0.08, 0.08, helixRadius * 1.8, 6);
+                    const pairMat = new THREE.MeshStandardMaterial({{
+                        color: i % 4 === 0 ? 0x44ff44 : i % 4 === 1 ? 0xff4444 : i % 4 === 2 ? 0x4444ff : 0xffff44
+                    }});
+                    const pair = new THREE.Mesh(pairGeo, pairMat);
+                    pair.position.set(0, y, 0);
+                    pair.rotation.z = Math.PI / 2;
+                    pair.rotation.y = angle;
+                    dnaGroup.add(pair);
+                }}
+
+                dnaGroup.position.set(-2, 0, 0);
+                scene.add(dnaGroup);
+
+                // ═══════ RNA POLYMERASE (transcription machine) ═══════
+                const rnaPolGeo = new THREE.SphereGeometry(1.2, 16, 16);
+                rnaPolGeo.scale(1.5, 1, 1);
+                const rnaPolMat = new THREE.MeshStandardMaterial({{ color: 0x44aaff, roughness: 0.3 }});
+                const rnaPol = new THREE.Mesh(rnaPolGeo, rnaPolMat);
+                rnaPol.position.set(-2, -4 + phase * 8, 0);
+                if (phase < 0.4) scene.add(rnaPol);
+
+                // ═══════ mRNA STRAND ═══════
+                const mrnaGroup = new THREE.Group();
+                const mrnaLength = phase < 0.4 ? phase * 2.5 : 1.0;
+                const mrnaPoints = [];
+                for (let i = 0; i <= 50 * mrnaLength; i++) {{
+                    const t = i / 50;
+                    let x = 3 + t * 8;
+                    let y = -4 + phase * 8 + Math.sin(t * 6) * 0.5;
+                    let z = Math.cos(t * 6) * 0.5;
+
+                    // Export through nuclear pore
+                    if (phase >= 0.4 && phase < 0.6) {{
+                        const exportT = (phase - 0.4) / 0.2;
+                        x = 3 + t * 8 + exportT * 5;
+                    }}
+                    // In cytoplasm
+                    if (phase >= 0.6) {{
+                        x = 8 + t * 10;
+                        y = -2 + Math.sin(t * 4) * 1;
+                    }}
+
+                    mrnaPoints.push(new THREE.Vector3(x, y, z));
+                }}
+                if (mrnaPoints.length > 1) {{
+                    const mrnaCurve = new THREE.CatmullRomCurve3(mrnaPoints);
+                    const mrnaGeo = new THREE.TubeGeometry(mrnaCurve, 40, 0.2, 8, false);
+                    const mrnaMat = new THREE.MeshStandardMaterial({{ color: 0x44ff88, roughness: 0.4, emissive: 0x113322, emissiveIntensity: 0.3 }});
+                    mrnaGroup.add(new THREE.Mesh(mrnaGeo, mrnaMat));
+                }}
+                scene.add(mrnaGroup);
+
+                // ═══════ RIBOSOMES (translation) ═══════
+                if (showRibosomes && phase >= 0.5) {{
+                    for (let r = 0; r < 4; r++) {{
+                        const riboGeo = new THREE.SphereGeometry(0.8, 12, 12);
+                        riboGeo.scale(1.2, 0.8, 1);
+                        const riboMat = new THREE.MeshStandardMaterial({{ color: 0xaa66ff, roughness: 0.5 }});
+                        const ribo = new THREE.Mesh(riboGeo, riboMat);
+                        ribo.position.set(10 + r * 3, -2 + Math.sin(r) * 0.5, 0);
+                        if (phase >= 0.6) scene.add(ribo);
+
+                        // Nascent protein chain
+                        if (phase >= 0.7 && r < 2) {{
+                            const protPoints = [];
+                            for (let p = 0; p <= 10; p++) {{
+                                protPoints.push(new THREE.Vector3(
+                                    10 + r * 3,
+                                    -3 - p * 0.5,
+                                    Math.sin(p * 0.8) * 0.5
+                                ));
+                            }}
+                            const protCurve = new THREE.CatmullRomCurve3(protPoints);
+                            const protGeo = new THREE.TubeGeometry(protCurve, 15, 0.25, 8, false);
+                            const protMat = new THREE.MeshStandardMaterial({{ color: 0xff44aa, roughness: 0.4 }});
+                            scene.add(new THREE.Mesh(protGeo, protMat));
+                        }}
+                    }}
+                }}
+
+                // Nuclear pore
+                const poreGeo = new THREE.TorusGeometry(1.5, 0.3, 8, 16);
+                const poreMat = new THREE.MeshStandardMaterial({{ color: 0x556688 }});
+                const pore = new THREE.Mesh(poreGeo, poreMat);
+                pore.position.set(8, 0, 0);
+                pore.rotation.y = Math.PI / 2;
+                scene.add(pore);
+
+                // Labels
+                function addLabel(text, pos, color) {{
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256; canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = color;
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText(text, 10, 40);
+                    const tex = new THREE.CanvasTexture(canvas);
+                    const spriteMat = new THREE.SpriteMaterial({{ map: tex, transparent: true }});
+                    const sprite = new THREE.Sprite(spriteMat);
+                    sprite.position.set(pos.x, pos.y, pos.z);
+                    sprite.scale.set(6, 1.5, 1);
+                    scene.add(sprite);
+                }}
+
+                addLabel('DNA', {{ x: -6, y: 6, z: 0 }}, '#ff8844');
+                addLabel('Nucleus', {{ x: 0, y: 10, z: 0 }}, '#6688aa');
+                if (phase >= 0.3) addLabel('mRNA', {{ x: 5, y: 5, z: 0 }}, '#44ff88');
+                if (phase >= 0.6) addLabel('Cytoplasm', {{ x: 15, y: 8, z: 0 }}, '#888888');
+                if (phase >= 0.7) addLabel('Protein', {{ x: 12, y: -8, z: 0 }}, '#ff44aa');
+
+                let time = 0;
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    time += 0.016;
+
+                    dnaGroup.rotation.y = time * 0.2;
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }}
+                animate();
+
+                window.addEventListener('resize', () => {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }});
+            </script>
+        </body>
+        </html>
+        '''
+
+    elif process_type == "Viral Infection Cycle":
+        stage_map = {"Entry": 0, "Replication": 1, "Assembly": 2, "Lysis": 3}
+        stage_idx = stage_map[infection_stage]
+
+        virus_colors = {
+            "SARS-CoV-2": "0xff4444",
+            "HIV": "0x44ff44",
+            "Influenza": "0x4488ff",
+            "Bacteriophage": "0xaa44ff",
+        }
+        v_color = virus_colors[virus_type]
+
+        process_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; overflow: hidden; background: #0a0a15; }}
+                #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 13px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; }}
+                #stage {{ position: absolute; top: 10px; right: 10px; color: #ff4444; font-family: monospace; font-size: 20px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 10px; border: 2px solid #ff4444; }}
+            </style>
+        </head>
+        <body>
+            <div id="info">
+                <div style="font-size:16px;font-weight:bold;color:#ff6666;margin-bottom:10px">🦠 {virus_type} Infection</div>
+                <div style="margin-bottom:5px">Stage: <span style="color:#ffaa44">{infection_stage}</span></div>
+                <div style="font-size:11px;color:#888;margin-top:8px">
+                    {"Viral attachment to cell receptor" if stage_idx == 0 else ""}
+                    {"Viral RNA/DNA replication in nucleus" if stage_idx == 1 else ""}
+                    {"New virions assembling in cytoplasm" if stage_idx == 2 else ""}
+                    {"Cell bursting, releasing virions" if stage_idx == 3 else ""}
+                </div>
+            </div>
+            <div id="stage">⚠ {infection_stage.upper()}</div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+            <script>
+                const stageIdx = {stage_idx};
+                const virusColor = {v_color};
+                const virusCount = {virus_count};
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a15);
+
+                const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 200);
+                camera.position.set(25, 20, 30);
+
+                const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                scene.add(new THREE.AmbientLight(0x404050, 0.7));
+                const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+                sun.position.set(20, 30, 20);
+                scene.add(sun);
+
+                // ═══════ HOST CELL ═══════
+                const cellGeo = new THREE.SphereGeometry(10, 48, 48);
+                let cellOpacity = stageIdx === 3 ? 0.15 : 0.35;
+                const cellMat = new THREE.MeshStandardMaterial({{
+                    color: 0x4488aa,
+                    transparent: true,
+                    opacity: cellOpacity,
+                    side: stageIdx === 3 ? THREE.DoubleSide : THREE.FrontSide,
+                }});
+                const cell = new THREE.Mesh(cellGeo, cellMat);
+
+                // Lysis effect - cell membrane breaking
+                if (stageIdx === 3) {{
+                    cell.geometry.vertices?.forEach?.(v => {{
+                        v.x += (Math.random() - 0.5) * 2;
+                        v.y += (Math.random() - 0.5) * 2;
+                    }});
+                }}
+                scene.add(cell);
+
+                // Nucleus
+                const nucGeo = new THREE.SphereGeometry(3, 32, 32);
+                const nucMat = new THREE.MeshStandardMaterial({{ color: 0x224466, roughness: 0.4 }});
+                const nuc = new THREE.Mesh(nucGeo, nucMat);
+                if (stageIdx < 3) scene.add(nuc);
+
+                // Viral RNA in nucleus (replication stage)
+                if (stageIdx >= 1) {{
+                    for (let i = 0; i < 8; i++) {{
+                        const rnaGeo = new THREE.TorusKnotGeometry(0.5, 0.1, 30, 8);
+                        const rnaMat = new THREE.MeshStandardMaterial({{ color: virusColor, emissive: virusColor, emissiveIntensity: 0.3 }});
+                        const rna = new THREE.Mesh(rnaGeo, rnaMat);
+                        rna.position.set(
+                            (Math.random() - 0.5) * 4,
+                            (Math.random() - 0.5) * 4,
+                            (Math.random() - 0.5) * 4
+                        );
+                        rna.scale.setScalar(0.6);
+                        scene.add(rna);
+                    }}
+                }}
+
+                // ═══════ VIRIONS ═══════
+                const virions = [];
+
+                function createVirion(pos, isSpike) {{
+                    const group = new THREE.Group();
+
+                    // Core
+                    const coreGeo = new THREE.IcosahedronGeometry(0.6, 1);
+                    const coreMat = new THREE.MeshStandardMaterial({{ color: virusColor, roughness: 0.3 }});
+                    group.add(new THREE.Mesh(coreGeo, coreMat));
+
+                    // Spike proteins (corona)
+                    if (isSpike) {{
+                        for (let s = 0; s < 20; s++) {{
+                            const spikeGeo = new THREE.ConeGeometry(0.08, 0.4, 4);
+                            const spikeMat = new THREE.MeshStandardMaterial({{ color: 0xffcc44 }});
+                            const spike = new THREE.Mesh(spikeGeo, spikeMat);
+
+                            const phi = Math.acos(2 * Math.random() - 1);
+                            const theta = Math.random() * Math.PI * 2;
+                            spike.position.set(
+                                0.7 * Math.sin(phi) * Math.cos(theta),
+                                0.7 * Math.sin(phi) * Math.sin(theta),
+                                0.7 * Math.cos(phi)
+                            );
+                            spike.lookAt(spike.position.clone().multiplyScalar(2));
+                            group.add(spike);
+                        }}
+                    }}
+
+                    group.position.copy(pos);
+                    return group;
+                }}
+
+                // Position virions based on stage
+                for (let v = 0; v < virusCount; v++) {{
+                    let pos;
+                    if (stageIdx === 0) {{
+                        // Outside cell, approaching
+                        const angle = v / virusCount * Math.PI * 2;
+                        pos = new THREE.Vector3(
+                            Math.cos(angle) * 14,
+                            Math.sin(angle) * 14,
+                            (Math.random() - 0.5) * 10
+                        );
+                    }} else if (stageIdx === 1) {{
+                        // Some inside
+                        pos = new THREE.Vector3(
+                            (Math.random() - 0.5) * 6,
+                            (Math.random() - 0.5) * 6,
+                            (Math.random() - 0.5) * 6
+                        );
+                    }} else if (stageIdx === 2) {{
+                        // Assembling near membrane
+                        const r = 7 + Math.random() * 2;
+                        const phi = Math.random() * Math.PI;
+                        const theta = Math.random() * Math.PI * 2;
+                        pos = new THREE.Vector3(
+                            r * Math.sin(phi) * Math.cos(theta),
+                            r * Math.sin(phi) * Math.sin(theta),
+                            r * Math.cos(phi)
+                        );
+                    }} else {{
+                        // Bursting out
+                        const r = 10 + Math.random() * 8;
+                        const phi = Math.random() * Math.PI;
+                        const theta = Math.random() * Math.PI * 2;
+                        pos = new THREE.Vector3(
+                            r * Math.sin(phi) * Math.cos(theta),
+                            r * Math.sin(phi) * Math.sin(theta),
+                            r * Math.cos(phi)
+                        );
+                    }}
+
+                    const virion = createVirion(pos, true);
+                    virion.userData = {{ basePos: pos.clone(), phase: Math.random() * Math.PI * 2 }};
+                    scene.add(virion);
+                    virions.push(virion);
+                }}
+
+                // ACE2 receptors on cell surface
+                if (stageIdx === 0) {{
+                    for (let r = 0; r < 30; r++) {{
+                        const recGeo = new THREE.CylinderGeometry(0.15, 0.1, 0.8, 6);
+                        const recMat = new THREE.MeshStandardMaterial({{ color: 0x44ff88 }});
+                        const rec = new THREE.Mesh(recGeo, recMat);
+
+                        const phi = Math.random() * Math.PI;
+                        const theta = Math.random() * Math.PI * 2;
+                        rec.position.set(
+                            10.2 * Math.sin(phi) * Math.cos(theta),
+                            10.2 * Math.sin(phi) * Math.sin(theta),
+                            10.2 * Math.cos(phi)
+                        );
+                        rec.lookAt(0, 0, 0);
+                        scene.add(rec);
+                    }}
+                }}
+
+                let time = 0;
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    time += 0.016;
+
+                    virions.forEach((v, i) => {{
+                        const phase = v.userData.phase;
+                        if (stageIdx === 0) {{
+                            // Move toward cell
+                            v.position.lerp(new THREE.Vector3(0, 0, 0), 0.0005);
+                        }} else if (stageIdx === 3) {{
+                            // Explode outward
+                            v.position.add(v.position.clone().normalize().multiplyScalar(0.02));
+                        }}
+                        v.rotation.x += 0.01;
+                        v.rotation.y += 0.01;
+                    }});
+
+                    // Cell lysis animation
+                    if (stageIdx === 3) {{
+                        cell.scale.setScalar(1 + Math.sin(time * 3) * 0.05);
+                    }}
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }}
+                animate();
+
+                window.addEventListener('resize', () => {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }});
+            </script>
+        </body>
+        </html>
+        '''
+
+    elif process_type == "Apoptosis (Programmed Cell Death)":
+        stage_map = {"Healthy": 0, "Initiation": 1, "Chromatin Condensation": 2, "Membrane Blebbing": 3, "Apoptotic Bodies": 4}
+        stage_idx = stage_map[apoptosis_stage]
+
+        process_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; overflow: hidden; background: #0a0510; }}
+                #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 13px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; }}
+                #stage {{ position: absolute; top: 10px; right: 10px; color: #aa44ff; font-family: monospace; font-size: 18px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 10px; border: 2px solid #aa44ff; }}
+            </style>
+        </head>
+        <body>
+            <div id="info">
+                <div style="font-size:16px;font-weight:bold;color:#aa66ff;margin-bottom:10px">💀 Apoptosis</div>
+                <div>Trigger: <span style="color:#ffaa44">{trigger}</span></div>
+                <div>Stage: <span style="color:#ff66aa">{apoptosis_stage}</span></div>
+                <div style="font-size:11px;color:#888;margin-top:8px">
+                    {"Normal cell function" if stage_idx == 0 else ""}
+                    {"Caspase cascade activated" if stage_idx == 1 else ""}
+                    {"DNA fragmentation, nuclear condensation" if stage_idx == 2 else ""}
+                    {"Cell membrane blebbing" if stage_idx == 3 else ""}
+                    {"Cell fragmenting into apoptotic bodies" if stage_idx == 4 else ""}
+                </div>
+            </div>
+            <div id="stage">{apoptosis_stage.upper()}</div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+            <script>
+                const stageIdx = {stage_idx};
+                const showCaspases = {'true' if show_caspases else 'false'};
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0510);
+
+                const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 200);
+                camera.position.set(20, 15, 25);
+
+                const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.3;
+
+                scene.add(new THREE.AmbientLight(0x404050, 0.6));
+                scene.add(new THREE.DirectionalLight(0xffffff, 1.0)).position.set(15, 25, 20);
+
+                // Cell state based on stage
+                const cellRadius = stageIdx <= 1 ? 8 : stageIdx === 2 ? 7 : stageIdx === 3 ? 6 : 0;
+                const cellColor = stageIdx === 0 ? 0x4488ff : stageIdx <= 2 ? 0x8866aa : 0x664488;
+
+                if (stageIdx < 4) {{
+                    // Main cell membrane
+                    const cellGeo = new THREE.SphereGeometry(cellRadius, 48, 48);
+                    const cellMat = new THREE.MeshStandardMaterial({{
+                        color: cellColor,
+                        transparent: true,
+                        opacity: 0.35,
+                        side: THREE.DoubleSide,
+                    }});
+                    const cell = new THREE.Mesh(cellGeo, cellMat);
+                    scene.add(cell);
+
+                    // Membrane blebs (stage 3)
+                    if (stageIdx === 3) {{
+                        for (let b = 0; b < 15; b++) {{
+                            const blebGeo = new THREE.SphereGeometry(0.8 + Math.random() * 0.8, 12, 12);
+                            const blebMat = new THREE.MeshStandardMaterial({{
+                                color: 0x664488,
+                                transparent: true,
+                                opacity: 0.5,
+                            }});
+                            const bleb = new THREE.Mesh(blebGeo, blebMat);
+
+                            const phi = Math.random() * Math.PI;
+                            const theta = Math.random() * Math.PI * 2;
+                            const r = cellRadius + 0.5;
+                            bleb.position.set(
+                                r * Math.sin(phi) * Math.cos(theta),
+                                r * Math.sin(phi) * Math.sin(theta),
+                                r * Math.cos(phi)
+                            );
+                            scene.add(bleb);
+                        }}
+                    }}
+                }}
+
+                // Nucleus (condensing in later stages)
+                const nucRadius = stageIdx === 0 ? 3 : stageIdx === 1 ? 2.8 : stageIdx === 2 ? 2 : stageIdx === 3 ? 1.5 : 0;
+                if (nucRadius > 0) {{
+                    const nucGeo = new THREE.SphereGeometry(nucRadius, 32, 32);
+                    const nucMat = new THREE.MeshStandardMaterial({{
+                        color: stageIdx <= 1 ? 0x224488 : 0x442266,
+                        roughness: 0.4,
+                    }});
+                    const nuc = new THREE.Mesh(nucGeo, nucMat);
+                    scene.add(nuc);
+
+                    // Chromatin condensation (stage 2+)
+                    if (stageIdx >= 2) {{
+                        for (let c = 0; c < 8; c++) {{
+                            const chromGeo = new THREE.SphereGeometry(0.4, 8, 8);
+                            const chromMat = new THREE.MeshStandardMaterial({{ color: 0x220044 }});
+                            const chrom = new THREE.Mesh(chromGeo, chromMat);
+                            chrom.position.set(
+                                (Math.random() - 0.5) * nucRadius,
+                                (Math.random() - 0.5) * nucRadius,
+                                (Math.random() - 0.5) * nucRadius
+                            );
+                            scene.add(chrom);
+                        }}
+                    }}
+                }}
+
+                // Caspase cascade visualization
+                if (showCaspases && stageIdx >= 1) {{
+                    for (let c = 0; c < 20; c++) {{
+                        const caspGeo = new THREE.TetrahedronGeometry(0.3);
+                        const caspMat = new THREE.MeshStandardMaterial({{
+                            color: 0xff4444,
+                            emissive: 0xff2222,
+                            emissiveIntensity: 0.5,
+                        }});
+                        const casp = new THREE.Mesh(caspGeo, caspMat);
+                        casp.position.set(
+                            (Math.random() - 0.5) * 12,
+                            (Math.random() - 0.5) * 12,
+                            (Math.random() - 0.5) * 12
+                        );
+                        casp.userData = {{ speed: 0.02 + Math.random() * 0.02 }};
+                        scene.add(casp);
+                    }}
+                }}
+
+                // Apoptotic bodies (stage 4)
+                if (stageIdx === 4) {{
+                    for (let a = 0; a < 12; a++) {{
+                        const bodyGeo = new THREE.SphereGeometry(1 + Math.random() * 1.5, 16, 16);
+                        const bodyMat = new THREE.MeshStandardMaterial({{
+                            color: 0x664488,
+                            transparent: true,
+                            opacity: 0.7,
+                        }});
+                        const body = new THREE.Mesh(bodyGeo, bodyMat);
+
+                        const angle = a / 12 * Math.PI * 2;
+                        const r = 4 + Math.random() * 6;
+                        body.position.set(
+                            Math.cos(angle) * r,
+                            (Math.random() - 0.5) * 8,
+                            Math.sin(angle) * r
+                        );
+                        body.userData = {{ drift: new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).multiplyScalar(0.02) }};
+                        scene.add(body);
+
+                        // DNA fragments inside
+                        const fragGeo = new THREE.IcosahedronGeometry(0.3, 0);
+                        const fragMat = new THREE.MeshStandardMaterial({{ color: 0x220044 }});
+                        const frag = new THREE.Mesh(fragGeo, fragMat);
+                        frag.position.copy(body.position);
+                        scene.add(frag);
+                    }}
+
+                    // Phosphatidylserine "eat me" signals
+                    for (let p = 0; p < 30; p++) {{
+                        const psGeo = new THREE.SphereGeometry(0.15, 6, 6);
+                        const psMat = new THREE.MeshStandardMaterial({{ color: 0x44ff44, emissive: 0x22aa22, emissiveIntensity: 0.5 }});
+                        const ps = new THREE.Mesh(psGeo, psMat);
+                        ps.position.set(
+                            (Math.random() - 0.5) * 16,
+                            (Math.random() - 0.5) * 12,
+                            (Math.random() - 0.5) * 16
+                        );
+                        scene.add(ps);
+                    }}
+                }}
+
+                // Mitochondria (release cytochrome c in initiation)
+                if (stageIdx >= 1 && stageIdx < 4) {{
+                    for (let m = 0; m < 6; m++) {{
+                        const mitoGeo = new THREE.SphereGeometry(0.5, 10, 10);
+                        mitoGeo.scale(1, 2, 1);
+                        const mitoMat = new THREE.MeshStandardMaterial({{ color: 0xff8844 }});
+                        const mito = new THREE.Mesh(mitoGeo, mitoMat);
+                        mito.position.set(
+                            (Math.random() - 0.5) * 8,
+                            (Math.random() - 0.5) * 8,
+                            (Math.random() - 0.5) * 8
+                        );
+                        mito.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+                        scene.add(mito);
+
+                        // Cytochrome c leaking
+                        if (stageIdx >= 1) {{
+                            for (let cy = 0; cy < 3; cy++) {{
+                                const cytoGeo = new THREE.SphereGeometry(0.12, 6, 6);
+                                const cytoMat = new THREE.MeshStandardMaterial({{ color: 0xff2222, emissive: 0xff0000, emissiveIntensity: 0.3 }});
+                                const cyto = new THREE.Mesh(cytoGeo, cytoMat);
+                                cyto.position.copy(mito.position).add(new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5));
+                                scene.add(cyto);
+                            }}
+                        }}
+                    }}
+                }}
+
+                let time = 0;
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    time += 0.016;
+
+                    scene.children.forEach(obj => {{
+                        if (obj.userData?.drift) {{
+                            obj.position.add(obj.userData.drift);
+                        }}
+                        if (obj.userData?.speed) {{
+                            obj.rotation.x += obj.userData.speed;
+                            obj.rotation.y += obj.userData.speed * 0.7;
+                        }}
+                    }});
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }}
+                animate();
+
+                window.addEventListener('resize', () => {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }});
+            </script>
+        </body>
+        </html>
+        '''
+
+    else:  # Phagocytosis
+        stage_map = {"Recognition": 0, "Attachment": 1, "Engulfment": 2, "Phagosome Formation": 3, "Digestion": 4}
+        stage_idx = stage_map[phago_stage]
+
+        target_colors = {"Bacteria": "0x44ff44", "Apoptotic Cell": "0x8866aa", "Cancer Cell": "0xff4444"}
+        t_color = target_colors[target_type]
+
+        process_html = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ margin: 0; overflow: hidden; background: #050a10; }}
+                #info {{ position: absolute; top: 10px; left: 10px; color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 13px; background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; }}
+                #stage {{ position: absolute; top: 10px; right: 10px; color: #44aaff; font-family: monospace; font-size: 18px; background: rgba(0,0,0,0.8); padding: 15px 25px; border-radius: 10px; border: 2px solid #44aaff; }}
+            </style>
+        </head>
+        <body>
+            <div id="info">
+                <div style="font-size:16px;font-weight:bold;color:#66aaff;margin-bottom:10px">🦠 Phagocytosis</div>
+                <div>Target: <span style="color:#ffaa44">{target_type}</span></div>
+                <div>Stage: <span style="color:#44ff88">{phago_stage}</span></div>
+                <div style="font-size:11px;color:#888;margin-top:8px">
+                    {"Pattern recognition receptors detect pathogen" if stage_idx == 0 else ""}
+                    {"Pseudopods extending around target" if stage_idx == 1 else ""}
+                    {"Membrane wrapping around pathogen" if stage_idx == 2 else ""}
+                    {"Phagosome formed, fusing with lysosome" if stage_idx == 3 else ""}
+                    {"Lysosomal enzymes destroying pathogen" if stage_idx == 4 else ""}
+                </div>
+            </div>
+            <div id="stage">{phago_stage.upper()}</div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+            <script>
+                const stageIdx = {stage_idx};
+                const targetColor = {t_color};
+                const showLysosomes = {'true' if show_lysosomes else 'false'};
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x050a10);
+
+                const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 200);
+                camera.position.set(22, 18, 28);
+
+                const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 0.2;
+
+                scene.add(new THREE.AmbientLight(0x405060, 0.7));
+                scene.add(new THREE.DirectionalLight(0xffffff, 1.0)).position.set(15, 25, 20);
+
+                // ═══════ MACROPHAGE ═══════
+                const macroGeo = new THREE.SphereGeometry(8, 48, 48);
+                const macroMat = new THREE.MeshStandardMaterial({{
+                    color: 0x4488aa,
+                    transparent: true,
+                    opacity: 0.4,
+                    side: THREE.DoubleSide,
+                }});
+                const macro = new THREE.Mesh(macroGeo, macroMat);
+                scene.add(macro);
+
+                // Macrophage nucleus
+                const macNucGeo = new THREE.SphereGeometry(2.5, 24, 24);
+                const macNucMat = new THREE.MeshStandardMaterial({{ color: 0x224466 }});
+                const macNuc = new THREE.Mesh(macNucGeo, macNucMat);
+                macNuc.position.set(-3, 0, 0);
+                scene.add(macNuc);
+
+                // ═══════ PSEUDOPODS (stages 1-2) ═══════
+                if (stageIdx >= 1 && stageIdx <= 2) {{
+                    const pseudopods = [];
+                    for (let p = 0; p < 4; p++) {{
+                        const angle = (p / 4) * Math.PI + Math.PI * 0.25;
+                        const points = [];
+                        const extension = stageIdx === 1 ? 0.5 : 1.0;
+
+                        for (let t = 0; t <= 10; t++) {{
+                            const tt = t / 10;
+                            const r = 8 + tt * 6 * extension;
+                            const spread = tt * 0.3;
+                            points.push(new THREE.Vector3(
+                                r * Math.cos(angle + spread * Math.sin(p)),
+                                tt * 3 - 1.5,
+                                r * Math.sin(angle + spread * Math.sin(p))
+                            ));
+                        }}
+
+                        const curve = new THREE.CatmullRomCurve3(points);
+                        const tubeGeo = new THREE.TubeGeometry(curve, 20, 1.2 - t * 0.08, 12, false);
+                        const tubeMat = new THREE.MeshStandardMaterial({{
+                            color: 0x4488aa,
+                            transparent: true,
+                            opacity: 0.5,
+                        }});
+                        scene.add(new THREE.Mesh(tubeGeo, tubeMat));
+                    }}
+                }}
+
+                // ═══════ TARGET (bacteria/cell) ═══════
+                const targetGroup = new THREE.Group();
+
+                // Position based on stage
+                let targetX = stageIdx === 0 ? 16 : stageIdx === 1 ? 12 : stageIdx === 2 ? 8 : 2;
+                let targetScale = stageIdx >= 3 ? 0.7 : 1.0;
+
+                const targetGeo = new THREE.SphereGeometry(2, 24, 24);
+                const targetMat = new THREE.MeshStandardMaterial({{
+                    color: targetColor,
+                    roughness: 0.4,
+                    transparent: stageIdx >= 4,
+                    opacity: stageIdx >= 4 ? 0.3 : 1.0,
+                }});
+                const target = new THREE.Mesh(targetGeo, targetMat);
+                targetGroup.add(target);
+
+                // Bacteria flagella
+                if ("{target_type}" === "Bacteria") {{
+                    for (let f = 0; f < 3; f++) {{
+                        const flagPoints = [];
+                        for (let t = 0; t <= 20; t++) {{
+                            flagPoints.push(new THREE.Vector3(
+                                -2 - t * 0.3,
+                                Math.sin(t * 0.8) * 0.5,
+                                Math.cos(t * 0.8 + f * 2) * 0.5
+                            ));
+                        }}
+                        const flagCurve = new THREE.CatmullRomCurve3(flagPoints);
+                        const flagGeo = new THREE.TubeGeometry(flagCurve, 15, 0.08, 6, false);
+                        const flagMat = new THREE.MeshStandardMaterial({{ color: 0x88ff88 }});
+                        targetGroup.add(new THREE.Mesh(flagGeo, flagMat));
+                    }}
+                }}
+
+                targetGroup.position.set(targetX, 0, 0);
+                targetGroup.scale.setScalar(targetScale);
+                scene.add(targetGroup);
+
+                // ═══════ PHAGOSOME (stages 3-4) ═══════
+                if (stageIdx >= 3) {{
+                    const phagoGeo = new THREE.SphereGeometry(3.5, 24, 24);
+                    const phagoMat = new THREE.MeshStandardMaterial({{
+                        color: 0x336688,
+                        transparent: true,
+                        opacity: 0.4,
+                    }});
+                    const phago = new THREE.Mesh(phagoGeo, phagoMat);
+                    phago.position.set(2, 0, 0);
+                    scene.add(phago);
+                }}
+
+                // ═══════ LYSOSOMES ═══════
+                if (showLysosomes) {{
+                    const lysoCount = stageIdx >= 3 ? 8 : 4;
+                    for (let l = 0; l < lysoCount; l++) {{
+                        const lysoGeo = new THREE.SphereGeometry(0.6, 12, 12);
+                        const lysoMat = new THREE.MeshStandardMaterial({{
+                            color: 0xffaa22,
+                            emissive: 0xff8800,
+                            emissiveIntensity: stageIdx >= 4 ? 0.5 : 0.2,
+                        }});
+                        const lyso = new THREE.Mesh(lysoGeo, lysoMat);
+
+                        if (stageIdx < 3) {{
+                            // Distributed in cytoplasm
+                            lyso.position.set(
+                                (Math.random() - 0.5) * 10,
+                                (Math.random() - 0.5) * 10,
+                                (Math.random() - 0.5) * 10
+                            );
+                        }} else if (stageIdx === 3) {{
+                            // Moving toward phagosome
+                            const angle = l / lysoCount * Math.PI * 2;
+                            lyso.position.set(
+                                2 + Math.cos(angle) * 4,
+                                Math.sin(angle) * 4,
+                                0
+                            );
+                        }} else {{
+                            // Fused with phagosome
+                            const angle = l / lysoCount * Math.PI * 2;
+                            lyso.position.set(
+                                2 + Math.cos(angle) * 2,
+                                Math.sin(angle) * 2,
+                                0
+                            );
+                        }}
+                        lyso.userData = {{ phase: l * 0.5 }};
+                        scene.add(lyso);
+                    }}
+
+                    // Digestive enzymes (stage 4)
+                    if (stageIdx >= 4) {{
+                        for (let e = 0; e < 20; e++) {{
+                            const enzGeo = new THREE.TetrahedronGeometry(0.15);
+                            const enzMat = new THREE.MeshStandardMaterial({{
+                                color: 0xff4444,
+                                emissive: 0xff2222,
+                                emissiveIntensity: 0.4
+                            }});
+                            const enz = new THREE.Mesh(enzGeo, enzMat);
+                            enz.position.set(
+                                2 + (Math.random() - 0.5) * 4,
+                                (Math.random() - 0.5) * 4,
+                                (Math.random() - 0.5) * 4
+                            );
+                            enz.userData = {{ speed: 0.03 + Math.random() * 0.02 }};
+                            scene.add(enz);
+                        }}
+                    }}
+                }}
+
+                // Pattern recognition receptors (stage 0)
+                if (stageIdx === 0) {{
+                    for (let r = 0; r < 12; r++) {{
+                        const recGeo = new THREE.CylinderGeometry(0.2, 0.15, 1, 6);
+                        const recMat = new THREE.MeshStandardMaterial({{ color: 0x88ffaa }});
+                        const rec = new THREE.Mesh(recGeo, recMat);
+
+                        const phi = Math.random() * Math.PI * 0.5 + Math.PI * 0.25;
+                        const theta = Math.random() * Math.PI - Math.PI * 0.5;
+                        rec.position.set(
+                            8.5 * Math.cos(theta),
+                            8.5 * Math.sin(theta) * Math.sin(phi),
+                            8.5 * Math.sin(theta) * Math.cos(phi)
+                        );
+                        rec.lookAt(16, 0, 0);
+                        scene.add(rec);
+                    }}
+                }}
+
+                let time = 0;
+                function animate() {{
+                    requestAnimationFrame(animate);
+                    time += 0.016;
+
+                    // Animate lysosomes
+                    scene.children.forEach(obj => {{
+                        if (obj.userData?.phase !== undefined) {{
+                            obj.position.y += Math.sin(time * 2 + obj.userData.phase) * 0.01;
+                        }}
+                        if (obj.userData?.speed) {{
+                            obj.rotation.x += obj.userData.speed;
+                            obj.rotation.y += obj.userData.speed * 0.7;
+                        }}
+                    }});
+
+                    // Target movement
+                    if (stageIdx === 0) {{
+                        targetGroup.position.x = 16 + Math.sin(time) * 0.5;
+                    }}
+
+                    controls.update();
+                    renderer.render(scene, camera);
+                }}
+                animate();
+
+                window.addEventListener('resize', () => {{
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                }});
+            </script>
+        </body>
+        </html>
+        '''
+
+    components.html(process_html, height=600)
+
+    st.caption(f"**{process_type}** — Interactive 3D biological process simulation")
+
 
 # ────────────────────────────────────────────────────────────────
 # TAB 1: Cell Population 3D
