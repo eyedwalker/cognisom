@@ -9,6 +9,7 @@ to PDB, glTF, VTK, and CSV.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import tempfile
 import json
@@ -535,7 +536,6 @@ with tab_live3d:
     </html>
     '''
 
-    import streamlit.components.v1 as components
     components.html(threejs_html, height=600)
 
     st.caption("**Controls:** Click and drag to rotate • Scroll to zoom • Right-click to pan")
