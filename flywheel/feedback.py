@@ -55,6 +55,7 @@ class FeedbackSummary:
     average_rating: float = 0.0
     thumbs_up_pct: float = 0.0
     corrections_count: int = 0
+    preferences_count: int = 0
     rating_distribution: Dict[int, int] = field(default_factory=dict)
     common_issues: List[str] = field(default_factory=list)
     period_start: float = 0.0
@@ -273,6 +274,12 @@ class FeedbackCollector:
         summary.corrections_count = sum(
             1 for f in period_feedback
             if f.feedback_type == FeedbackType.CORRECTION
+        )
+
+        # Count preferences
+        summary.preferences_count = sum(
+            1 for f in period_feedback
+            if f.feedback_type == FeedbackType.PREFERENCE
         )
 
         # Extract common issues from comments
