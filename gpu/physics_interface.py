@@ -58,6 +58,9 @@ class PhysicsModelType(str, Enum):
     FLUID = "fluid"             # Eulerian/SPH fluid
     DIFFUSION = "diffusion"     # Concentration fields
     HYBRID = "hybrid"           # Combined approaches
+    ODE = "ode"                 # Ordinary differential equations (VCell parity)
+    SSA = "ssa"                 # Stochastic simulation algorithm
+    SMOLDYN = "smoldyn"         # Spatial stochastic (particle-based)
 
 
 @dataclass
