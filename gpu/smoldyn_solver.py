@@ -75,20 +75,23 @@ void brownian_motion_step(
     float D = diffusion[sp];
     float sigma = sqrtf(2.0f * D * dt);
 
-    // xorshift64 RNG
+    // xorshift64 RNG - inline version (no GNU C extensions)
     unsigned long long s = rng[i];
-    #define NEXT() ({ s ^= s << 13; s ^= s >> 7; s ^= s << 17; s; })
-    #define UNIFORM() ((NEXT() >> 11) * 2.220446049250313e-16)
 
-    // Box-Muller for 3 Gaussian randoms
-    float u1 = (float)UNIFORM();
-    float u2 = (float)UNIFORM();
-    float u3 = (float)UNIFORM();
-    float u4 = (float)UNIFORM();
+    // Generate 4 uniform randoms
+    s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+    float u1 = (float)((s >> 11) * 2.220446049250313e-16);
+    s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+    float u2 = (float)((s >> 11) * 2.220446049250313e-16);
+    s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+    float u3 = (float)((s >> 11) * 2.220446049250313e-16);
+    s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+    float u4 = (float)((s >> 11) * 2.220446049250313e-16);
 
     if (u1 < 1e-10f) u1 = 1e-10f;
     if (u3 < 1e-10f) u3 = 1e-10f;
 
+    // Box-Muller for 3 Gaussian randoms
     float r1 = sqrtf(-2.0f * logf(u1));
     float r2 = sqrtf(-2.0f * logf(u3));
 
