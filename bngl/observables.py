@@ -25,6 +25,45 @@ import numpy as np
 from .molecules import MoleculeType, Pattern, Species, parse_pattern
 
 
+def _split_patterns(pattern_str: str) -> List[str]:
+    """
+    Split observable pattern string on '+' but not inside parentheses.
+
+    In BNGL, '+' has two meanings:
+    - Between patterns: "L(r) + R(l)" means sum of matches
+    - Inside component: "L(r!+)" means "r is bound to any"
+
+    This function correctly handles both cases.
+
+    Examples:
+        "L(r!+)" -> ["L(r!+)"]
+        "L(r) + R(l)" -> ["L(r)", "R(l)"]
+        "A(b!+) + B(a!+)" -> ["A(b!+)", "B(a!+)"]
+    """
+    parts = []
+    current = []
+    depth = 0
+
+    for char in pattern_str:
+        if char == '(':
+            depth += 1
+            current.append(char)
+        elif char == ')':
+            depth -= 1
+            current.append(char)
+        elif char == '+' and depth == 0:
+            # This is a pattern separator
+            parts.append(''.join(current))
+            current = []
+        else:
+            current.append(char)
+
+    if current:
+        parts.append(''.join(current))
+
+    return parts
+
+
 class ObservableType(Enum):
     """Type of observable counting."""
     MOLECULES = auto()  # Count matching molecules (can count same molecule twice in complex)
@@ -133,9 +172,10 @@ class Observable:
         else:
             raise ValueError(f"Unknown observable type: {type_str}")
 
-        # Parse patterns
+        # Parse patterns - split on '+' but not inside parentheses
+        # (e.g., "L!+" in BNGL means "bound to any", should not split there)
         patterns = []
-        for p_str in pattern_str.split('+'):
+        for p_str in _split_patterns(pattern_str):
             p_str = p_str.strip()
             if p_str:
                 patterns.append(parse_pattern(p_str, molecule_types))
