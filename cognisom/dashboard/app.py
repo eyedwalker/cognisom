@@ -672,6 +672,14 @@ if user is None:
         with badge_col2:
             st.image(str(_inception_png_path), width=200)
 
+    # ── Demo Video ────────────────────────────────────────────────
+    st.markdown("### Platform Overview")
+    vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
+    with vid_col2:
+        st.video("https://www.youtube.com/watch?v=gaLwSzDk2zE")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4 = st.columns(4)
     with m1:
