@@ -1,0 +1,88 @@
+name: Switch Compute Mode
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Compute mode'
+        required: true
+        type: choice
+        options:
+          - cpu
+          - gpu
+        default: cpu
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_enable_gpu: ${{ github.event.inputs.mode == 'gpu' }}
+
+jobs:
+  switch-mode:
+    runs-on: ubuntu-latest
+    environment: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        working-directory: infrastructure/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infrastructure/terraform
+        run: |
+          echo "Switching to ${{ github.event.inputs.mode }} mode..."
+          terraform apply -var="enable_gpu=${{ env.TF_VAR_enable_gpu }}" -auto-approve
+
+      - name: Output Mode
+        working-directory: infrastructure/terraform
+        run: |
+          echo "## Compute Mode Switched" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          terraform output mode >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          terraform output estimated_monthly_cost >> $GITHUB_STEP_SUMMARY
+
+      - name: Force new deployment
+        run: |
+          if [ "${{ github.event.inputs.mode }}" = "gpu" ]; then
+            SERVICE="cognisom-production-gpu"
+          else
+            SERVICE="cognisom-production-cpu"
+          fi
+
+          aws ecs update-service \
+            --cluster cognisom-production-cluster \
+            --service "$SERVICE" \
+            --force-new-deployment
+
+      - name: Post to summary
+        run: |
+          echo "## Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Mode: **${{ github.event.inputs.mode }}**" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.mode }}" = "gpu" ]; then
+            echo "- NVIDIA T4 GPU (16GB VRAM)" >> $GITHUB_STEP_SUMMARY
+            echo "- 4 vCPU / 16GB RAM" >> $GITHUB_STEP_SUMMARY
+            echo "- Spot pricing (~\$170/mo)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Fargate (serverless)" >> $GITHUB_STEP_SUMMARY
+            echo "- 1 vCPU / 2GB RAM" >> $GITHUB_STEP_SUMMARY
+            echo "- ~\$83/mo" >> $GITHUB_STEP_SUMMARY
+          fi
