@@ -25,11 +25,13 @@ resource "aws_iam_policy" "secrets_read" {
     Statement = [{
       Effect = "Allow"
       Action = ["secretsmanager:GetSecretValue"]
-      Resource = [
+      Resource = concat([
         aws_secretsmanager_secret.nvidia_api_key.arn,
         aws_secretsmanager_secret.ngc_api_key.arn,
         aws_secretsmanager_secret.secret_key.arn,
-      ]
+      ],
+      # Include database credentials if RDS is enabled
+      var.enable_rds ? [aws_secretsmanager_secret.db_credentials[0].arn] : [])
     }]
   })
 }

@@ -25,17 +25,30 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 
 # ─── Container Definition (shared JSON) ──────────────────────
 locals {
-  container_environment = [
+  container_environment = concat([
     { name = "FLASK_DEBUG", value = "false" },
     { name = "CORS_ORIGINS", value = "https://${var.domain_name}" },
     { name = "COGNISOM_GPU", value = var.enable_gpu ? "1" : "0" },
-  ]
+    # Database: pass secret ARN so EntityStore can fetch from Secrets Manager
+    { name = "DB_SECRET_ARN", value = var.enable_rds ? aws_secretsmanager_secret.db_credentials[0].arn : "" },
+  ],
+  # Cognito authentication (when enabled)
+  var.enable_cognito ? [
+    { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main[0].id },
+    { name = "COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.web[0].id },
+    { name = "COGNITO_DOMAIN", value = "https://${aws_cognito_user_pool_domain.main[0].domain}.auth.${var.aws_region}.amazoncognito.com" },
+    { name = "AWS_REGION", value = var.aws_region },
+  ] : [])
 
-  container_secrets = [
+  container_secrets = concat([
     { name = "NVIDIA_API_KEY", valueFrom = aws_secretsmanager_secret.nvidia_api_key.arn },
     { name = "NGC_API_KEY", valueFrom = aws_secretsmanager_secret.ngc_api_key.arn },
     { name = "SECRET_KEY", valueFrom = aws_secretsmanager_secret.secret_key.arn },
-  ]
+  ],
+  # Add database URL as a secret when RDS is enabled
+  var.enable_rds ? [
+    { name = "DATABASE_URL", valueFrom = "${aws_secretsmanager_secret.db_credentials[0].arn}:url::" }
+  ] : [])
 
   container_log_config = {
     logDriver = "awslogs"

@@ -11,6 +11,7 @@ matplotlib>=3.7.0
 pandas>=2.0.0
 anndata>=0.10.0
 scanpy>=1.9.0
+cellxgene-census>=1.0.0
 
 # Testing
 pytest>=7.3.0
@@ -39,6 +40,10 @@ networkx>=3.0
 
 # Environment
 python-dotenv>=1.0.0
+
+# Database (PostgreSQL for production, SQLite fallback)
+psycopg2-binary>=2.9.0
+boto3>=1.34.0  # AWS SDK for Secrets Manager
 
 # Optional: GPU support (install separately if you have NVIDIA GPU)
 # torch>=2.0.0  # Uncomment if you have CUDA-capable GPU

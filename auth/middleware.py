@@ -1,4 +1,13 @@
-"""Authentication middleware for Flask API and Streamlit dashboard."""
+"""Authentication middleware for Flask API and Streamlit dashboard.
+
+Supports both:
+1. Local auth (JSON file-based) - for development
+2. AWS Cognito - for production (HIPAA-compliant)
+
+The auth backend is selected based on environment variables:
+- COGNITO_USER_POOL_ID + COGNITO_CLIENT_ID = Cognito
+- Otherwise = Local auth
+"""
 
 from __future__ import annotations
 
@@ -7,10 +16,25 @@ import os
 from pathlib import Path
 from typing import Optional
 
-# ── Shared auth manager instance ─────────────────────────────────────
+# ── Shared auth instances ────────────────────────────────────────────
 
 _auth_manager = None
+_cognito_provider = None
 _org_manager = None
+
+
+def _get_cognito_provider():
+    """Lazy-load Cognito provider if configured."""
+    global _cognito_provider
+    if _cognito_provider is None:
+        # Only import if Cognito is configured
+        if os.environ.get("COGNITO_USER_POOL_ID") and os.environ.get("COGNITO_CLIENT_ID"):
+            try:
+                from .cognito_provider import CognitoAuthProvider
+                _cognito_provider = CognitoAuthProvider()
+            except ImportError:
+                _cognito_provider = None
+    return _cognito_provider
 
 
 def _get_auth_manager():
@@ -41,14 +65,20 @@ def _get_org_manager():
     return _org_manager
 
 
+def is_cognito_enabled() -> bool:
+    """Check if Cognito auth is enabled."""
+    provider = _get_cognito_provider()
+    return provider is not None and provider.enabled
+
+
 # ── Flask decorators ─────────────────────────────────────────────────
 
 
 def require_auth(f):
-    """Flask route decorator: require valid session or API key.
+    """Flask route decorator: require valid session, API key, or Cognito token.
 
     Checks:
-    1. ``Authorization: Bearer <session_id>`` header
+    1. ``Authorization: Bearer <token>`` header (Cognito JWT or session ID)
     2. ``X-API-Key: <api_key>`` header
     3. ``api_key`` query parameter
 
@@ -60,13 +90,21 @@ def require_auth(f):
         from flask import request, g, jsonify
 
         auth = _get_auth_manager()
+        cognito = _get_cognito_provider()
         user = None
 
-        # Check Bearer token (session)
+        # Check Bearer token (Cognito JWT or local session)
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
-            session_id = auth_header[7:]
-            user = auth.validate_session(session_id)
+            token = auth_header[7:]
+
+            # Try Cognito first if enabled (JWTs are longer than session IDs)
+            if cognito and cognito.enabled and len(token) > 100:
+                user = cognito.validate_token(token)
+
+            # Fall back to local session
+            if user is None:
+                user = auth.validate_session(token)
 
         # Check API key header
         if user is None:
@@ -126,11 +164,34 @@ def require_role(role_name: str):
 def get_current_user():
     """Get the currently logged-in user from Streamlit session state.
 
+    Supports both Cognito tokens and local sessions.
     Returns None if not authenticated.
     """
     try:
         import streamlit as st
 
+        # Check for Cognito access token first
+        cognito_token = st.session_state.get("cognito_access_token")
+        if cognito_token:
+            cognito = _get_cognito_provider()
+            if cognito and cognito.enabled:
+                # Check if token is expired
+                token_expires = st.session_state.get("cognito_token_expires", 0)
+                import time
+                if time.time() < token_expires:
+                    user = cognito.validate_token(cognito_token)
+                    if user:
+                        return user
+                # Token expired, try refresh
+                refresh_token = st.session_state.get("cognito_refresh_token")
+                if refresh_token:
+                    new_tokens, msg = cognito.refresh_tokens(refresh_token)
+                    if new_tokens:
+                        st.session_state["cognito_access_token"] = new_tokens.access_token
+                        st.session_state["cognito_token_expires"] = new_tokens.expires_at
+                        return cognito.validate_token(new_tokens.access_token)
+
+        # Fall back to local session
         session_id = st.session_state.get("session_id")
         if not session_id:
             return None
@@ -183,48 +244,243 @@ def streamlit_login_gate():
     """Show login form if user is not authenticated.
 
     Call this at the top of any Streamlit page that requires auth.
+    Supports both Cognito and local authentication.
     Returns the User object if authenticated, None otherwise (page stops).
     """
     import streamlit as st
 
     user = get_current_user()
     if user is not None:
-        # Check if password change is required
-        if user.must_change_password:
+        # Check if password change is required (local auth only)
+        if hasattr(user, 'must_change_password') and user.must_change_password:
             _streamlit_force_password_change(user)
             return None  # unreachable due to st.stop() above
         return user
 
+    cognito = _get_cognito_provider()
+    use_cognito = cognito is not None and cognito.enabled
+
     # Show login / registration tabs
-    tab_login, tab_new_org, tab_join_org = st.tabs([
-        "Log In", "Create Organization", "Join Organization",
-    ])
+    if use_cognito:
+        tab_login, tab_register, tab_forgot = st.tabs([
+            "Log In", "Register", "Forgot Password",
+        ])
+    else:
+        tab_login, tab_new_org, tab_join_org = st.tabs([
+            "Log In", "Create Organization", "Join Organization",
+        ])
 
     with tab_login:
         st.markdown("### Log in to Cognisom")
-        with st.form("login_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Log in", type="primary")
 
-        if submitted and username and password:
-            auth = _get_auth_manager()
-            session, msg = auth.login(username, password)
-            if session:
-                st.session_state["session_id"] = session.session_id
-                st.session_state["username"] = username
-                st.rerun()
-            else:
-                st.error(msg)
+        if use_cognito:
+            _streamlit_cognito_login(cognito)
+        else:
+            _streamlit_local_login()
 
-    with tab_new_org:
-        _streamlit_register_new_org()
-
-    with tab_join_org:
-        _streamlit_join_existing_org()
+    if use_cognito:
+        with tab_register:
+            _streamlit_cognito_register(cognito)
+        with tab_forgot:
+            _streamlit_cognito_forgot_password(cognito)
+    else:
+        with tab_new_org:
+            _streamlit_register_new_org()
+        with tab_join_org:
+            _streamlit_join_existing_org()
 
     st.stop()
     return None
+
+
+def _streamlit_local_login():
+    """Local (non-Cognito) login form."""
+    import streamlit as st
+
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Log in", type="primary")
+
+    if submitted and username and password:
+        auth = _get_auth_manager()
+        session, msg = auth.login(username, password)
+        if session:
+            st.session_state["session_id"] = session.session_id
+            st.session_state["username"] = username
+            st.rerun()
+        else:
+            st.error(msg)
+
+
+def _streamlit_cognito_login(cognito):
+    """Cognito login form."""
+    import streamlit as st
+
+    # Show success message if user just verified their account
+    if st.session_state.pop("cognito_just_verified", False):
+        st.success("Account verified! Please log in with your email and password.")
+
+    with st.form("cognito_login_form"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Log in", type="primary")
+
+    if submitted and email and password:
+        tokens, user, msg = cognito.authenticate(email, password)
+        if tokens and user:
+            st.session_state["cognito_access_token"] = tokens.access_token
+            st.session_state["cognito_refresh_token"] = tokens.refresh_token
+            st.session_state["cognito_token_expires"] = tokens.expires_at
+            st.session_state["username"] = user.username
+            st.rerun()
+        else:
+            st.error(msg)
+
+    # Show hosted UI link for SSO
+    if cognito.hosted_ui_url:
+        st.divider()
+        st.markdown("**Or sign in with your institution:**")
+        st.link_button("University SSO", cognito.hosted_ui_url)
+
+
+def _streamlit_cognito_register(cognito):
+    """Cognito registration form."""
+    import streamlit as st
+
+    st.markdown("### Create an account")
+
+    # Check if we're in confirmation step
+    if st.session_state.get("cognito_confirm_email"):
+        _streamlit_cognito_confirm(cognito)
+        return
+
+    with st.form("cognito_register_form"):
+        email = st.text_input("Email")
+        name = st.text_input("Full Name")
+        organization = st.text_input("Organization (optional)")
+        research_area = st.text_input("Research Area (optional)")
+        password = st.text_input("Password", type="password")
+        password_confirm = st.text_input("Confirm Password", type="password")
+        submitted = st.form_submit_button("Register", type="primary")
+
+    st.caption("Password requirements: 12+ characters, uppercase, lowercase, number, symbol")
+
+    if submitted:
+        if not email or not password:
+            st.error("Email and password are required.")
+            return
+        if password != password_confirm:
+            st.error("Passwords do not match.")
+            return
+
+        ok, msg = cognito.register(
+            email=email,
+            password=password,
+            display_name=name,
+            organization=organization,
+            research_area=research_area,
+        )
+        if ok:
+            st.session_state["cognito_confirm_email"] = email
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+
+
+def _streamlit_cognito_confirm(cognito):
+    """Cognito email confirmation form."""
+    import streamlit as st
+
+    email = st.session_state.get("cognito_confirm_email", "")
+    st.markdown(f"### Verify your email")
+    st.info(f"A verification code was sent to **{email}**")
+
+    with st.form("cognito_confirm_form"):
+        code = st.text_input("Verification Code")
+        submitted = st.form_submit_button("Verify", type="primary")
+
+    if submitted and code:
+        ok, msg = cognito.confirm_registration(email, code)
+        if ok:
+            st.session_state.pop("cognito_confirm_email", None)
+            st.session_state["cognito_just_verified"] = True
+            st.balloons()
+            st.success("Account verified! Click the **Log In** tab to sign in.")
+            # Don't rerun - let user see the message and click Login tab
+        else:
+            st.error(msg)
+
+    if st.button("Resend code"):
+        ok, msg = cognito.resend_confirmation_code(email)
+        if ok:
+            st.success(msg)
+        else:
+            st.error(msg)
+
+    if st.button("Use different email"):
+        st.session_state.pop("cognito_confirm_email", None)
+        st.rerun()
+
+
+def _streamlit_cognito_forgot_password(cognito):
+    """Cognito password reset form."""
+    import streamlit as st
+
+    st.markdown("### Reset your password")
+
+    # Check if we're in confirmation step
+    if st.session_state.get("cognito_reset_email"):
+        _streamlit_cognito_reset_confirm(cognito)
+        return
+
+    with st.form("cognito_forgot_form"):
+        email = st.text_input("Email")
+        submitted = st.form_submit_button("Send Reset Code", type="primary")
+
+    if submitted and email:
+        ok, msg = cognito.forgot_password(email)
+        if ok:
+            st.session_state["cognito_reset_email"] = email
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+
+
+def _streamlit_cognito_reset_confirm(cognito):
+    """Cognito password reset confirmation form."""
+    import streamlit as st
+
+    email = st.session_state.get("cognito_reset_email", "")
+    st.info(f"A reset code was sent to **{email}**")
+
+    with st.form("cognito_reset_confirm_form"):
+        code = st.text_input("Reset Code")
+        new_password = st.text_input("New Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        submitted = st.form_submit_button("Reset Password", type="primary")
+
+    if submitted:
+        if not code or not new_password:
+            st.error("All fields are required.")
+            return
+        if new_password != confirm_password:
+            st.error("Passwords do not match.")
+            return
+
+        ok, msg = cognito.confirm_forgot_password(email, code, new_password)
+        if ok:
+            st.session_state.pop("cognito_reset_email", None)
+            st.success("Password reset! You can now log in.")
+            st.rerun()
+        else:
+            st.error(msg)
+
+    if st.button("Back to forgot password"):
+        st.session_state.pop("cognito_reset_email", None)
+        st.rerun()
 
 
 def _streamlit_register_new_org():
@@ -406,7 +662,15 @@ def streamlit_page_gate(page_name: str = ""):
     if user.role == UserRole.ADMIN:
         return user
 
-    # Check org tier for page access
+    # Cognito users bypass org tier checks (they authenticated via AWS Cognito)
+    # They get full access since they're using enterprise authentication
+    if is_cognito_enabled():
+        cognito_token = st.session_state.get("cognito_access_token")
+        if cognito_token:
+            # User authenticated via Cognito - grant full access
+            return user
+
+    # Check org tier for page access (local auth only)
     org_mgr = _get_org_manager()
     org = org_mgr.get_org(user.org_id) if user.org_id else None
 
