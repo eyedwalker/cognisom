@@ -262,11 +262,19 @@ if data_source == "CellxGene (real data)":
     st.sidebar.markdown("---")
     tissue = st.sidebar.selectbox("Tissue", [
         "prostate gland", "lung", "breast", "colon", "liver", "kidney",
+        "bone marrow", "blood", "brain", "heart",
     ])
     disease = st.sidebar.selectbox("Disease", [
-        "prostate adenocarcinoma", "normal", "lung adenocarcinoma",
-        "breast carcinoma", "colorectal cancer",
+        "normal",  # Most reliable - always has data
+        "prostate adenocarcinoma",
+        "lung adenocarcinoma",
+        "breast carcinoma",
+        "colorectal cancer",
+        "(any disease)",  # Query without disease filter
     ])
+    # Map "(any disease)" to None for the loader
+    if disease == "(any disease)":
+        disease = None
     max_cells = st.sidebar.slider("Max cells", 1000, 20000, 5000, 1000)
 
 run_col1, run_col2 = st.columns([3, 1])
@@ -281,9 +289,19 @@ with run_col2:
 if run_btn or st.session_state.get("ingestion_ran"):
     st.session_state["ingestion_ran"] = True
     if data_source == "CellxGene (real data)":
-        data = run_real_pipeline(tissue=tissue, disease=disease, max_cells=max_cells)
+        try:
+            data = run_real_pipeline(tissue=tissue, disease=disease, max_cells=max_cells)
+        except Exception as e:
+            st.error(f"Pipeline error: {e}")
+            st.info("**Tip**: Try 'normal' disease for best results, or use Synthetic data for a guaranteed demo.")
+            st.stop()
         if data is None:
-            st.error("Failed to download dataset from CellxGene. Check your internet connection or try synthetic data.")
+            st.error(f"No cells found for tissue='{tissue}' with disease='{disease or 'any'}'.")
+            st.info("""**Tips**:
+- Try **'normal'** disease - this has the most data in CellxGene
+- Try **'(any disease)'** to search without disease filter
+- Try a different tissue like **'lung'** or **'bone marrow'**
+- Use **Synthetic (demo)** for a guaranteed working demo""")
             st.stop()
     else:
         data = run_synthetic_pipeline()

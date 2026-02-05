@@ -20,6 +20,32 @@ logger = logging.getLogger(__name__)
 # Standard data directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "scrna"
 
+# CellxGene uses specific ontology terms - map friendly names to actual values
+DISEASE_MAPPING = {
+    # Prostate
+    "prostate adenocarcinoma": "prostate adenocarcinoma",
+    "prostate cancer": "prostate adenocarcinoma",
+    "prostate carcinoma": "prostate adenocarcinoma",
+    # Lung
+    "lung adenocarcinoma": "lung adenocarcinoma",
+    "lung cancer": "lung adenocarcinoma",
+    # Breast
+    "breast carcinoma": "breast carcinoma",
+    "breast cancer": "breast carcinoma",
+    # Colorectal
+    "colorectal cancer": "colorectal cancer",
+    "colon cancer": "colorectal cancer",
+    # Normal
+    "normal": "normal",
+    "healthy": "normal",
+}
+
+# Tissues that are known to work in CellxGene
+VALID_TISSUES = [
+    "prostate gland", "lung", "breast", "colon", "liver", "kidney",
+    "heart", "brain", "skin", "blood", "bone marrow", "pancreas",
+]
+
 
 class ScRNALoader:
     """Load scRNA-seq datasets from files or public repositories.
@@ -82,14 +108,18 @@ class ScRNALoader:
             max_cells: Maximum cells to download.
 
         Returns:
-            AnnData object.
+            AnnData object or None if no data found.
         """
         import cellxgene_census
-        import tiledbsoma
+
+        # Map friendly disease names to CellxGene ontology terms
+        disease_term = None
+        if disease:
+            disease_term = DISEASE_MAPPING.get(disease.lower(), disease)
 
         cache_name = f"cellxgene_{tissue.replace(' ', '_')}"
-        if disease:
-            cache_name += f"_{disease.replace(' ', '_')}"
+        if disease_term:
+            cache_name += f"_{disease_term.replace(' ', '_')}"
         cache_path = self.data_dir / f"{cache_name}.h5ad"
 
         if cache_path.exists():
@@ -98,35 +128,32 @@ class ScRNALoader:
 
         logger.info(
             f"Querying CellxGene Census: tissue={tissue}, "
-            f"organism={organism}, disease={disease}"
+            f"organism={organism}, disease={disease_term or 'normal'}"
         )
 
-        # Build value filter
-        filters = [f'tissue == "{tissue}"']
-        if disease:
-            filters.append(f'disease == "{disease}"')
-        else:
-            filters.append('disease == "normal"')
-        value_filter = " and ".join(filters)
+        # Try primary query first
+        adata = self._query_cellxgene(
+            tissue, organism, disease_term, max_cells
+        )
 
-        with cellxgene_census.open_soma() as census:
-            adata = cellxgene_census.get_anndata(
-                census,
-                organism=organism,
-                obs_value_filter=value_filter,
-                obs_column_names=[
-                    "cell_type", "tissue", "disease",
-                    "sex", "development_stage", "assay",
-                    "donor_id", "suspension_type",
-                ],
+        # If disease query returned 0 cells, try with just tissue (any disease)
+        if adata is None or adata.n_obs == 0:
+            if disease_term:
+                logger.warning(
+                    f"No cells found for disease='{disease_term}'. "
+                    f"Trying tissue-only query..."
+                )
+                adata = self._query_cellxgene(
+                    tissue, organism, None, max_cells, include_any_disease=True
+                )
+
+        # Still nothing? Return None with helpful message
+        if adata is None or adata.n_obs == 0:
+            logger.error(
+                f"No cells found for tissue='{tissue}'. "
+                f"Try a different tissue or use synthetic data."
             )
-
-        # Subsample if too large
-        if adata.n_obs > max_cells:
-            import numpy as np
-            indices = np.random.choice(adata.n_obs, max_cells, replace=False)
-            adata = adata[indices].copy()
-            logger.info(f"Subsampled to {max_cells} cells")
+            return None
 
         # Cache locally
         adata.write_h5ad(cache_path)
@@ -134,6 +161,49 @@ class ScRNALoader:
             f"Downloaded {adata.n_obs} cells x {adata.n_vars} genes -> {cache_path}"
         )
         return adata
+
+    def _query_cellxgene(self, tissue: str, organism: str,
+                         disease: Optional[str], max_cells: int,
+                         include_any_disease: bool = False):
+        """Execute CellxGene Census query with error handling."""
+        import cellxgene_census
+
+        # Build value filter
+        filters = [f'tissue == "{tissue}"']
+        if disease:
+            filters.append(f'disease == "{disease}"')
+        elif not include_any_disease:
+            filters.append('disease == "normal"')
+        # If include_any_disease=True, don't filter by disease at all
+
+        value_filter = " and ".join(filters)
+        logger.info(f"Query filter: {value_filter}")
+
+        try:
+            with cellxgene_census.open_soma() as census:
+                adata = cellxgene_census.get_anndata(
+                    census,
+                    organism=organism,
+                    obs_value_filter=value_filter,
+                    obs_column_names=[
+                        "cell_type", "tissue", "disease",
+                        "sex", "development_stage", "assay",
+                        "donor_id", "suspension_type",
+                    ],
+                )
+
+            # Subsample if too large
+            if adata.n_obs > max_cells:
+                import numpy as np
+                indices = np.random.choice(adata.n_obs, max_cells, replace=False)
+                adata = adata[indices].copy()
+                logger.info(f"Subsampled to {max_cells} cells")
+
+            return adata
+
+        except Exception as e:
+            logger.error(f"CellxGene query failed: {e}")
+            return None
 
     def from_geo(self, accession: str):
         """Load from GEO accession (e.g., GSE141445).
