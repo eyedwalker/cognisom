@@ -6,10 +6,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies
+# System dependencies (igraph needs cmake, flex, bison)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        gcc g++ git curl \
+        gcc g++ git curl cmake \
+        flex bison libxml2-dev \
         libxrender1 libxext6 libsm6 && \
     rm -rf /var/lib/apt/lists/*
 
