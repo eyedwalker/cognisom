@@ -18,14 +18,24 @@ user = streamlit_page_gate("4_admin")
 
 
 def _load_env():
+    """Load environment variables from both os.environ and .env file.
+
+    Priority: os.environ > .env file (production secrets come from ECS/Secrets Manager)
+    """
     env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
     env_vars = {}
+    # First load from .env file
     if env_path.exists():
         for line in env_path.read_text().splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, val = line.split("=", 1)
                 env_vars[key.strip()] = val.strip().strip('"').strip("'")
+    # Override with actual environment variables (from ECS/Secrets Manager in production)
+    for key in ["NVIDIA_API_KEY", "NGC_API_KEY", "SECRET_KEY", "DATABASE_URL",
+                "COGNITO_USER_POOL_ID", "COGNITO_CLIENT_ID"]:
+        if os.environ.get(key):
+            env_vars[key] = os.environ[key]
     return env_vars, env_path
 
 

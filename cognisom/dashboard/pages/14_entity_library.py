@@ -105,6 +105,103 @@ tab_browse, tab_detail, tab_graph, tab_manage, tab_import = st.tabs([
 # ══════════════════════════════════════════════════════════════════════
 
 with tab_browse:
+    # Check if viewing a specific entity
+    selected_entity_id = st.session_state.get("detail_entity_id")
+
+    if selected_entity_id:
+        # Show entity detail view inline
+        entity = store.get_entity(selected_entity_id)
+        if entity:
+            # Back button
+            if st.button("← Back to list", type="secondary"):
+                st.session_state.pop("detail_entity_id", None)
+                st.rerun()
+
+            st.divider()
+
+            etype = entity.entity_type.value
+            type_class = f"type-{etype}"
+
+            # Header row
+            header_col1, header_col2 = st.columns([3, 1])
+            with header_col1:
+                st.markdown(
+                    f'<span class="entity-type-badge {type_class}" style="font-size:0.85rem; padding:4px 12px;">'
+                    f'{etype}</span>',
+                    unsafe_allow_html=True,
+                )
+                st.subheader(entity.display_name)
+            with header_col2:
+                st.caption(f"ID: `{entity.entity_id}`")
+                st.caption(f"Status: **{entity.status.value}**")
+                st.caption(f"Source: {entity.source}")
+
+            # Description
+            if entity.description:
+                st.markdown(entity.description)
+
+            st.divider()
+
+            # Two columns for details
+            detail_col1, detail_col2 = st.columns(2)
+
+            with detail_col1:
+                st.markdown("**Identifiers**")
+                if entity.external_ids:
+                    for k, v in entity.external_ids.items():
+                        st.markdown(f"- {k}: `{v}`")
+                else:
+                    st.caption("No external identifiers")
+
+                if entity.synonyms:
+                    st.markdown("**Synonyms**")
+                    st.write(", ".join(entity.synonyms))
+
+            with detail_col2:
+                st.markdown("**Tags**")
+                if entity.tags:
+                    st.write(", ".join(entity.tags))
+                else:
+                    st.caption("No tags")
+
+                # Relationships
+                rels = store.get_relationships(entity.entity_id)
+                if rels:
+                    st.markdown("**Relationships**")
+                    for rel in rels[:10]:
+                        other_id = rel.target_id if rel.source_id == entity.entity_id else rel.source_id
+                        other = store.get_entity(other_id)
+                        other_name = other.display_name if other else other_id
+                        st.caption(f"→ {rel.relationship_type.value}: {other_name}")
+
+            # Edit section (expandable)
+            with st.expander("Edit Entity", expanded=False):
+                with st.form(f"edit_{entity.entity_id}"):
+                    new_name = st.text_input("Display Name", value=entity.display_name)
+                    new_desc = st.text_area("Description", value=entity.description or "")
+                    new_tags = st.text_input("Tags (comma-separated)", value=", ".join(entity.tags) if entity.tags else "")
+                    new_status = st.selectbox("Status", [s.value for s in EntityStatus],
+                                              index=[s.value for s in EntityStatus].index(entity.status.value))
+
+                    if st.form_submit_button("Save Changes", type="primary"):
+                        # Update entity
+                        entity.display_name = new_name
+                        entity.description = new_desc
+                        entity.tags = [t.strip() for t in new_tags.split(",") if t.strip()]
+                        entity.status = EntityStatus(new_status)
+                        store.update_entity(entity, user=user.username if user else "anonymous")
+                        st.success("Entity updated!")
+                        st.rerun()
+
+            if entity.source_url:
+                st.divider()
+                st.markdown(f"[View on source database]({entity.source_url})")
+
+            st.stop()  # Don't show the rest of the browse tab
+        else:
+            st.error(f"Entity '{selected_entity_id}' not found")
+            st.session_state.pop("detail_entity_id", None)
+
     # Stats row
     stats = store.stats()
     col1, col2, col3, col4 = st.columns(4)
