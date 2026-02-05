@@ -76,6 +76,31 @@ resource "aws_iam_role_policy_attachment" "s3_exports" {
   policy_arn = aws_iam_policy.s3_exports.arn
 }
 
+# ─── Cognito Admin Access (for role mapping) ─────────────────
+resource "aws_iam_policy" "cognito_admin" {
+  count = var.enable_cognito ? 1 : 0
+  name  = "${local.name_prefix}-cognito-admin"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "cognito-idp:AdminListGroupsForUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:ListUsers"
+      ]
+      Resource = aws_cognito_user_pool.main[0].arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cognito_admin" {
+  count      = var.enable_cognito ? 1 : 0
+  role       = aws_iam_role.ecs_task.name
+  policy_arn = aws_iam_policy.cognito_admin[0].arn
+}
+
 # ─── EC2 Instance Role (GPU mode only) ──────────────────────
 resource "aws_iam_role" "ec2_gpu" {
   count = var.enable_gpu ? 1 : 0
