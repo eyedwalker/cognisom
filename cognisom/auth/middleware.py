@@ -317,6 +317,10 @@ def _streamlit_cognito_login(cognito):
     """Cognito login form."""
     import streamlit as st
 
+    # Show success message if user just verified their account
+    if st.session_state.pop("cognito_just_verified", False):
+        st.success("Account verified! Please log in with your email and password.")
+
     with st.form("cognito_login_form"):
         email = st.text_input("Email")
         password = st.text_input("Password", type="password")
@@ -401,8 +405,10 @@ def _streamlit_cognito_confirm(cognito):
         ok, msg = cognito.confirm_registration(email, code)
         if ok:
             st.session_state.pop("cognito_confirm_email", None)
-            st.success("Account verified! You can now log in.")
-            st.rerun()
+            st.session_state["cognito_just_verified"] = True
+            st.balloons()
+            st.success("Account verified! Click the **Log In** tab to sign in.")
+            # Don't rerun - let user see the message and click Login tab
         else:
             st.error(msg)
 
@@ -656,7 +662,15 @@ def streamlit_page_gate(page_name: str = ""):
     if user.role == UserRole.ADMIN:
         return user
 
-    # Check org tier for page access
+    # Cognito users bypass org tier checks (they authenticated via AWS Cognito)
+    # They get full access since they're using enterprise authentication
+    if is_cognito_enabled():
+        cognito_token = st.session_state.get("cognito_access_token")
+        if cognito_token:
+            # User authenticated via Cognito - grant full access
+            return user
+
+    # Check org tier for page access (local auth only)
     org_mgr = _get_org_manager()
     org = org_mgr.get_org(user.org_id) if user.org_id else None
 
