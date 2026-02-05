@@ -71,6 +71,63 @@ def is_cognito_enabled() -> bool:
     return provider is not None and provider.enabled
 
 
+def _ensure_cognito_user_org(user):
+    """Ensure a Cognito user has a valid organization.
+
+    When users register via Cognito, they enter an organization name
+    which is stored as custom:organization attribute. This function
+    checks if that org exists in OrgManager, and creates it if not.
+
+    Args:
+        user: User object from Cognito validation
+
+    Returns:
+        User object with updated org_id (or original if no org specified)
+    """
+    if not user or not user.org_id:
+        return user
+
+    org_mgr = _get_org_manager()
+
+    # Check if org already exists (org_id could be a slug)
+    existing_org = org_mgr.get_org(user.org_id)
+    if existing_org:
+        return user
+
+    # Org doesn't exist - create it from the organization name
+    # Use the org_id (which is the custom:organization text) as the name
+    org_name = user.org_id
+    org_slug = org_name.lower().replace(" ", "-").replace("_", "-")
+    # Remove special characters
+    import re
+    org_slug = re.sub(r'[^a-z0-9-]', '', org_slug)
+
+    # Check if slug already exists (different user created same-named org)
+    if org_mgr.get_org(org_slug):
+        # Org with this slug exists - assign user to it
+        user.org_id = org_slug
+        return user
+
+    # Create new org with user as creator (ORG_ADMIN)
+    from .organization import SubscriptionTier
+    org, msg = org_mgr.create_org(
+        name=org_name,
+        slug=org_slug,
+        created_by=user.email or user.username,
+        plan=SubscriptionTier.FREE,  # Start on free tier
+        description=f"Organization created via Cognito registration",
+    )
+
+    if org:
+        user.org_id = org.org_id
+        import logging
+        logging.getLogger(__name__).info(
+            "Created org '%s' for Cognito user %s", org_slug, user.email
+        )
+
+    return user
+
+
 # ── Flask decorators ─────────────────────────────────────────────────
 
 
@@ -181,7 +238,8 @@ def get_current_user():
                 if time.time() < token_expires:
                     user = cognito.validate_token(cognito_token)
                     if user:
-                        return user
+                        # Ensure Cognito user has a valid org
+                        return _ensure_cognito_user_org(user)
                 # Token expired, try refresh
                 refresh_token = st.session_state.get("cognito_refresh_token")
                 if refresh_token:
@@ -189,7 +247,9 @@ def get_current_user():
                     if new_tokens:
                         st.session_state["cognito_access_token"] = new_tokens.access_token
                         st.session_state["cognito_token_expires"] = new_tokens.expires_at
-                        return cognito.validate_token(new_tokens.access_token)
+                        user = cognito.validate_token(new_tokens.access_token)
+                        if user:
+                            return _ensure_cognito_user_org(user)
 
         # Fall back to local session
         session_id = st.session_state.get("session_id")
@@ -660,6 +720,11 @@ def streamlit_page_gate(page_name: str = ""):
     # ADMIN users (system org) bypass tier checks
     from .models import UserRole
     if user.role == UserRole.ADMIN:
+        return user
+
+    # DEV MODE: bypass all tier checks for local development
+    # Set COGNISOM_DEV_MODE=true in .env to enable
+    if os.environ.get("COGNISOM_DEV_MODE", "").lower() in ("true", "1", "yes"):
         return user
 
     # Cognito users bypass org tier checks (they authenticated via AWS Cognito)

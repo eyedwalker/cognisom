@@ -49,8 +49,12 @@ with tab_my_org:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Plan", my_org.plan.value.title())
     members = auth.get_org_users(my_org.org_id)
+    # Count current user if they're a Cognito user (not in local auth)
+    member_count = len(members)
+    if not any(m.username == user.username for m in members) and user.org_id == my_org.org_id:
+        member_count += 1
     limit_str = str(my_org.max_users) if my_org.max_users > 0 else "Unlimited"
-    col2.metric("Members", f"{len(members)} / {limit_str}")
+    col2.metric("Members", f"{member_count} / {limit_str}")
     col3.metric("Org ID", my_org.org_id)
     col4.metric("Created", datetime.fromtimestamp(my_org.created_at).strftime("%Y-%m-%d"))
 
@@ -78,12 +82,23 @@ with tab_my_org:
     # ── Members ──────────────────────────────────────────────────────
     st.subheader("Members")
 
-    if members:
-        for m in members:
+    # Include current user if they're a Cognito user (not in local auth)
+    all_members = list(members)
+    current_user_in_list = any(m.username == user.username for m in members)
+    if not current_user_in_list and user.org_id == my_org.org_id:
+        all_members.insert(0, user)  # Add current user at top
+
+    if all_members:
+        for m in all_members:
             mcol1, mcol2, mcol3, mcol4 = st.columns([3, 2, 2, 1])
-            mcol1.markdown(f"**{m.display_name}** (`{m.username}`)")
+            is_cognito_user = m.username == user.username and not current_user_in_list
+            display_name = m.display_name + (" (you)" if m.username == user.username else "")
+            mcol1.markdown(f"**{display_name}** (`{m.username}`)")
             mcol2.markdown(f"{m.email}")
-            mcol3.markdown(f"Role: `{m.role.value}`")
+            role_text = f"Role: `{m.role.value}`"
+            if is_cognito_user:
+                role_text += " (Cognito)"
+            mcol3.markdown(role_text)
             if is_org_admin and m.username != user.username:
                 if mcol4.button("Remove", key=f"remove_{m.username}"):
                     auth.set_user_org(m.username, "")
