@@ -1,0 +1,483 @@
+#usda 1.0
+(
+    """
+    Bio-USD Core Schema — Biological Entity Library for OpenUSD
+    ============================================================
+
+    Cognisom Phase 5: A standardised schema for representing biological
+    entities in OpenUSD, enabling interoperability between computational
+    biology tools and NVIDIA Omniverse.
+
+    Author: eyentelligence inc.
+    Version: 0.1.0
+    License: Apache 2.0
+
+    This schema defines the core prim types for biological simulation:
+      - BioCell: Single cell with position, type, and cell cycle state
+      - BioImmuneCell: Specialised immune cell with activation mechanics
+      - BioGene: Gene with expression and mutation metadata
+      - BioProtein: Protein with optional 3D structure (mesh)
+      - BioMolecule: Small molecule with SMILES/InChI
+      - BioTissue: Collection of cells forming tissue architecture
+      - BioCapillary: Blood vessel segment
+      - BioSpatialField: 3D volumetric concentration field
+      - BioExosome: Extracellular vesicle carrying molecular cargo
+    """
+    subLayers = []
+    defaultPrim = "BioScene"
+)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# ABSTRACT BASE
+# ══════════════════════════════════════════════════════════════════════
+
+class "BioUnit" (
+    doc = """Abstract base class for all Bio-USD prims.
+    Every biological entity inherits from BioUnit."""
+)
+{
+    uniform string bio:version = "0.1.0" (
+        doc = "Bio-USD schema version"
+    )
+    string bio:displayName = "" (
+        doc = "Human-readable display name"
+    )
+}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# CELL TYPES (IsA Schemas)
+# ══════════════════════════════════════════════════════════════════════
+
+class BioCell "BioCell" (
+    inherits = </Xformable>
+    doc = """A single biological cell with spatial position and state.
+
+    Positioned in 3D space using UsdGeomXformable transforms.
+    Cell type, cycle phase, and metabolic state are tracked as attributes.
+    """
+)
+{
+    int bio:cell:id = 0 (
+        doc = "Unique cell identifier"
+    )
+    token bio:cell:type = "normal" (
+        allowedTokens = ["normal", "cancer", "immune", "stromal",
+                         "endothelial", "basal", "luminal",
+                         "neuroendocrine", "stem", "fibroblast"]
+        doc = "Cell classification"
+    )
+    token bio:cell:phase = "G1" (
+        allowedTokens = ["G0", "G1", "S", "G2", "M"]
+        doc = "Cell cycle phase"
+    )
+    float bio:cell:age = 0.0 (
+        doc = "Cell age in simulation hours"
+    )
+    bool bio:cell:alive = true (
+        doc = "Viability state"
+    )
+    float bio:cell:volume = 1.0 (
+        doc = "Relative cell volume (1.0 = normal size)"
+        customData = { float min = 0.0 }
+    )
+    float bio:cell:divisionTime = 24.0 (
+        doc = "Hours between cell divisions"
+        customData = { float min = 1.0 }
+    )
+}
+
+
+class BioImmuneCell "BioImmuneCell" (
+    inherits = </BioCell>
+    doc = """Immune cell with activation and targeting mechanics.
+
+    Extends BioCell with immune-specific properties for T cells,
+    NK cells, macrophages, and other immune effectors.
+    """
+)
+{
+    token bio:immune:cellType = "T_cell" (
+        allowedTokens = ["T_cell", "NK_cell", "macrophage", "dendritic", "B_cell"]
+        doc = "Immune cell subtype"
+    )
+    bool bio:immune:activated = false (
+        doc = "Whether the cell is actively targeting"
+    )
+    int bio:immune:targetCellId = -1 (
+        doc = "ID of the cell being targeted (-1 = scanning)"
+    )
+    float bio:immune:detectionRadius = 10.0 (
+        doc = "Scanning radius in micrometres"
+        customData = { float min = 1.0, float max = 100.0 }
+    )
+    float bio:immune:killRadius = 5.0 (
+        doc = "Effective kill distance in micrometres"
+        customData = { float min = 1.0, float max = 50.0 }
+    )
+    float bio:immune:killProbability = 0.8 (
+        doc = "Per-contact kill probability"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:immune:mhc1Expression = 1.0 (
+        doc = "MHC class I surface expression level (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# MOLECULAR TYPES
+# ══════════════════════════════════════════════════════════════════════
+
+class BioGene "BioGene" (
+    doc = """A gene with expression level and mutation metadata.
+
+    Represents a genomic locus with transcription state and variant
+    annotation. Used for gene expression profiling and mutation tracking.
+    """
+)
+{
+    string bio:gene:name = "" (
+        doc = "Standard gene symbol (e.g. TP53, BRCA1, AR)"
+    )
+    token bio:gene:type = "housekeeping" (
+        allowedTokens = ["oncogene", "tumor_suppressor", "housekeeping", "signaling"]
+        doc = "Functional classification"
+    )
+    string bio:gene:chromosome = "" (
+        doc = "Chromosome location"
+    )
+    int bio:gene:sequenceLength = 0 (
+        doc = "Coding sequence length in base pairs"
+    )
+    float bio:gene:expressionLevel = 0.5 (
+        doc = "Normalised expression level (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    string[] bio:gene:mutations = [] (
+        doc = "List of mutation identifiers (e.g. 'R175H', 'G12D')"
+    )
+}
+
+
+class BioProtein "BioProtein" (
+    inherits = </Mesh>
+    doc = """A protein molecule with optional 3D mesh structure.
+
+    Inherits UsdGeomMesh so that experimentally or computationally
+    determined 3D structures (PDB, AlphaFold) can be directly
+    represented as geometry.
+    """
+)
+{
+    string bio:protein:name = "" (
+        doc = "Protein name (e.g. p53, Androgen Receptor)"
+    )
+    string bio:protein:geneSource = "" (
+        doc = "Gene that encodes this protein"
+    )
+    int bio:protein:aminoAcidLength = 0 (
+        doc = "Number of amino acid residues"
+    )
+    string bio:protein:pdbId = "" (
+        doc = "PDB identifier (e.g. '1TSR' for p53)"
+    )
+    float bio:protein:bindingAffinity = 0.0 (
+        doc = "Binding affinity in arbitrary units"
+    )
+    int[] bio:protein:activeSites = [] (
+        doc = "Residue positions of active/binding sites"
+    )
+}
+
+
+class BioMolecule "BioMolecule" (
+    doc = """A small molecule (drug, metabolite, ligand).
+
+    Represents compounds with chemical identifiers for use in
+    drug discovery workflows and metabolic simulations.
+    """
+)
+{
+    string bio:molecule:smiles = "" (
+        doc = "SMILES string representation"
+    )
+    string bio:molecule:inchi = "" (
+        doc = "InChI identifier"
+    )
+    float bio:molecule:molecularWeight = 0.0 (
+        doc = "Molecular weight in Daltons"
+    )
+    float bio:molecule:logP = 0.0 (
+        doc = "Octanol-water partition coefficient"
+    )
+    int bio:molecule:charge = 0 (
+        doc = "Net charge at physiological pH"
+    )
+}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# STRUCTURAL TYPES
+# ══════════════════════════════════════════════════════════════════════
+
+class BioTissue "BioTissue" (
+    doc = """A collection of cells forming tissue architecture.
+
+    Groups cells into biologically meaningful tissue units (e.g.
+    prostate epithelium, tumour microenvironment, stroma).
+    """
+)
+{
+    token bio:tissue:type = "unknown" (
+        allowedTokens = ["prostate", "epithelial", "stromal",
+                         "tumor_microenvironment", "vasculature",
+                         "immune_infiltrate", "unknown"]
+        doc = "Tissue classification"
+    )
+    int[] bio:tissue:cellIds = [] (
+        doc = "IDs of cells belonging to this tissue"
+    )
+    float3 bio:tissue:extentMin = (0.0, 0.0, 0.0) (
+        doc = "Bounding box minimum (x, y, z) in um"
+    )
+    float3 bio:tissue:extentMax = (100.0, 100.0, 50.0) (
+        doc = "Bounding box maximum (x, y, z) in um"
+    )
+    int bio:tissue:cellCount = 0 (
+        doc = "Number of cells in the tissue"
+    )
+}
+
+
+class BioCapillary "BioCapillary" (
+    doc = """A blood vessel segment in the vascular network.
+
+    Represents a single capillary with nutrient/waste exchange
+    properties. Networks are built by connecting capillary endpoints.
+    """
+)
+{
+    int bio:capillary:id = 0 (
+        doc = "Capillary segment identifier"
+    )
+    float3 bio:capillary:start = (0.0, 0.0, 0.0) (
+        doc = "Start point (x, y, z) in um"
+    )
+    float3 bio:capillary:end = (100.0, 0.0, 0.0) (
+        doc = "End point (x, y, z) in um"
+    )
+    float bio:capillary:radius = 5.0 (
+        doc = "Vessel radius in um"
+        customData = { float min = 1.0 }
+    )
+    float bio:capillary:oxygenConc = 0.21 (
+        doc = "Oxygen concentration (normalised, 0-0.21)"
+        customData = { float min = 0.0, float max = 0.3 }
+    )
+    float bio:capillary:glucoseConc = 5.0 (
+        doc = "Glucose concentration in mM"
+        customData = { float min = 0.0 }
+    )
+    float bio:capillary:flowRate = 0.5 (
+        doc = "Blood flow rate (arbitrary units)"
+        customData = { float min = 0.0 }
+    )
+}
+
+
+class BioSpatialField "BioSpatialField" (
+    doc = """A 3D volumetric concentration field.
+
+    Represents spatially varying concentrations of oxygen, glucose,
+    cytokines, or other diffusible substances. The actual float32
+    array data is stored externally and referenced by data_ref.
+    """
+)
+{
+    token bio:field:type = "oxygen" (
+        allowedTokens = ["oxygen", "glucose", "cytokine", "lactate", "morphogen"]
+        doc = "Field substance type"
+    )
+    int3 bio:field:gridShape = (200, 200, 100) (
+        doc = "Voxel grid dimensions (nx, ny, nz)"
+    )
+    float bio:field:voxelSize = 10.0 (
+        doc = "Size of each voxel in um"
+        customData = { float min = 0.1 }
+    )
+    float bio:field:diffusionCoeff = 2000.0 (
+        doc = "Diffusion coefficient in um^2/s"
+        customData = { float min = 0.0 }
+    )
+    float bio:field:minValue = 0.0 (
+        doc = "Current minimum concentration in the field"
+    )
+    float bio:field:maxValue = 0.21 (
+        doc = "Current maximum concentration in the field"
+    )
+    asset bio:field:dataRef = @@ (
+        doc = "Path to raw float32 binary array data"
+    )
+}
+
+
+class BioExosome "BioExosome" (
+    inherits = </Xformable>
+    doc = """An extracellular vesicle carrying molecular cargo.
+
+    Positioned in 3D space. Carries mRNA, miRNA, and protein cargo
+    between cells for intercellular communication.
+    """
+)
+{
+    int bio:exosome:sourceCellId = -1 (
+        doc = "Cell that released this exosome"
+    )
+    int bio:exosome:targetCellId = -1 (
+        doc = "Cell that will receive this exosome (-1 = unbound)"
+    )
+    string[] bio:exosome:cargoMrna = [] (
+        doc = "mRNA gene names carried"
+    )
+    string[] bio:exosome:cargoMirna = [] (
+        doc = "miRNA identifiers carried"
+    )
+    string[] bio:exosome:cargoProteins = [] (
+        doc = "Protein names carried"
+    )
+}
+
+
+# ══════════════════════════════════════════════════════════════════════
+# APPLIED API SCHEMAS (composable metadata)
+# ══════════════════════════════════════════════════════════════════════
+
+class "BioMetabolicAPI" (
+    inherits = </APISchemaBase>
+    doc = """Metabolic concentrations applied to a BioCell.
+
+    Tracks oxygen, glucose, ATP, and lactate per cell.
+    Oxygen levels below 0.02 indicate hypoxia (Warburg effect trigger).
+    """
+)
+{
+    float bio:metabolic:oxygen = 0.21 (
+        doc = "O2 level (0-0.21, arterial=0.21, hypoxic<0.02)"
+        customData = { float min = 0.0, float max = 0.3 }
+    )
+    float bio:metabolic:glucose = 5.0 (
+        doc = "Glucose concentration in mM"
+        customData = { float min = 0.0, float max = 20.0 }
+    )
+    float bio:metabolic:atp = 1000.0 (
+        doc = "ATP energy units"
+        customData = { float min = 0.0 }
+    )
+    float bio:metabolic:lactate = 0.0 (
+        doc = "Lactate concentration in mM (Warburg effect marker)"
+        customData = { float min = 0.0 }
+    )
+}
+
+
+class "BioGeneExpressionAPI" (
+    inherits = </APISchemaBase>
+    doc = """Gene expression state applied to a BioCell.
+
+    Tracks overall expression level, methylation state, active genes,
+    and detected mutations.
+    """
+)
+{
+    float bio:geneExpression:level = 0.5 (
+        doc = "Normalised overall expression (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:geneExpression:methylation = 0.0 (
+        doc = "Global methylation level (0-1, higher = more silenced)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    string[] bio:geneExpression:activeGenes = [] (
+        doc = "List of actively transcribed gene names"
+    )
+    string[] bio:geneExpression:mutations = [] (
+        doc = "Mutation identifiers (e.g. 'TP53_R175H', 'KRAS_G12D')"
+    )
+}
+
+
+class "BioEpigeneticAPI" (
+    inherits = </APISchemaBase>
+    doc = """Epigenetic state applied to a BioCell.
+
+    Tracks histone modifications and chromatin accessibility.
+    These states influence gene expression without changing DNA sequence.
+    """
+)
+{
+    float bio:epigenetic:methylationLevel = 0.0 (
+        doc = "CpG methylation level (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:epigenetic:h3k4me3 = 1.0 (
+        doc = "H3K4me3 active promoter mark (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:epigenetic:h3k27me3 = 0.0 (
+        doc = "H3K27me3 Polycomb repressive mark (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:epigenetic:h3k9ac = 1.0 (
+        doc = "H3K9ac active acetylation mark (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    bool bio:epigenetic:chromatinOpen = true (
+        doc = "true = euchromatin (open), false = heterochromatin (closed)"
+    )
+}
+
+
+class "BioImmuneAPI" (
+    inherits = </APISchemaBase>
+    doc = """Immune surveillance metadata applied to a BioCell.
+
+    Can be applied to any cell to track immune visibility (MHC-I)
+    or to immune cells for activation state.
+    """
+)
+{
+    float bio:immune:mhc1Expression = 1.0 (
+        doc = "MHC class I expression (0-1, low = immune evasion)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+    float bio:immune:activationState = 0.0 (
+        doc = "Immune activation level (0-1)"
+        customData = { float min = 0.0, float max = 1.0 }
+    )
+}
+
+
+class "BioInteractionAPI" (
+    inherits = </APISchemaBase>
+    doc = """Molecular interaction metadata.
+
+    Applied to proteins and molecules to annotate binding relationships,
+    affinities, and interaction types.
+    """
+)
+{
+    rel bio:interaction:bindsTo (
+        doc = "Prim path of the binding partner"
+    )
+    float bio:interaction:bindingAffinity = 0.0 (
+        doc = "Dissociation constant Kd in nM (lower = stronger)"
+    )
+    token bio:interaction:type = "binding" (
+        allowedTokens = ["binding", "inhibition", "activation",
+                         "phosphorylation", "degradation"]
+        doc = "Type of molecular interaction"
+    )
+}

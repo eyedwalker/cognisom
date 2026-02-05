@@ -1,0 +1,32 @@
+apiVersion: v2
+name: cognisom-engine
+description: Cognisom Biological Simulation Engine
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - simulation
+  - biology
+  - cancer
+  - digital-twin
+  - nvidia
+
+home: https://github.com/cognisom/cognisom
+sources:
+  - https://github.com/cognisom/cognisom
+
+maintainers:
+  - name: Cognisom Team
+    email: team@cognisom.com
+
+dependencies:
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: postgresql
+    version: "14.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

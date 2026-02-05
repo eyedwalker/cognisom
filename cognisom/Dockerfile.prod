@@ -1,0 +1,50 @@
+# Cognisom HDT Platform — Production image
+# Runs both Flask API (gunicorn) + Streamlit dashboard
+# No GPU required — simulation is pure NumPy/SciPy
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc g++ git curl \
+        libxrender1 libxext6 libsm6 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir rdkit-pypi 2>/dev/null || true
+
+# Application code
+COPY . .
+
+# Create data directories
+RUN mkdir -p data/auth \
+             data/scrna \
+             data/research_cache \
+             data/subscriptions \
+             data/flywheel \
+             data/feedback \
+             data/agent_interactions \
+             data/model_registry \
+             data/distilled_models \
+             data/calibration \
+             exports
+
+# Non-root user for security
+RUN groupadd -r cognisom && useradd -r -g cognisom -d /app cognisom && \
+    chown -R cognisom:cognisom /app
+USER cognisom
+
+# Expose both services
+EXPOSE 5000 8501
+
+# Health check on Flask API
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:5000/api/health || exit 1
+
+# Start both services
+ENTRYPOINT ["bash", "entrypoint.sh"]

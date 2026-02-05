@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>cognisom Simulation Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { color: #667eea; }
+        h2 { color: #764ba2; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        .summary { background: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .stat { display: inline-block; margin: 10px 20px; }
+        .stat-label { font-weight: bold; color: #666; }
+        .stat-value { font-size: 1.5em; color: #667eea; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #667eea; color: white; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 2px solid #ddd; color: #666; }
+    </style>
+</head>
+<body>
+    <h1>🧬 cognisom Simulation Report</h1>
+    <p><strong>Generated:</strong> 2025-11-12 10:13:01</p>
+    
+    <div class="summary">
+        <h2>Executive Summary</h2>
+        <div class="stat">
+            <div class="stat-label">Duration</div>
+            <div class="stat-value">0.50 hours</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Total Steps</div>
+            <div class="stat-value">50</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Modules Active</div>
+            <div class="stat-value">9</div>
+        </div>
+    </div>
+    
+    <h2>📊 Results by Module</h2>
+
+    <h3>MOLECULAR</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_genes</td><td>3</td></tr>
+        <tr><td>n_cells_tracked</td><td>12</td></tr>
+        <tr><td>n_exosomes</td><td>0</td></tr>
+        <tr><td>n_active_exosomes</td><td>0</td></tr>
+        <tr><td>total_released</td><td>0</td></tr>
+        <tr><td>total_uptaken</td><td>0</td></tr>
+        <tr><td>total_mutations</td><td>0</td></tr>
+        <tr><td>total_transcriptions</td><td>10</td></tr>
+    </table>
+
+    <h3>CELLULAR</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_cells</td><td>12</td></tr>
+        <tr><td>n_cancer</td><td>2</td></tr>
+        <tr><td>n_normal</td><td>10</td></tr>
+        <tr><td>total_divisions</td><td>0</td></tr>
+        <tr><td>total_deaths</td><td>1</td></tr>
+        <tr><td>total_transformations</td><td>0</td></tr>
+    </table>
+
+    <h3>IMMUNE</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_immune_cells</td><td>16</td></tr>
+        <tr><td>n_activated</td><td>0</td></tr>
+        <tr><td>n_t_cells</td><td>5</td></tr>
+        <tr><td>n_nk_cells</td><td>3</td></tr>
+        <tr><td>n_macrophages</td><td>8</td></tr>
+        <tr><td>total_kills</td><td>1</td></tr>
+        <tr><td>total_activations</td><td>1</td></tr>
+        <tr><td>total_recruited</td><td>0</td></tr>
+    </table>
+
+    <h3>VASCULAR</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_capillaries</td><td>4</td></tr>
+        <tr><td>hypoxic_regions</td><td>0</td></tr>
+    </table>
+
+    <h3>LYMPHATIC</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_vessels</td><td>2</td></tr>
+        <tr><td>total_fluid_drained</td><td>0.009999999999999995</td></tr>
+        <tr><td>total_immune_trafficked</td><td>0</td></tr>
+        <tr><td>total_metastases</td><td>0</td></tr>
+        <tr><td>immune_in_vessels</td><td>0</td></tr>
+        <tr><td>cancer_in_vessels</td><td>0</td></tr>
+    </table>
+
+    <h3>SPATIAL</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>resolution</td><td>10.0</td></tr>
+        <tr><td>n_fields</td><td>3</td></tr>
+    </table>
+
+    <h3>EPIGENETIC</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_cells_tracked</td><td>13</td></tr>
+        <tr><td>avg_methylation</td><td>0.07230769230769231</td></tr>
+        <tr><td>silenced_genes</td><td>6</td></tr>
+        <tr><td>active_genes</td><td>59</td></tr>
+        <tr><td>total_silencing_events</td><td>0</td></tr>
+        <tr><td>total_activation_events</td><td>0</td></tr>
+    </table>
+
+    <h3>CIRCADIAN</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>master_phase</td><td>0.5000000000000002</td></tr>
+        <tr><td>master_time_of_day</td><td>night</td></tr>
+        <tr><td>n_clocks</td><td>12</td></tr>
+        <tr><td>synchrony</td><td>0.3730314946637347</td></tr>
+        <tr><td>avg_phase</td><td>9.057050267392034</td></tr>
+        <tr><td>avg_amplitude</td><td>1.0</td></tr>
+        <tr><td>total_peaks</td><td>0</td></tr>
+        <tr><td>total_troughs</td><td>0</td></tr>
+    </table>
+
+    <h3>MORPHOGEN</h3>
+    <table>
+        <tr><th>Parameter</th><th>Value</th></tr>
+        <tr><td>n_gradients</td><td>3</td></tr>
+        <tr><td>n_cells_tracked</td><td>12</td></tr>
+        <tr><td>total_fates_determined</td><td>13</td></tr>
+    </table>
+
+    <div class="footer">
+        <p><strong>cognisom</strong> - Multi-Scale Cellular Simulation Platform</p>
+        <p>Report generated: 2025-11-12 10:13:01</p>
+    </div>
+</body>
+</html>

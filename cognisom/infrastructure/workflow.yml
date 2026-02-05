@@ -1,0 +1,124 @@
+# Cognisom Engine - NeMo Agent Toolkit (NAT) Workflow
+# =======================================================
+# Orchestrates the multi-agent drug discovery pipeline.
+#
+# Agents:
+#   researcher  - Literature review + target identification via RAG
+#   designer    - Molecule/binder generation via BioNeMo NIMs
+#   simulator   - Digital tissue twin simulation via cognisom
+#
+# Usage:
+#   nat run infrastructure/workflow.yml
+#
+# Requires:
+#   NVIDIA_API_KEY in environment
+
+general:
+  name: cognisom-engine
+  description: >
+    Multi-agent pipeline for prostate cancer drug discovery.
+    Combines literature RAG, generative chemistry, protein design,
+    and tissue simulation.
+
+functions:
+  # --- NIM Tool Wrappers ---
+  molmim_generate:
+    description: Generate novel small molecules from a seed SMILES using MolMIM
+    module: cognisom.nims.molmim
+    class: MolMIMClient
+    method: generate
+
+  rfdiffusion_design:
+    description: Design a protein binder for a target structure using RFdiffusion
+    module: cognisom.nims.rfdiffusion
+    class: RFdiffusionClient
+    method: design_binder
+
+  proteinmpnn_design:
+    description: Design protein sequences for a backbone using ProteinMPNN
+    module: cognisom.nims.proteinmpnn
+    class: ProteinMPNNClient
+    method: design_sequences
+
+  drug_bridge:
+    description: Convert generated molecules to simulation parameters
+    module: cognisom.bridge.drug_bridge
+    class: DrugBridge
+    method: convert_molecules
+
+  run_simulation:
+    description: Run cognisom tissue simulation with drug parameters
+    module: cognisom.bridge.drug_bridge
+    class: DrugBridge
+    method: apply_to_simulation
+
+  discovery_pipeline:
+    description: Run the full end-to-end discovery pipeline
+    module: cognisom.bridge.pipeline
+    class: DiscoveryPipeline
+    method: run
+
+agents:
+  researcher:
+    description: >
+      Identifies drug targets from prostate cancer literature.
+      Queries PubMed and local knowledge base to find targets,
+      pathways, and known inhibitors.
+    llm: nvidia/llama-3.1-nemotron-70b-instruct
+    tools:
+      - web_search
+      - vector_retrieval
+    system_prompt: >
+      You are a biomedical research agent specializing in prostate cancer.
+      Your role is to identify drug targets, known inhibitors, and resistance
+      mechanisms. Focus on: androgen receptor (AR) signaling, PI3K/AKT pathway,
+      DNA repair (PARP), and immune checkpoint (PD-1/PD-L1) pathways.
+      Return structured output with: target_name, seed_smiles, target_pdb_id,
+      binding_site_residues, and rationale.
+
+  designer:
+    description: >
+      Generates candidate molecules and protein binders using BioNeMo NIMs.
+      Takes targets from the researcher and produces drug candidates.
+    llm: nvidia/llama-3.1-nemotron-70b-instruct
+    tools:
+      - molmim_generate
+      - rfdiffusion_design
+      - proteinmpnn_design
+      - drug_bridge
+    system_prompt: >
+      You are a computational chemistry agent. Given a drug target and seed
+      molecule, use MolMIM to generate candidate molecules, then use the drug
+      bridge to convert them to simulation-ready parameters. If a protein
+      structure is provided, also design protein binders using RFdiffusion
+      and ProteinMPNN. Rank candidates by drug-likeness (QED) and predicted
+      efficacy.
+
+  simulator:
+    description: >
+      Tests drug candidates in the cognisom digital tissue twin.
+      Runs simulation with drug parameters and reports outcomes.
+    llm: nvidia/llama-3.1-nemotron-70b-instruct
+    tools:
+      - run_simulation
+    system_prompt: >
+      You are a simulation agent. Given drug candidates with simulation
+      parameters, run them through the cognisom tissue simulation and
+      report: tumor regression rate, normal cell toxicity, immune response
+      changes, and overall treatment score. Compare multiple candidates
+      and recommend the best one.
+
+workflow:
+  - name: identify_targets
+    agent: researcher
+    input: "Identify the top 3 druggable targets for castration-resistant prostate cancer. For each target, provide a seed SMILES for a known inhibitor."
+
+  - name: generate_candidates
+    agent: designer
+    input: "For each target from the researcher, generate 20 candidate molecules and convert them to simulation parameters. Rank by predicted efficacy."
+    depends_on: identify_targets
+
+  - name: simulate_treatment
+    agent: simulator
+    input: "Test the top 3 candidates from each target in the tissue simulation. Run each for 48 simulated hours and report tumor cell count, immune kills, and normal cell survival."
+    depends_on: generate_candidates

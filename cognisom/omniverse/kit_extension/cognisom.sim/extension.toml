@@ -1,0 +1,27 @@
+[package]
+version = "1.0.0"
+title = "Cognisom Biological Simulation"
+description = "Real-time biological cell simulation in Omniverse"
+authors = ["Cognisom Team"]
+repository = "https://github.com/cognisom/cognisom"
+keywords = ["simulation", "biology", "cells", "cancer", "digital twin"]
+category = "Simulation"
+changelog = "docs/CHANGELOG.md"
+preview_image = "data/preview.png"
+icon = "data/icon.png"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.ui" = {}
+"omni.usd" = {}
+"omni.kit.window.toolbar" = {}
+"omni.physx" = {}
+
+[[python.module]]
+name = "cognisom.sim"
+
+[settings]
+exts."cognisom.sim".simulation.fps = 60
+exts."cognisom.sim".simulation.dt = 0.01
+exts."cognisom.sim".visualization.cell_scale = 1.0
+exts."cognisom.sim".visualization.show_trails = false

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: nim-pods
+description: NVIDIA Inference Microservices (NIM) for Cognisom
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - nvidia
+  - nim
+  - inference
+  - diffdock
+  - genmol
+  - llm
+
+home: https://developer.nvidia.com/nim
+sources:
+  - https://github.com/cognisom/cognisom
+
+maintainers:
+  - name: Cognisom Team
+    email: team@cognisom.com

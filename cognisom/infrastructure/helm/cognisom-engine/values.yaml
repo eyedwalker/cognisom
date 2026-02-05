@@ -1,0 +1,221 @@
+# Cognisom Engine Helm Chart Values
+# ==================================
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Cognisom API deployment
+api:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: cognisom/api
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: api.cognisom.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: cognisom-api-tls
+        hosts:
+          - api.cognisom.com
+
+  env:
+    - name: FLASK_ENV
+      value: production
+    - name: LOG_LEVEL
+      value: INFO
+    - name: REDIS_URL
+      value: redis://cognisom-redis-master:6379/0
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: cognisom-secrets
+          key: database-url
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Dashboard deployment
+dashboard:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: cognisom/dashboard
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  service:
+    type: ClusterIP
+    port: 8501
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: app.cognisom.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: cognisom-dashboard-tls
+        hosts:
+          - app.cognisom.com
+
+  env:
+    - name: COGNISOM_API_URL
+      value: http://cognisom-api:8080
+    - name: AUTH_ENABLED
+      value: "true"
+
+# Simulation worker deployment (GPU)
+worker:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: cognisom/worker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+
+  nodeSelector:
+    nvidia.com/gpu.present: "true"
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  env:
+    - name: CUDA_VISIBLE_DEVICES
+      value: "0"
+    - name: REDIS_URL
+      value: redis://cognisom-redis-master:6379/0
+
+# Agent orchestrator deployment
+agent:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: cognisom/agent
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 8Gi
+
+  env:
+    - name: NVIDIA_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: cognisom-secrets
+          key: nvidia-api-key
+    - name: ANTHROPIC_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: cognisom-secrets
+          key: anthropic-api-key
+    - name: COGNISOM_API_URL
+      value: http://cognisom-api:8080
+
+# Redis configuration
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 8Gi
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  auth:
+    database: cognisom
+    existingSecret: cognisom-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      size: 20Gi
+
+# Service account
+serviceAccount:
+  create: true
+  name: cognisom
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # Fill with IRSA role ARN
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network policy
+networkPolicy:
+  enabled: true
+
+# Monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    interval: 30s
