@@ -110,7 +110,18 @@ class ScRNALoader:
         Returns:
             AnnData object or None if no data found.
         """
-        import cellxgene_census
+        # Check if cellxgene_census is available (needs tiledb system libs)
+        try:
+            import cellxgene_census
+        except ImportError as e:
+            logger.error(
+                f"CellxGene Census not available: {e}. "
+                f"Use Synthetic data instead."
+            )
+            return None
+        except Exception as e:
+            logger.error(f"CellxGene import failed: {e}")
+            return None
 
         # Map friendly disease names to CellxGene ontology terms
         disease_term = None
