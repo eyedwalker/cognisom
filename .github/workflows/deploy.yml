@@ -73,7 +73,10 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
         run: |
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+          BUILD_DATE=$(date -u +%Y-%m-%d)
           docker build -f ${{ steps.dockerfile.outputs.file }} \
+            --build-arg COGNISOM_GIT_SHA=${{ github.sha }} \
+            --build-arg COGNISOM_BUILD_DATE=$BUILD_DATE \
             -t "$IMAGE:${{ github.sha }}" \
             -t "$IMAGE:${{ steps.dockerfile.outputs.tag }}" \
             -t "$IMAGE:latest" .

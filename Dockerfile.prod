@@ -4,6 +4,16 @@
 
 FROM python:3.11-slim
 
+# Build args for versioning
+ARG COGNISOM_GIT_SHA=dev
+ARG COGNISOM_BUILD_DATE=unknown
+ARG COGNISOM_VERSION=0.3.0
+
+# Set as environment variables for runtime
+ENV COGNISOM_GIT_SHA=$COGNISOM_GIT_SHA
+ENV COGNISOM_BUILD_DATE=$COGNISOM_BUILD_DATE
+ENV COGNISOM_VERSION=$COGNISOM_VERSION
+
 WORKDIR /app
 
 # System dependencies
