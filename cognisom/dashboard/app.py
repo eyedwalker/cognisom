@@ -1122,7 +1122,9 @@ else:
         session_id = st.session_state.get("session_id")
         if session_id:
             auth.logout(session_id)
-        for key in ["session_id", "username"]:
+        # Clear all auth-related session state (local + Cognito)
+        for key in ["session_id", "username", "cognito_access_token",
+                    "cognito_refresh_token", "cognito_token_expires"]:
             st.session_state.pop(key, None)
         st.rerun()
     st.sidebar.divider()
