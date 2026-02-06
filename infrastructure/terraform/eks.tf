@@ -84,6 +84,7 @@ resource "aws_eks_node_group" "system" {
   node_group_name = "${local.name_prefix}-system"
   node_role_arn   = aws_iam_role.eks_node.arn
   subnet_ids      = aws_subnet.private[*].id
+  ami_type        = "AL2023_x86_64_STANDARD"  # Upgraded from AL2
 
   scaling_config {
     desired_size = var.eks_system_node_count
@@ -127,7 +128,7 @@ resource "aws_eks_node_group" "gpu" {
   node_role_arn   = aws_iam_role.eks_node.arn
   subnet_ids      = aws_subnet.private[*].id
   capacity_type   = var.eks_gpu_capacity_type  # ON_DEMAND or SPOT
-  ami_type        = "AL2_x86_64_GPU"
+  ami_type        = "AL2023_x86_64_NVIDIA"  # Upgraded from AL2_x86_64_GPU
 
   scaling_config {
     desired_size = var.eks_gpu_node_count
@@ -173,6 +174,7 @@ resource "aws_eks_node_group" "inference" {
   node_role_arn   = aws_iam_role.eks_node.arn
   subnet_ids      = aws_subnet.private[*].id
   capacity_type   = "SPOT"
+  ami_type        = "AL2023_x86_64_STANDARD"  # Upgraded from AL2
 
   scaling_config {
     desired_size = var.eks_inference_node_count
@@ -365,17 +367,17 @@ resource "aws_cloudwatch_log_group" "eks" {
 variable "eks_version" {
   description = "EKS cluster version"
   type        = string
-  default     = "1.29"
+  default     = "1.30"  # Upgraded from 1.29
 }
 
 variable "eks_addon_versions" {
-  description = "Versions for EKS addons"
+  description = "Versions for EKS addons (compatible with EKS 1.30)"
   type        = map(string)
   default = {
-    "vpc-cni"            = "v1.16.0-eksbuild.1"
-    "coredns"            = "v1.11.1-eksbuild.4"
-    "kube-proxy"         = "v1.29.0-eksbuild.1"
-    "aws-ebs-csi-driver" = "v1.27.0-eksbuild.1"
+    "vpc-cni"            = "v1.18.0-eksbuild.1"  # Updated for 1.30
+    "coredns"            = "v1.11.1-eksbuild.9"  # Updated for 1.30
+    "kube-proxy"         = "v1.30.0-eksbuild.3"  # Updated for 1.30
+    "aws-ebs-csi-driver" = "v1.30.0-eksbuild.1"  # Updated for 1.30
   }
 }
 
