@@ -52,14 +52,19 @@ variable "db_password" {
 }
 
 # ─── Random Password (if not provided) ────────────────────────
+# NOTE: Use nonsensitive() for comparisons only - the value itself stays sensitive
+locals {
+  db_password_provided = nonsensitive(var.db_password != "")
+}
+
 resource "random_password" "db_password" {
-  count   = var.enable_rds && var.db_password == "" ? 1 : 0
+  count   = var.enable_rds && !local.db_password_provided ? 1 : 0
   length  = 32
   special = false  # Avoid special chars that cause connection string issues
 }
 
 locals {
-  db_password = var.db_password != "" ? var.db_password : (
+  db_password = local.db_password_provided ? var.db_password : (
     var.enable_rds ? random_password.db_password[0].result : ""
   )
 }
