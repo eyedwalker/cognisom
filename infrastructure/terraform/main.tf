@@ -8,14 +8,14 @@ terraform {
     }
   }
 
-  # Uncomment after first deploy to store state in S3:
-  # backend "s3" {
-  #   bucket         = "cognisom-terraform-state"
-  #   key            = "production/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "cognisom-terraform-lock"
-  #   encrypt        = true
-  # }
+  # S3 backend for persistent state across CI/CD runs
+  backend "s3" {
+    bucket         = "cognisom-terraform-state-780457123717"
+    key            = "production/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "cognisom-terraform-lock"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
