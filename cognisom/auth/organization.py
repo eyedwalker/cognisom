@@ -76,6 +76,9 @@ TIER_PAGE_ACCESS: Dict[SubscriptionTier, List[str]] = {
         "16_usd_omniverse",       # USD/Omniverse 3D integration
         "17_flywheel_monitor",    # Research flywheel monitoring
         "18_external_databases",  # UniProt, KEGG, ChEMBL integrations
+        "19_prostate_metastasis", # Prostate cancer metastasis model
+        "20_vcell_solvers",       # VCell-parity simulation solvers
+        "21_universe_scale",      # Universe-scale visualization
     ],
 }
 
