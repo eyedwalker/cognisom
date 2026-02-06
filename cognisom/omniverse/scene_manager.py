@@ -32,9 +32,24 @@ import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 log = logging.getLogger(__name__)
+
+# Import precision module for universe-scale visualization (Phase B1)
+try:
+    from .precision import (
+        PrecisionTransformManager,
+        BiologicalScale,
+        verify_no_jitter,
+    )
+    PRECISION_AVAILABLE = True
+except ImportError:
+    PRECISION_AVAILABLE = False
+    log.debug("Precision module not available for scene manager")
+
+if TYPE_CHECKING:
+    from .precision import PrecisionTransformManager
 
 
 class EntityType(str, Enum):
@@ -143,6 +158,9 @@ class SceneManager:
 
     Handles creation, updates, and removal of entities with efficient
     batch processing and LOD management.
+
+    Phase B1 Update: Now supports double-precision transforms via
+    PrecisionTransformManager for universe-scale visualization.
     """
 
     # Scene hierarchy paths
@@ -155,11 +173,18 @@ class SceneManager:
     # LOD thresholds (distance from camera)
     LOD_THRESHOLDS = [50.0, 150.0, 500.0]
 
-    def __init__(self, connector) -> None:
+    def __init__(
+        self,
+        connector,
+        enable_precision_mode: bool = True,
+        biological_scale: Optional["BiologicalScale"] = None
+    ) -> None:
         """Initialize scene manager.
 
         Args:
             connector: OmniverseConnector instance
+            enable_precision_mode: Enable double-precision transforms (Phase B1)
+            biological_scale: Primary biological scale for the scene
         """
         self._connector = connector
         self._stage = None
@@ -176,6 +201,11 @@ class SceneManager:
         self._last_batch_time = 0.0
         self._batch_count = 0
 
+        # Phase B1: Precision mode configuration
+        self._enable_precision_mode = enable_precision_mode and PRECISION_AVAILABLE
+        self._biological_scale = biological_scale
+        self._precision_manager: Optional["PrecisionTransformManager"] = None
+
     def initialize(self) -> bool:
         """Initialize the scene structure."""
         if not self._connector or not self._connector.is_connected:
@@ -187,6 +217,19 @@ class SceneManager:
             log.error("Failed to get USD stage")
             return False
 
+        # Phase B1: Initialize precision manager if enabled
+        if self._enable_precision_mode and PRECISION_AVAILABLE:
+            try:
+                scale = self._biological_scale or BiologicalScale.CELLULAR
+                self._precision_manager = PrecisionTransformManager(
+                    self._stage,
+                    default_scale=scale
+                )
+                log.info(f"Scene manager: precision mode enabled ({scale.value} scale)")
+            except Exception as e:
+                log.warning(f"Could not initialize precision manager: {e}")
+                self._precision_manager = None
+
         # Create scene hierarchy
         self._create_hierarchy()
 
@@ -195,6 +238,16 @@ class SceneManager:
 
         log.info("Scene manager initialized")
         return True
+
+    @property
+    def precision_manager(self) -> Optional["PrecisionTransformManager"]:
+        """Get the precision transform manager (Phase B1)."""
+        return self._precision_manager
+
+    @property
+    def precision_mode_enabled(self) -> bool:
+        """Check if precision mode is enabled."""
+        return self._precision_manager is not None
 
     def _create_hierarchy(self) -> None:
         """Create default scene hierarchy."""
@@ -651,7 +704,7 @@ class SceneManager:
             type_counts[t] = type_counts.get(t, 0) + 1
             state_counts[s] = state_counts.get(s, 0) + 1
 
-        return {
+        stats = {
             "total_entities": len(self._entities),
             "visible_entities": sum(1 for e in self._entities.values() if e.visible),
             "pending_updates": len(self._pending_updates),
@@ -661,7 +714,15 @@ class SceneManager:
             "state_counts": state_counts,
             "last_batch_time_ms": self._last_batch_time * 1000,
             "batch_count": self._batch_count,
+            # Phase B1: Precision mode info
+            "precision_mode": self._precision_manager is not None,
+            "precision_available": PRECISION_AVAILABLE,
         }
+
+        if self._precision_manager and self._biological_scale:
+            stats["biological_scale"] = self._biological_scale.value
+
+        return stats
 
     def clear(self) -> None:
         """Clear all entities from scene."""

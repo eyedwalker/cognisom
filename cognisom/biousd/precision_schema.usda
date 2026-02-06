@@ -1,0 +1,226 @@
+#usda 1.0
+(
+    "Bio-Precision USD Schema Extension"
+    "Phase B5: High-precision coordinate storage for scientific simulation"
+    subLayers = [
+        @usd/schema.usda@
+    ]
+)
+
+# ============================================================================
+# BioPrecisePointAPI - High-precision coordinates for simulation
+# ============================================================================
+#
+# This API schema stores double-precision (float64) coordinates parallel to
+# the standard float32 render coordinates. Required for:
+# - Molecular dynamics with sub-angstrom precision
+# - Universe-scale visualization (11 orders of magnitude: Angstrom to meter)
+# - Thermodynamic analysis requiring high-fidelity velocity data
+
+class "BioPrecisePointAPI"
+(
+    inherits = </APISchemaBase>
+    customData = {
+        token apiSchemaType = "singleApply"
+        string className = "BioPrecisePointAPI"
+        string libraryName = "cognisom"
+        string libraryPath = "cognisom/biousd"
+    }
+    doc = "API schema for high-precision biological coordinate storage."
+)
+{
+    # Double-precision positions for simulation accuracy
+    # Parallel to the standard float3[] points attribute
+    custom double3[] precise:positions (
+        doc = "Double-precision particle/atom coordinates for simulation."
+        customData = {
+            string cognisom:usage = "simulation"
+        }
+    )
+
+    # High-fidelity velocity vectors for thermodynamic analysis
+    custom double3[] precise:velocities (
+        doc = "Double-precision velocity vectors (m/s or nm/ps)."
+        customData = {
+            string cognisom:usage = "simulation"
+        }
+    )
+
+    # Atomic/particle masses for momentum calculations
+    custom double[] precise:masses (
+        doc = "Particle masses in atomic mass units (Daltons)."
+        customData = {
+            string cognisom:usage = "simulation"
+        }
+    )
+
+    # Force vectors (optional, for debugging/visualization)
+    custom double3[] precise:forces (
+        doc = "Current force vectors on each particle."
+        customData = {
+            string cognisom:usage = "debug"
+        }
+    )
+
+    # Scale factor for coordinate transformation
+    custom double precise:scale = 1.0 (
+        doc = "Scale factor applied to transform precise coords to render coords."
+    )
+
+    # Reference origin for local coordinate system
+    custom double3 precise:origin = (0.0, 0.0, 0.0) (
+        doc = "Origin point for the local coordinate system."
+    )
+}
+
+
+# ============================================================================
+# BioSimulationBridgeAPI - Mixed-precision simulation bridge
+# ============================================================================
+#
+# Manages the precision trade-off between simulation accuracy and GPU performance.
+# Strategy:
+# - Position integration: MUST be float64 (prevents accumulated drift)
+# - Force calculation: Can be float32 for local interactions
+# - Rendering: float32 for GPU optimization
+
+class "BioSimulationBridgeAPI"
+(
+    inherits = </APISchemaBase>
+    customData = {
+        token apiSchemaType = "singleApply"
+    }
+    doc = "API schema bridging simulation precision to visualization."
+)
+{
+    # Precision configuration
+    custom token simulation:positionPrecision = "float64" (
+        allowedTokens = ["float64", "float32"]
+        doc = "Precision for position integration (float64 recommended)."
+    )
+
+    custom token simulation:forcePrecision = "float32" (
+        allowedTokens = ["float64", "float32"]
+        doc = "Precision for force calculations (float32 OK for local)."
+    )
+
+    custom token simulation:renderPrecision = "float32" (
+        allowedTokens = ["float32", "half"]
+        doc = "Precision for visualization (float32 standard)."
+    )
+
+    # Synchronization tracking
+    custom double simulation:lastSyncTime = 0.0 (
+        doc = "Last time simulation state was synced to visualization."
+    )
+
+    custom int simulation:syncInterval = 1 (
+        doc = "Sync every N simulation steps (1 = every step)."
+    )
+
+    # Drift correction accumulator
+    custom double3 simulation:driftCorrection = (0.0, 0.0, 0.0) (
+        doc = "Accumulated position drift correction."
+    )
+}
+
+
+# ============================================================================
+# BiologicalScaleAPI - Multi-scale information for semantic zooming
+# ============================================================================
+#
+# Defines the biological scale level of an entity for:
+# - Semantic zooming (representation switching)
+# - Coordinate precision requirements
+# - Memory/performance optimization
+
+class "BiologicalScaleAPI"
+(
+    inherits = </APISchemaBase>
+    customData = {
+        token apiSchemaType = "singleApply"
+    }
+    doc = "API schema defining biological scale level for semantic zooming."
+)
+{
+    # Scale level enumeration
+    custom token bio:scaleLevel = "CELLULAR" (
+        allowedTokens = [
+            "ATOMIC",       # ~1 Angstrom (1e-10 m)
+            "MOLECULAR",    # ~1 nanometer (1e-9 m)
+            "ORGANELLE",    # ~100 nm (1e-7 m)
+            "CELLULAR",     # ~10 microns (1e-5 m)
+            "TISSUE",       # ~1 mm (1e-3 m)
+            "ORGAN",        # ~10 cm (1e-1 m)
+            "ORGANISM"      # ~1 m
+        ]
+        doc = "Biological scale level of this entity."
+    )
+
+    # Typical size at this scale
+    custom double bio:typicalSizeMeters (
+        doc = "Typical entity size at this scale in meters."
+    )
+
+    # Required coordinate precision
+    custom token bio:coordinatePrecision = "float64" (
+        allowedTokens = ["float64", "float32"]
+        doc = "Required precision for coordinates at this scale."
+    )
+
+    # Default representation type
+    custom token bio:representationType = "mesh" (
+        allowedTokens = [
+            "mesh",           # UsdGeomMesh
+            "points",         # UsdGeomPoints
+            "pointInstancer", # UsdGeomPointInstancer
+            "curves",         # UsdGeomBasisCurves
+            "sphere",         # UsdGeomSphere (simple proxy)
+            "volume"          # UsdVolVolume
+        ]
+        doc = "Default geometry representation for this scale."
+    )
+
+    # Variant set for representation switching
+    custom string bio:variantSetName = "Representation" (
+        doc = "Name of VariantSet for semantic zoom switching."
+    )
+}
+
+
+# ============================================================================
+# BioPrecisionTransformAPI - Transform with double-precision support
+# ============================================================================
+#
+# Extends UsdGeomXformable to store double-precision transforms
+# while maintaining float32 compatibility for rendering.
+
+class "BioPrecisionTransformAPI"
+(
+    inherits = </APISchemaBase>
+    customData = {
+        token apiSchemaType = "singleApply"
+    }
+    doc = "API schema for double-precision transforms."
+)
+{
+    # Double-precision world position
+    custom double3 precise:worldPosition (
+        doc = "World position in double precision (meters)."
+    )
+
+    # Double-precision orientation (quaternion)
+    custom double4 precise:worldOrientation = (0.0, 0.0, 0.0, 1.0) (
+        doc = "World orientation as quaternion (x, y, z, w)."
+    )
+
+    # Local-to-world matrix in double precision
+    custom matrix4d precise:localToWorld (
+        doc = "Local-to-world transform matrix in double precision."
+    )
+
+    # Flag indicating this prim uses precision transforms
+    custom bool precise:enabled = false (
+        doc = "Whether high-precision transforms are active."
+    )
+}

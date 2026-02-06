@@ -46,6 +46,17 @@ from .physics_interface import (
     CuPyParticlePhysics,
     NumPyFallbackPhysics,
 )
+from .mixed_precision import (
+    MixedPrecisionConfig,
+    MixedPrecisionSimulator,
+    PrecisionLevel,
+    GPUCapability,
+    SimulationState,
+    detect_gpu_capability,
+    detect_optimal_precision,
+    create_mixed_precision_simulator,
+    precision_to_dtype,
+)
 
 __all__ = [
     # Backend
@@ -68,4 +79,14 @@ __all__ = [
     "CuPyDiffusionPhysics",
     "CuPyParticlePhysics",
     "NumPyFallbackPhysics",
+    # Mixed precision (Phase B6)
+    "MixedPrecisionConfig",
+    "MixedPrecisionSimulator",
+    "PrecisionLevel",
+    "GPUCapability",
+    "SimulationState",
+    "detect_gpu_capability",
+    "detect_optimal_precision",
+    "create_mixed_precision_simulator",
+    "precision_to_dtype",
 ]

@@ -38,6 +38,19 @@ except ImportError as e:
     USD_AVAILABLE = False
     log.warning(f"OpenUSD not available: {e}. Install with: pip install usd-core")
 
+# Import precision module for universe-scale visualization
+try:
+    from .precision import (
+        PrecisionTransformManager,
+        BioPrecisePointAPI,
+        BiologicalScale,
+        configure_stage_for_biology,
+    )
+    PRECISION_AVAILABLE = True
+except ImportError:
+    PRECISION_AVAILABLE = False
+    log.debug("Precision module not available")
+
 
 class ConnectionStatus(str, Enum):
     """Connection status states."""
@@ -76,13 +89,23 @@ class RealOmniverseConnector:
     - Opened in Pixar's usdview
     - Loaded into Blender, Maya, or any USD-compatible software
     - Streamed to web viewers
+
+    Phase B1 Update: Now supports double-precision transforms for universe-scale
+    visualization (11 orders of magnitude from Ångströms to meters).
     """
 
-    def __init__(self, output_dir: str = "data/simulation/usd") -> None:
+    def __init__(
+        self,
+        output_dir: str = "data/simulation/usd",
+        biological_scale: Optional["BiologicalScale"] = None,
+        enable_precision_mode: bool = True
+    ) -> None:
         """Initialize the connector.
 
         Args:
             output_dir: Directory for USD output files
+            biological_scale: Primary biological scale for the scene (default: CELLULAR)
+            enable_precision_mode: Enable double-precision transforms for universe-scale
         """
         self._output_dir = Path(output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
@@ -93,6 +116,11 @@ class RealOmniverseConnector:
         self._frame_count = 0
         self._cells: Dict[str, Any] = {}  # prim references
         self._event_handlers: Dict[str, List[Callable]] = {}
+
+        # Precision mode configuration (Phase B1)
+        self._enable_precision_mode = enable_precision_mode and PRECISION_AVAILABLE
+        self._biological_scale = biological_scale
+        self._precision_manager: Optional["PrecisionTransformManager"] = None
 
         if not USD_AVAILABLE:
             log.error("USD not available - real connector cannot function")
@@ -142,6 +170,15 @@ class RealOmniverseConnector:
             self._stage.SetStartTimeCode(0)
             self._stage.SetEndTimeCode(1000)
             self._stage.SetTimeCodesPerSecond(24)
+
+            # Initialize precision manager for universe-scale visualization (Phase B1)
+            if self._enable_precision_mode and PRECISION_AVAILABLE:
+                scale = self._biological_scale or BiologicalScale.CELLULAR
+                self._precision_manager = PrecisionTransformManager(self._stage, default_scale=scale)
+                log.info(f"Precision mode enabled: {scale.value} scale with double-precision transforms")
+            else:
+                # Fallback: Set basic stage metadata
+                UsdGeom.SetStageUpAxis(self._stage, UsdGeom.Tokens.y)
 
             # Create scene hierarchy
             self._setup_scene_hierarchy()
@@ -271,12 +308,23 @@ class RealOmniverseConnector:
             sphere = UsdGeom.Sphere.Define(self._stage, cell_path)
             sphere.GetRadiusAttr().Set(cell.radius, time_code)
 
-            # Set position
+            # Set position using precision manager if available (Phase B1)
             xform = UsdGeom.Xformable(sphere)
-            xform.AddTranslateOp().Set(
-                Gf.Vec3d(*cell.position),
-                time_code
-            )
+            if self._precision_manager:
+                # Use double-precision for global positioning
+                self._precision_manager.set_world_position(
+                    sphere.GetPrim(),
+                    cell.position,
+                    time_code
+                )
+                # Add scale metadata for the cell
+                sphere.GetPrim().SetCustomDataByKey("cognisom:scale", "cellular")
+            else:
+                # Fallback to standard Vec3d (still double, but without precision management)
+                xform.AddTranslateOp().Set(
+                    Gf.Vec3d(*cell.position),
+                    time_code
+                )
 
             # Create and bind material
             mat_path = f"/World/Cells/Cell_{cell.cell_id}_Material"
@@ -317,14 +365,25 @@ class RealOmniverseConnector:
         try:
             cell_ref = self._cells[cell.cell_id]
             sphere = cell_ref["prim"]
-            xform = cell_ref["xform"]
 
             # Update radius (animated)
             sphere.GetRadiusAttr().Set(cell.radius, time_code)
 
-            # Update position (animated)
-            translate_op = xform.GetOrderedXformOps()[0]  # First op is translate
-            translate_op.Set(Gf.Vec3d(*cell.position), time_code)
+            # Update position using precision manager if available (Phase B1)
+            if self._precision_manager:
+                # Use double-precision for global positioning
+                self._precision_manager.set_world_position(
+                    sphere.GetPrim(),
+                    cell.position,
+                    time_code
+                )
+            else:
+                # Fallback: update via xform ops
+                xform = cell_ref["xform"]
+                xform_ops = xform.GetOrderedXformOps()
+                if xform_ops:
+                    translate_op = xform_ops[0]  # First op is translate
+                    translate_op.Set(Gf.Vec3d(*cell.position), time_code)
 
             # Update material color based on metabolic state
             self._update_cell_material(cell_ref["material_path"], cell)
@@ -483,9 +542,19 @@ class RealOmniverseConnector:
 
     # ── Status ──────────────────────────────────────────────────────
 
+    @property
+    def precision_manager(self) -> Optional["PrecisionTransformManager"]:
+        """Get the precision transform manager (Phase B1)."""
+        return self._precision_manager
+
+    @property
+    def precision_mode_enabled(self) -> bool:
+        """Check if precision mode is enabled."""
+        return self._precision_manager is not None
+
     def get_info(self) -> Dict[str, Any]:
         """Get connector information."""
-        return {
+        info = {
             "status": self._status.value,
             "stage_path": str(self._stage_path) if self._stage_path else None,
             "usd_available": USD_AVAILABLE,
@@ -493,7 +562,15 @@ class RealOmniverseConnector:
             "frame_count": self._frame_count,
             "is_real": True,  # This is the REAL connector
             "simulated": False,
+            # Phase B1: Precision mode info
+            "precision_mode": self._precision_manager is not None,
+            "precision_available": PRECISION_AVAILABLE,
         }
+
+        if self._precision_manager and self._biological_scale:
+            info["biological_scale"] = self._biological_scale.value
+
+        return info
 
     def close(self) -> None:
         """Close the stage and clean up."""

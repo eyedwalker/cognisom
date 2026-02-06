@@ -553,6 +553,87 @@ class BioInteractionAPI:
     interaction_type: str = "binding"
 
 
+@dataclass
+class BioPrecisePointAPI:
+    """High-precision coordinate storage for simulation-grade accuracy.
+
+    Maps to: ``class "BioPrecisePointAPI" (inherits = </APISchemaBase>)``
+
+    This API schema enables storing double-precision (float64) coordinates
+    alongside the standard float32 render coordinates. Essential for:
+    - Molecular dynamics with sub-angstrom precision
+    - Universe-scale visualization (11 orders of magnitude)
+    - Thermodynamic analysis requiring velocity data
+
+    The visualization uses float32 points for rendering performance,
+    while the simulation uses float64 precise:positions for accuracy.
+
+    Properties:
+        precise_positions: Double-precision atomic/particle coordinates
+        precise_velocities: High-fidelity velocity vectors
+        precise_masses: Atomic masses for momentum calculations
+        precision_scale: Scale factor applied to coordinates
+        reference_origin: Origin point for local coordinate system
+    """
+    precise_positions: List[Tuple[float, float, float]] = field(default_factory=list)
+    precise_velocities: List[Tuple[float, float, float]] = field(default_factory=list)
+    precise_masses: List[float] = field(default_factory=list)
+    precision_scale: float = 1.0
+    reference_origin: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+@dataclass
+class BioSimulationBridgeAPI:
+    """Bridge between simulation and visualization precision levels.
+
+    Maps to: ``class "BioSimulationBridgeAPI" (inherits = </APISchemaBase>)``
+
+    Manages the mixed-precision approach where:
+    - Position integration uses float64 (prevents drift)
+    - Force calculation can use float32 (local interactions)
+    - Rendering uses float32 (GPU optimization)
+
+    Properties:
+        position_precision: Precision for position integration ('float64' or 'float32')
+        force_precision: Precision for force calculations
+        render_precision: Precision for visualization
+        last_sync_time: Last time simulation synced to visualization
+        drift_correction: Accumulated position drift correction
+    """
+    position_precision: str = "float64"
+    force_precision: str = "float32"
+    render_precision: str = "float32"
+    last_sync_time: float = 0.0
+    drift_correction: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+@dataclass
+class BiologicalScaleAPI:
+    """Scale information for multi-scale visualization.
+
+    Maps to: ``class "BiologicalScaleAPI" (inherits = </APISchemaBase>)``
+
+    Defines the biological scale level for semantic zooming:
+    - ATOMIC (1e-10m): Bond lengths, atomic positions
+    - MOLECULAR (1e-9m): Protein structures, small molecules
+    - ORGANELLE (1e-7m): Mitochondria, nuclei, vesicles
+    - CELLULAR (1e-5m): Whole cells
+    - TISSUE (1e-3m): Cell aggregates, tissues
+    - ORGAN (1e-1m): Organs, organ systems
+    - ORGANISM (1m): Whole organisms
+
+    Properties:
+        scale_level: Biological scale level name
+        typical_size_meters: Typical entity size at this scale
+        coordinate_precision: Required precision for this scale
+        representation_type: Default representation (mesh, instancer, etc.)
+    """
+    scale_level: str = "CELLULAR"
+    typical_size_meters: float = 1e-5
+    coordinate_precision: str = "float64"
+    representation_type: str = "mesh"
+
+
 # ── Scene Graph Helper ────────────────────────────────────────────────
 
 @dataclass
@@ -624,6 +705,10 @@ _BUILTIN_APIS = {
     "bio_epigenetic_api": BioEpigeneticAPI,
     "bio_immune_api": BioImmuneAPI,
     "bio_interaction_api": BioInteractionAPI,
+    # Precision-related APIs (Phase B5)
+    "bio_precise_point_api": BioPrecisePointAPI,
+    "bio_simulation_bridge_api": BioSimulationBridgeAPI,
+    "biological_scale_api": BiologicalScaleAPI,
 }
 
 
