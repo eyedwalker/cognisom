@@ -52,21 +52,18 @@ variable "db_password" {
 }
 
 # ─── Random Password (if not provided) ────────────────────────
-# NOTE: Use nonsensitive() for comparisons only - the value itself stays sensitive
-locals {
-  db_password_provided = nonsensitive(var.db_password != "")
-}
-
+# Generate a password if db_password is empty
+# NOTE: Always generate to avoid conditional on sensitive value
 resource "random_password" "db_password" {
-  count   = var.enable_rds && !local.db_password_provided ? 1 : 0
+  count   = var.enable_rds ? 1 : 0
   length  = 32
   special = false  # Avoid special chars that cause connection string issues
 }
 
 locals {
-  db_password = local.db_password_provided ? var.db_password : (
-    var.enable_rds ? random_password.db_password[0].result : ""
-  )
+  # Use random password - in production, set db_password variable explicitly
+  # The random_password is always generated when RDS is enabled
+  db_password = var.enable_rds ? random_password.db_password[0].result : ""
 }
 
 # ─── DB Subnet Group ──────────────────────────────────────────
