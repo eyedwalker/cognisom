@@ -357,9 +357,37 @@ def _streamlit_local_login():
     """Local (non-Cognito) login form."""
     import streamlit as st
 
+    # Inject autocomplete attributes for browser autofill
+    st.markdown("""
+    <style>
+    /* Style for autofill compatibility */
+    input[data-testid="stTextInput-Username"] { autocomplete: username !important; }
+    input[data-testid="stTextInput-Password"] { autocomplete: current-password !important; }
+    </style>
+    <script>
+    // Add autocomplete attributes to login form inputs
+    (function() {
+        setTimeout(function() {
+            const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
+            inputs.forEach(function(input) {
+                const label = input.closest('[data-testid]')?.querySelector('label')?.textContent || '';
+                if (label.toLowerCase().includes('username') || label.toLowerCase().includes('email')) {
+                    input.setAttribute('autocomplete', 'username');
+                    input.setAttribute('name', 'username');
+                }
+                if (label.toLowerCase().includes('password')) {
+                    input.setAttribute('autocomplete', 'current-password');
+                    input.setAttribute('name', 'password');
+                }
+            });
+        }, 100);
+    })();
+    </script>
+    """, unsafe_allow_html=True)
+
     with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
         submitted = st.form_submit_button("Log in", type="primary")
 
     if submitted and username and password:
@@ -376,6 +404,29 @@ def _streamlit_local_login():
 def _streamlit_cognito_login(cognito):
     """Cognito login form."""
     import streamlit as st
+
+    # Inject autocomplete attributes for browser autofill
+    st.markdown("""
+    <script>
+    // Add autocomplete attributes to Cognito login form inputs
+    (function() {
+        setTimeout(function() {
+            const inputs = document.querySelectorAll('input[type="text"], input[type="password"]');
+            inputs.forEach(function(input) {
+                const label = input.closest('[data-testid]')?.querySelector('label')?.textContent || '';
+                if (label.toLowerCase().includes('email')) {
+                    input.setAttribute('autocomplete', 'email');
+                    input.setAttribute('name', 'email');
+                }
+                if (label.toLowerCase().includes('password')) {
+                    input.setAttribute('autocomplete', 'current-password');
+                    input.setAttribute('name', 'password');
+                }
+            });
+        }, 100);
+    })();
+    </script>
+    """, unsafe_allow_html=True)
 
     # Show success message if user just verified their account
     if st.session_state.pop("cognito_just_verified", False):
