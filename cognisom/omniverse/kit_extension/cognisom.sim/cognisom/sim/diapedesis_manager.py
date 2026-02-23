@@ -153,12 +153,22 @@ class DiapedesisManager:
         self._playback_speed = max(0.1, min(5.0, value))
 
     def _init_stage(self):
-        """Get the current USD stage."""
+        """Get or create a USD stage for scene building."""
+        # Try getting the existing stage from Kit's USD context
         try:
             context = omni.usd.get_context()
             self._stage = context.get_stage()
         except Exception:
             self._stage = None
+
+        # If no stage available (headless mode), create one in memory
+        if not self._stage:
+            try:
+                self._stage = Usd.Stage.CreateInMemory("diapedesis.usda")
+                carb.log_info("[diapedesis] Created in-memory USD stage")
+            except Exception as e:
+                carb.log_error(f"[diapedesis] Failed to create stage: {e}")
+                self._stage = None
 
     # ── Simulation / Frame Loading ──────────────────────────────────────
 
