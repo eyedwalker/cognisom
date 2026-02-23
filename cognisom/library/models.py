@@ -6,7 +6,7 @@ Dataclass definitions for all entity types in the Biological Entity Library.
 Each entity has a unique ID, standard identifiers, ontology references,
 and metadata for FAIR compliance.
 
-Entity types (20 total):
+Entity types (31 total):
     Core biological:
         Gene, Protein, Metabolite, CellType, TissueType, Pathway,
         Drug, Mutation, Receptor, Ligand, Organ
@@ -18,7 +18,15 @@ Entity types (20 total):
         PhysicalCell, ImmuneCellEntity, Exosome, Capillary,
         SpatialField, Tissue, PhysicsModelEntity
 
-Relationship types (26 total):
+    Researcher workflow:
+        SimulationRun, ResearchProject
+
+    Immunology:
+        Virus, Bacterium, Antibody, Antigen, Cytokine,
+        PatternRecognitionReceptor, ComplementComponent, MHCMolecule,
+        AdhesionMolecule
+
+Relationship types (36 total):
     Core: binds_to, activates, inhibits, part_of, located_in,
           expressed_in, metabolizes, encodes, targets, regulates,
           produces, transports, catalyzes, phosphorylates, mutated_in,
@@ -27,16 +35,14 @@ Relationship types (26 total):
     Bio-USD: supplies, kills, divides_into, releases, receives,
              contains, senses, secretes, uses_physics
 
+    Immunology: presents, recognizes, neutralizes, opsonizes,
+                activates_complement, polarizes, differentiates
+
+    Diapedesis: adheres_to, transmigrates_through, expresses_on_surface
+
 Extensibility:
-    New entity types can be registered at runtime using the entity_registry:
-
-        from cognisom.library.models import entity_registry
-
-        @entity_registry.register("virus")
-        class VirusEntity(BioEntity):
-            virus_family: str = ""
-            genome_type: str = ""  # DNA, RNA, etc.
-            ...
+    New entity types can be registered at runtime using the entity_registry.
+    See register_entity() and entity_registry.
 """
 
 from __future__ import annotations
@@ -80,6 +86,16 @@ class EntityType(str, Enum):
     # Researcher workflow types
     SIMULATION_RUN = "simulation_run"
     RESEARCH_PROJECT = "research_project"
+    # Immunology entity types
+    VIRUS = "virus"
+    BACTERIUM = "bacterium"
+    ANTIBODY = "antibody"
+    ANTIGEN = "antigen"
+    CYTOKINE = "cytokine"
+    PATTERN_RECOGNITION_RECEPTOR = "prr"
+    COMPLEMENT_COMPONENT = "complement"
+    MHC_MOLECULE = "mhc"
+    ADHESION_MOLECULE = "adhesion_molecule"
 
 
 class RelationshipType(str, Enum):
@@ -114,6 +130,18 @@ class RelationshipType(str, Enum):
     EXECUTES = "executes"            # SimulationRun -> SimulationScenario
     BELONGS_TO = "belongs_to"        # SimulationRun -> ResearchProject
     COMPARES_TO = "compares_to"      # SimulationRun -> SimulationRun
+    # Immunology relationships
+    PRESENTS = "presents"            # MHC -> Antigen
+    RECOGNIZES = "recognizes"        # TCR/BCR -> Antigen
+    NEUTRALIZES = "neutralizes"      # Antibody -> Pathogen
+    OPSONIZES = "opsonizes"          # Antibody/Complement -> Pathogen
+    ACTIVATES_COMPLEMENT = "activates_complement"  # Antibody -> Complement
+    POLARIZES = "polarizes"          # Cytokine -> Macrophage M1/M2
+    DIFFERENTIATES = "differentiates"  # Cytokine -> T cell subset
+    # Diapedesis / leukocyte migration relationships
+    ADHERES_TO = "adheres_to"                        # Leukocyte -> Endothelium (via selectin/integrin)
+    TRANSMIGRATES_THROUGH = "transmigrates_through"  # Leukocyte -> Endothelial junction
+    EXPRESSES_ON_SURFACE = "expresses_on_surface"    # Cell -> AdhesionMolecule
 
 
 class EntityStatus(str, Enum):
@@ -1114,6 +1142,12 @@ class ImmuneCellEntity(BioEntity):
     # Inherited from PhysicalCell
     phase: str = "G0"
     alive: bool = True
+    # Expanded immunology fields
+    immune_subtype: str = ""        # Th1, Th2, Th17, Treg, Tfh, naive, effector, memory, M1, M2
+    polarization_state: str = ""    # M1/M2 for macrophages, Th1/Th2/Th17 for CD4+ T cells
+    cytokines_secreting: List[str] = field(default_factory=list)  # e.g. ["IFNg", "TNFa"]
+    surface_markers: List[str] = field(default_factory=list)      # e.g. ["CD8", "CD45"]
+    exhaustion_level: float = 0.0   # 0-1, T cell exhaustion (PD-1/LAG-3/TIM-3)
 
     def _extra_properties(self) -> dict:
         return {
@@ -1129,6 +1163,11 @@ class ImmuneCellEntity(BioEntity):
             "activation_state": self.activation_state,
             "phase": self.phase,
             "alive": self.alive,
+            "immune_subtype": self.immune_subtype,
+            "polarization_state": self.polarization_state,
+            "cytokines_secreting": self.cytokines_secreting,
+            "surface_markers": self.surface_markers,
+            "exhaustion_level": self.exhaustion_level,
         }
 
     def _apply_properties(self, props: dict):
@@ -1144,6 +1183,11 @@ class ImmuneCellEntity(BioEntity):
         self.activation_state = props.get("activation_state", 0.0)
         self.phase = props.get("phase", "G0")
         self.alive = props.get("alive", True)
+        self.immune_subtype = props.get("immune_subtype", "")
+        self.polarization_state = props.get("polarization_state", "")
+        self.cytokines_secreting = props.get("cytokines_secreting", [])
+        self.surface_markers = props.get("surface_markers", [])
+        self.exhaustion_level = props.get("exhaustion_level", 0.0)
 
 
 @dataclass
@@ -1342,6 +1386,420 @@ class PhysicsModelEntity(BioEntity):
         self.is_gpu = props.get("is_gpu", True)
 
 
+# ── Immunology Entity Types ──────────────────────────────────────────
+
+
+@dataclass
+class Virus(BioEntity):
+    """A virus with genome type, tropism, and immune evasion data.
+
+    Represents viral pathogens for immunology simulations including
+    replication dynamics, host cell tropism, and immune evasion strategies.
+    """
+    entity_type: EntityType = EntityType.VIRUS
+    virus_family: str = ""          # Coronaviridae, Orthomyxoviridae, Retroviridae
+    genome_type: str = ""           # dsDNA, ssDNA, dsRNA, ssRNA+, ssRNA-, retro
+    capsid_type: str = ""           # icosahedral, helical, complex
+    envelope: bool = False          # Enveloped or non-enveloped
+    genome_size_kb: float = 0.0     # Genome size in kilobases
+    replication_rate: float = 0.0   # Virions per cell per hour
+    host_tropism: List[str] = field(default_factory=list)  # ["epithelial", "T_cell"]
+    target_receptors: List[str] = field(default_factory=list)  # ["ACE2", "CD4"]
+    evasion_mechanisms: List[str] = field(default_factory=list)  # ["antigenic_drift", "MHC_downregulation"]
+    incubation_hours: float = 0.0
+    virulence_genes: List[str] = field(default_factory=list)
+    taxonomy_id: str = ""           # NCBI Taxonomy ID
+
+    def _extra_properties(self) -> dict:
+        return {
+            "virus_family": self.virus_family,
+            "genome_type": self.genome_type,
+            "capsid_type": self.capsid_type,
+            "envelope": self.envelope,
+            "genome_size_kb": self.genome_size_kb,
+            "replication_rate": self.replication_rate,
+            "host_tropism": self.host_tropism,
+            "target_receptors": self.target_receptors,
+            "evasion_mechanisms": self.evasion_mechanisms,
+            "incubation_hours": self.incubation_hours,
+            "virulence_genes": self.virulence_genes,
+            "taxonomy_id": self.taxonomy_id,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.virus_family = props.get("virus_family", "")
+        self.genome_type = props.get("genome_type", "")
+        self.capsid_type = props.get("capsid_type", "")
+        self.envelope = props.get("envelope", False)
+        self.genome_size_kb = props.get("genome_size_kb", 0.0)
+        self.replication_rate = props.get("replication_rate", 0.0)
+        self.host_tropism = props.get("host_tropism", [])
+        self.target_receptors = props.get("target_receptors", [])
+        self.evasion_mechanisms = props.get("evasion_mechanisms", [])
+        self.incubation_hours = props.get("incubation_hours", 0.0)
+        self.virulence_genes = props.get("virulence_genes", [])
+        self.taxonomy_id = props.get("taxonomy_id", "")
+
+
+@dataclass
+class Bacterium(BioEntity):
+    """A bacterium with virulence factors and antibiotic resistance.
+
+    Represents bacterial pathogens for immunology and infection simulations.
+    """
+    entity_type: EntityType = EntityType.BACTERIUM
+    gram_stain: str = ""            # positive, negative
+    shape: str = ""                 # rod (bacillus), coccus, spiral, filamentous
+    oxygen_requirement: str = ""    # aerobic, anaerobic, facultative
+    pathogenicity_factors: List[str] = field(default_factory=list)  # ["LPS", "type_III_secretion"]
+    antibiotic_resistance: List[str] = field(default_factory=list)  # ["methicillin", "vancomycin"]
+    growth_rate: float = 0.0        # Doublings per hour
+    virulence_genes: List[str] = field(default_factory=list)
+    toxins: List[str] = field(default_factory=list)  # ["exotoxin_A", "endotoxin"]
+    host_niche: str = ""            # "intracellular", "extracellular", "mucosal"
+    taxonomy_id: str = ""           # NCBI Taxonomy ID
+    genome_size_mb: float = 0.0
+
+    def _extra_properties(self) -> dict:
+        return {
+            "gram_stain": self.gram_stain,
+            "shape": self.shape,
+            "oxygen_requirement": self.oxygen_requirement,
+            "pathogenicity_factors": self.pathogenicity_factors,
+            "antibiotic_resistance": self.antibiotic_resistance,
+            "growth_rate": self.growth_rate,
+            "virulence_genes": self.virulence_genes,
+            "toxins": self.toxins,
+            "host_niche": self.host_niche,
+            "taxonomy_id": self.taxonomy_id,
+            "genome_size_mb": self.genome_size_mb,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.gram_stain = props.get("gram_stain", "")
+        self.shape = props.get("shape", "")
+        self.oxygen_requirement = props.get("oxygen_requirement", "")
+        self.pathogenicity_factors = props.get("pathogenicity_factors", [])
+        self.antibiotic_resistance = props.get("antibiotic_resistance", [])
+        self.growth_rate = props.get("growth_rate", 0.0)
+        self.virulence_genes = props.get("virulence_genes", [])
+        self.toxins = props.get("toxins", [])
+        self.host_niche = props.get("host_niche", "")
+        self.taxonomy_id = props.get("taxonomy_id", "")
+        self.genome_size_mb = props.get("genome_size_mb", 0.0)
+
+
+@dataclass
+class Antibody(BioEntity):
+    """An antibody/immunoglobulin with isotype and binding properties.
+
+    Represents all antibody isotypes (IgG1-4, IgA, IgE, IgM, IgD) with
+    their effector functions, binding affinities, and producing cell types.
+    """
+    entity_type: EntityType = EntityType.ANTIBODY
+    isotype: str = ""               # IgG1, IgG2, IgG3, IgG4, IgA1, IgA2, IgE, IgM, IgD
+    heavy_chain: str = ""           # gamma1-4, alpha1-2, epsilon, mu, delta
+    light_chain: str = ""           # kappa, lambda
+    target_antigen: str = ""        # Name or ID of target antigen
+    affinity_kd: float = 0.0        # Dissociation constant (M)
+    fab_sequence: str = ""          # Variable region sequence (preview)
+    fc_function: List[str] = field(default_factory=list)  # ["ADCC", "CDC", "opsonization", "neutralization"]
+    producing_cell_type: str = ""   # "plasma_cell", "B_cell_memory"
+    half_life_days: float = 0.0     # Serum half-life
+    valency: int = 2                # Number of antigen-binding sites (IgM=10, IgG=2)
+    complement_fixation: bool = False
+
+    def _extra_properties(self) -> dict:
+        return {
+            "isotype": self.isotype,
+            "heavy_chain": self.heavy_chain,
+            "light_chain": self.light_chain,
+            "target_antigen": self.target_antigen,
+            "affinity_kd": self.affinity_kd,
+            "fab_sequence": self.fab_sequence,
+            "fc_function": self.fc_function,
+            "producing_cell_type": self.producing_cell_type,
+            "half_life_days": self.half_life_days,
+            "valency": self.valency,
+            "complement_fixation": self.complement_fixation,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.isotype = props.get("isotype", "")
+        self.heavy_chain = props.get("heavy_chain", "")
+        self.light_chain = props.get("light_chain", "")
+        self.target_antigen = props.get("target_antigen", "")
+        self.affinity_kd = props.get("affinity_kd", 0.0)
+        self.fab_sequence = props.get("fab_sequence", "")
+        self.fc_function = props.get("fc_function", [])
+        self.producing_cell_type = props.get("producing_cell_type", "")
+        self.half_life_days = props.get("half_life_days", 0.0)
+        self.valency = props.get("valency", 2)
+        self.complement_fixation = props.get("complement_fixation", False)
+
+
+@dataclass
+class Antigen(BioEntity):
+    """An antigen — a molecule recognized by the adaptive immune system.
+
+    Represents protein, lipid, or carbohydrate antigens with their epitopes,
+    MHC restriction, and immunogenicity properties.
+    """
+    entity_type: EntityType = EntityType.ANTIGEN
+    antigen_type: str = ""          # protein, lipid, carbohydrate, nucleic_acid
+    epitope: str = ""               # Epitope sequence or structure description
+    mhc_restriction: str = ""       # "MHC_I", "MHC_II", "both", "none" (lipids via CD1)
+    source_organism: str = ""       # Organism or cell of origin
+    immunogenicity: float = 0.0     # 0-1 how immunogenic
+    cross_reactivity: List[str] = field(default_factory=list)  # Related antigens
+    peptide_length: int = 0         # Length of presented peptide (8-10 for MHC-I, 13-25 for MHC-II)
+    processing_pathway: str = ""    # "proteasome", "endosomal", "cross-presentation"
+    t_cell_response: str = ""       # "CD8_cytotoxic", "CD4_helper", "both"
+    b_cell_epitope: bool = False    # Can be recognized by BCR directly
+
+    def _extra_properties(self) -> dict:
+        return {
+            "antigen_type": self.antigen_type,
+            "epitope": self.epitope,
+            "mhc_restriction": self.mhc_restriction,
+            "source_organism": self.source_organism,
+            "immunogenicity": self.immunogenicity,
+            "cross_reactivity": self.cross_reactivity,
+            "peptide_length": self.peptide_length,
+            "processing_pathway": self.processing_pathway,
+            "t_cell_response": self.t_cell_response,
+            "b_cell_epitope": self.b_cell_epitope,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.antigen_type = props.get("antigen_type", "")
+        self.epitope = props.get("epitope", "")
+        self.mhc_restriction = props.get("mhc_restriction", "")
+        self.source_organism = props.get("source_organism", "")
+        self.immunogenicity = props.get("immunogenicity", 0.0)
+        self.cross_reactivity = props.get("cross_reactivity", [])
+        self.peptide_length = props.get("peptide_length", 0)
+        self.processing_pathway = props.get("processing_pathway", "")
+        self.t_cell_response = props.get("t_cell_response", "")
+        self.b_cell_epitope = props.get("b_cell_epitope", False)
+
+
+@dataclass
+class Cytokine(BioEntity):
+    """A cytokine — soluble signaling protein of the immune system.
+
+    Represents interleukins, interferons, chemokines, TNF family members,
+    and colony-stimulating factors with their receptor, source, and target info.
+    """
+    entity_type: EntityType = EntityType.CYTOKINE
+    cytokine_family: str = ""       # interleukin, interferon, chemokine, TNF, CSF, TGF
+    receptor: str = ""              # Primary receptor (e.g. "IL2RA/IL2RB/IL2RG")
+    producing_cells: List[str] = field(default_factory=list)   # ["Th1", "macrophage_M1"]
+    target_cells: List[str] = field(default_factory=list)      # ["T_cell", "NK_cell"]
+    function: str = ""              # Primary biological function
+    signaling_pathway: str = ""     # JAK-STAT, NF-kB, MAPK
+    half_life_hours: float = 0.0    # Serum half-life
+    pro_inflammatory: bool = True
+    gene_symbol: str = ""           # Gene encoding this cytokine (e.g. "IL2", "IFNG")
+    molecular_weight_kda: float = 0.0
+
+    def _extra_properties(self) -> dict:
+        return {
+            "cytokine_family": self.cytokine_family,
+            "receptor": self.receptor,
+            "producing_cells": self.producing_cells,
+            "target_cells": self.target_cells,
+            "function": self.function,
+            "signaling_pathway": self.signaling_pathway,
+            "half_life_hours": self.half_life_hours,
+            "pro_inflammatory": self.pro_inflammatory,
+            "gene_symbol": self.gene_symbol,
+            "molecular_weight_kda": self.molecular_weight_kda,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.cytokine_family = props.get("cytokine_family", "")
+        self.receptor = props.get("receptor", "")
+        self.producing_cells = props.get("producing_cells", [])
+        self.target_cells = props.get("target_cells", [])
+        self.function = props.get("function", "")
+        self.signaling_pathway = props.get("signaling_pathway", "")
+        self.half_life_hours = props.get("half_life_hours", 0.0)
+        self.pro_inflammatory = props.get("pro_inflammatory", True)
+        self.gene_symbol = props.get("gene_symbol", "")
+        self.molecular_weight_kda = props.get("molecular_weight_kda", 0.0)
+
+
+@dataclass
+class PatternRecognitionReceptor(BioEntity):
+    """A pattern recognition receptor (PRR) of the innate immune system.
+
+    Represents TLRs, RLRs, CLRs, NLRs, and cGAS-STING sensors that detect
+    PAMPs (pathogen-associated) and DAMPs (damage-associated) molecular patterns.
+    """
+    entity_type: EntityType = EntityType.PATTERN_RECOGNITION_RECEPTOR
+    prr_type: str = ""              # TLR, RLR, CLR, NLR, cGAS_STING
+    ligands: List[str] = field(default_factory=list)        # ["LPS", "dsRNA", "flagellin"]
+    pamp_or_damp: str = ""          # "PAMP", "DAMP", "both"
+    signaling_pathway: str = ""     # "MyD88-dependent", "TRIF-dependent", "inflammasome"
+    cell_expression: List[str] = field(default_factory=list) # ["macrophage", "dendritic"]
+    downstream_effectors: List[str] = field(default_factory=list)  # ["NF-kB", "IRF3", "IL1B"]
+    subcellular_location: str = ""  # "cell_surface", "endosomal", "cytoplasmic"
+    gene_symbol: str = ""           # e.g. "TLR4", "NLRP3", "DDX58"
+
+    def _extra_properties(self) -> dict:
+        return {
+            "prr_type": self.prr_type,
+            "ligands": self.ligands,
+            "pamp_or_damp": self.pamp_or_damp,
+            "signaling_pathway": self.signaling_pathway,
+            "cell_expression": self.cell_expression,
+            "downstream_effectors": self.downstream_effectors,
+            "subcellular_location": self.subcellular_location,
+            "gene_symbol": self.gene_symbol,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.prr_type = props.get("prr_type", "")
+        self.ligands = props.get("ligands", [])
+        self.pamp_or_damp = props.get("pamp_or_damp", "")
+        self.signaling_pathway = props.get("signaling_pathway", "")
+        self.cell_expression = props.get("cell_expression", [])
+        self.downstream_effectors = props.get("downstream_effectors", [])
+        self.subcellular_location = props.get("subcellular_location", "")
+        self.gene_symbol = props.get("gene_symbol", "")
+
+
+@dataclass
+class ComplementComponent(BioEntity):
+    """A complement system component for innate immunity.
+
+    Represents proteins of the classical, alternative, and lectin complement
+    pathways including their activation steps and effector functions.
+    """
+    entity_type: EntityType = EntityType.COMPLEMENT_COMPONENT
+    pathway: str = ""               # classical, alternative, lectin, terminal
+    activation_step: int = 0        # Order in cascade (1=initiator, 9=MAC)
+    cleavage_products: List[str] = field(default_factory=list)  # ["C3a", "C3b"]
+    function: str = ""              # "opsonization", "anaphylatoxin", "MAC_formation", "C3_convertase"
+    deficiency_phenotype: str = ""  # Clinical consequence of deficiency
+    gene_symbol: str = ""           # e.g. "C3", "CFB", "MBL2"
+    serum_concentration_ug_ml: float = 0.0
+    half_life_hours: float = 0.0
+
+    def _extra_properties(self) -> dict:
+        return {
+            "pathway": self.pathway,
+            "activation_step": self.activation_step,
+            "cleavage_products": self.cleavage_products,
+            "function": self.function,
+            "deficiency_phenotype": self.deficiency_phenotype,
+            "gene_symbol": self.gene_symbol,
+            "serum_concentration_ug_ml": self.serum_concentration_ug_ml,
+            "half_life_hours": self.half_life_hours,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.pathway = props.get("pathway", "")
+        self.activation_step = props.get("activation_step", 0)
+        self.cleavage_products = props.get("cleavage_products", [])
+        self.function = props.get("function", "")
+        self.deficiency_phenotype = props.get("deficiency_phenotype", "")
+        self.gene_symbol = props.get("gene_symbol", "")
+        self.serum_concentration_ug_ml = props.get("serum_concentration_ug_ml", 0.0)
+        self.half_life_hours = props.get("half_life_hours", 0.0)
+
+
+@dataclass
+class MHCMolecule(BioEntity):
+    """An MHC/HLA molecule for antigen presentation.
+
+    Represents MHC class I and class II molecules with their peptide-binding
+    properties, tissue distribution, and disease associations.
+    """
+    entity_type: EntityType = EntityType.MHC_MOLECULE
+    mhc_class: str = ""             # "I", "II"
+    hla_allele: str = ""            # "HLA-A*02:01", "HLA-DRB1*04:01"
+    gene_symbol: str = ""           # "HLA-A", "HLA-DRA", "B2M"
+    peptide_length_range: List[int] = field(default_factory=lambda: [8, 10])  # MHC-I: 8-10, MHC-II: 13-25
+    tissue_distribution: List[str] = field(default_factory=list)  # ["all_nucleated" for MHC-I]
+    presenting_cell_types: List[str] = field(default_factory=list)  # ["dendritic", "macrophage", "B_cell"]
+    associated_diseases: List[str] = field(default_factory=list)
+    binding_groove: str = ""        # Structural description
+    population_frequency: float = 0.0  # Allele frequency in population
+
+    def _extra_properties(self) -> dict:
+        return {
+            "mhc_class": self.mhc_class,
+            "hla_allele": self.hla_allele,
+            "gene_symbol": self.gene_symbol,
+            "peptide_length_range": self.peptide_length_range,
+            "tissue_distribution": self.tissue_distribution,
+            "presenting_cell_types": self.presenting_cell_types,
+            "associated_diseases": self.associated_diseases,
+            "binding_groove": self.binding_groove,
+            "population_frequency": self.population_frequency,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.mhc_class = props.get("mhc_class", "")
+        self.hla_allele = props.get("hla_allele", "")
+        self.gene_symbol = props.get("gene_symbol", "")
+        self.peptide_length_range = props.get("peptide_length_range", [8, 10])
+        self.tissue_distribution = props.get("tissue_distribution", [])
+        self.presenting_cell_types = props.get("presenting_cell_types", [])
+        self.associated_diseases = props.get("associated_diseases", [])
+        self.binding_groove = props.get("binding_groove", "")
+        self.population_frequency = props.get("population_frequency", 0.0)
+
+
+# ── Adhesion Molecule ────────────────────────────────────────────────
+
+@dataclass
+class AdhesionMolecule(BioEntity):
+    """Cell adhesion molecule involved in leukocyte-endothelial interactions and diapedesis."""
+    entity_type: EntityType = EntityType.ADHESION_MOLECULE
+    molecule_family: str = ""  # selectin, integrin, immunoglobulin_superfamily, cadherin, JAM
+    expressed_on: List[str] = field(default_factory=list)  # ["endothelial", "leukocyte", "platelet"]
+    ligands: List[str] = field(default_factory=list)  # binding partners
+    binding_affinity_kd: float = 0.0  # Kd in μM
+    on_rate: float = 0.0  # kon in μM⁻¹s⁻¹
+    off_rate: float = 0.0  # koff in s⁻¹
+    regulation: str = ""  # constitutive, cytokine_induced, chemokine_activated, histamine_induced
+    signaling_pathway: str = ""
+    diapedesis_step: str = ""  # rolling, activation, arrest, transmigration
+    gene_symbol: str = ""
+    structure_type: str = ""  # type_I_transmembrane, heterodimer, GPI_anchored, homophilic
+
+    def _extra_properties(self) -> Dict[str, Any]:
+        return {
+            "molecule_family": self.molecule_family,
+            "expressed_on": self.expressed_on,
+            "ligands": self.ligands,
+            "binding_affinity_kd": self.binding_affinity_kd,
+            "on_rate": self.on_rate,
+            "off_rate": self.off_rate,
+            "regulation": self.regulation,
+            "signaling_pathway": self.signaling_pathway,
+            "diapedesis_step": self.diapedesis_step,
+            "gene_symbol": self.gene_symbol,
+            "structure_type": self.structure_type,
+        }
+
+    def _apply_properties(self, props: Dict[str, Any]):
+        self.molecule_family = props.get("molecule_family", "")
+        self.expressed_on = props.get("expressed_on", [])
+        self.ligands = props.get("ligands", [])
+        self.binding_affinity_kd = props.get("binding_affinity_kd", 0.0)
+        self.on_rate = props.get("on_rate", 0.0)
+        self.off_rate = props.get("off_rate", 0.0)
+        self.regulation = props.get("regulation", "")
+        self.signaling_pathway = props.get("signaling_pathway", "")
+        self.diapedesis_step = props.get("diapedesis_step", "")
+        self.gene_symbol = props.get("gene_symbol", "")
+        self.structure_type = props.get("structure_type", "")
+
+
 # ── Relationship ─────────────────────────────────────────────────────
 
 @dataclass
@@ -1417,6 +1875,16 @@ ENTITY_CLASS_MAP = {
     # Researcher workflow types
     "simulation_run": SimulationRun,
     "research_project": ResearchProject,
+    # Immunology entity types
+    "virus": Virus,
+    "bacterium": Bacterium,
+    "antibody": Antibody,
+    "antigen": Antigen,
+    "cytokine": Cytokine,
+    "prr": PatternRecognitionReceptor,
+    "complement": ComplementComponent,
+    "mhc": MHCMolecule,
+    "adhesion_molecule": AdhesionMolecule,
 }
 
 

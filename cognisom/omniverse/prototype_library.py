@@ -407,6 +407,243 @@ STRUCTURE_PROTOTYPES: Dict[str, PrototypeSpec] = {
 }
 
 
+# ── Immune Cell Prototypes ────────────────────────────────────────────
+
+IMMUNE_CELL_PROTOTYPES: Dict[str, PrototypeSpec] = {
+    "t_cell_cd8": PrototypeSpec(
+        name="t_cell_cd8",
+        category=PrototypeCategory.CELL,
+        description="CD8+ cytotoxic T cell",
+        geometry_type="sphere",
+        default_size=8.0,
+        color=(0.1, 0.2, 0.8),  # Deep blue
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=1000000
+    ),
+    "t_cell_cd4": PrototypeSpec(
+        name="t_cell_cd4",
+        category=PrototypeCategory.CELL,
+        description="CD4+ helper T cell",
+        geometry_type="sphere",
+        default_size=8.0,
+        color=(0.3, 0.4, 0.85),  # Medium blue
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=1000000
+    ),
+    "b_cell": PrototypeSpec(
+        name="b_cell",
+        category=PrototypeCategory.CELL,
+        description="B lymphocyte",
+        geometry_type="sphere",
+        default_size=7.0,
+        color=(0.5, 0.3, 0.8),  # Purple-blue
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=1000000
+    ),
+    "plasma_cell": PrototypeSpec(
+        name="plasma_cell",
+        category=PrototypeCategory.CELL,
+        description="Antibody-secreting plasma cell",
+        geometry_type="ellipsoid",
+        default_size=15.0,
+        color=(0.7, 0.2, 0.9),  # Bright purple
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000,
+        geometry_params={"radii": (1.0, 0.7, 0.7)}
+    ),
+    "dendritic_cell": PrototypeSpec(
+        name="dendritic_cell",
+        category=PrototypeCategory.CELL,
+        description="Dendritic cell (antigen-presenting)",
+        geometry_type="ellipsoid",
+        default_size=15.0,
+        color=(0.95, 0.7, 0.2),  # Yellow-orange
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000,
+        geometry_params={"radii": (1.0, 0.8, 0.6)}
+    ),
+    "macrophage_m1": PrototypeSpec(
+        name="macrophage_m1",
+        category=PrototypeCategory.CELL,
+        description="M1 macrophage (pro-inflammatory)",
+        geometry_type="sphere",
+        default_size=20.0,
+        color=(0.9, 0.35, 0.15),  # Red-orange
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000
+    ),
+    "macrophage_m2": PrototypeSpec(
+        name="macrophage_m2",
+        category=PrototypeCategory.CELL,
+        description="M2 macrophage (tissue repair)",
+        geometry_type="sphere",
+        default_size=20.0,
+        color=(0.4, 0.75, 0.35),  # Green-tinted
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000
+    ),
+    "neutrophil": PrototypeSpec(
+        name="neutrophil",
+        category=PrototypeCategory.CELL,
+        description="Neutrophil granulocyte",
+        geometry_type="sphere",
+        default_size=12.0,
+        color=(0.75, 0.8, 0.9),  # Light gray-blue
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=5000000
+    ),
+    "mast_cell": PrototypeSpec(
+        name="mast_cell",
+        category=PrototypeCategory.CELL,
+        description="Mast cell (granule-filled)",
+        geometry_type="sphere",
+        default_size=12.0,
+        color=(0.65, 0.2, 0.7),  # Purple
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000
+    ),
+    "nk_cell": PrototypeSpec(
+        name="nk_cell",
+        category=PrototypeCategory.CELL,
+        description="Natural killer cell",
+        geometry_type="sphere",
+        default_size=10.0,
+        color=(0.1, 0.8, 0.8),  # Cyan
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=1000000
+    ),
+}
+
+IMMUNE_PARTICLE_PROTOTYPES: Dict[str, PrototypeSpec] = {
+    "antibody_igg": PrototypeSpec(
+        name="antibody_igg",
+        category=PrototypeCategory.MOLECULE,
+        description="IgG antibody (Y-shaped)",
+        geometry_type="capsule",
+        default_size=0.015,  # ~15 nm
+        color=(0.95, 0.8, 0.2),  # Gold
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000,
+        geometry_params={"radius": 0.003, "height": 0.012}
+    ),
+    "antibody_igm": PrototypeSpec(
+        name="antibody_igm",
+        category=PrototypeCategory.MOLECULE,
+        description="IgM pentamer",
+        geometry_type="sphere",
+        default_size=0.025,  # ~25 nm pentameric
+        color=(0.95, 0.75, 0.1),  # Gold
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=10000000
+    ),
+    "virus_capsid": PrototypeSpec(
+        name="virus_capsid",
+        category=PrototypeCategory.PARTICLE,
+        description="Viral capsid (generic)",
+        geometry_type="sphere",
+        default_size=0.1,  # ~100 nm
+        color=(0.7, 0.15, 0.5),  # Red-purple
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=10000000
+    ),
+    "bacterium_rod": PrototypeSpec(
+        name="bacterium_rod",
+        category=PrototypeCategory.PARTICLE,
+        description="Rod-shaped bacterium (bacillus)",
+        geometry_type="capsule",
+        default_size=2.0,
+        color=(0.3, 0.7, 0.3),  # Green
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000,
+        geometry_params={"radius": 0.4, "height": 1.5}
+    ),
+    "bacterium_coccus": PrototypeSpec(
+        name="bacterium_coccus",
+        category=PrototypeCategory.PARTICLE,
+        description="Spherical bacterium (coccus)",
+        geometry_type="sphere",
+        default_size=1.0,
+        color=(0.35, 0.65, 0.3),  # Green
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000
+    ),
+    "cytokine_particle": PrototypeSpec(
+        name="cytokine_particle",
+        category=PrototypeCategory.MOLECULE,
+        description="Cytokine signaling molecule",
+        geometry_type="sphere",
+        default_size=0.005,  # ~5 nm
+        color=(0.2, 0.9, 0.9),  # Cyan
+        opacity=0.6,
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000
+    ),
+    "complement_complex": PrototypeSpec(
+        name="complement_complex",
+        category=PrototypeCategory.MOLECULE,
+        description="Complement protein complex",
+        geometry_type="sphere",
+        default_size=0.015,  # ~15 nm
+        color=(0.95, 0.65, 0.15),  # Orange-yellow
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=10000000
+    ),
+    # Diapedesis-specific prototypes
+    "endothelial_cell": PrototypeSpec(
+        name="endothelial_cell",
+        category=PrototypeCategory.CELL,
+        description="Endothelial cell (flat squamous, vessel lining)",
+        geometry_type="ellipsoid",
+        default_size=25.0,  # ~25 μm
+        color=(0.9, 0.75, 0.75),  # Light pink
+        suggested_strategy=InstancingStrategy.SCENEGRAPH,
+        max_instances=500000,
+        geometry_params={"radii": (1.0, 1.0, 0.15)}  # Very flat (squamous)
+    ),
+    "selectin_molecule": PrototypeSpec(
+        name="selectin_molecule",
+        category=PrototypeCategory.MOLECULE,
+        description="Selectin adhesion molecule (E/P/L-selectin)",
+        geometry_type="sphere",
+        default_size=0.02,  # ~20 nm
+        color=(1.0, 0.9, 0.2),  # Yellow
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000
+    ),
+    "integrin_low": PrototypeSpec(
+        name="integrin_low",
+        category=PrototypeCategory.MOLECULE,
+        description="Integrin (low affinity / bent conformation)",
+        geometry_type="sphere",
+        default_size=0.015,  # ~15 nm
+        color=(0.3, 0.6, 0.7),  # Dim cyan
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000
+    ),
+    "integrin_high": PrototypeSpec(
+        name="integrin_high",
+        category=PrototypeCategory.MOLECULE,
+        description="Integrin (high affinity / extended conformation)",
+        geometry_type="sphere",
+        default_size=0.015,  # ~15 nm
+        color=(0.0, 1.0, 1.0),  # Bright cyan
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=100000000
+    ),
+    "ecm_fiber": PrototypeSpec(
+        name="ecm_fiber",
+        category=PrototypeCategory.STRUCTURE,
+        description="Extracellular matrix fiber (collagen/fibronectin)",
+        geometry_type="capsule",
+        default_size=0.5,  # ~0.5 μm segment
+        color=(0.8, 0.75, 0.6),  # Beige
+        suggested_strategy=InstancingStrategy.POINT_INSTANCER,
+        max_instances=10000000,
+        geometry_params={"radius": 0.02, "height": 0.5}
+    ),
+}
+
+
 # Combine all prototypes
 ALL_PROTOTYPES: Dict[str, PrototypeSpec] = {
     **MOLECULE_PROTOTYPES,
@@ -414,6 +651,8 @@ ALL_PROTOTYPES: Dict[str, PrototypeSpec] = {
     **CELL_PROTOTYPES,
     **PARTICLE_PROTOTYPES,
     **STRUCTURE_PROTOTYPES,
+    **IMMUNE_CELL_PROTOTYPES,
+    **IMMUNE_PARTICLE_PROTOTYPES,
 }
 
 

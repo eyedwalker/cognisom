@@ -16,6 +16,8 @@ from cognisom.workflow.run_manager import RunManager
 from cognisom.workflow.project_manager import ProjectManager
 from cognisom.workflow.figure_generator import FigureGenerator
 from cognisom.workflow.paper_generator import PaperGenerator
+from cognisom.workflow.parameter_bridge import ParameterBridge
+from cognisom.workflow.scenario_builder import ScenarioBuilder
 
 __all__ = [
     "ArtifactStore",
@@ -23,4 +25,6 @@ __all__ = [
     "ProjectManager",
     "FigureGenerator",
     "PaperGenerator",
+    "ParameterBridge",
+    "ScenarioBuilder",
 ]

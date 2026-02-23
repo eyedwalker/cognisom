@@ -201,6 +201,47 @@ class EngineRunner:
         # Engine reference (populated on build)
         self.engine: Optional[SimulationEngine] = None
 
+    # ── Alternative constructor ────────────────────────────────────
+
+    @classmethod
+    def from_scenario(
+        cls,
+        scenario,
+        store,
+        modules_enabled: Optional[Dict[str, bool]] = None,
+        record_interval: int = 10,
+    ) -> "EngineRunner":
+        """Create an EngineRunner from a SimulationScenario entity.
+
+        Uses ParameterBridge to resolve scenario's parameter_set_ids,
+        gene_ids, and drug_ids into concrete module configs.
+
+        Args:
+            scenario: A SimulationScenario entity from EntityStore.
+            store: EntityStore instance for entity lookups.
+            modules_enabled: Which modules to enable (auto-inferred if None).
+            record_interval: How often to record snapshots.
+
+        Returns:
+            Configured EngineRunner ready for .build() and .run().
+        """
+        from cognisom.workflow.parameter_bridge import ParameterBridge
+
+        bridge = ParameterBridge(store)
+        resolved = bridge.resolve_scenario(scenario)
+
+        if modules_enabled is None:
+            modules_enabled = bridge.infer_enabled_modules(scenario, resolved)
+
+        return cls(
+            dt=scenario.time_step_hours,
+            duration=scenario.duration_hours,
+            scenario="Baseline",  # base preset; resolved params override
+            modules_enabled=modules_enabled,
+            overrides=resolved,
+            record_interval=record_interval,
+        )
+
     # ── Setup ────────────────────────────────────────────────────────
 
     def build(self):

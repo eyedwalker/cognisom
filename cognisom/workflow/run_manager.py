@@ -197,18 +197,42 @@ class RunManager:
             # Seed for reproducibility
             np.random.seed(run.random_seed)
 
-            # Build engine
+            # Build engine — prefer entity-driven config via ParameterBridge
             from cognisom.dashboard.engine_runner import EngineRunner
+
+            resolved_overrides = run.config_snapshot.get("overrides")
+
+            # If scenario has parameter_set_ids, resolve them via bridge
+            param_set_ids = run.config_snapshot.get("parameter_set_ids", [])
+            if param_set_ids:
+                try:
+                    from cognisom.workflow.parameter_bridge import ParameterBridge
+                    bridge = ParameterBridge(self._store)
+                    scenario_entity = self._store.get_entity(run.scenario_id)
+                    if isinstance(scenario_entity, SimulationScenario):
+                        resolved_overrides = bridge.resolve_scenario(scenario_entity)
+                        # Merge any user-provided overrides on top
+                        user_overrides = run.config_snapshot.get("overrides")
+                        if user_overrides:
+                            for mod, params in user_overrides.items():
+                                resolved_overrides.setdefault(mod, {}).update(params)
+                        log.info(
+                            "Resolved %d ParameterSets for run %s",
+                            len(param_set_ids), run_id,
+                        )
+                except Exception as e:
+                    log.warning("ParameterBridge resolution failed, using legacy path: %s", e)
+
             runner = EngineRunner(
                 dt=run.dt,
                 duration=run.duration_hours,
-                scenario="Baseline",  # Scenario preset name (config applied via overrides)
+                scenario="Baseline",  # Base preset (overridden by resolved params)
                 modules_enabled=modules_enabled or {
                     "cellular": True, "immune": True, "vascular": True,
                     "lymphatic": True, "molecular": True, "spatial": True,
                     "epigenetic": True, "circadian": True, "morphogen": True,
                 },
-                overrides=run.config_snapshot.get("overrides"),
+                overrides=resolved_overrides,
             )
             run.modules_enabled = runner.modules_enabled
 

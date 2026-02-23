@@ -7,7 +7,7 @@ running physics simulations, and exporting to OpenUSD.
 
 Tabs:
 1. Schema Browser — Browse Bio-USD prim types and API schemas
-2. Prototype Library — Browse 35 biological prototypes across 5 categories
+2. Prototype Library — Browse 47 biological prototypes across 7 categories
 3. Scene Composer — Place entities, configure counts/placement, live 3D preview
 4. Physics Workbench — Configure physics, force fields, run simulation, animated viewer
 5. Export — Download composed scenes as .usda
@@ -71,6 +71,7 @@ try:
         PrototypeSpec, PrototypeCategory,
         ALL_PROTOTYPES, MOLECULE_PROTOTYPES, ORGANELLE_PROTOTYPES,
         CELL_PROTOTYPES, PARTICLE_PROTOTYPES, STRUCTURE_PROTOTYPES,
+        IMMUNE_CELL_PROTOTYPES, IMMUNE_PARTICLE_PROTOTYPES,
     )
     PROTOTYPES_AVAILABLE = True
 except ImportError:
@@ -84,6 +85,8 @@ CATEGORY_DICTS = {
     "Cells": CELL_PROTOTYPES if PROTOTYPES_AVAILABLE else {},
     "Particles": PARTICLE_PROTOTYPES if PROTOTYPES_AVAILABLE else {},
     "Structures": STRUCTURE_PROTOTYPES if PROTOTYPES_AVAILABLE else {},
+    "Immune Cells": IMMUNE_CELL_PROTOTYPES if PROTOTYPES_AVAILABLE else {},
+    "Immune Particles": IMMUNE_PARTICLE_PROTOTYPES if PROTOTYPES_AVAILABLE else {},
 }
 
 
@@ -654,7 +657,7 @@ prim = create_prim("{selected_prim}",
 # ─────────────────────────────────────────────────────────────────────────
 with tab2:
     st.subheader("Biological Prototype Library")
-    st.markdown("Browse 35 biological prototypes across 5 categories. Add entities to your scene.")
+    st.markdown("Browse 47 biological prototypes across 7 categories. Add entities to your scene.")
 
     if not PROTOTYPES_AVAILABLE:
         st.error("Prototype library not available. Check cognisom.omniverse.prototype_library.")
@@ -1124,14 +1127,17 @@ with tab6:
     ```
     BioUnit (abstract base)
     ├── BioCell              — Single biological cell
-    │   └── BioImmuneCell    — T cells, NK cells, macrophages
+    │   └── BioImmuneCell    — T cells, NK cells, macrophages (29 subtypes)
     ├── BioGene              — Gene with expression state
     ├── BioProtein           — Protein with 3D structure
     ├── BioMolecule          — Small molecule (drug, metabolite)
     ├── BioTissue            — Cell collection / tissue
     ├── BioCapillary         — Blood vessel segment
     ├── BioSpatialField      — 3D concentration field
-    └── BioExosome           — Extracellular vesicle
+    ├── BioExosome           — Extracellular vesicle
+    ├── BioAntibody          — Antibody (IgG, IgM, IgA, IgE, IgD)
+    ├── BioVirusParticle     — Virus particle with capsid state
+    └── BioCytokineField     — Cytokine concentration field
     ```
 
     ### Applied API Schemas
@@ -1162,7 +1168,7 @@ with tab6:
 
     ## Prototype Library
 
-    The prototype library provides 35 pre-defined biological entities:
+    The prototype library provides 47 pre-defined biological entities:
 
     | Category | Count | Examples |
     |----------|-------|---------|
@@ -1171,6 +1177,8 @@ with tab6:
     | Cells | 9 | Generic cell, RBC, WBC, platelet, neuron, hepatocyte, tumor, immune, bacteria |
     | Particles | 5 | Water, Na+, K+, Ca2+, drug particle |
     | Structures | 4 | Microtubule, actin, collagen, blood vessel |
+    | Immune Cells | 10 | CD8+ T cell, CD4+ T cell, B cell, plasma cell, dendritic, M1/M2 macrophage, neutrophil, mast cell, NK cell |
+    | Immune Particles | 7 | IgG, IgM, virus capsid, bacterium rod/coccus, cytokine, complement complex |
 
     ## Physics Bridge
 

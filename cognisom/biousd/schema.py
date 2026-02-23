@@ -9,14 +9,18 @@ converter module to export simulation state to USD format.
 Hierarchy:
     BioUnit (abstract)
     ├── BioCell
-    │   └── BioImmuneCell
+    │   ├── BioImmuneCell
+    │   └── BioEndothelialCell
     ├── BioGene
     ├── BioProtein
     ├── BioMolecule
     ├── BioTissue
     ├── BioCapillary
     ├── BioSpatialField
-    └── BioExosome
+    ├── BioExosome
+    ├── BioAntibody
+    ├── BioVirusParticle
+    └── BioCytokineField
 
 Applied API Schemas (composable metadata):
     BioMetabolicAPI      — oxygen, glucose, ATP, lactate per cell
@@ -74,11 +78,43 @@ class CellPhase(str, Enum):
 
 
 class ImmuneCellType(str, Enum):
+    # Legacy aliases (backward compat)
     T_CELL = "T_cell"
     NK_CELL = "NK_cell"
     MACROPHAGE = "macrophage"
     DENDRITIC = "dendritic"
     B_CELL = "B_cell"
+    # T cell subtypes
+    T_CELL_CD8_NAIVE = "T_cell_CD8_naive"
+    T_CELL_CD8_EFFECTOR = "T_cell_CD8_effector"
+    T_CELL_CD8_MEMORY = "T_cell_CD8_memory"
+    T_CELL_CD4_TH1 = "T_cell_CD4_Th1"
+    T_CELL_CD4_TH2 = "T_cell_CD4_Th2"
+    T_CELL_CD4_TH17 = "T_cell_CD4_Th17"
+    T_CELL_TREG = "T_cell_Treg"
+    T_CELL_TFH = "T_cell_Tfh"
+    T_CELL_GAMMA_DELTA = "T_cell_gamma_delta"
+    # NK subtypes
+    NKT_CELL = "NKT_cell"
+    # Macrophage subtypes
+    MACROPHAGE_M1 = "macrophage_M1"
+    MACROPHAGE_M2 = "macrophage_M2"
+    # Dendritic subtypes
+    DENDRITIC_CONVENTIONAL = "dendritic_cDC"
+    DENDRITIC_PLASMACYTOID = "dendritic_pDC"
+    # B cell subtypes
+    B_CELL_NAIVE = "B_cell_naive"
+    B_CELL_MEMORY = "B_cell_memory"
+    PLASMA_CELL = "plasma_cell"
+    # Granulocytes
+    NEUTROPHIL = "neutrophil"
+    MAST_CELL = "mast_cell"
+    BASOPHIL = "basophil"
+    EOSINOPHIL = "eosinophil"
+    # Innate lymphoid cells
+    ILC1 = "ILC1"
+    ILC2 = "ILC2"
+    ILC3 = "ILC3"
 
 
 class SpatialFieldType(str, Enum):
@@ -456,6 +492,74 @@ class BioExosome(BioUnit):
     cargo_proteins: List[str] = field(default_factory=list)
 
 
+# ── Immunology Prim Types ────────────────────────────────────────────
+
+
+@dataclass
+class BioAntibody(BioUnit):
+    """An antibody molecule in the simulation scene.
+
+    Represents IgG, IgM, IgA, IgE, IgD immunoglobulins with their
+    binding state and target information for visualization.
+    """
+    isotype: str = "IgG1"           # IgG1-4, IgA, IgE, IgM, IgD
+    target_antigen: str = ""
+    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    bound: bool = False             # True if bound to target
+    affinity_kd: float = 1e-9       # Dissociation constant (M)
+    source_cell_id: int = -1        # Plasma cell that produced it
+
+
+@dataclass
+class BioVirusParticle(BioUnit):
+    """A virus particle in the simulation scene.
+
+    Represents individual virions for infection dynamics visualization.
+    """
+    virus_type: str = ""            # SARS-CoV-2, Influenza, HIV-1
+    genome_type: str = "ssRNA+"     # dsDNA, ssDNA, dsRNA, ssRNA+, ssRNA-, retro
+    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    capsid_intact: bool = True
+    attached_to_cell: int = -1      # Cell ID if attached (-1 = free)
+    replication_stage: str = ""     # attachment, entry, replication, assembly, budding
+
+
+@dataclass
+class BioCytokineField(BioUnit):
+    """A cytokine concentration field for immune signaling visualization.
+
+    Represents the spatial distribution of a specific cytokine, enabling
+    gradient-based chemotaxis and immune cell activation visualization.
+    """
+    cytokine_name: str = ""         # IL-2, IFNg, TNFa, etc.
+    concentration: float = 0.0      # Local concentration (pg/mL)
+    source_cell_ids: List[int] = field(default_factory=list)
+    diffusion_coeff: float = 100.0  # um^2/s
+    half_life_hours: float = 1.0
+    grid_shape: Tuple[int, int, int] = (200, 200, 100)
+
+
+@dataclass
+class BioEndothelialCell(BioCell):
+    """Endothelial cell lining blood vessel wall.
+
+    Models the endothelial cell with adhesion molecule expression levels
+    for diapedesis simulation. Tracks inflammation-driven upregulation
+    of selectins (E/P-selectin) and Ig-superfamily ligands (ICAM-1, VCAM-1),
+    as well as junction integrity for transmigration.
+    """
+    cell_subtype: str = ""                # postcapillary_venule, HEV, arterial, capillary
+    e_selectin_expression: float = 0.0    # 0-1 normalized
+    p_selectin_expression: float = 0.0
+    icam1_expression: float = 0.0
+    vcam1_expression: float = 0.0
+    inflammation_state: float = 0.0       # 0=resting, 1=fully activated
+    junction_integrity: float = 1.0       # 1=intact, 0=fully open
+
+    def __post_init__(self):
+        self.cell_type = CellType.ENDOTHELIAL
+
+
 # ── Applied API Schemas ───────────────────────────────────────────────
 
 @dataclass
@@ -696,6 +800,12 @@ _BUILTIN_PRIMS = {
     "bio_capillary": BioCapillary,
     "bio_spatial_field": BioSpatialField,
     "bio_exosome": BioExosome,
+    # Immunology prim types
+    "bio_antibody": BioAntibody,
+    "bio_virus_particle": BioVirusParticle,
+    "bio_cytokine_field": BioCytokineField,
+    # Diapedesis prim types
+    "bio_endothelial_cell": BioEndothelialCell,
 }
 
 # Built-in API schemas to register
