@@ -1,10 +1,10 @@
 [package]
-version = "1.0.0"
+version = "2.0.0"
 title = "Cognisom Biological Simulation"
-description = "Real-time biological cell simulation in Omniverse"
+description = "Real-time biological cell simulation and diapedesis cascade visualization in Omniverse"
 authors = ["Cognisom Team"]
 repository = "https://github.com/cognisom/cognisom"
-keywords = ["simulation", "biology", "cells", "cancer", "digital twin"]
+keywords = ["simulation", "biology", "cells", "diapedesis", "immunology", "digital twin"]
 category = "Simulation"
 changelog = "docs/CHANGELOG.md"
 preview_image = "data/preview.png"
@@ -17,6 +17,9 @@ icon = "data/icon.png"
 "omni.kit.window.toolbar" = {}
 "omni.physx" = {}
 
+# Optional: WebRTC streaming for remote viewport
+# "omni.kit.livestream.webrtc" = {optional = true}
+
 [[python.module]]
 name = "cognisom.sim"
 
@@ -25,3 +28,6 @@ exts."cognisom.sim".simulation.fps = 60
 exts."cognisom.sim".simulation.dt = 0.01
 exts."cognisom.sim".visualization.cell_scale = 1.0
 exts."cognisom.sim".visualization.show_trails = false
+exts."cognisom.sim".diapedesis.default_preset = "inflammation"
+exts."cognisom.sim".diapedesis.default_duration = 120
+exts."cognisom.sim".diapedesis.playback_fps = 30

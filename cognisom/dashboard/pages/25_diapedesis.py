@@ -171,6 +171,29 @@ with st.sidebar:
 
     st.divider()
 
+    # ── Rendering Mode ───────────────────────────────────────────────
+    st.subheader("Rendering")
+    render_mode = st.radio(
+        "Viewer",
+        ["Three.js (Browser)", "Omniverse RTX (HD)"],
+        index=0,
+        help=(
+            "**Three.js**: Runs in browser, works everywhere.\n\n"
+            "**Omniverse RTX**: Subsurface scattering, volumetrics, "
+            "PBR materials. Requires Kit running on GPU server."
+        ),
+    )
+    use_omniverse = render_mode == "Omniverse RTX (HD)"
+
+    if use_omniverse:
+        omni_host = st.text_input(
+            "Kit Streaming URL",
+            value="ws://localhost:8211/streaming/webrtc",
+            help="WebRTC streaming endpoint from Omniverse Kit",
+        )
+
+    st.divider()
+
     run_btn = st.button("▶ Run Simulation", type="primary", use_container_width=True)
 
     if st.session_state.diap_frames:
@@ -219,6 +242,144 @@ if run_btn:
             f"[{gpu_tag}] "
             f"({sim.config.n_leukocytes} leukocytes, {sim.config.n_rbc} RBCs)"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Omniverse RTX Viewer (WebRTC streaming from Kit)
+# ═══════════════════════════════════════════════════════════════════════
+
+def _render_omniverse_viewer(frames, streaming_url: str):
+    """Render the Omniverse Kit WebRTC streaming viewer.
+
+    When Kit is running with the cognisom.sim extension on the GPU server,
+    this sends frame data to Kit via its REST API and displays the RTX-
+    rendered viewport streamed back via WebRTC.
+
+    If Kit is not available, shows setup instructions.
+    """
+    st.markdown("### Omniverse RTX Viewer")
+
+    # Check if Kit streaming endpoint is reachable
+    kit_base = streaming_url.replace("/streaming/webrtc", "").replace("ws://", "http://").replace("wss://", "https://")
+
+    kit_available = False
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"{kit_base}/status", method="GET")
+        req.add_header("Accept", "application/json")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            kit_available = resp.status == 200
+    except Exception:
+        pass
+
+    if not kit_available:
+        st.warning(
+            "Omniverse Kit streaming not detected. "
+            "Make sure Kit is running on the GPU server with the cognisom.sim extension loaded."
+        )
+        with st.expander("Setup Instructions"):
+            st.markdown(f"""
+**To enable Omniverse RTX rendering:**
+
+1. **Start Kit on the GPU server** (L4/L40S):
+   ```bash
+   ./kit --ext-folder /path/to/cognisom/omniverse/kit_extension \\
+         --enable cognisom.sim \\
+         --enable omni.kit.livestream.webrtc \\
+         --/app/livestream/port=8211
+   ```
+
+2. **Or use the Docker container**:
+   ```bash
+   docker run --gpus all -p 8211:8211 -p 8899:8899 \\
+       nvcr.io/nvidia/omniverse/kit:105.1 \\
+       --ext-folder /cognisom/omniverse/kit_extension \\
+       --enable cognisom.sim \\
+       --enable omni.kit.livestream.webrtc
+   ```
+
+3. **Set the streaming URL** in the sidebar to:
+   `{streaming_url}`
+
+The Kit extension will:
+- Build the diapedesis scene with PBR materials + subsurface scattering
+- Stream the RTX-rendered viewport back to this browser via WebRTC
+- Support real-time scrubbing through simulation frames
+""")
+        # Fall back to Three.js
+        st.info("Falling back to Three.js viewer.")
+        viewer_html = _build_vessel_viewer(frames, 2.0)
+        st.components.v1.html(viewer_html, height=700, scrolling=False)
+        return
+
+    # Kit is available — send frames and embed WebRTC viewer
+    st.success("Connected to Omniverse Kit RTX renderer")
+
+    # Send first frame to Kit to build scene
+    try:
+        import urllib.request
+        frame_data = json.dumps({"action": "load_frames", "frames": frames}).encode()
+        req = urllib.request.Request(
+            f"{kit_base}/cognisom/diapedesis",
+            data=frame_data,
+            method="POST",
+        )
+        req.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+            st.caption(f"Scene loaded: {result.get('message', 'OK')}")
+    except Exception as e:
+        st.error(f"Failed to send frames to Kit: {e}")
+
+    # Embed WebRTC streaming viewport
+    webrtc_html = f"""
+    <div id="omniViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;
+         background:#0a0a1a;position:relative;">
+        <iframe src="{kit_base}/streaming/client"
+                style="width:100%;height:100%;border:none;"
+                allow="autoplay; fullscreen">
+        </iframe>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,180,0,0.8);
+             color:white;padding:4px 10px;border-radius:4px;font:12px monospace;">
+            RTX HD
+        </div>
+    </div>
+    """
+    st.components.v1.html(webrtc_html, height=680, scrolling=False)
+
+    # Playback controls for Kit
+    col1, col2, col3 = st.columns([1, 6, 1])
+    with col1:
+        if st.button("Play", key="omni_play"):
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(
+                        f"{kit_base}/cognisom/diapedesis/play",
+                        method="POST"),
+                    timeout=3)
+            except Exception:
+                pass
+    with col2:
+        frame_idx = st.slider(
+            "Frame", 0, len(frames) - 1, 0, key="omni_frame_slider")
+        try:
+            urllib.request.urlopen(
+                urllib.request.Request(
+                    f"{kit_base}/cognisom/diapedesis/seek?frame={frame_idx}",
+                    method="POST"),
+                timeout=3)
+        except Exception:
+            pass
+    with col3:
+        if st.button("Stop", key="omni_stop"):
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(
+                        f"{kit_base}/cognisom/diapedesis/stop",
+                        method="POST"),
+                    timeout=3)
+            except Exception:
+                pass
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1104,9 +1265,12 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
 frames = st.session_state.diap_frames
 
 if frames:
-    # Render 3D viewer
-    viewer_html = _build_vessel_viewer(frames, playback_speed)
-    st.components.v1.html(viewer_html, height=700, scrolling=False)
+    # Render 3D viewer (Three.js or Omniverse RTX)
+    if use_omniverse:
+        _render_omniverse_viewer(frames, omni_host)
+    else:
+        viewer_html = _build_vessel_viewer(frames, playback_speed)
+        st.components.v1.html(viewer_html, height=700, scrolling=False)
 
     # Metrics summary
     st.subheader("Simulation Summary")
