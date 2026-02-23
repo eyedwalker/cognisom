@@ -32,7 +32,13 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
-# Try importing Warp for GPU acceleration
+# Try importing Warp GPU kernels
+try:
+    from cognisom.physics.diapedesis_kernels import DiapedesisGPU
+    _GPU_CLASS_AVAILABLE = True
+except ImportError:
+    _GPU_CLASS_AVAILABLE = False
+
 try:
     import warp as wp
     WARP_AVAILABLE = True
@@ -261,6 +267,24 @@ class DiapedesisSim:
 
         # Metrics
         self._metrics_history: List[Dict] = []
+
+        # GPU accelerator (force computation + integration + boundary)
+        self._gpu = None
+        if _GPU_CLASS_AVAILABLE:
+            try:
+                gpu = DiapedesisGPU()
+                if gpu.available:
+                    self._gpu = gpu
+                    log.info("DiapedesisSim: GPU acceleration enabled (Warp)")
+            except Exception as e:
+                log.info(f"DiapedesisSim: GPU init failed ({e}), using CPU")
+        if self._gpu is None:
+            log.info("DiapedesisSim: using CPU (NumPy) path")
+
+    @property
+    def gpu_enabled(self) -> bool:
+        """Whether GPU acceleration is active."""
+        return self._gpu is not None and self._gpu.available
 
     @property
     def n_total(self) -> int:
@@ -793,10 +817,31 @@ class DiapedesisSim:
     # ── Main step ──────────────────────────────────────────────────────
 
     def step(self) -> None:
-        """Advance simulation by one timestep."""
+        """Advance simulation by one timestep.
+
+        Uses GPU (Warp) kernels for force computation, integration, and
+        boundary enforcement when available. State machine logic and
+        stochastic binding decisions stay on CPU.
+        """
         if not self._initialized:
             raise RuntimeError("Call initialize() before step()")
 
+        cfg = self.config
+
+        if self._gpu is not None:
+            self._step_gpu()
+        else:
+            self._step_cpu()
+
+        # Update chemokine field (every 10 steps for performance)
+        if self._step_count % 10 == 0:
+            self._update_chemokine_field()
+
+        self._time += cfg.dt
+        self._step_count += 1
+
+    def _step_cpu(self) -> None:
+        """CPU (NumPy) simulation step."""
         # Zero forces
         self.forces[:] = 0.0
 
@@ -816,12 +861,103 @@ class DiapedesisSim:
         self._integrate_positions()
         self._enforce_vessel_boundary()
 
-        # Update chemokine field (every 10 steps for performance)
-        if self._step_count % 10 == 0:
-            self._update_chemokine_field()
+    def _step_gpu(self) -> None:
+        """GPU (Warp) simulation step — forces + integration + boundary on GPU."""
+        cfg = self.config
+        gpu = self._gpu
+        n_leuko = cfg.n_leukocytes
 
-        self._time += self.config.dt
-        self._step_count += 1
+        # CPU: stochastic binding / state logic (branchy, not GPU-friendly)
+        self._update_selectin_binding_stochastic()
+        self._update_integrin_activation()
+        self._update_transmigration_progress()
+        self._update_state_machine()
+
+        # Upload current state to GPU
+        gpu.upload(
+            self.positions, self.velocities, self.forces,
+            self.particle_types, self.radii,
+            self.selectin_bonds.astype(np.int32),
+            self.leukocyte_states.astype(np.int32),
+            self.integrin_activation.astype(np.float32),
+            self.transmigration_progress.astype(np.float32),
+            n_leuko,
+        )
+
+        # GPU: parallel force computation
+        gpu.zero_forces()
+        gpu.apply_shear_flow(cfg.vessel_radius, cfg.flow_velocity_max, cfg.damping)
+        gpu.apply_brownian(
+            cfg.brownian_strength * math.sqrt(cfg.damping / cfg.dt),
+            self._rng,
+        )
+        gpu.apply_selectin_rolling(
+            cfg.vessel_radius, cfg.selectin_bond_force,
+            cfg.rolling_velocity, cfg.damping,
+        )
+        gpu.apply_integrin_adhesion(
+            cfg.vessel_radius, cfg.integrin_bond_strength, cfg.damping,
+        )
+        gpu.apply_transmigration(
+            cfg.vessel_radius, cfg.transmigration_speed, cfg.damping,
+        )
+
+        # GPU: integration + boundary
+        gpu.integrate(cfg.damping, cfg.flow_velocity_max * 3.0, cfg.dt)
+        gpu.apply_boundary(cfg.vessel_radius, cfg.vessel_length)
+        gpu.sync()
+
+        # Download results back to CPU
+        gpu.download(self.positions, self.velocities)
+
+        # CPU: tissue migration (needs chemokine field gradient, not worth GPU)
+        self._update_tissue_migration()
+
+    def _update_selectin_binding_stochastic(self):
+        """CPU-only stochastic selectin bind/unbind (no force computation).
+
+        Separated from _update_selectin_binding so GPU path can handle
+        forces while CPU handles stochastic decisions.
+        """
+        cfg = self.config
+        dt = cfg.dt
+
+        for i in range(cfg.n_leukocytes):
+            idx = self.leukocyte_indices[i]
+            state = self.leukocyte_states[i]
+
+            if state not in (LeukocyteState.MARGINATING, LeukocyteState.ROLLING):
+                continue
+
+            d_wall = self._distance_to_wall(self.positions[idx])
+            near_wall = d_wall < self.radii[idx] * 3
+
+            if not self.selectin_bonds[i] and near_wall:
+                sel_expr = self._nearest_selectin_expression(self.positions[idx])
+                p_bind = cfg.selectin_on_rate * sel_expr * dt
+                if self._rng.random() < p_bind:
+                    self.selectin_bonds[i] = True
+
+            elif self.selectin_bonds[i]:
+                p_unbind = cfg.selectin_off_rate * dt
+                if self._rng.random() < p_unbind:
+                    self.selectin_bonds[i] = False
+
+    def _update_transmigration_progress(self):
+        """CPU: update transmigration progress counter and junction weakening."""
+        cfg = self.config
+        dt = cfg.dt
+
+        for i in range(cfg.n_leukocytes):
+            idx = self.leukocyte_indices[i]
+            state = self.leukocyte_states[i]
+
+            if state == LeukocyteState.TRANSMIGRATING:
+                rate = dt / cfg.junction_disruption_time
+                self.transmigration_progress[i] = min(
+                    1.0, self.transmigration_progress[i] + rate)
+                self._weaken_junction_near(
+                    self.positions[idx], self.transmigration_progress[i])
 
     def get_snapshot(self) -> Dict[str, Any]:
         """Get current state for visualization.

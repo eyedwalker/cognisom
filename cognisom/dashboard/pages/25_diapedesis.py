@@ -163,7 +163,7 @@ with st.sidebar:
 
     st.divider()
 
-    duration = st.slider("Duration (seconds)", 30, 300, 120, 10)
+    duration = st.slider("Duration (seconds)", 30, 300, 60, 10)
     fps = st.selectbox("Output FPS", [5, 10, 15, 30], index=1)
     playback_speed = st.select_slider(
         "Playback speed", options=[0.5, 1.0, 2.0, 4.0], value=2.0
@@ -188,27 +188,27 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════════════════════
 
 if run_btn:
-    with st.spinner(f"Running diapedesis simulation ({duration}s at dt=0.01)..."):
+    # Create sim from preset or custom config
+    if cfg is not None:
+        sim = DiapedesisSim(cfg)
+    elif preset == "Severe inflammation":
+        sim = DiapedesisSim.severe_inflammation()
+    elif preset == "Mild inflammation":
+        sim = DiapedesisSim.mild_inflammation()
+    elif preset == "Healthy vessel":
+        sim = DiapedesisSim.healthy_vessel()
+    elif "LAD-1" in preset:
+        sim = DiapedesisSim.lad1_no_lfa1()
+    elif "LAD-2" in preset:
+        sim = DiapedesisSim.lad2_no_selectin_ligand()
+    elif "LAD-3" in preset:
+        sim = DiapedesisSim.lad3_no_kindlin3()
+    else:
+        sim = DiapedesisSim.severe_inflammation()
+
+    gpu_tag = "GPU (Warp/CUDA)" if sim.gpu_enabled else "CPU (NumPy)"
+    with st.spinner(f"Running diapedesis simulation ({duration}s at dt=0.01, {gpu_tag})..."):
         t0 = time.time()
-
-        # Create sim from preset or custom config
-        if cfg is not None:
-            sim = DiapedesisSim(cfg)
-        elif preset == "Severe inflammation":
-            sim = DiapedesisSim.severe_inflammation()
-        elif preset == "Mild inflammation":
-            sim = DiapedesisSim.mild_inflammation()
-        elif preset == "Healthy vessel":
-            sim = DiapedesisSim.healthy_vessel()
-        elif "LAD-1" in preset:
-            sim = DiapedesisSim.lad1_no_lfa1()
-        elif "LAD-2" in preset:
-            sim = DiapedesisSim.lad2_no_selectin_ligand()
-        elif "LAD-3" in preset:
-            sim = DiapedesisSim.lad3_no_kindlin3()
-        else:
-            sim = DiapedesisSim.severe_inflammation()
-
         sim.initialize()
         frames = sim.run(duration=float(duration), fps=fps)
         elapsed = time.time() - t0
@@ -216,6 +216,7 @@ if run_btn:
         st.session_state.diap_frames = frames
         st.success(
             f"Simulation complete: {len(frames)} frames in {elapsed:.1f}s "
+            f"[{gpu_tag}] "
             f"({sim.config.n_leukocytes} leukocytes, {sim.config.n_rbc} RBCs)"
         )
 
