@@ -1,0 +1,160 @@
+\documentclass[12pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage[numbers]{natbib}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{float}
+
+\title{\VAR{title}}
+\author{\VAR{authors}}
+\date{\VAR{date}}
+
+\begin{document}
+
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────
+
+\begin{abstract}
+\VAR{abstract}
+\end{abstract}
+
+% ── Introduction ──────────────────────────────────────────────────────
+
+\section{Introduction}
+
+\VAR{introduction}
+
+% ── Methods ───────────────────────────────────────────────────────────
+
+\section{Methods}
+
+\subsection{Simulation Platform}
+
+Multi-scale cellular simulations were performed using the Cognisom
+Bio-Digital Twin platform (v\VAR{software_version}, commit
+\texttt{\VAR{git_commit}})~\cite{cognisom2026}. The platform integrates
+nine simulation modules: cellular dynamics, immune surveillance,
+vascular oxygen delivery, lymphatic transport, molecular signaling,
+spatial diffusion, epigenetic regulation, circadian gating, and
+morphogen gradient computation.
+
+\subsection{Simulation Configuration}
+
+\BLOCK{for run in runs}
+\textbf{\VAR{run.name}}: Duration \VAR{run.duration_hours} hours with
+time step $\Delta t = \VAR{run.dt}$ hours. Random seed: \VAR{run.random_seed}.
+\BLOCK{if run.modules_list}
+Enabled modules: \VAR{run.modules_list}.
+\BLOCK{endif}
+\BLOCK{endfor}
+
+\BLOCK{if parameter_table}
+\begin{table}[H]
+\centering
+\caption{Simulation Parameters}
+\label{tab:parameters}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Run} \\
+\midrule
+\BLOCK{for row in parameter_table}
+\VAR{row.param} & \VAR{row.value} & \VAR{row.run_name} \\
+\BLOCK{endfor}
+\bottomrule
+\end{tabular}
+\end{table}
+\BLOCK{endif}
+
+% ── Results ───────────────────────────────────────────────────────────
+
+\section{Results}
+
+\BLOCK{for run in runs}
+\subsection{\VAR{run.name}}
+
+\BLOCK{if run.metrics_text}
+\VAR{run.metrics_text}
+\BLOCK{endif}
+
+\BLOCK{if run.accuracy_grade}
+Accuracy evaluation against published benchmarks yielded an overall
+grade of \textbf{\VAR{run.accuracy_grade}}.
+\BLOCK{endif}
+
+\BLOCK{if run.fidelity_grade}
+Tissue fidelity assessment yielded a grade of
+\textbf{\VAR{run.fidelity_grade}}.
+\BLOCK{endif}
+
+\BLOCK{endfor}
+
+\BLOCK{if figures}
+\BLOCK{for fig in figures}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\VAR{fig.width}]{\VAR{fig.path}}
+\caption{\VAR{fig.caption}}
+\label{fig:\VAR{fig.label}}
+\end{figure}
+
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\BLOCK{if metrics_table}
+\begin{table}[H]
+\centering
+\caption{Summary Metrics}
+\label{tab:metrics}
+\begin{tabular}{l\BLOCK{for run in runs}r\BLOCK{endfor}}
+\toprule
+\textbf{Metric} \BLOCK{for run in runs}& \textbf{\VAR{run.short_name}} \BLOCK{endfor}\\
+\midrule
+\BLOCK{for row in metrics_table}
+\VAR{row.metric} \BLOCK{for val in row.run_values}& \VAR{val} \BLOCK{endfor}\\
+\BLOCK{endfor}
+\bottomrule
+\end{tabular}
+\end{table}
+\BLOCK{endif}
+
+% ── Discussion ────────────────────────────────────────────────────────
+
+\section{Discussion}
+
+\VAR{discussion}
+
+% ── Reproducibility ───────────────────────────────────────────────────
+
+\section{Reproducibility Statement}
+
+All simulations were performed using the Cognisom platform with the
+following configuration for full reproducibility:
+
+\begin{itemize}
+\item \textbf{Software}: Cognisom v\VAR{software_version}
+  (commit \texttt{\VAR{git_commit}})
+\item \textbf{Hardware}: \VAR{hardware_description}
+\BLOCK{for run in runs}
+\item \textbf{\VAR{run.name} seed}: \VAR{run.random_seed}
+\BLOCK{endfor}
+\item \textbf{Python}: \VAR{python_version}
+\BLOCK{if package_versions}
+\item \textbf{Key packages}: \VAR{package_versions}
+\BLOCK{endif}
+\end{itemize}
+
+Simulation configurations and analysis scripts are available upon request.
+
+% ── References ────────────────────────────────────────────────────────
+
+\bibliographystyle{unsrtnat}
+\bibliography{manuscript}
+
+\end{document}

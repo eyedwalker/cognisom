@@ -77,6 +77,9 @@ class EntityType(str, Enum):
     SPATIAL_FIELD = "spatial_field"      # Maps to BioSpatialField
     TISSUE = "tissue"                    # Maps to BioTissue
     PHYSICS_MODEL = "physics_model"      # Physics configuration reference
+    # Researcher workflow types
+    SIMULATION_RUN = "simulation_run"
+    RESEARCH_PROJECT = "research_project"
 
 
 class RelationshipType(str, Enum):
@@ -107,6 +110,10 @@ class RelationshipType(str, Enum):
     SENSES = "senses"                # Cell -> SpatialField
     SECRETES = "secretes"            # Cell -> SpatialField (cytokine release)
     USES_PHYSICS = "uses_physics"    # Scenario -> PhysicsModel
+    # Researcher workflow relationships
+    EXECUTES = "executes"            # SimulationRun -> SimulationScenario
+    BELONGS_TO = "belongs_to"        # SimulationRun -> ResearchProject
+    COMPARES_TO = "compares_to"      # SimulationRun -> SimulationRun
 
 
 class EntityStatus(str, Enum):
@@ -743,6 +750,170 @@ class SimulationScenario(BioEntity):
         self.initial_field_values = props.get("initial_field_values", {})
 
 
+# ── Researcher Workflow Entity Types ─────────────────────────────────
+
+
+@dataclass
+class SimulationRun(BioEntity):
+    """A single execution of a simulation scenario with persisted results.
+
+    Captures the full context needed for reproducibility: frozen config
+    snapshot, hardware/software info, random seed, and references to
+    artifact files on disk.  Final metrics and eval grades are stored
+    inline (JSONB) for fast listing and filtering.
+    """
+    entity_type: EntityType = EntityType.SIMULATION_RUN
+
+    # Links
+    scenario_id: str = ""           # -> SimulationScenario
+    project_id: str = ""            # -> ResearchProject (optional grouping)
+
+    # Execution state
+    run_status: str = "pending"     # pending | running | completed | failed
+    started_at: float = 0.0         # epoch timestamp
+    completed_at: float = 0.0
+    elapsed_seconds: float = 0.0
+
+    # Configuration snapshot (frozen at run creation for reproducibility)
+    config_snapshot: Dict = field(default_factory=dict)
+    modules_enabled: Dict[str, bool] = field(default_factory=dict)
+    dt: float = 0.05
+    duration_hours: float = 6.0
+    random_seed: int = 0
+
+    # Reproducibility metadata
+    hardware_info: Dict = field(default_factory=dict)
+    software_versions: Dict = field(default_factory=dict)
+    git_commit: str = ""
+
+    # Results summary (lightweight, queryable via JSONB)
+    final_metrics: Dict = field(default_factory=dict)
+    event_summary: Dict = field(default_factory=dict)
+
+    # Evaluation grades
+    accuracy_grade: str = ""        # A-F from AccuracyReport
+    fidelity_grade: str = ""        # A-F from FidelityReport
+
+    # Artifact paths (relative to /app/data/runs/<entity_id>/)
+    artifacts_dir: str = ""
+    time_series_file: str = "timeseries.csv"
+    cell_snapshots_file: str = "cell_snapshots.npz"
+    event_log_file: str = "events.jsonl"
+    eval_report_file: str = "eval_report.json"
+
+    def _extra_properties(self) -> dict:
+        return {
+            "scenario_id": self.scenario_id,
+            "project_id": self.project_id,
+            "run_status": self.run_status,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "elapsed_seconds": self.elapsed_seconds,
+            "config_snapshot": self.config_snapshot,
+            "modules_enabled": self.modules_enabled,
+            "dt": self.dt,
+            "duration_hours": self.duration_hours,
+            "random_seed": self.random_seed,
+            "hardware_info": self.hardware_info,
+            "software_versions": self.software_versions,
+            "git_commit": self.git_commit,
+            "final_metrics": self.final_metrics,
+            "event_summary": self.event_summary,
+            "accuracy_grade": self.accuracy_grade,
+            "fidelity_grade": self.fidelity_grade,
+            "artifacts_dir": self.artifacts_dir,
+            "time_series_file": self.time_series_file,
+            "cell_snapshots_file": self.cell_snapshots_file,
+            "event_log_file": self.event_log_file,
+            "eval_report_file": self.eval_report_file,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.scenario_id = props.get("scenario_id", "")
+        self.project_id = props.get("project_id", "")
+        self.run_status = props.get("run_status", "pending")
+        self.started_at = props.get("started_at", 0.0)
+        self.completed_at = props.get("completed_at", 0.0)
+        self.elapsed_seconds = props.get("elapsed_seconds", 0.0)
+        self.config_snapshot = props.get("config_snapshot", {})
+        self.modules_enabled = props.get("modules_enabled", {})
+        self.dt = props.get("dt", 0.05)
+        self.duration_hours = props.get("duration_hours", 6.0)
+        self.random_seed = props.get("random_seed", 0)
+        self.hardware_info = props.get("hardware_info", {})
+        self.software_versions = props.get("software_versions", {})
+        self.git_commit = props.get("git_commit", "")
+        self.final_metrics = props.get("final_metrics", {})
+        self.event_summary = props.get("event_summary", {})
+        self.accuracy_grade = props.get("accuracy_grade", "")
+        self.fidelity_grade = props.get("fidelity_grade", "")
+        self.artifacts_dir = props.get("artifacts_dir", "")
+        self.time_series_file = props.get("time_series_file", "timeseries.csv")
+        self.cell_snapshots_file = props.get("cell_snapshots_file", "cell_snapshots.npz")
+        self.event_log_file = props.get("event_log_file", "events.jsonl")
+        self.eval_report_file = props.get("eval_report_file", "eval_report.json")
+
+
+@dataclass
+class ResearchProject(BioEntity):
+    """A collection of simulation runs grouped for analysis and publication.
+
+    Projects link multiple runs together (e.g., baseline + treatment),
+    store researcher-authored text for paper sections, and manage
+    citations for the final manuscript.
+    """
+    entity_type: EntityType = EntityType.RESEARCH_PROJECT
+
+    # Project metadata
+    title: str = ""
+    hypothesis: str = ""
+    methodology: str = ""
+
+    # Linked runs
+    run_ids: List[str] = field(default_factory=list)
+    baseline_run_id: str = ""
+
+    # Paper content (editable text sections)
+    abstract: str = ""
+    introduction: str = ""
+    discussion: str = ""
+
+    # Citations
+    bibtex_entries: Dict[str, str] = field(default_factory=dict)
+
+    # Publication status
+    paper_status: str = "draft"     # draft | in_review | published
+    paper_artifact_dir: str = ""
+
+    def _extra_properties(self) -> dict:
+        return {
+            "title": self.title,
+            "hypothesis": self.hypothesis,
+            "methodology": self.methodology,
+            "run_ids": self.run_ids,
+            "baseline_run_id": self.baseline_run_id,
+            "abstract": self.abstract,
+            "introduction": self.introduction,
+            "discussion": self.discussion,
+            "bibtex_entries": self.bibtex_entries,
+            "paper_status": self.paper_status,
+            "paper_artifact_dir": self.paper_artifact_dir,
+        }
+
+    def _apply_properties(self, props: dict):
+        self.title = props.get("title", "")
+        self.hypothesis = props.get("hypothesis", "")
+        self.methodology = props.get("methodology", "")
+        self.run_ids = props.get("run_ids", [])
+        self.baseline_run_id = props.get("baseline_run_id", "")
+        self.abstract = props.get("abstract", "")
+        self.introduction = props.get("introduction", "")
+        self.discussion = props.get("discussion", "")
+        self.bibtex_entries = props.get("bibtex_entries", {})
+        self.paper_status = props.get("paper_status", "draft")
+        self.paper_artifact_dir = props.get("paper_artifact_dir", "")
+
+
 # ── Bio-USD Aligned Entity Types (Phase 0) ────────────────────────────
 
 @dataclass
@@ -1128,6 +1299,9 @@ ENTITY_CLASS_MAP = {
     "spatial_field": SpatialField,
     "tissue": Tissue,
     "physics_model": PhysicsModelEntity,
+    # Researcher workflow types
+    "simulation_run": SimulationRun,
+    "research_project": ResearchProject,
 }
 
 

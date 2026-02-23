@@ -488,3 +488,45 @@ class EngineRunner:
         if self.cell_snapshots:
             return self.cell_snapshots[index]
         return None
+
+    # ── Serialization helpers (for RunManager persistence) ──────────
+
+    def serialize_cell_snapshots(self) -> List[Dict[str, Any]]:
+        """Convert cell snapshots to a list of dicts with numpy arrays.
+
+        Used by RunManager to persist snapshots via ArtifactStore.
+        """
+        serialized = []
+        for i, snap in enumerate(self.cell_snapshots):
+            entry: Dict[str, Any] = {"index": i}
+            if snap.cell_positions is not None:
+                entry["cell_positions"] = snap.cell_positions
+                entry["cell_types"] = snap.cell_types
+                entry["cell_phases"] = snap.cell_phases
+                entry["cell_oxygen"] = np.array(snap.cell_oxygen, dtype=np.float32)
+            if snap.immune_positions is not None:
+                entry["immune_positions"] = snap.immune_positions
+                entry["immune_types"] = snap.immune_types
+                entry["immune_activated"] = snap.immune_activated
+            serialized.append(entry)
+        return serialized
+
+    def get_final_metrics(self) -> Dict[str, Any]:
+        """Extract final snapshot metrics for storage in SimulationRun entity."""
+        if not self.history:
+            return {}
+        final = self.history[-1]
+        return {
+            "final_cancer": final.n_cancer,
+            "final_normal": final.n_normal,
+            "final_immune": final.n_immune,
+            "total_kills": final.total_kills,
+            "total_divisions": final.total_divisions,
+            "total_deaths": final.total_deaths,
+            "total_transformations": final.total_transformations,
+            "total_metastases": final.total_metastases,
+            "avg_oxygen": final.avg_oxygen,
+            "avg_glucose": final.avg_glucose,
+            "total_steps": final.step,
+            "final_time": final.time,
+        }
