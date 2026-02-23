@@ -250,6 +250,10 @@ def get_current_user():
                         user = cognito.validate_token(new_tokens.access_token)
                         if user:
                             return _ensure_cognito_user_org(user)
+                # Token refresh failed — clear stale tokens so user gets login form
+                st.session_state.pop("cognito_access_token", None)
+                st.session_state.pop("cognito_refresh_token", None)
+                st.session_state.pop("cognito_token_expires", None)
 
         # Fall back to local session
         session_id = st.session_state.get("session_id")
@@ -583,7 +587,13 @@ def _streamlit_cognito_reset_confirm(cognito):
 
         ok, msg = cognito.confirm_forgot_password(email, code, new_password)
         if ok:
+            # Clear ALL cached tokens — Cognito invalidates them on password reset
             st.session_state.pop("cognito_reset_email", None)
+            st.session_state.pop("cognito_access_token", None)
+            st.session_state.pop("cognito_refresh_token", None)
+            st.session_state.pop("cognito_token_expires", None)
+            st.session_state.pop("session_id", None)
+            st.session_state.pop("username", None)
             st.success("Password reset! You can now log in.")
             st.rerun()
         else:
