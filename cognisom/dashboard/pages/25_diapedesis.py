@@ -163,7 +163,7 @@ with st.sidebar:
 
     st.divider()
 
-    duration = st.slider("Duration (seconds)", 30, 300, 60, 10)
+    duration = st.slider("Duration (seconds)", 30, 300, 120, 10)
     fps = st.selectbox("Output FPS", [5, 10, 15, 30], index=1)
     playback_speed = st.select_slider(
         "Playback speed", options=[0.5, 1.0, 2.0, 4.0], value=2.0
@@ -762,18 +762,20 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     /* ═══════════ Tissue Scene (Static) ═══════════ */
     const tissueGroup = new THREE.Group();
 
-    // --- Bacteria cluster (5-8, complement-opsonized) ---
-    const bacteriaPositions = [];
-    for (let i = 0; i < 6; i++) {{
+    // --- Bacteria (positions from simulation, complement-opsonized) ---
+    const bacteriaMeshes = [];
+    const bp0 = frames[0].bacteria_positions || [];
+    const nBacteria = bp0.length;
+    const bacteriaPositions = bp0;
+    for (let i = 0; i < nBacteria; i++) {{
         const bact = buildBacterium();
-        const bx = L*0.35 + Math.random()*L*0.3;
-        const by = -R*2.0 - Math.random()*R*0.8;
-        const bz = (Math.random()-0.5)*R*0.6;
-        bact.position.set(bx, by, bz);
+        const bp = bp0[i];
+        bact.position.set(bp[0], bp[1], bp[2]);
         bact.rotation.set(Math.random()*0.5, Math.random()*Math.PI*2, Math.random()*0.5);
         bact.scale.set(1.5, 1.5, 1.5);
+        bact.userData.baseScale = 1.5;
         tissueGroup.add(bact);
-        bacteriaPositions.push([bx, by, bz]);
+        bacteriaMeshes.push(bact);
     }}
 
     // --- Macrophages (2-3, near bacteria) ---
@@ -846,7 +848,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     const infGeo = new THREE.SphereGeometry(R*0.8, 16, 12);
     const infMat = new THREE.MeshBasicMaterial({{ color: 0xff4422, transparent: true, opacity: 0.08 }});
     const infMesh = new THREE.Mesh(infGeo, infMat);
-    infMesh.position.set(L*0.5, -R*2.5, 0);
+    infMesh.position.set(L*0.5, -R*1.75, 0);
     scene.add(infMesh);
     const infLight = new THREE.PointLight(0xff4422, 0.6, R*5);
     infLight.position.copy(infMesh.position);
@@ -949,6 +951,31 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
             }});
         }});
 
+        // --- Bacteria alive / phagocytosis animation ---
+        const ba = f.bacteria_alive || [];
+        const bph = f.bacteria_phagocytosis || [];
+        for (let bi = 0; bi < nBacteria; bi++) {{
+            const bm = bacteriaMeshes[bi];
+            if (!bm) continue;
+            if (!ba[bi]) {{
+                bm.visible = false;
+            }} else {{
+                bm.visible = true;
+                const prog = bph[bi] || 0;
+                const s = bm.userData.baseScale * (1.0 - prog * 0.8);
+                bm.scale.set(s, s, s);
+                // Flash red when being engulfed
+                if (prog > 0.05) {{
+                    const flash = 0.5 + 0.5 * Math.sin(Date.now() * 0.008);
+                    bm.traverse(child => {{
+                        if (child.material && child.material.emissive) {{
+                            child.material.emissive.setRGB(prog * flash * 0.4, 0, 0);
+                        }}
+                    }});
+                }}
+            }}
+        }}
+
         // --- Metrics overlay ---
         const m = f.metrics;
         const sc2 = m.state_counts;
@@ -965,10 +992,14 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         metricsHTML += '<br>Rolling v: ' + m.avg_rolling_velocity.toFixed(0) + ' \\u03BCm/s';
         metricsHTML += '<br>Junction: ' + (m.avg_junction_integrity * 100).toFixed(0) + '%';
         metricsHTML += '<br>Integrin: ' + (m.avg_integrin_activation * 100).toFixed(0) + '%';
+        const bAlive = m.bacteria_alive !== undefined ? m.bacteria_alive : '?';
+        const bTotal = m.bacteria_total !== undefined ? m.bacteria_total : '?';
+        metricsHTML += '<br><span style="color:#ff6644">\\u2620</span> Bacteria: ' + bAlive + '/' + bTotal + ' alive';
         if (metricsOverlay) metricsOverlay.innerHTML = metricsHTML;
 
         // Step annotations
         let stepsHTML = '<b style="color:#aabbcc">Diapedesis Steps</b><br>';
+        const bKilled = (m.bacteria_total || 0) - (m.bacteria_alive || 0);
         const steps = [
             ['1. Cytokine \\u2192 E-selectin', sc2.rolling > 0 || sc2.activating > 0 || sc2.arrested > 0],
             ['2. Selectin rolling', sc2.rolling > 0],
@@ -976,6 +1007,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
             ['4. Firm adhesion', sc2.arrested > 0 || sc2.crawling > 0],
             ['5. Transmigration', sc2.transmigrating > 0],
             ['6. Tissue migration', sc2.migrated > 0],
+            ['7. Phagocytosis (' + bKilled + ' killed)', bKilled > 0],
         ];
         steps.forEach(([label, active]) => {{
             const icon = active ? '\\u2705' : '\\u2B1C';
@@ -1091,11 +1123,13 @@ if frames:
         count = sc.get(label.lower(), 0)
         cols[i].metric(f"{emoji} {label}", count)
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Simulation time", f"{m['time']:.1f} s")
     col2.metric("Avg rolling velocity", f"{m['avg_rolling_velocity']:.0f} μm/s")
     col3.metric("Junction integrity", f"{m['avg_junction_integrity']*100:.0f}%")
-    col4.metric("Total frames", len(frames))
+    b_killed = m.get('bacteria_total', 0) - m.get('bacteria_alive', 0)
+    col4.metric("Bacteria killed", f"{b_killed}/{m.get('bacteria_total', 0)}")
+    col5.metric("Total frames", len(frames))
 
     # State distribution over time
     st.subheader("State Distribution Over Time")

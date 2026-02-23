@@ -107,12 +107,18 @@ class DiapedesisConfig:
     integrin_bond_strength: float = 200.0  # pN
 
     # Transmigration
-    junction_disruption_time: float = 60.0  # seconds
+    junction_disruption_time: float = 20.0  # seconds (accelerated for visualization)
     transmigration_speed: float = 5.0       # μm/min
 
     # Chemotaxis
     chemotaxis_strength: float = 2.0    # μm/min per gradient unit
     chemokine_diffusion: float = 100.0  # μm²/s
+    tissue_migration_speed: float = 20.0  # μm/min (neutrophil speed in tissue)
+
+    # Bacteria / phagocytosis
+    n_bacteria: int = 6
+    bacteria_kill_distance: float = 10.0  # μm to start phagocytosis
+    phagocytosis_time: float = 12.0       # seconds to fully engulf
 
     # Inflammation (0-1, controls E-selectin/ICAM-1 expression)
     inflammation_level: float = 0.7
@@ -265,6 +271,12 @@ class DiapedesisSim:
         self._vessel_center = np.array([0.0, 0.0, 0.0])  # yz center
         self._vessel_axis = np.array([1.0, 0.0, 0.0])    # along x
 
+        # Bacteria (infection site)
+        self.bacteria_positions: np.ndarray = None      # (n_bacteria, 3)
+        self.bacteria_alive: np.ndarray = None          # (n_bacteria,) bool
+        self.bacteria_phagocytosis: np.ndarray = None   # (n_bacteria,) 0-1
+        self.leukocyte_target: np.ndarray = None        # (n_leuko,) int, -1=none
+
         # Metrics
         self._metrics_history: List[Dict] = []
 
@@ -310,7 +322,10 @@ class DiapedesisSim:
         # Build combined particle arrays
         self._build_particle_arrays()
 
-        # Set up chemokine field
+        # Place bacteria at infection site
+        self._place_bacteria()
+
+        # Set up chemokine field (sources at bacteria positions)
         self._setup_chemokine_field()
 
         self._initialized = True
@@ -402,6 +417,24 @@ class DiapedesisSim:
 
         self._rbc_positions = positions
 
+    def _place_bacteria(self):
+        """Place bacteria at infection site below vessel."""
+        cfg = self.config
+        n = cfg.n_bacteria
+        R = cfg.vessel_radius
+        L = cfg.vessel_length
+
+        self.bacteria_positions = np.zeros((n, 3), dtype=np.float32)
+        for i in range(n):
+            x = self._rng.uniform(L * 0.3, L * 0.7)
+            y = -(R * 1.5 + self._rng.uniform(0, R * 0.5))
+            z = self._rng.uniform(-R * 0.3, R * 0.3)
+            self.bacteria_positions[i] = [x, y, z]
+
+        self.bacteria_alive = np.ones(n, dtype=np.bool_)
+        self.bacteria_phagocytosis = np.zeros(n, dtype=np.float32)
+        self.leukocyte_target = np.full(cfg.n_leukocytes, -1, dtype=np.int32)
+
     def _build_particle_arrays(self):
         """Combine leukocytes + RBCs into unified arrays."""
         cfg = self.config
@@ -441,11 +474,10 @@ class DiapedesisSim:
             diffusion_coeff=cfg.chemokine_diffusion,
         )
 
-        # Place infection sources at random x positions along vessel
-        for _ in range(cfg.n_chemokine_sources):
-            x = self._rng.uniform(cfg.vessel_length * 0.3, cfg.vessel_length * 0.7)
+        # Place chemokine sources at bacteria positions (infection site)
+        for i in range(min(cfg.n_bacteria, cfg.n_chemokine_sources)):
             rate = cfg.inflammation_level * 0.5
-            self.chemokine_field.add_source(x, rate)
+            self.chemokine_field.add_source(self.bacteria_positions[i, 0], rate)
 
         # Pre-diffuse for some initial spread
         for _ in range(100):
@@ -628,7 +660,7 @@ class DiapedesisSim:
         )
 
     def _update_tissue_migration(self):
-        """Chemotaxis in extravascular tissue."""
+        """Chemotaxis toward bacteria in extravascular tissue + phagocytosis."""
         cfg = self.config
 
         for i in range(cfg.n_leukocytes):
@@ -637,23 +669,41 @@ class DiapedesisSim:
 
             if state == LeukocyteState.MIGRATED:
                 pos = self.positions[idx]
-                r = self._radial_distance(pos)
 
-                # Follow chemokine gradient outward from vessel
-                grad_r = self.chemokine_field.get_gradient_radial_at(pos[0], r)
-                grad_x = self.chemokine_field.get_gradient_x_at(pos[0], r)
+                # Find or validate target bacterium
+                target = int(self.leukocyte_target[i])
+                if target < 0 or target >= cfg.n_bacteria or not self.bacteria_alive[target]:
+                    alive_mask = self.bacteria_alive
+                    if not np.any(alive_mask):
+                        continue  # All bacteria destroyed
+                    alive_idx = np.where(alive_mask)[0]
+                    dists = np.linalg.norm(
+                        self.bacteria_positions[alive_idx] - pos, axis=1)
+                    target = int(alive_idx[np.argmin(dists)])
+                    self.leukocyte_target[i] = target
 
-                # Convert radial gradient to yz direction
-                yz = np.array([0.0, pos[1], pos[2]])
-                dist = np.linalg.norm(yz)
-                if dist > 1e-6:
-                    outward = yz / dist
+                # Direction and distance to target bacterium
+                bact_pos = self.bacteria_positions[target]
+                direction = bact_pos - pos
+                dist = np.linalg.norm(direction)
+
+                if dist < cfg.bacteria_kill_distance:
+                    # Phagocytosis: engulf the bacterium
+                    self.bacteria_phagocytosis[target] = min(
+                        1.0,
+                        self.bacteria_phagocytosis[target] + cfg.dt / cfg.phagocytosis_time,
+                    )
+                    if self.bacteria_phagocytosis[target] >= 1.0:
+                        self.bacteria_alive[target] = False
+                        self.leukocyte_target[i] = -1
+                    # Gentle force to stay near bacterium
+                    if dist > 2.0:
+                        speed = cfg.tissue_migration_speed / 60.0
+                        self.forces[idx] += (direction / dist) * speed * cfg.damping
                 else:
-                    outward = np.array([0.0, 1.0, 0.0])
-
-                chemotax_force = cfg.chemotaxis_strength / 60.0 * cfg.damping
-                self.forces[idx, 0] += grad_x * chemotax_force
-                self.forces[idx, 1:3] += outward[1:3] * grad_r * chemotax_force
+                    # Chemotax toward bacterium
+                    speed = cfg.tissue_migration_speed / 60.0
+                    self.forces[idx] += (direction / max(dist, 1e-6)) * speed * cfg.damping
 
     # ── State machine ──────────────────────────────────────────────────
 
@@ -1016,6 +1066,11 @@ class DiapedesisSim:
             # Vessel geometry
             "vessel_length": cfg.vessel_length,
             "vessel_radius": cfg.vessel_radius,
+            # Bacteria
+            "bacteria_positions": self.bacteria_positions.tolist(),
+            "bacteria_alive": self.bacteria_alive.tolist(),
+            "bacteria_phagocytosis": self.bacteria_phagocytosis.tolist(),
+            "leukocyte_target": self.leukocyte_target.tolist(),
             # Metrics
             "metrics": metrics,
         }
@@ -1040,6 +1095,9 @@ class DiapedesisSim:
         # Transmigration rate (cells that reached MIGRATED)
         n_migrated = state_counts.get("migrated", 0)
 
+        n_bacteria_alive = int(np.sum(self.bacteria_alive)) if self.bacteria_alive is not None else 0
+        n_bacteria_total = len(self.bacteria_alive) if self.bacteria_alive is not None else 0
+
         metrics = {
             "state_counts": state_counts,
             "avg_rolling_velocity": avg_rolling_v,
@@ -1047,6 +1105,8 @@ class DiapedesisSim:
             "time": self._time,
             "avg_integrin_activation": float(np.mean(self.integrin_activation)),
             "avg_junction_integrity": float(np.mean(self.endo_junction_integrity)),
+            "bacteria_alive": n_bacteria_alive,
+            "bacteria_total": n_bacteria_total,
         }
 
         return metrics
