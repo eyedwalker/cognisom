@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognisom | Human Digital Twin Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e27;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .container {
+            max-width: 440px;
+            width: 90%;
+            padding: 2rem;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00d4aa, #6366f1, #00d4aa);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 5s ease infinite;
+            letter-spacing: -1px;
+        }
+
+        .logo p {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.85rem;
+            margin-top: 0.3rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 0.3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: #00d4aa;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.85rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4aa, #6366f1);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,212,170,0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-msg {
+            color: #f87171;
+            font-size: 0.85rem;
+            text-align: center;
+            margin-top: 0.75rem;
+            display: none;
+        }
+
+        /* ── Starting state ── */
+
+        .starting-state {
+            display: none;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #00d4aa;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        .starting-state h2 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .starting-state .status-text {
+            color: rgba(255,255,255,0.5);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4aa, #6366f1);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .elapsed {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.3);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.25);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>Cognisom</h1>
+            <p>by eyentelligence inc.</p>
+        </div>
+
+        <!-- Login Form -->
+        <div class="card" id="login-card">
+            <h2>Sign In to Launch GPU Server</h2>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required
+                           autocomplete="email" placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required
+                           autocomplete="current-password" placeholder="Enter password">
+                </div>
+                <button type="submit" class="btn btn-primary" id="login-btn">
+                    Sign In
+                </button>
+                <div class="error-msg" id="error-msg"></div>
+            </form>
+        </div>
+
+        <!-- Starting State -->
+        <div class="card starting-state" id="starting-card">
+            <div class="spinner"></div>
+            <h2>Starting GPU Server</h2>
+            <div class="status-text" id="status-text">Initializing...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="elapsed" id="elapsed-text"></div>
+        </div>
+
+        <div class="footer">
+            GPU-Accelerated Human Digital Twin Platform for Cancer Research<br>
+            NVIDIA Inception Member &bull; &copy; 2026 eyentelligence inc.
+        </div>
+    </div>
+
+    <script>
+    // Cognito auth via standard USER_PASSWORD_AUTH flow
+    const COGNITO_REGION = 'us-east-1';
+    const COGNITO_CLIENT_ID = '%%COGNITO_CLIENT_ID%%';  // Replaced at deploy time
+
+    let accessToken = null;
+    let startTime = null;
+    let pollTimer = null;
+
+    async function cognitoAuth(email, password) {
+        // Use Cognito InitiateAuth via HTTPS endpoint
+        const endpoint = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`;
+        const body = {
+            AuthFlow: 'USER_PASSWORD_AUTH',
+            ClientId: COGNITO_CLIENT_ID,
+            AuthParameters: {
+                USERNAME: email,
+                PASSWORD: password
+            }
+        };
+
+        const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-amz-json-1.1',
+                'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth'
+            },
+            body: JSON.stringify(body)
+        });
+
+        const data = await resp.json();
+
+        if (data.__type) {
+            // Error response
+            const errMsg = data.message || data.Message || 'Authentication failed';
+            throw new Error(errMsg);
+        }
+
+        if (data.ChallengeName) {
+            throw new Error('Account requires additional setup. Please use the main app.');
+        }
+
+        return {
+            accessToken: data.AuthenticationResult.AccessToken,
+            idToken: data.AuthenticationResult.IdToken,
+            refreshToken: data.AuthenticationResult.RefreshToken,
+        };
+    }
+
+    async function handleLogin(e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('login-btn');
+        const errEl = document.getElementById('error-msg');
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
+        errEl.style.display = 'none';
+
+        try {
+            const tokens = await cognitoAuth(email, password);
+            accessToken = tokens.accessToken;
+
+            // Store tokens for Streamlit to pick up
+            localStorage.setItem('cognisom_access_token', tokens.accessToken);
+            localStorage.setItem('cognisom_id_token', tokens.idToken);
+            localStorage.setItem('cognisom_refresh_token', tokens.refreshToken);
+
+            // Start the GPU instance
+            await startGPUInstance();
+
+        } catch (err) {
+            errEl.textContent = err.message;
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    }
+
+    async function startGPUInstance() {
+        // Switch to starting UI
+        document.getElementById('login-card').style.display = 'none';
+        document.getElementById('starting-card').style.display = 'block';
+
+        startTime = Date.now();
+        updateElapsed();
+
+        try {
+            const resp = await fetch('/api/lifecycle/start', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken }
+            });
+
+            const data = await resp.json();
+            if (!data.success) {
+                setStatus('Start failed: ' + data.message);
+                return;
+            }
+
+            setStatus('Instance starting... waiting for GPU server');
+            setProgress(10);
+
+            // Poll for readiness
+            pollTimer = setInterval(pollStatus, 5000);
+
+        } catch (err) {
+            setStatus('Error: ' + err.message);
+        }
+    }
+
+    async function pollStatus() {
+        try {
+            const resp = await fetch('/api/lifecycle/status');
+            const data = await resp.json();
+
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+            if (data.ready) {
+                clearInterval(pollTimer);
+                setStatus('GPU server ready! Redirecting...');
+                setProgress(100);
+                // Short delay then redirect to main app
+                setTimeout(function() {
+                    window.location.href = '/';
+                }, 1000);
+                return;
+            }
+
+            if (data.state === 'running') {
+                setStatus('Instance running, waiting for Streamlit to start...');
+                setProgress(Math.min(80, 20 + elapsed));
+            } else if (data.state === 'pending') {
+                setStatus('Instance booting...');
+                setProgress(Math.min(40, 10 + elapsed / 2));
+            } else if (data.state === 'stopped' || data.state === 'terminated') {
+                clearInterval(pollTimer);
+                setStatus('Instance failed to start. State: ' + data.state);
+                setProgress(0);
+                return;
+            }
+
+            // Timeout after 5 minutes
+            if (elapsed > 300) {
+                clearInterval(pollTimer);
+                setStatus('Timeout: GPU server did not become ready in 5 minutes.');
+            }
+
+        } catch (err) {
+            setStatus('Polling error: ' + err.message);
+        }
+    }
+
+    function setStatus(text) {
+        document.getElementById('status-text').textContent = text;
+    }
+
+    function setProgress(pct) {
+        document.getElementById('progress-fill').style.width = pct + '%';
+    }
+
+    function updateElapsed() {
+        if (!startTime) return;
+        const sec = Math.floor((Date.now() - startTime) / 1000);
+        const min = Math.floor(sec / 60);
+        const s = sec % 60;
+        document.getElementById('elapsed-text').textContent =
+            'Elapsed: ' + (min > 0 ? min + 'm ' : '') + s + 's';
+        requestAnimationFrame(function() {
+            setTimeout(updateElapsed, 1000);
+        });
+    }
+
+    // Check if already running on page load
+    (async function() {
+        try {
+            const resp = await fetch('/api/lifecycle/status');
+            const data = await resp.json();
+            if (data.ready) {
+                window.location.href = '/';
+            }
+        } catch (e) {}
+    })();
+    </script>
+</body>
+</html>

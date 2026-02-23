@@ -1,0 +1,46 @@
+# Tissue-Scale Multi-GPU Simulation Image
+# Built on NVIDIA CUDA 12.4 base for B200/H100 support
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev python3-pip python3.11-venv \
+    gcc g++ git openssh-client at \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python
+
+# Python dependencies (base)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# GPU + multi-GPU dependencies
+# Pin numpy<2 to avoid scipy/cupy ABI conflicts on some base images
+RUN pip install --no-cache-dir \
+    "numpy<2" \
+    cupy-cuda12x \
+    warp-lang \
+    websockets \
+    msgpack \
+    paramiko
+
+# Copy application
+COPY . .
+
+# Expose ports: 8501=Streamlit, 8600=WebSocket results
+EXPOSE 8501 8600
+
+# Environment
+ENV PYTHONUNBUFFERED=1
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV NCCL_P2P_LEVEL=NVL
+ENV NCCL_DEBUG=WARN
+
+# Health check (WebSocket port)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(5); s.connect(('localhost',8600)); s.close()"
+
+# Default: run tissue simulation runner
+CMD ["python", "-m", "cognisom.core.tissue_runner"]
