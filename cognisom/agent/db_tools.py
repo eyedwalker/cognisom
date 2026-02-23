@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -16,8 +17,17 @@ log = logging.getLogger(__name__)
 # ── helpers ──────────────────────────────────────────────────────────
 
 
+def _ncbi_key_params() -> str:
+    """Return NCBI api_key, tool, and email query params if available."""
+    key = os.environ.get("NCBI_API_KEY", "")
+    params = "&tool=cognisom&email=support@cognisom.com"
+    if key:
+        params += f"&api_key={key}"
+    return params
+
+
 def _http_get(url: str, timeout: int = 30) -> str:
-    req = urllib.request.Request(url, headers={"User-Agent": "Cognisom/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Cognisom/2.0"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read().decode()
 
@@ -42,7 +52,7 @@ class NCBIGeneTool(Tool):
             search_url = (
                 "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
                 f"?db=gene&term={urllib.parse.quote(query)}[Gene Name]+AND+Homo+sapiens[Organism]"
-                "&retmax=1&retmode=json"
+                f"&retmax=1&retmode=json{_ncbi_key_params()}"
             )
             sr = _http_get_json(search_url)
             ids = sr.get("esearchresult", {}).get("idlist", [])
@@ -54,7 +64,7 @@ class NCBIGeneTool(Tool):
             # Step 2: summary
             sum_url = (
                 "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-                f"?db=gene&id={gene_id}&retmode=json"
+                f"?db=gene&id={gene_id}&retmode=json{_ncbi_key_params()}"
             )
             sd = _http_get_json(sum_url)
             doc = sd.get("result", {}).get(gene_id, {})
@@ -300,7 +310,7 @@ class PubMedSearchTool(Tool):
             search_url = (
                 "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
                 f"?db=pubmed&term={urllib.parse.quote(query)}"
-                f"&retmax={max_results}&retmode=json&sort=date"
+                f"&retmax={max_results}&retmode=json&sort=date{_ncbi_key_params()}"
             )
             sr = _http_get_json(search_url)
             ids = sr.get("esearchresult", {}).get("idlist", [])
@@ -310,7 +320,7 @@ class PubMedSearchTool(Tool):
             # Fetch details
             fetch_url = (
                 "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-                f"?db=pubmed&id={','.join(ids)}&retmode=xml"
+                f"?db=pubmed&id={','.join(ids)}&retmode=xml{_ncbi_key_params()}"
             )
             xml_text = _http_get(fetch_url)
             root = ET.fromstring(xml_text)

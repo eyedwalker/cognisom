@@ -269,6 +269,32 @@ with tab_mutation:
                 c2.metric("Change", f"{dna.get('wt_base', '')} → {dna.get('mut_base', '')}")
                 c3.metric("Log-likelihood ratio", f"{dna.get('log_likelihood_ratio', 0):.4f}")
 
+        # ClinVar known variants
+        st.markdown("#### ClinVar Known Variants")
+        with st.spinner("Searching ClinVar…"):
+            try:
+                from cognisom.ncbi.clinvar import search_clinvar
+                clinvar_hits = search_clinvar(gene_mut, significance="pathogenic", max_results=10)
+                if clinvar_hits:
+                    import pandas as pd
+                    cv_df = pd.DataFrame([
+                        {
+                            "Variant": v.title,
+                            "Significance": v.clinical_significance,
+                            "Condition": v.condition,
+                            "Position": v.position,
+                            "Review": v.review_status,
+                            "Accession": v.accession,
+                        }
+                        for v in clinvar_hits
+                    ])
+                    st.dataframe(cv_df, use_container_width=True)
+                    st.caption(f"Showing {len(clinvar_hits)} pathogenic variants in {gene_mut} from ClinVar")
+                else:
+                    st.info(f"No pathogenic ClinVar variants found for {gene_mut}.")
+            except Exception as e:
+                st.warning(f"ClinVar lookup failed: {e}")
+
         # Literature
         lit = wf.results.get("literature")
         if lit and lit.success and isinstance(lit.data, list):

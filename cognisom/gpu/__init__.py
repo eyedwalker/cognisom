@@ -57,6 +57,11 @@ from .mixed_precision import (
     create_mixed_precision_simulator,
     precision_to_dtype,
 )
+from .multi_gpu_backend import MultiGPUBackend, DeviceContext
+from .nccl_ghost_exchange import GhostExchanger
+from .tissue_distributor import TissueDistributor, TissueCellArrays
+from .multi_gpu_diffusion import MultiGPUDiffusionSolver
+from .multi_gpu_mechanics import MultiGPUCellMechanics, MechanicsConfig, SpatialHash
 
 __all__ = [
     # Backend
@@ -89,4 +94,14 @@ __all__ = [
     "detect_optimal_precision",
     "create_mixed_precision_simulator",
     "precision_to_dtype",
+    # Multi-GPU tissue-scale (Phase C)
+    "MultiGPUBackend",
+    "DeviceContext",
+    "GhostExchanger",
+    "TissueDistributor",
+    "TissueCellArrays",
+    "MultiGPUDiffusionSolver",
+    "MultiGPUCellMechanics",
+    "MechanicsConfig",
+    "SpatialHash",
 ]

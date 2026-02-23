@@ -21,9 +21,9 @@ st.markdown(
     "Browse RCSB PDB structures, draw molecules from SMILES, and explore in 3D."
 )
 
-tab_protein, tab_molstar, tab_molecule, tab_targets, tab_structure_pred, tab_embeddings, tab_dna = st.tabs([
+tab_protein, tab_molstar, tab_molecule, tab_targets, tab_structure_pred, tab_embeddings, tab_dna, tab_blast = st.tabs([
     "Protein Viewer", "Mol* Viewer", "Molecule Drawer", "Prostate Cancer Targets",
-    "Structure Prediction", "Protein Embeddings", "DNA Analysis",
+    "Structure Prediction", "Protein Embeddings", "DNA Analysis", "BLAST Search",
 ])
 
 # ══════════════════════════════════════════════════════════════════════
@@ -274,6 +274,35 @@ with tab_molecule:
                     st.error(f"Lipinski Rule of Five: **FAIL** ({lip['violations']} violations)")
                 for rule, ok in lip["checks"].items():
                     st.markdown(f"- {'Pass' if ok else '**FAIL**'}: {rule}")
+
+        # PubChem lookup
+        st.markdown("---")
+        st.markdown("**PubChem Database Lookup**")
+        if st.button("Search PubChem", key="btn_pubchem_lookup"):
+            with st.spinner("Querying PubChem…"):
+                try:
+                    from cognisom.ncbi.pubchem import search_compound, similarity_search
+                    pc = search_compound(smiles_input, search_type="smiles")
+                    if pc:
+                        pc_c1, pc_c2, pc_c3, pc_c4 = st.columns(4)
+                        pc_c1.metric("PubChem CID", pc.cid)
+                        pc_c2.metric("Name", pc.name[:30] if pc.name else "—")
+                        pc_c3.metric("Formula", pc.molecular_formula)
+                        pc_c4.metric("InChIKey", pc.inchi_key[:14] + "…" if pc.inchi_key else "—")
+                        st.caption(f"[View on PubChem](https://pubchem.ncbi.nlm.nih.gov/compound/{pc.cid})")
+
+                        with st.expander("Similar compounds in PubChem"):
+                            similar = similarity_search(smiles_input, threshold=0.8, max_results=5)
+                            if similar:
+                                import pandas as pd
+                                sim_df = pd.DataFrame(similar)
+                                st.dataframe(sim_df, use_container_width=True)
+                            else:
+                                st.info("No similar compounds found (threshold: 80%).")
+                    else:
+                        st.info("Compound not found in PubChem.")
+                except Exception as e:
+                    st.warning(f"PubChem lookup failed: {e}")
 
         # 3D conformer
         st.markdown("---")
@@ -607,20 +636,98 @@ with tab_dna:
         "BRCA1 exon 11 (partial)": "ATGATTCTGCCCTGTGAGGGAAATAATGACCTCTATTACTGGCACTTAATATTAAATAAAAGTTTAGGCATACATTGCTAACGGACAGTATAAGGGGAA",
     }
 
+    # Initialize session state for DNA sequence
+    if "dna_loaded_seq" not in st.session_state:
+        st.session_state.dna_loaded_seq = ""
+
     st.markdown("**Quick-load example sequences:**")
     dna_col1, dna_col2, dna_col3 = st.columns(3)
-    selected_dna = ""
     for i, (name, seq) in enumerate(example_dna.items()):
         col = [dna_col1, dna_col2, dna_col3][i % 3]
         with col:
             if st.button(name, key=f"dna_ex_{i}", use_container_width=True):
-                selected_dna = seq
+                st.session_state.dna_loaded_seq = seq
+
+    # ── Import DNA from file ──
+    st.markdown("**Import from file:**")
+    dna_file = st.file_uploader(
+        "Upload a DNA sequence file",
+        type=["fasta", "fa", "fna", "txt", "gb", "gbk"],
+        key="dna_file_upload",
+        help="Supports FASTA (.fasta, .fa, .fna), plain text (.txt), and GenBank (.gb, .gbk) formats.",
+    )
+    if dna_file is not None:
+        raw = dna_file.read().decode("utf-8", errors="ignore")
+        fname = dna_file.name.lower()
+        imported_seq = ""
+        if fname.endswith((".gb", ".gbk")):
+            # GenBank: extract sequence from ORIGIN section
+            in_origin = False
+            parts = []
+            for line in raw.splitlines():
+                if line.startswith("ORIGIN"):
+                    in_origin = True
+                    continue
+                if line.startswith("//"):
+                    break
+                if in_origin:
+                    parts.append("".join(ch for ch in line if ch.isalpha()))
+            imported_seq = "".join(parts).upper()
+        else:
+            # FASTA or plain text: skip header lines starting with '>'
+            parts = []
+            for line in raw.splitlines():
+                stripped = line.strip()
+                if stripped.startswith(">"):
+                    if parts:
+                        break  # stop at second record
+                    continue
+                parts.append(stripped)
+            imported_seq = "".join(parts).upper()
+        # Keep only valid nucleotides
+        imported_seq = "".join(ch for ch in imported_seq if ch in "ATGCNRYSWKMBDHV")
+        if imported_seq:
+            st.session_state.dna_loaded_seq = imported_seq
+            st.success(f"Imported {len(imported_seq)} nucleotides from **{dna_file.name}**")
+        else:
+            st.warning("No valid DNA nucleotides found in the uploaded file.")
+
+    # ── Fetch from NCBI ──
+    st.markdown("**Fetch from NCBI:**")
+    ncbi_col1, ncbi_col2, ncbi_col3 = st.columns([2, 1, 1])
+    with ncbi_col1:
+        ncbi_query = st.text_input(
+            "Gene name or accession",
+            placeholder="e.g. BRCA1, TP53, NM_007294.4",
+            key="ncbi_seq_query",
+            help="Enter a gene symbol (BRCA1) or RefSeq accession (NM_007294.4).",
+        )
+    with ncbi_col2:
+        ncbi_db = st.selectbox("Database", ["nucleotide", "protein"], key="ncbi_seq_db")
+    with ncbi_col3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        ncbi_fetch_btn = st.button("Fetch from NCBI", key="btn_ncbi_fetch", type="secondary")
+    if ncbi_fetch_btn and ncbi_query.strip():
+        with st.spinner(f"Fetching {ncbi_query} from NCBI {ncbi_db}…"):
+            try:
+                from cognisom.ncbi import fetch_sequence
+                seq_result = fetch_sequence(ncbi_query.strip(), db=ncbi_db)
+                if seq_result:
+                    st.session_state.dna_loaded_seq = seq_result.sequence
+                    st.success(f"Fetched **{seq_result.accession}** — {seq_result.length:,} {'nt' if ncbi_db == 'nucleotide' else 'aa'}")
+                    with st.expander("Sequence details"):
+                        st.caption(seq_result.description)
+                        st.code(seq_result.sequence[:500] + ("…" if len(seq_result.sequence) > 500 else ""), language=None)
+                else:
+                    st.warning(f"No sequences found for '{ncbi_query}' in NCBI {ncbi_db}.")
+            except Exception as e:
+                st.error(f"NCBI fetch error: {e}")
 
     if dna_mode == "Generate DNA":
         dna_prompt = st.text_area(
             "DNA prompt sequence",
             height=100,
-            value=selected_dna,
+            value=st.session_state.dna_loaded_seq,
             placeholder="ATGCGATCGATCGATCG…",
             key="dna_prompt",
             help="Seed sequence; the model will extend it.",
@@ -637,13 +744,14 @@ with tab_dna:
                         client = Evo2Client()
                         result = client.generate(dna_prompt.strip(), num_tokens=dna_len)
                         st.success("Generated!")
-                        st.code(result.sequence, language=None)
-                        st.caption(f"Length: {len(result.sequence)} nt")
+                        st.code(result.generated_sequence, language=None)
+                        st.caption(f"Length: {len(result.generated_sequence)} nt")
                     except Exception as e:
                         st.error(f"Error: {e}")
 
     else:  # Score mutation
         dna_wt = st.text_area("Wild-type DNA", height=80, key="dna_wt_score",
+                               value=st.session_state.dna_loaded_seq,
                                placeholder="ATGCGATCGATCG…")
         mut_col1, mut_col2 = st.columns(2)
         with mut_col1:
@@ -670,6 +778,95 @@ with tab_dna:
                         c3.metric("Log-likelihood ratio", f"{result.get('log_likelihood_ratio', 0):.4f}")
                     except Exception as e:
                         st.error(f"Error: {e}")
+
+# ══════════════════════════════════════════════════════════════════════
+# BLAST SEARCH
+# ══════════════════════════════════════════════════════════════════════
+
+with tab_blast:
+    st.subheader("NCBI BLAST Search")
+    st.markdown(
+        "Search sequence databases using **BLAST** (Basic Local Alignment Search Tool). "
+        "Find similar DNA or protein sequences across NCBI databases."
+    )
+
+    blast_program = st.selectbox(
+        "Program",
+        ["blastn", "blastp", "blastx", "tblastn"],
+        help="blastn: DNA→DNA, blastp: Protein→Protein, blastx: DNA→Protein, tblastn: Protein→DNA",
+        key="blast_program",
+    )
+
+    blast_db_options = {
+        "blastn": ["core_nt", "nt", "refseq_rna", "refseq_genomic"],
+        "blastp": ["swissprot", "nr", "refseq_protein", "pdb"],
+        "blastx": ["swissprot", "nr", "refseq_protein"],
+        "tblastn": ["core_nt", "nt", "refseq_rna"],
+    }
+    blast_db = st.selectbox(
+        "Database", blast_db_options.get(blast_program, ["nr"]),
+        key="blast_db",
+    )
+
+    blast_seq = st.text_area(
+        "Query sequence",
+        height=120,
+        placeholder="Paste a DNA or protein sequence (FASTA or plain)…",
+        key="blast_query_seq",
+    )
+
+    blast_col1, blast_col2 = st.columns(2)
+    with blast_col1:
+        blast_evalue = st.select_slider("E-value threshold", [0.001, 0.01, 0.1, 1, 10, 100], value=10, key="blast_evalue")
+    with blast_col2:
+        blast_hits = st.slider("Max hits", 10, 100, 50, key="blast_max_hits")
+
+    if st.button("Run BLAST", key="btn_blast_run", type="primary"):
+        seq = blast_seq.strip()
+        if not seq:
+            st.error("Enter a query sequence.")
+        else:
+            try:
+                from cognisom.ncbi.blast import submit_blast, wait_for_blast, get_blast_results
+
+                progress = st.progress(0, text="Submitting BLAST search…")
+                rid = submit_blast(seq, program=blast_program, database=blast_db,
+                                   expect=blast_evalue, hitlist_size=blast_hits)
+                st.info(f"BLAST job submitted (RID: `{rid}`). Waiting for results…")
+
+                def _blast_progress(status, elapsed):
+                    pct = min(int(elapsed / 120 * 100), 95)
+                    progress.progress(pct, text=f"Status: {status} ({elapsed:.0f}s elapsed)")
+
+                final_status = wait_for_blast(rid, timeout=300, poll_interval=15,
+                                              callback=_blast_progress)
+
+                if final_status == "READY":
+                    progress.progress(100, text="Retrieving results…")
+                    result = get_blast_results(rid, max_hits=blast_hits)
+
+                    if result.hits:
+                        st.success(f"Found **{len(result.hits)}** hits")
+                        import pandas as pd
+                        df = pd.DataFrame([
+                            {
+                                "Accession": h.accession,
+                                "Identity %": f"{h.identity_pct:.1f}",
+                                "E-value": f"{h.evalue:.2e}",
+                                "Score": f"{h.score:.0f}",
+                                "Length": h.length,
+                            }
+                            for h in result.hits
+                        ])
+                        st.dataframe(df, use_container_width=True)
+                    else:
+                        st.warning("BLAST completed but no hits found. Try a longer sequence or less stringent E-value.")
+                elif final_status == "TIMEOUT":
+                    st.warning("BLAST search timed out (>5 min). Try a shorter sequence or smaller database.")
+                else:
+                    st.error(f"BLAST search failed with status: {final_status}")
+            except Exception as e:
+                st.error(f"BLAST error: {e}")
 
 # Footer
 from cognisom.dashboard.footer import render_footer

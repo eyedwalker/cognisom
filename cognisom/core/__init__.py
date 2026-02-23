@@ -8,6 +8,8 @@ Master simulation engine and core infrastructure.
 from .simulation_engine import SimulationEngine, SimulationConfig
 from .event_bus import EventBus, EventTypes
 from .module_base import SimulationModule
+from .tissue_config import TissueScaleConfig, DiffusionFieldConfig
+from .tissue_engine import TissueSimulationEngine
 from .registry import (
     Registry,
     RegistryEntry,
@@ -36,4 +38,8 @@ __all__ = [
     'ValidationError',
     'registry_manager',
     'get_registry',
+    # Tissue-scale simulation
+    'TissueScaleConfig',
+    'DiffusionFieldConfig',
+    'TissueSimulationEngine',
 ]

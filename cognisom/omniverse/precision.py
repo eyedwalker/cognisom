@@ -198,7 +198,7 @@ class PrecisionTransformManager:
         self,
         prim: "Usd.Prim",
         position: Tuple[float, float, float],
-        time_code: float = Usd.TimeCode.Default()
+        time_code: float = None
     ) -> bool:
         """
         Set world position using double-precision transform.
@@ -214,6 +214,8 @@ class PrecisionTransformManager:
         Returns:
             True if successful
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         try:
             xformable = UsdGeom.Xformable(prim)
 
@@ -244,7 +246,7 @@ class PrecisionTransformManager:
         self,
         prim: "Usd.Prim",
         position: Tuple[float, float, float],
-        time_code: float = Usd.TimeCode.Default()
+        time_code: float = None
     ) -> bool:
         """
         Set local position using single-precision transform.
@@ -260,6 +262,8 @@ class PrecisionTransformManager:
         Returns:
             True if successful
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         try:
             xformable = UsdGeom.Xformable(prim)
             xform_ops = xformable.GetOrderedXformOps()
@@ -284,7 +288,7 @@ class PrecisionTransformManager:
             log.error(f"Failed to set local position: {e}")
             return False
 
-    def get_world_position(self, prim: "Usd.Prim", time_code: float = Usd.TimeCode.Default()) -> Tuple[float, float, float]:
+    def get_world_position(self, prim: "Usd.Prim", time_code: float = None) -> Tuple[float, float, float]:
         """
         Get world position from a prim's transform.
 
@@ -297,6 +301,8 @@ class PrecisionTransformManager:
         Returns:
             World position (x, y, z) as float64
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         try:
             xformable = UsdGeom.Xformable(prim)
             world_transform = xformable.ComputeLocalToWorldTransform(time_code)
@@ -489,7 +495,7 @@ class BioPrecisePointAPI:
         if "BioPrecisePointAPI" not in schemas:
             self.prim.AddAppliedSchema("BioPrecisePointAPI")
 
-    def set_precise_positions(self, positions: np.ndarray, time_code: float = Usd.TimeCode.Default()) -> None:
+    def set_precise_positions(self, positions: np.ndarray, time_code: float = None) -> None:
         """
         Set double-precision positions for simulation.
 
@@ -497,6 +503,8 @@ class BioPrecisePointAPI:
             positions: Nx3 array of float64 positions
             time_code: USD time code
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         if positions.dtype != np.float64:
             positions = positions.astype(np.float64)
 
@@ -511,7 +519,7 @@ class BioPrecisePointAPI:
         vt_positions = Vt.Vec3dArray.FromNumpy(positions.reshape(-1, 3))
         attr.Set(vt_positions, time_code)
 
-    def get_precise_positions(self, time_code: float = Usd.TimeCode.Default()) -> np.ndarray:
+    def get_precise_positions(self, time_code: float = None) -> np.ndarray:
         """
         Get double-precision positions.
 
@@ -521,6 +529,8 @@ class BioPrecisePointAPI:
         Returns:
             Nx3 array of float64 positions
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         attr = self.prim.GetAttribute(self.POSITIONS_ATTR)
         if not attr or not attr.HasValue():
             return np.array([], dtype=np.float64).reshape(0, 3)
@@ -528,7 +538,7 @@ class BioPrecisePointAPI:
         vt_positions = attr.Get(time_code)
         return np.array(vt_positions, dtype=np.float64)
 
-    def set_precise_velocities(self, velocities: np.ndarray, time_code: float = Usd.TimeCode.Default()) -> None:
+    def set_precise_velocities(self, velocities: np.ndarray, time_code: float = None) -> None:
         """
         Set double-precision velocities.
 
@@ -536,6 +546,8 @@ class BioPrecisePointAPI:
             velocities: Nx3 array of float64 velocities
             time_code: USD time code
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         if velocities.dtype != np.float64:
             velocities = velocities.astype(np.float64)
 
@@ -549,7 +561,7 @@ class BioPrecisePointAPI:
         vt_velocities = Vt.Vec3dArray.FromNumpy(velocities.reshape(-1, 3))
         attr.Set(vt_velocities, time_code)
 
-    def get_precise_velocities(self, time_code: float = Usd.TimeCode.Default()) -> np.ndarray:
+    def get_precise_velocities(self, time_code: float = None) -> np.ndarray:
         """
         Get double-precision velocities.
 
@@ -559,6 +571,8 @@ class BioPrecisePointAPI:
         Returns:
             Nx3 array of float64 velocities
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         attr = self.prim.GetAttribute(self.VELOCITIES_ATTR)
         if not attr or not attr.HasValue():
             return np.array([], dtype=np.float64).reshape(0, 3)
@@ -566,7 +580,7 @@ class BioPrecisePointAPI:
         vt_velocities = attr.Get(time_code)
         return np.array(vt_velocities, dtype=np.float64)
 
-    def set_precise_masses(self, masses: np.ndarray, time_code: float = Usd.TimeCode.Default()) -> None:
+    def set_precise_masses(self, masses: np.ndarray, time_code: float = None) -> None:
         """
         Set double-precision masses.
 
@@ -574,6 +588,8 @@ class BioPrecisePointAPI:
             masses: N array of float64 masses
             time_code: USD time code
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         if masses.dtype != np.float64:
             masses = masses.astype(np.float64)
 
@@ -587,7 +603,7 @@ class BioPrecisePointAPI:
         vt_masses = Vt.DoubleArray.FromNumpy(masses.flatten())
         attr.Set(vt_masses, time_code)
 
-    def get_precise_masses(self, time_code: float = Usd.TimeCode.Default()) -> np.ndarray:
+    def get_precise_masses(self, time_code: float = None) -> np.ndarray:
         """
         Get double-precision masses.
 
@@ -597,6 +613,8 @@ class BioPrecisePointAPI:
         Returns:
             N array of float64 masses
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         attr = self.prim.GetAttribute(self.MASSES_ATTR)
         if not attr or not attr.HasValue():
             return np.array([], dtype=np.float64)

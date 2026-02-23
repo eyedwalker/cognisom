@@ -468,7 +468,7 @@ class NestedInstancingManager:
         self,
         prototype_name: str,
         positions: np.ndarray,
-        time_code: float = Usd.TimeCode.Default()
+        time_code: float = None
     ) -> bool:
         """
         Update positions for a point instancer (for animation).
@@ -481,6 +481,8 @@ class NestedInstancingManager:
         Returns:
             True if successful
         """
+        if time_code is None:
+            time_code = Usd.TimeCode.Default()
         if prototype_name not in self._point_instancers:
             log.error(f"No point instancer for '{prototype_name}'")
             return False

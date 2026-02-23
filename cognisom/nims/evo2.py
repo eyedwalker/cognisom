@@ -15,8 +15,8 @@ from .client import NIMClient
 
 logger = logging.getLogger(__name__)
 
-ENDPOINT_GENERATE = "arc/evo2/generate"
-ENDPOINT_FORWARD = "arc/evo2/forward"
+ENDPOINT_GENERATE = "arc/evo2-40b/generate"
+ENDPOINT_FORWARD = "arc/evo2-40b/forward"
 
 
 @dataclass

@@ -297,10 +297,125 @@ cognisom/
     └── immune_escape/     # Cancer immune evasion
 ```
 
+## VCell Parity: GPU-Accelerated Solvers
+
+Cognisom achieves feature parity with [VCell](https://vcell.org) with 5 GPU-accelerated solver types:
+
+| Solver | VCell Equivalent | GPU Speedup | Key File |
+|--------|------------------|-------------|----------|
+| **ODE Solver** | CVODE | 10-50× | `cognisom/gpu/ode_solver.py` |
+| **Smoldyn Spatial** | Smoldyn | 20-100× | `cognisom/gpu/smoldyn_solver.py` |
+| **Hybrid ODE/SSA** | Hybrid Solvers | 5-20× | `cognisom/gpu/hybrid_solver.py` |
+| **BNGL Rules** | BioNetGen | ~1× (rule parsing) | `cognisom/bngl/` |
+| **Imaging Pipeline** | Image-based | 10-50× | `cognisom/imaging/` |
+
+### ODE Solver — Batched Deterministic Integration
+GPU-accelerated ODE integration for simulating **thousands of cells in parallel**:
+```python
+from cognisom.gpu.ode_solver import BatchedODEIntegrator, ODESystem
+
+system = ODESystem.gene_expression_2species()
+solver = BatchedODEIntegrator(system, n_cells=10000, method='rk45')
+solution = solver.integrate(t_span=(0, 10), y0=y0)
+```
+- **Methods**: RK45, BDF (stiff), Adams-Moulton
+- **Heterogeneity**: Per-cell parameter randomization
+- **Use Cases**: Gene regulatory networks, parameter sensitivity, drug response
+
+### Smoldyn Spatial — Particle Brownian Dynamics
+Simulate **individual molecules** diffusing in 3D with bimolecular reactions:
+```python
+from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem, SmoldynSpecies
+
+species = [SmoldynSpecies(name='A', diffusion_coeff=1.0)]
+system = SmoldynSystem(species=species, reactions=[], compartment=compartment)
+solver = SmoldynSolver(system, n_max_particles=100000)
+solver.add_particles('A', positions)
+solver.step(dt)
+```
+- **Scale**: 100K+ particles on GPU
+- **Features**: Reflective/absorbing boundaries, bimolecular reactions
+- **Use Cases**: Receptor-ligand kinetics, single-molecule tracking, spatial patterning
+
+### Hybrid ODE/SSA — Automatic Partitioning
+Combines **deterministic ODE** for high-copy species with **stochastic SSA** for low-copy:
+```python
+from cognisom.gpu.hybrid_solver import HybridSolver, HybridSystem
+
+system = HybridSystem.gene_regulatory_network()
+solver = HybridSolver(system, n_cells=5000, threshold=100)
+solver.initialize()
+solver.step(dt)
+```
+- **Partitioning**: Haseltine-Rawlings automatic fast/slow separation
+- **Dynamic**: Species repartitioned as populations change
+- **Use Cases**: Gene expression with transcription bursts, mixed abundance systems
+
+### BNGL Rules — Combinatorial Complexity
+Handle **combinatorial complexity** in signaling pathways using reaction rules:
+```python
+from cognisom.bngl import BNGLModel, BNGLParser
+
+model = BNGLModel.egfr_signaling()
+# or parse from file:
+parser = BNGLParser()
+model = parser.parse_file("model.bngl")
+```
+- **Features**: Molecule types with components/states, rule expansion
+- **Observables**: Pattern-based counting (Molecules, Species)
+- **Use Cases**: Receptor signaling, phosphorylation cascades, protein networks
+
+### Imaging Pipeline — Image to Geometry
+Convert **microscopy images** into simulation-ready geometries:
+```python
+from cognisom.imaging import CellSegmenter, MeshGenerator, GPUImageProcessor
+
+proc = GPUImageProcessor()
+blurred = proc.gaussian_blur(image, sigma=2.0)
+binary = proc.threshold_otsu(blurred)
+
+segmenter = CellSegmenter(method='watershed')
+result = segmenter.segment(image)  # Returns SegmentationResult
+
+generator = MeshGenerator(resolution=0.5)
+mesh = generator.labels_to_mesh(result.labels)  # Returns SimulationMesh
+```
+- **Formats**: TIFF, OME-TIFF, CZI (Zeiss), ND2 (Nikon), PNG/JPEG
+- **Methods**: Otsu, watershed, Cellpose, StarDist (if installed)
+- **Output**: 3D mesh with compartments for spatial simulations
+
+### Dashboard Access
+All VCell solvers are accessible via the Streamlit dashboard:
+- **Page 20**: VCell Solvers — Interactive configuration and visualization
+- **URL**: `http://localhost:8501` or your Brev deployment URL
+
+### Integration with Entity Model
+VCell solvers integrate with Cognisom's entity model for data management:
+- **`ParameterSet`**: Store kinetic parameters as entities
+- **`SimulationScenario`**: Define complete simulation setups
+- **`PhysicsModelEntity`**: Reference specific solver configurations
+
+```python
+from cognisom.library.models import SimulationScenario, ParameterSet
+
+params = ParameterSet(
+    name="GRN_baseline",
+    context="gene_regulatory_network",
+    parameters={"k_transcription": 1.0, "gamma_mrna": 0.1}
+)
+scenario = SimulationScenario(
+    name="GRN_1000_cells",
+    duration_hours=24.0,
+    parameter_set_ids=[params.entity_id],
+)
+```
+
+---
+
 ## Getting Started
 
 ### Prerequisites
-- NVIDIA GPU (RTX 4090 or better)
+- NVIDIA GPU (RTX 4090 or better recommended, or cloud L40S/H100)
 - CUDA 12.0+
 - Python 3.10+
 - Docker & Docker Compose
