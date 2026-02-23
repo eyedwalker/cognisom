@@ -30,6 +30,7 @@ import logging
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, parse_qs
 
@@ -290,61 +291,62 @@ class _StreamHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "diapedesis manager not available"}, 503)
             return
 
-        if path == "/cognisom/diapedesis":
-            # Load frames
-            content_len = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_len)
-            try:
+        try:
+            if path == "/cognisom/diapedesis":
+                # Load frames — scene build is queued for Kit main thread
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
                 data = json.loads(body)
                 frames = data.get("frames", [])
                 mgr.load_frames(frames, fps=data.get("fps", 30))
-                mgr.build_scene()
+                mgr.request_build_scene()
                 self._send_json({
-                    "message": f"Loaded {len(frames)} frames, scene built",
+                    "message": f"Loaded {len(frames)} frames, scene build queued",
                     "total_frames": mgr.total_frames,
                 })
-            except Exception as e:
-                self._send_json({"error": str(e)}, 400)
 
-        elif path == "/cognisom/diapedesis/play":
-            mgr.play()
-            self._send_json({"status": "playing"})
+            elif path == "/cognisom/diapedesis/play":
+                mgr.play()
+                self._send_json({"status": "playing"})
 
-        elif path == "/cognisom/diapedesis/pause":
-            if mgr.is_paused:
-                mgr.resume()
-                self._send_json({"status": "resumed"})
+            elif path == "/cognisom/diapedesis/pause":
+                if mgr.is_paused:
+                    mgr.resume()
+                    self._send_json({"status": "resumed"})
+                else:
+                    mgr.pause()
+                    self._send_json({"status": "paused"})
+
+            elif path == "/cognisom/diapedesis/stop":
+                mgr.stop()
+                self._send_json({"status": "stopped"})
+
+            elif path == "/cognisom/diapedesis/seek":
+                frame = int(params.get("frame", [0])[0])
+                mgr.seek(frame)
+                self._send_json({"status": "seeked", "frame": mgr.current_frame})
+
+            elif path == "/cognisom/diapedesis/preset":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len) if content_len else b"{}"
+                data = json.loads(body) if body else {}
+                preset = data.get("preset", "inflammation")
+                duration = data.get("duration", 60)
+                success = mgr.load_preset(preset, duration=duration)
+                if success:
+                    mgr.request_build_scene()
+                    self._send_json({
+                        "message": f"Preset '{preset}' loaded, scene build queued",
+                        "total_frames": mgr.total_frames,
+                    })
+                else:
+                    self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
+
             else:
-                mgr.pause()
-                self._send_json({"status": "paused"})
-
-        elif path == "/cognisom/diapedesis/stop":
-            mgr.stop()
-            self._send_json({"status": "stopped"})
-
-        elif path == "/cognisom/diapedesis/seek":
-            frame = int(params.get("frame", [0])[0])
-            mgr.seek(frame)
-            self._send_json({"status": "seeked", "frame": mgr.current_frame})
-
-        elif path == "/cognisom/diapedesis/preset":
-            content_len = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_len) if content_len else b"{}"
-            data = json.loads(body) if body else {}
-            preset = data.get("preset", "inflammation")
-            duration = data.get("duration", 120)
-            success = mgr.load_preset(preset, duration=duration)
-            if success:
-                mgr.build_scene()
-                self._send_json({
-                    "message": f"Preset '{preset}' loaded",
-                    "total_frames": mgr.total_frames,
-                })
-            else:
-                self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
-
-        else:
-            self._send_json({"error": "not found"}, 404)
+                self._send_json({"error": "not found"}, 404)
+        except Exception as e:
+            carb.log_warn(f"[streaming] POST {path} error: {e}")
+            self._send_json({"error": str(e)}, 500)
 
     def _serve_viewer_html(self):
         """Serve a standalone HTML viewer for the MJPEG stream."""
@@ -403,12 +405,18 @@ class _StreamHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    """Threaded HTTP server — each request in its own thread."""
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 class StreamingServer:
     """HTTP server for Kit viewport streaming."""
 
     def __init__(self, diapedesis_manager, port: int = 8211):
         self._port = port
-        self._server: Optional[HTTPServer] = None
+        self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._viewport_capture = _ViewportCapture()
         self._capture_thread: Optional[threading.Thread] = None
@@ -424,7 +432,8 @@ class StreamingServer:
             return
 
         try:
-            self._server = HTTPServer(("0.0.0.0", self._port), _StreamHandler)
+            self._server = _ThreadingHTTPServer(
+                ("0.0.0.0", self._port), _StreamHandler)
             self._server.timeout = 1.0
             self._running = True
 

@@ -158,8 +158,12 @@ class CognisomSimExtension(omni.ext.IExt):
         carb.log_info(f"[cognisom.sim] Mode changed to: {mode}")
 
     def _on_update(self, event):
-        """Called every frame."""
+        """Called every frame on Kit main thread."""
         dt = event.payload.get("dt", 1.0 / 60.0)
+
+        # Process any queued actions from HTTP threads (must run on main thread)
+        if self._diapedesis_manager:
+            self._diapedesis_manager.process_pending()
 
         if self._mode == "cell_sim":
             if self._simulation_manager and self._simulation_manager.is_running:

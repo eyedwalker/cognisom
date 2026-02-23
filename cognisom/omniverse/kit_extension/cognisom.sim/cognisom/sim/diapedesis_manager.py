@@ -103,6 +103,7 @@ class DiapedesisManager:
         self._frame_interval: float = 1.0 / 30.0  # 30 fps playback
         self._preset_name: str = ""
         self._scene_built: bool = False
+        self._build_requested: bool = False  # queued for main thread
 
         # Stats
         self._stats = {
@@ -361,6 +362,16 @@ class DiapedesisManager:
         return frames
 
     # ── Scene Building ──────────────────────────────────────────────────
+
+    def request_build_scene(self):
+        """Queue a scene build for the main thread (thread-safe)."""
+        self._build_requested = True
+
+    def process_pending(self):
+        """Process queued actions — MUST be called from Kit main thread."""
+        if self._build_requested:
+            self._build_requested = False
+            self.build_scene()
 
     def build_scene(self) -> bool:
         """Build the USD scene from the first frame."""
