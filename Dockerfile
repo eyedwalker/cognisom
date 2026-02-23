@@ -26,9 +26,10 @@ EXPOSE 5000 8080
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=api/rest_server.py
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/api/health')"
+# Health check (works for both Flask:5000 and Streamlit:8501)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import requests; r=requests.get('http://localhost:8501/_stcore/health'); r.raise_for_status()" || \
+    python -c "import requests; requests.get('http://localhost:5000/api/health')"
 
 # Default command (API server)
 CMD ["python", "api/rest_server.py"]
