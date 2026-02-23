@@ -226,7 +226,18 @@ if run_btn:
 # ═══════════════════════════════════════════════════════════════════════
 
 def _build_vessel_viewer(frames, playback_speed=2.0):
-    """Build Three.js 3D vessel cutaway with animated diapedesis."""
+    """Build Three.js 3D vessel cutaway with realistic molecular geometries.
+
+    Features:
+    - Selectin lollipops (C-type lectin head + SCR stalk) on endothelium
+    - Integrin bent/extended conformational change on leukocytes
+    - ICAM-1 bead-rods on endothelium
+    - PECAM-1 dimers at endothelial junctions
+    - Biconcave RBCs (Evans-Fung parametric)
+    - Neutrophils with microvilli + lobulated nucleus
+    - Tissue scene: complement-opsonized bacteria, macrophages, fibrin, ECM
+    - Chemokine gradient cloud
+    """
     if not frames:
         return ""
 
@@ -237,7 +248,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     L = first["vessel_length"]
 
     return f'''
-<div id="vesselViewer" style="width:100%;height:600px;border-radius:8px;overflow:hidden;background:#050510;position:relative;"></div>
+<div id="vesselViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;background:#040412;position:relative;"></div>
 <div id="vesselControls" style="width:100%;padding:8px 0;display:flex;align-items:center;gap:10px;font:13px monospace;color:#ccc;">
     <button id="vPlayBtn" style="padding:4px 12px;cursor:pointer;background:#2a2a4a;color:#ccc;border:1px solid #555;border-radius:4px;">Play</button>
     <input id="vSlider" type="range" min="0" max="{n_frames - 1}" value="0" style="flex:1;">
@@ -252,107 +263,596 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     const W = container.clientWidth, H = container.clientHeight;
     const R = {R}, L = {L};
 
-    // Scene
+    /* ═══════════ Scene Setup ═══════════ */
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050510);
+    scene.background = new THREE.Color(0x040412);
+    scene.fog = new THREE.FogExp2(0x040412, 0.003);
 
     const camera = new THREE.PerspectiveCamera(50, W/H, 0.1, 2000);
-    camera.position.set(L*0.5, R*2.5, R*3.0);
-    camera.lookAt(L*0.5, 0, 0);
+    camera.position.set(L*0.5, R*2.2, R*3.5);
+    camera.lookAt(L*0.5, -R*0.3, 0);
 
     const renderer = new THREE.WebGLRenderer({{ antialias: true, alpha: true }});
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
     container.appendChild(renderer.domElement);
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(L*0.5, 0, 0);
+    controls.target.set(L*0.5, -R*0.3, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.update();
 
-    // Lighting
-    scene.add(new THREE.AmbientLight(0x404060, 0.5));
-    const key = new THREE.DirectionalLight(0xfff5e8, 1.0);
-    key.position.set(L, R*3, R*2);
-    scene.add(key);
-    scene.add(new THREE.DirectionalLight(0x6688cc, 0.3).position.set(-L, R, -R));
+    /* ═══════════ Lighting ═══════════ */
+    scene.add(new THREE.AmbientLight(0x404060, 0.6));
+    const keyLight = new THREE.DirectionalLight(0xfff5e8, 1.0);
+    keyLight.position.set(L, R*3, R*2);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0x6688cc, 0.4);
+    fillLight.position.set(-L*0.5, R, -R*2);
+    scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0xff8866, 0.2);
+    rimLight.position.set(L*0.5, -R*3, 0);
+    scene.add(rimLight);
 
-    // ── Vessel wall (half-cylinder cutaway) ──
+    /* ═══════════ Geometry Builders ═══════════ */
+
+    // --- Biconcave RBC (Evans-Fung equation) ---
+    function buildBiconcaveRBC() {{
+        const D = 1.0; // unit disc, scaled later
+        const segs = 32, rings = 16;
+        const verts = [], normals = [], indices = [];
+        for (let j = 0; j <= rings; j++) {{
+            const v = j / rings;
+            const r = v * D * 0.5;
+            const rn = r / (D * 0.5);
+            const rn2 = rn*rn, rn4 = rn2*rn2;
+            const sq = 1.0 - 4.0*rn2;
+            const h = sq > 0 ? D*0.5*Math.sqrt(sq)*(0.0518 + 2.0026*rn2 - 4.491*rn4) : 0;
+            for (let i = 0; i <= segs; i++) {{
+                const u = i / segs;
+                const theta = u * Math.PI * 2;
+                const x = r * Math.cos(theta);
+                const z = r * Math.sin(theta);
+                // Top half
+                verts.push(x, h, z);
+                // Approximate normals
+                const dx = 0.001;
+                const rp = Math.min(0.499, (r+dx)/(D*0.5));
+                const sq2 = 1.0 - 4.0*rp*rp;
+                const hp = sq2 > 0 ? D*0.5*Math.sqrt(sq2)*(0.0518 + 2.0026*rp*rp - 4.491*rp*rp*rp*rp) : 0;
+                const dh = (hp - h) / dx;
+                const nx = -dh * Math.cos(theta);
+                const nz = -dh * Math.sin(theta);
+                const ny = 1.0;
+                const nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+                normals.push(nx/nl, ny/nl, nz/nl);
+            }}
+        }}
+        // Bottom half (mirror)
+        const topCount = verts.length / 3;
+        for (let j = 0; j <= rings; j++) {{
+            for (let i = 0; i <= segs; i++) {{
+                const idx = (j * (segs+1) + i) * 3;
+                verts.push(verts[idx], -verts[idx+1], verts[idx+2]);
+                normals.push(normals[idx], -normals[idx+1], normals[idx+2]);
+            }}
+        }}
+        // Indices for top
+        for (let j = 0; j < rings; j++) {{
+            for (let i = 0; i < segs; i++) {{
+                const a = j*(segs+1)+i, b = a+segs+1, c = a+1, d = b+1;
+                indices.push(a, b, c, c, b, d);
+            }}
+        }}
+        // Indices for bottom
+        for (let j = 0; j < rings; j++) {{
+            for (let i = 0; i < segs; i++) {{
+                const a = topCount+j*(segs+1)+i, b = a+segs+1, c = a+1, d = b+1;
+                indices.push(a, c, b, c, d, b);
+            }}
+        }}
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+        geo.setIndex(indices);
+        return geo;
+    }}
+
+    // --- Selectin lollipop (C-type lectin head + EGF + SCR stalk) ---
+    function buildSelectin() {{
+        const g = new THREE.Group();
+        // SCR stalk: 5 small beads
+        const bead = new THREE.SphereGeometry(0.25, 6, 4);
+        const stalkMat = new THREE.MeshPhongMaterial({{ color: 0xccaa22 }});
+        for (let i = 0; i < 5; i++) {{
+            const m = new THREE.Mesh(bead, stalkMat);
+            m.position.y = i * 0.45 + 0.2;
+            g.add(m);
+        }}
+        // EGF domain
+        const egf = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 4),
+            new THREE.MeshPhongMaterial({{ color: 0xddbb33 }}));
+        egf.position.y = 2.5;
+        g.add(egf);
+        // Lectin head (oblate spheroid)
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6),
+            new THREE.MeshPhongMaterial({{ color: 0xffaa00, emissive: 0x332200 }}));
+        head.scale.set(1, 0.7, 1);
+        head.position.y = 3.1;
+        g.add(head);
+        return g;
+    }}
+
+    // --- ICAM-1 (5 Ig-domain bead rod with kink) ---
+    function buildICAM1() {{
+        const g = new THREE.Group();
+        const domainGeo = new THREE.SphereGeometry(0.22, 6, 4);
+        for (let i = 0; i < 5; i++) {{
+            const isD1 = (i === 4);
+            const mat = new THREE.MeshPhongMaterial({{
+                color: isD1 ? 0x4488ff : 0x3366aa,
+                emissive: isD1 ? 0x112244 : 0x000000,
+            }});
+            const m = new THREE.Mesh(domainGeo, mat);
+            // Kink between D2 and D3 (index 2 and 3)
+            let y = i * 0.5;
+            let x = 0;
+            if (i >= 3) {{
+                const kinkAngle = 0.4; // ~23 degrees
+                x = (i - 2) * 0.5 * Math.sin(kinkAngle);
+                y = 1.0 + (i - 2) * 0.5 * Math.cos(kinkAngle);
+            }}
+            m.position.set(x, y, 0);
+            m.scale.set(1, 1.4, 1); // elongated Ig domains
+            g.add(m);
+        }}
+        return g;
+    }}
+
+    // --- PECAM-1 dimer pair at junction ---
+    function buildPECAM1Pair() {{
+        const g = new THREE.Group();
+        const domainGeo = new THREE.SphereGeometry(0.18, 6, 4);
+        const mat = new THREE.MeshPhongMaterial({{ color: 0x33bb88, transparent: true, opacity: 0.9 }});
+        const matTip = new THREE.MeshPhongMaterial({{ color: 0x55ddaa, emissive: 0x112211, transparent: true, opacity: 0.9 }});
+        // Two rods pointing at each other
+        for (let side = -1; side <= 1; side += 2) {{
+            for (let i = 0; i < 6; i++) {{
+                const isBinding = (i >= 4);
+                const m = new THREE.Mesh(domainGeo, isBinding ? matTip : mat);
+                m.position.set(0, side * (0.5 + i * 0.4), 0);
+                m.scale.set(1, 1.3, 1);
+                g.add(m);
+            }}
+        }}
+        return g;
+    }}
+
+    // --- Integrin (bent vs extended, driven by activation 0-1) ---
+    function buildIntegrinBent() {{
+        const g = new THREE.Group();
+        const legMat = new THREE.MeshPhongMaterial({{ color: 0x448899 }});
+        const headMat = new THREE.MeshPhongMaterial({{ color: 0x55aabb, emissive: 0x112233 }});
+        // Compact bent shape: headpiece near membrane
+        const headDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 8),
+            headMat);
+        headDisc.position.y = 0.5;
+        g.add(headDisc);
+        const alphaI = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), headMat);
+        alphaI.position.y = 0.7;
+        g.add(alphaI);
+        // Short bent legs
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.6, 4), legMat);
+        leg.position.set(0.15, 0.15, 0);
+        leg.rotation.z = 0.5;
+        g.add(leg);
+        const leg2 = leg.clone();
+        leg2.position.set(-0.15, 0.15, 0);
+        leg2.rotation.z = -0.5;
+        g.add(leg2);
+        return g;
+    }}
+
+    function buildIntegrinExtended() {{
+        const g = new THREE.Group();
+        const legMat = new THREE.MeshPhongMaterial({{ color: 0x00ccdd }});
+        const headMat = new THREE.MeshPhongMaterial({{ color: 0x00ffff, emissive: 0x003344 }});
+        // Tall extended: two straight legs, headpiece at top
+        const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 4), legMat);
+        leg1.position.set(0.12, 0.9, 0);
+        leg1.rotation.z = 0.06;
+        g.add(leg1);
+        const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 4), legMat);
+        leg2.position.set(-0.12, 0.9, 0);
+        leg2.rotation.z = -0.06;
+        g.add(leg2);
+        // Headpiece (beta-propeller disc + alphaI knob)
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.12, 8), headMat);
+        disc.position.y = 1.85;
+        g.add(disc);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 4), headMat);
+        knob.position.y = 2.05;
+        g.add(knob);
+        // Hybrid domain swung out
+        const hybrid = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15),
+            new THREE.MeshPhongMaterial({{ color: 0x00eeff }}));
+        hybrid.position.set(0.45, 1.7, 0);
+        g.add(hybrid);
+        return g;
+    }}
+
+    // --- Neutrophil (lumpy sphere + microvilli + lobulated nucleus) ---
+    function buildNeutrophil(radius) {{
+        const g = new THREE.Group();
+        // Body: sphere with vertex noise
+        const bodyGeo = new THREE.SphereGeometry(1, 20, 16);
+        const posArr = bodyGeo.attributes.position.array;
+        for (let i = 0; i < posArr.length; i += 3) {{
+            const len = Math.sqrt(posArr[i]*posArr[i]+posArr[i+1]*posArr[i+1]+posArr[i+2]*posArr[i+2]);
+            const noise = 1.0 + 0.06 * (Math.sin(posArr[i]*11)*Math.cos(posArr[i+1]*13)*Math.sin(posArr[i+2]*17));
+            const s = noise / len;
+            posArr[i] *= s; posArr[i+1] *= s; posArr[i+2] *= s;
+        }}
+        bodyGeo.computeVertexNormals();
+        const bodyMat = new THREE.MeshPhongMaterial({{
+            color: 0xddddee, transparent: true, opacity: 0.75,
+            side: THREE.DoubleSide,
+        }});
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        g.add(body);
+
+        // Microvilli: small spikes on surface
+        const mvGeo = new THREE.CylinderGeometry(0.02, 0.03, 0.15, 3);
+        const mvMat = new THREE.MeshPhongMaterial({{ color: 0xccccdd }});
+        const tipMat = new THREE.MeshPhongMaterial({{ color: 0xffcc00 }}); // PSGL-1 at tips
+        for (let k = 0; k < 50; k++) {{
+            const phi = Math.acos(2*Math.random()-1);
+            const theta = Math.random()*Math.PI*2;
+            const nx = Math.sin(phi)*Math.cos(theta);
+            const ny = Math.sin(phi)*Math.sin(theta);
+            const nz = Math.cos(phi);
+            const mv = new THREE.Mesh(mvGeo, mvMat);
+            mv.position.set(nx*1.0, ny*1.0, nz*1.0);
+            mv.lookAt(nx*2, ny*2, nz*2);
+            mv.rotateX(Math.PI/2);
+            g.add(mv);
+            // PSGL-1 tip (yellow dot) every 5th microvillus
+            if (k % 5 === 0) {{
+                const tip = new THREE.Mesh(new THREE.SphereGeometry(0.03, 4, 3), tipMat);
+                tip.position.set(nx*1.15, ny*1.15, nz*1.15);
+                g.add(tip);
+            }}
+        }}
+
+        // Nucleus: 3-4 lobes (multilobed = neutrophil signature)
+        const lobeMat = new THREE.MeshPhongMaterial({{ color: 0x5544aa, transparent: true, opacity: 0.6 }});
+        const lobeGeo = new THREE.SphereGeometry(0.3, 8, 6);
+        const lobePositions = [[0.15,0.1,0], [-0.15,-0.05,0.1], [0,-0.1,-0.15], [0.1,0.15,-0.05]];
+        lobePositions.forEach(p => {{
+            const lobe = new THREE.Mesh(lobeGeo, lobeMat);
+            lobe.position.set(p[0], p[1], p[2]);
+            lobe.scale.set(1, 0.9, 0.8);
+            g.add(lobe);
+        }});
+        // Thin connections between lobes
+        const connMat = new THREE.MeshPhongMaterial({{ color: 0x443388, transparent: true, opacity: 0.4 }});
+        for (let i = 0; i < lobePositions.length - 1; i++) {{
+            const conn = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 3), connMat);
+            const p1 = lobePositions[i], p2 = lobePositions[i+1];
+            conn.position.set((p1[0]+p2[0])/2, (p1[1]+p2[1])/2, (p1[2]+p2[2])/2);
+            g.add(conn);
+        }}
+
+        g.scale.set(radius, radius, radius);
+        return g;
+    }}
+
+    // --- Bacterium (rod-shaped + complement coating) ---
+    function buildBacterium() {{
+        const g = new THREE.Group();
+        // Rod body (capsule = cylinder + hemisphere caps)
+        const bodyMat = new THREE.MeshPhongMaterial({{ color: 0x336633, emissive: 0x112211 }});
+        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 3, 8, 1), bodyMat);
+        g.add(cyl);
+        const capGeo = new THREE.SphereGeometry(0.8, 8, 6, 0, Math.PI*2, 0, Math.PI/2);
+        const cap1 = new THREE.Mesh(capGeo, bodyMat);
+        cap1.position.y = 1.5;
+        g.add(cap1);
+        const cap2 = new THREE.Mesh(capGeo, bodyMat);
+        cap2.position.y = -1.5;
+        cap2.rotation.x = Math.PI;
+        g.add(cap2);
+        // Complement coating (C3b/iC3b): scattered gold spheres on surface
+        const compMat = new THREE.MeshPhongMaterial({{
+            color: 0xcc9933, emissive: 0x332200,
+            transparent: true, opacity: 0.8,
+        }});
+        const compGeo = new THREE.SphereGeometry(0.15, 4, 3);
+        for (let i = 0; i < 25; i++) {{
+            const theta = Math.random() * Math.PI * 2;
+            const y = (Math.random() - 0.5) * 3.5;
+            const cr = 0.85 + Math.random() * 0.1;
+            const comp = new THREE.Mesh(compGeo, compMat);
+            comp.position.set(cr*Math.cos(theta), y, cr*Math.sin(theta));
+            g.add(comp);
+        }}
+        // Flagellum (thin helix)
+        const flagPts = [];
+        for (let t = 0; t < 4; t += 0.1) {{
+            flagPts.push(new THREE.Vector3(
+                0.3*Math.sin(t*4), -1.8 - t*1.2, 0.3*Math.cos(t*4)));
+        }}
+        const flagCurve = new THREE.CatmullRomCurve3(flagPts);
+        const flagGeo = new THREE.TubeGeometry(flagCurve, 20, 0.04, 4, false);
+        const flagMat = new THREE.MeshPhongMaterial({{ color: 0x558855 }});
+        g.add(new THREE.Mesh(flagGeo, flagMat));
+        return g;
+    }}
+
+    // --- Macrophage (large amoeboid + pseudopods) ---
+    function buildMacrophage() {{
+        const g = new THREE.Group();
+        const bodyGeo = new THREE.SphereGeometry(1, 16, 12);
+        const posArr = bodyGeo.attributes.position.array;
+        // Heavy vertex displacement for ruffled membrane
+        for (let i = 0; i < posArr.length; i += 3) {{
+            const len = Math.sqrt(posArr[i]*posArr[i]+posArr[i+1]*posArr[i+1]+posArr[i+2]*posArr[i+2]);
+            const noise = 1.0 + 0.15 * (Math.sin(posArr[i]*7)*Math.cos(posArr[i+1]*9)*Math.sin(posArr[i+2]*11));
+            const s = noise / len;
+            posArr[i] *= s; posArr[i+1] *= s; posArr[i+2] *= s;
+        }}
+        bodyGeo.computeVertexNormals();
+        const bodyMat = new THREE.MeshPhongMaterial({{
+            color: 0xdd5522, emissive: 0x221100,
+            transparent: true, opacity: 0.8,
+        }});
+        g.add(new THREE.Mesh(bodyGeo, bodyMat));
+        // Pseudopods (3 extending arms)
+        const podMat = new THREE.MeshPhongMaterial({{ color: 0xcc4411, transparent: true, opacity: 0.7 }});
+        const angles = [0, 2.1, 4.2];
+        angles.forEach(a => {{
+            const pod = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), podMat);
+            pod.position.set(Math.cos(a)*1.3, Math.sin(a)*0.3, Math.sin(a)*1.1);
+            pod.scale.set(1.5, 0.5, 0.7);
+            g.add(pod);
+        }});
+        // Kidney-shaped nucleus
+        const nucMat = new THREE.MeshPhongMaterial({{ color: 0x663322, transparent: true, opacity: 0.5 }});
+        const nuc = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.2, 6, 8, Math.PI*1.3), nucMat);
+        g.add(nuc);
+        return g;
+    }}
+
+    /* ═══════════ Vessel Wall ═══════════ */
     const vesselGeo = new THREE.CylinderGeometry(R, R, L, 48, 1, true, 0, Math.PI);
-    vesselGeo.rotateZ(Math.PI / 2);  // length along X
+    vesselGeo.rotateZ(Math.PI / 2);
     vesselGeo.translate(L/2, 0, 0);
     const vesselMat = new THREE.MeshPhongMaterial({{
-        color: 0xe8b0b0,
-        transparent: true,
-        opacity: 0.25,
-        side: THREE.DoubleSide,
-        depthWrite: false,
+        color: 0xe8b0b0, transparent: true, opacity: 0.18,
+        side: THREE.DoubleSide, depthWrite: false,
     }});
-    const vesselMesh = new THREE.Mesh(vesselGeo, vesselMat);
-    scene.add(vesselMesh);
+    scene.add(new THREE.Mesh(vesselGeo, vesselMat));
 
-    // Vessel wireframe
+    // Wireframe
     const wireGeo = new THREE.CylinderGeometry(R, R, L, 24, 4, true, 0, Math.PI);
     wireGeo.rotateZ(Math.PI / 2);
     wireGeo.translate(L/2, 0, 0);
-    const wireMat = new THREE.MeshBasicMaterial({{ color: 0xcc8888, wireframe: true, transparent: true, opacity: 0.15 }});
-    scene.add(new THREE.Mesh(wireGeo, wireMat));
+    scene.add(new THREE.Mesh(wireGeo, new THREE.MeshBasicMaterial({{
+        color: 0xcc8888, wireframe: true, transparent: true, opacity: 0.1
+    }})));
 
-    // Vessel axis line
-    const axisGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0), new THREE.Vector3(L, 0, 0)
-    ]);
-    scene.add(new THREE.Line(axisGeo, new THREE.LineBasicMaterial({{ color: 0x334466, transparent: true, opacity: 0.3 }})));
+    // Basement membrane (thin layer outside vessel)
+    const bmGeo = new THREE.CylinderGeometry(R*1.04, R*1.04, L*0.95, 32, 1, true, 0, Math.PI);
+    bmGeo.rotateZ(Math.PI/2); bmGeo.translate(L/2, 0, 0);
+    scene.add(new THREE.Mesh(bmGeo, new THREE.MeshPhongMaterial({{
+        color: 0x886644, transparent: true, opacity: 0.12,
+        side: THREE.DoubleSide, depthWrite: false, wireframe: true,
+    }})));
 
-    // ── Infection site glow (below vessel) ──
-    const infGeo = new THREE.SphereGeometry(R*0.6, 16, 12);
-    const infMat = new THREE.MeshBasicMaterial({{ color: 0xff4422, transparent: true, opacity: 0.15 }});
-    const infMesh = new THREE.Mesh(infGeo, infMat);
-    infMesh.position.set(L*0.5, -R*1.8, 0);
-    scene.add(infMesh);
-
-    // Infection label
-    const infLight = new THREE.PointLight(0xff4422, 0.5, R*4);
-    infLight.position.copy(infMesh.position);
-    scene.add(infLight);
-
-    // ── Load frames data ──
+    /* ═══════════ Load Frame Data ═══════════ */
     const frames = {frames_json};
-
-    // ── InstancedMesh: leukocytes ──
     const nLeuko = frames[0].leukocyte_positions.length;
-    const leukoGeo = new THREE.SphereGeometry(1, 16, 12);
-    const leukoMat = new THREE.MeshPhongMaterial({{ vertexColors: false }});
-    const leukoMesh = new THREE.InstancedMesh(leukoGeo, leukoMat, nLeuko);
-    leukoMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    // Per-instance color
-    const leukoColors = new Float32Array(nLeuko * 3);
-    leukoMesh.instanceColor = new THREE.InstancedBufferAttribute(leukoColors, 3);
-    leukoMat.vertexColors = false;
-    scene.add(leukoMesh);
-
-    // ── InstancedMesh: RBCs ──
     const nRBC = frames[0].rbc_positions.length;
-    const rbcGeo = new THREE.SphereGeometry(1, 8, 6);
-    rbcGeo.scale(1, 1, 0.35);  // oblate disc
-    const rbcMat = new THREE.MeshPhongMaterial({{ color: 0xb01010, transparent: true, opacity: 0.7 }});
+    const nEndo = frames[0].endo_positions.length;
+
+    /* ═══════════ Biconcave RBCs (InstancedMesh) ═══════════ */
+    const rbcGeo = buildBiconcaveRBC();
+    const rbcMat = new THREE.MeshPhongMaterial({{
+        color: 0xcc2222, transparent: true, opacity: 0.75,
+        shininess: 40,
+    }});
     const rbcMesh = new THREE.InstancedMesh(rbcGeo, rbcMat, nRBC);
     rbcMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(rbcMesh);
 
-    // ── InstancedMesh: endothelial cells ──
-    const nEndo = frames[0].endo_positions.length;
-    const endoGeo = new THREE.SphereGeometry(1, 8, 6);
-    endoGeo.scale(1, 1, 0.15);  // very flat (squamous)
+    /* ═══════════ Neutrophil Leukocytes (Individual Groups) ═══════════ */
+    const leukoGroups = [];
+    const integrinBentProto = buildIntegrinBent();
+    const integrinExtProto = buildIntegrinExtended();
+    for (let i = 0; i < nLeuko; i++) {{
+        const rad = frames[0].leukocyte_radii[i] || 6;
+        const ng = buildNeutrophil(rad);
+        // Add integrins (4 per leukocyte, on lower hemisphere)
+        const integrins = [];
+        for (let j = 0; j < 4; j++) {{
+            const angle = (j / 4) * Math.PI * 2;
+            const ig = {{ bent: integrinBentProto.clone(), ext: integrinExtProto.clone(), angle: angle }};
+            ig.bent.position.set(Math.cos(angle)*rad*0.9, -rad*0.7, Math.sin(angle)*rad*0.9);
+            ig.bent.scale.set(rad*0.4, rad*0.4, rad*0.4);
+            ig.ext.position.copy(ig.bent.position);
+            ig.ext.scale.copy(ig.bent.scale);
+            ig.ext.visible = false;
+            ng.add(ig.bent);
+            ng.add(ig.ext);
+            integrins.push(ig);
+        }}
+        scene.add(ng);
+        leukoGroups.push({{ group: ng, integrins: integrins, radius: rad }});
+    }}
+
+    /* ═══════════ Endothelial Cells (InstancedMesh, colored) ═══════════ */
+    const endoGeo = new THREE.SphereGeometry(1, 6, 4);
+    endoGeo.scale(1, 1, 0.12);
     const endoMat = new THREE.MeshPhongMaterial({{ vertexColors: false }});
     const endoMesh = new THREE.InstancedMesh(endoGeo, endoMat, nEndo);
     const endoColors = new Float32Array(nEndo * 3);
     endoMesh.instanceColor = new THREE.InstancedBufferAttribute(endoColors, 3);
-    endoMat.vertexColors = false;
     scene.add(endoMesh);
 
-    // ── State color map ──
+    /* ═══════════ Surface Molecules on Endothelium ═══════════ */
+    // Selectin lollipops (placed at endothelial positions, scaled by selectin expr)
+    const selectinGroup = new THREE.Group();
+    const selectinInstances = [];
+    const ep0 = frames[0].endo_positions;
+    const se0 = frames[0].endo_selectin_expr;
+    for (let i = 0; i < nEndo; i++) {{
+        if (se0[i] < 0.1) continue;
+        const n = Math.floor(se0[i] * 3) + 1; // 1-3 selectins per endo cell
+        const p = ep0[i];
+        const yz = Math.sqrt(p[1]*p[1] + p[2]*p[2]) || 1;
+        for (let j = 0; j < n; j++) {{
+            const sel = buildSelectin();
+            const offset = (j - n/2) * 2;
+            sel.position.set(p[0] + offset, p[1], p[2]);
+            // Orient toward vessel center (inward)
+            sel.lookAt(p[0] + offset, 0, 0);
+            sel.rotateX(-Math.PI/2);
+            sel.scale.set(1.2, 1.2, 1.2);
+            selectinGroup.add(sel);
+            selectinInstances.push({{ mesh: sel, endoIdx: i }});
+        }}
+    }}
+    scene.add(selectinGroup);
+
+    // ICAM-1 on endothelium (blue bead-rods)
+    const icamGroup = new THREE.Group();
+    for (let i = 0; i < nEndo; i++) {{
+        if (se0[i] < 0.2) continue; // ICAM-1 upregulated with inflammation
+        const p = ep0[i];
+        const icam = buildICAM1();
+        icam.position.set(p[0] + 3, p[1], p[2]);
+        icam.lookAt(p[0] + 3, 0, 0);
+        icam.rotateX(-Math.PI/2);
+        icam.scale.set(1.0, 1.0, 1.0);
+        icamGroup.add(icam);
+    }}
+    scene.add(icamGroup);
+
+    // PECAM-1 at junctions (between adjacent endothelial cells)
+    const pecamGroup = new THREE.Group();
+    const pecamInstances = [];
+    for (let i = 0; i < nEndo - 1; i++) {{
+        const p1 = ep0[i], p2 = ep0[i+1];
+        const dx = p2[0]-p1[0], dy = p2[1]-p1[1], dz = p2[2]-p1[2];
+        const dist = Math.sqrt(dx*dx+dy*dy+dz*dz);
+        if (dist < 20) {{ // Adjacent cells
+            const pecam = buildPECAM1Pair();
+            pecam.position.set((p1[0]+p2[0])/2, (p1[1]+p2[1])/2, (p1[2]+p2[2])/2);
+            pecam.lookAt(pecam.position.x, 0, 0);
+            pecam.scale.set(0.8, 0.8, 0.8);
+            pecamGroup.add(pecam);
+            pecamInstances.push({{ mesh: pecam, endoIdx: i }});
+        }}
+    }}
+    scene.add(pecamGroup);
+
+    /* ═══════════ Tissue Scene (Static) ═══════════ */
+    const tissueGroup = new THREE.Group();
+
+    // --- Bacteria cluster (5-8, complement-opsonized) ---
+    const bacteriaPositions = [];
+    for (let i = 0; i < 6; i++) {{
+        const bact = buildBacterium();
+        const bx = L*0.35 + Math.random()*L*0.3;
+        const by = -R*2.0 - Math.random()*R*0.8;
+        const bz = (Math.random()-0.5)*R*0.6;
+        bact.position.set(bx, by, bz);
+        bact.rotation.set(Math.random()*0.5, Math.random()*Math.PI*2, Math.random()*0.5);
+        bact.scale.set(1.5, 1.5, 1.5);
+        tissueGroup.add(bact);
+        bacteriaPositions.push([bx, by, bz]);
+    }}
+
+    // --- Macrophages (2-3, near bacteria) ---
+    for (let i = 0; i < 2; i++) {{
+        const mac = buildMacrophage();
+        const bp = bacteriaPositions[i];
+        mac.position.set(bp[0] + (i===0?-5:5), bp[1] - 3, bp[2] + (i===0?3:-3));
+        mac.scale.set(4, 4, 4);
+        tissueGroup.add(mac);
+    }}
+
+    // --- Fibrin mesh (pale yellow fibers) ---
+    const fibrinMat = new THREE.MeshPhongMaterial({{
+        color: 0xeee8cc, transparent: true, opacity: 0.35,
+    }});
+    for (let i = 0; i < 40; i++) {{
+        const len = 5 + Math.random()*12;
+        const fib = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len, 3), fibrinMat);
+        fib.position.set(
+            L*0.2 + Math.random()*L*0.6,
+            -R*1.5 - Math.random()*R*1.5,
+            (Math.random()-0.5)*R*1.0
+        );
+        fib.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+        tissueGroup.add(fib);
+    }}
+
+    // --- ECM collagen fibers (thicker, beige, wavy) ---
+    const colMat = new THREE.MeshPhongMaterial({{ color: 0xccbb99, transparent: true, opacity: 0.3 }});
+    for (let i = 0; i < 20; i++) {{
+        const pts = [];
+        const sx = L*0.1 + Math.random()*L*0.8;
+        const sy = -R*1.3 - Math.random()*R*1.5;
+        const sz = (Math.random()-0.5)*R*1.2;
+        for (let t = 0; t < 5; t++) {{
+            pts.push(new THREE.Vector3(
+                sx + t*5 + Math.sin(t*2)*1.5,
+                sy + Math.cos(t*1.7)*0.8,
+                sz + Math.sin(t*2.3)*0.6
+            ));
+        }}
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const tubeGeo = new THREE.TubeGeometry(curve, 12, 0.25 + Math.random()*0.15, 4, false);
+        tissueGroup.add(new THREE.Mesh(tubeGeo, colMat));
+    }}
+
+    // --- Chemokine gradient cloud ---
+    const chemGeo = new THREE.SphereGeometry(0.4, 4, 3);
+    const chemMat = new THREE.MeshBasicMaterial({{
+        color: 0x55bbff, transparent: true, opacity: 0.2,
+    }});
+    const chemParticles = [];
+    for (let i = 0; i < 150; i++) {{
+        // Dense near infection, sparse near vessel
+        const t = Math.pow(Math.random(), 0.7); // bias toward infection
+        const cx = L*0.25 + Math.random()*L*0.5;
+        const cy = -R*0.5 - t*R*2.2;
+        const cz = (Math.random()-0.5)*R*0.8;
+        const cm = new THREE.Mesh(chemGeo, chemMat.clone());
+        cm.position.set(cx, cy, cz);
+        const s = 0.3 + Math.random()*0.5;
+        cm.scale.set(s, s, s);
+        cm.material.opacity = 0.08 + t*0.2;
+        chemParticles.push(cm);
+        tissueGroup.add(cm);
+    }}
+    scene.add(tissueGroup);
+
+    // --- Infection site glow ---
+    const infGeo = new THREE.SphereGeometry(R*0.8, 16, 12);
+    const infMat = new THREE.MeshBasicMaterial({{ color: 0xff4422, transparent: true, opacity: 0.08 }});
+    const infMesh = new THREE.Mesh(infGeo, infMat);
+    infMesh.position.set(L*0.5, -R*2.5, 0);
+    scene.add(infMesh);
+    const infLight = new THREE.PointLight(0xff4422, 0.6, R*5);
+    infLight.position.copy(infMesh.position);
+    scene.add(infLight);
+
+    /* ═══════════ State Colors ═══════════ */
     const stateColors = [
         [0.9, 0.9, 0.9],       // 0 FLOWING: white
         [1.0, 1.0, 0.7],       // 1 MARGINATING: light yellow
@@ -365,53 +865,71 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     ];
     const stateNames = ['Flowing','Marginating','Rolling','Activating',
                         'Arrested','Crawling','Transmigrating','Migrated'];
-
     const dummy = new THREE.Object3D();
 
+    /* ═══════════ Frame Application ═══════════ */
     function applyFrame(fi) {{
         const f = frames[fi];
         if (!f) return;
 
-        // Leukocytes
+        // --- Leukocytes (individual groups) ---
         const lp = f.leukocyte_positions;
         const ls = f.leukocyte_states;
         const lr = f.leukocyte_radii;
+        const ia = f.integrin_activation;
+        const tp = f.transmigration_progress;
         for (let i = 0; i < nLeuko; i++) {{
+            const lg = leukoGroups[i];
             const p = lp[i];
-            dummy.position.set(p[0], p[1], p[2]);
-            const rad = lr[i] || 6;
-            dummy.scale.set(rad, rad, rad);
-            dummy.updateMatrix();
-            leukoMesh.setMatrixAt(i, dummy.matrix);
-            const sc = stateColors[ls[i]] || stateColors[0];
-            leukoColors[i*3] = sc[0];
-            leukoColors[i*3+1] = sc[1];
-            leukoColors[i*3+2] = sc[2];
-        }}
-        leukoMesh.instanceMatrix.needsUpdate = true;
-        leukoMesh.instanceColor.needsUpdate = true;
+            lg.group.position.set(p[0], p[1], p[2]);
 
-        // RBCs
+            // State-dependent coloring (tint the body)
+            const sc = stateColors[ls[i]] || stateColors[0];
+            const bodyMesh = lg.group.children[0]; // first child is body
+            if (bodyMesh && bodyMesh.material) {{
+                bodyMesh.material.color.setRGB(sc[0], sc[1], sc[2]);
+                bodyMesh.material.opacity = ls[i] === 6 ? 0.5 : 0.75; // more transparent when transmigrating
+            }}
+
+            // State-dependent deformation
+            const rad = lr[i] || 6;
+            if (ls[i] === 6) {{ // TRANSMIGRATING: elongate
+                const prog = tp[i] || 0;
+                lg.group.scale.set(rad*(1-prog*0.3), rad*(1+prog*0.5), rad*(1-prog*0.3));
+            }} else if (ls[i] >= 2 && ls[i] <= 5) {{ // ROLLING-CRAWLING: slightly flattened
+                lg.group.scale.set(rad*1.1, rad*0.9, rad*1.1);
+            }} else {{
+                lg.group.scale.set(rad, rad, rad);
+            }}
+
+            // Integrin conformation: bent (low) vs extended (high)
+            const activation = ia[i] || 0;
+            lg.integrins.forEach(ig => {{
+                const showExtended = activation > 0.5;
+                ig.bent.visible = !showExtended;
+                ig.ext.visible = showExtended;
+            }});
+        }}
+
+        // --- RBCs (biconcave InstancedMesh) ---
         const rp = f.rbc_positions;
         for (let i = 0; i < nRBC; i++) {{
             const p = rp[i];
             dummy.position.set(p[0], p[1], p[2]);
             dummy.scale.set(3.75, 3.75, 3.75);
-            // Random rotation for visual variety
             dummy.rotation.set(p[0]*0.1, p[1]*0.1, p[2]*0.1);
             dummy.updateMatrix();
             rbcMesh.setMatrixAt(i, dummy.matrix);
         }}
         rbcMesh.instanceMatrix.needsUpdate = true;
 
-        // Endothelial cells
+        // --- Endothelial cells ---
         const ep = f.endo_positions;
         const ec = f.endo_colors;
         for (let i = 0; i < nEndo; i++) {{
             const p = ep[i];
             dummy.position.set(p[0], p[1], p[2]);
             dummy.scale.set(10, 10, 10);
-            // Orient flat face toward vessel center
             dummy.lookAt(p[0], 0, 0);
             dummy.updateMatrix();
             endoMesh.setMatrixAt(i, dummy.matrix);
@@ -422,12 +940,21 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         endoMesh.instanceMatrix.needsUpdate = true;
         endoMesh.instanceColor.needsUpdate = true;
 
-        // Update metrics overlay
+        // --- PECAM-1 opacity (junction integrity) ---
+        const ji = f.endo_junction_integrity;
+        pecamInstances.forEach(pi => {{
+            const integrity = ji[pi.endoIdx] || 1.0;
+            pi.mesh.traverse(child => {{
+                if (child.material) child.material.opacity = integrity * 0.9;
+            }});
+        }});
+
+        // --- Metrics overlay ---
         const m = f.metrics;
-        const sc = m.state_counts;
-        let metricsHTML = '<b>Diapedesis State</b><br>';
+        const sc2 = m.state_counts;
+        let metricsHTML = '<b style="color:#aabbcc">Diapedesis State</b><br>';
         stateNames.forEach((name, si) => {{
-            const count = sc[name.toLowerCase()] || 0;
+            const count = sc2[name.toLowerCase()] || 0;
             const c = stateColors[si];
             const hex = '#' + new THREE.Color(c[0],c[1],c[2]).getHexString();
             if (count > 0) {{
@@ -437,17 +964,18 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         metricsHTML += '<br>t = ' + f.time.toFixed(1) + 's';
         metricsHTML += '<br>Rolling v: ' + m.avg_rolling_velocity.toFixed(0) + ' \\u03BCm/s';
         metricsHTML += '<br>Junction: ' + (m.avg_junction_integrity * 100).toFixed(0) + '%';
+        metricsHTML += '<br>Integrin: ' + (m.avg_integrin_activation * 100).toFixed(0) + '%';
         if (metricsOverlay) metricsOverlay.innerHTML = metricsHTML;
 
         // Step annotations
-        let stepsHTML = '<b>Diapedesis Steps</b><br>';
+        let stepsHTML = '<b style="color:#aabbcc">Diapedesis Steps</b><br>';
         const steps = [
-            ['1. Cytokine \\u2192 E-selectin', sc.rolling > 0 || sc.activating > 0 || sc.arrested > 0],
-            ['2. Selectin rolling', sc.rolling > 0],
-            ['3. Integrin activation', sc.activating > 0 || sc.arrested > 0],
-            ['4. Firm adhesion', sc.arrested > 0 || sc.crawling > 0],
-            ['5. Transmigration', sc.transmigrating > 0],
-            ['6. Tissue migration', sc.migrated > 0],
+            ['1. Cytokine \\u2192 E-selectin', sc2.rolling > 0 || sc2.activating > 0 || sc2.arrested > 0],
+            ['2. Selectin rolling', sc2.rolling > 0],
+            ['3. Integrin activation', sc2.activating > 0 || sc2.arrested > 0],
+            ['4. Firm adhesion', sc2.arrested > 0 || sc2.crawling > 0],
+            ['5. Transmigration', sc2.transmigrating > 0],
+            ['6. Tissue migration', sc2.migrated > 0],
         ];
         steps.forEach(([label, active]) => {{
             const icon = active ? '\\u2705' : '\\u2B1C';
@@ -456,20 +984,35 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         if (stepsOverlay) stepsOverlay.innerHTML = stepsHTML;
     }}
 
-    // Metrics overlay
+    /* ═══════════ Overlays ═══════════ */
     const metricsOverlay = document.createElement('div');
-    metricsOverlay.style.cssText = 'position:absolute;top:10px;left:10px;color:#ccc;font:12px monospace;background:rgba(5,5,16,0.8);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.6;';
+    metricsOverlay.style.cssText = 'position:absolute;top:10px;left:10px;color:#ccc;font:11px monospace;background:rgba(4,4,18,0.85);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.6;border:1px solid rgba(100,100,150,0.2);';
     container.appendChild(metricsOverlay);
 
-    // Steps overlay
     const stepsOverlay = document.createElement('div');
-    stepsOverlay.style.cssText = 'position:absolute;top:10px;right:10px;color:#ccc;font:12px monospace;background:rgba(5,5,16,0.8);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.8;';
+    stepsOverlay.style.cssText = 'position:absolute;top:10px;right:10px;color:#ccc;font:11px monospace;background:rgba(4,4,18,0.85);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.8;border:1px solid rgba(100,100,150,0.2);';
     container.appendChild(stepsOverlay);
+
+    // Legend overlay (bottom-left)
+    const legendOverlay = document.createElement('div');
+    legendOverlay.style.cssText = 'position:absolute;bottom:10px;left:10px;color:#999;font:10px monospace;background:rgba(4,4,18,0.85);padding:8px 12px;border-radius:6px;pointer-events:none;line-height:1.5;border:1px solid rgba(100,100,150,0.15);';
+    legendOverlay.innerHTML = '<b style="color:#aab">Molecules</b><br>'
+        + '<span style="color:#ffaa00">\\u25CF</span> Selectin (E-sel)<br>'
+        + '<span style="color:#4488ff">\\u25CF</span> ICAM-1<br>'
+        + '<span style="color:#33bb88">\\u25CF</span> PECAM-1 (junction)<br>'
+        + '<span style="color:#00ccdd">\\u25CF</span> Integrin (LFA-1)<br>'
+        + '<span style="color:#cc9933">\\u25CF</span> Complement (C3b)<br>'
+        + '<b style="color:#aab">Tissue</b><br>'
+        + '<span style="color:#336633">\\u25CF</span> Bacteria<br>'
+        + '<span style="color:#dd5522">\\u25CF</span> Macrophage<br>'
+        + '<span style="color:#eee8cc">\\u25CF</span> Fibrin<br>'
+        + '<span style="color:#55bbff">\\u25CF</span> Chemokines';
+    container.appendChild(legendOverlay);
 
     // Apply first frame
     applyFrame(0);
 
-    // Playback controls
+    /* ═══════════ Playback ═══════════ */
     let currentFrame = 0;
     let playing = false;
     let lastTime = 0;
@@ -489,7 +1032,6 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         applyFrame(currentFrame);
     }});
 
-    // Animation loop
     function animate(t) {{
         requestAnimationFrame(animate);
 
@@ -504,9 +1046,15 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
             }}
         }}
 
-        // Pulse infection site
-        const pulse = 0.12 + 0.05 * Math.sin(t * 0.003);
+        // Animate: infection pulse
+        const pulse = 0.06 + 0.04 * Math.sin(t * 0.003);
         infMat.opacity = pulse;
+
+        // Animate: chemokine drift
+        chemParticles.forEach((cm, i) => {{
+            cm.position.y += Math.sin(t*0.001 + i*0.5) * 0.01;
+            cm.position.x += Math.cos(t*0.0008 + i*0.3) * 0.005;
+        }});
 
         controls.update();
         renderer.render(scene, camera);
