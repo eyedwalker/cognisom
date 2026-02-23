@@ -395,6 +395,13 @@ class DiapedesisManager:
             carb.log_warn("[diapedesis] No USD stage available")
             return False
 
+        # Clear previous scene to avoid duplicate xformOp errors
+        from .diapedesis_scene import ROOT
+        old_prim = self._stage.GetPrimAtPath(ROOT)
+        if old_prim and old_prim.IsValid():
+            self._stage.RemovePrim(ROOT)
+            carb.log_info("[diapedesis] Cleared previous scene")
+
         self._scene_builder = DiapedesisSceneBuilder(self._stage)
         self._scene_builder.build_scene(self._frames[0])
         self._scene_built = True

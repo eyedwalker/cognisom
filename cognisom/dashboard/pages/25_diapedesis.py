@@ -187,9 +187,9 @@ with st.sidebar:
 
     if use_omniverse:
         omni_host = st.text_input(
-            "Kit Server URL",
-            value="http://52.32.247.131:8211",
-            help="HTTP endpoint for Kit viewport streaming",
+            "Kit Browser URL",
+            value="/kit",
+            help="Browser-accessible Kit endpoint (proxied through nginx HTTPS)",
         )
 
     st.divider()
@@ -254,18 +254,25 @@ def _render_omniverse_viewer(frames, streaming_url: str):
     Sends simulation frames to Kit via REST API, then displays the
     RTX-rendered viewport as an MJPEG stream (no WebRTC needed).
     Falls back to Three.js if Kit is unreachable.
+
+    Args:
+        streaming_url: Browser-accessible URL for Kit (e.g. "/kit" for
+            nginx proxy, or "http://host:8211" for direct access).
+            Server-side Python calls always use localhost:8211 directly.
     """
     import urllib.request
 
     st.markdown("### Omniverse RTX Viewer")
 
-    # Normalize base URL
-    kit_base = streaming_url.rstrip("/")
+    # Server-side URL (Python → Kit, same machine)
+    kit_server = "http://localhost:8211"
+    # Browser-side URL (JS/HTML → Kit, through nginx HTTPS proxy)
+    kit_browser = streaming_url.rstrip("/")
 
-    # Check if Kit is reachable
+    # Check if Kit is reachable (server-side)
     kit_status = None
     try:
-        req = urllib.request.Request(f"{kit_base}/status", method="GET")
+        req = urllib.request.Request(f"{kit_server}/status", method="GET")
         req.add_header("Accept", "application/json")
         with urllib.request.urlopen(req, timeout=3) as resp:
             kit_status = json.loads(resp.read())
@@ -274,11 +281,11 @@ def _render_omniverse_viewer(frames, streaming_url: str):
 
     if not kit_status:
         st.warning(
-            "Omniverse Kit not detected at " + kit_base + ". "
+            "Omniverse Kit not detected. "
             "Make sure the Kit container is running with the cognisom.sim extension."
         )
         with st.expander("Setup Instructions"):
-            st.markdown(f"""
+            st.markdown("""
 **To enable Omniverse RTX rendering:**
 
 1. **Launch Kit container on the GPU server** (L4/L40S):
@@ -292,8 +299,7 @@ def _render_omniverse_viewer(frames, streaming_url: str):
        --/renderer/active="rtx"
    ```
 
-2. **Set the Kit Server URL** in the sidebar to:
-   `{kit_base}`
+2. **Ensure nginx proxies** `/kit/` to `localhost:8211`
 
 The extension provides:
 - PBR materials with subsurface scattering
@@ -312,36 +318,33 @@ The extension provides:
         f"({'playing' if kit_status.get('playing') else 'idle'})"
     )
 
-    # Send simulation frames to Kit
+    # Send simulation frames to Kit (server-side, via localhost)
     if frames:
         try:
             payload = json.dumps({"frames": frames}).encode()
             req = urllib.request.Request(
-                f"{kit_base}/cognisom/diapedesis",
+                f"{kit_server}/cognisom/diapedesis",
                 data=payload,
                 method="POST",
             )
             req.add_header("Content-Type", "application/json")
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:
                 result = json.loads(resp.read())
                 st.caption(f"Scene: {result.get('message', 'OK')}")
         except Exception as e:
             st.error(f"Failed to load frames into Kit: {e}")
 
-    # Embed MJPEG viewport stream
+    # Embed MJPEG viewport stream (browser-side, through HTTPS proxy)
     viewer_html = f"""
     <div id="omniViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;
          background:#0a0a1a;position:relative;">
-        <img id="rtxStream" src="{kit_base}/stream"
+        <img id="rtxStream" src="{kit_browser}/stream"
              style="width:100%;height:100%;object-fit:contain;"
              onerror="this.style.display='none';document.getElementById('rtxFallback').style.display='flex';" />
         <div id="rtxFallback" style="display:none;width:100%;height:100%;align-items:center;
              justify-content:center;color:#556;font:18px monospace;flex-direction:column;">
             <div style="font-size:28px;margin-bottom:12px;">Omniverse Kit RTX</div>
             <div>Waiting for viewport render...</div>
-            <div style="margin-top:8px;font-size:13px;color:#445;">
-                Stream: <a href="{kit_base}/stream" target="_blank" style="color:#68a">{kit_base}/stream</a>
-            </div>
         </div>
         <div style="position:absolute;top:8px;right:8px;background:rgba(0,180,0,0.85);
              color:white;padding:4px 12px;border-radius:4px;font:13px monospace;z-index:2;">
@@ -354,7 +357,7 @@ The extension provides:
         // Poll status for frame counter overlay
         setInterval(async () => {{
             try {{
-                const r = await fetch("{kit_base}/status");
+                const r = await fetch("{kit_browser}/status");
                 const d = await r.json();
                 const el = document.getElementById('rtxStatus');
                 if (el) el.textContent = `Frame ${{d.current_frame}}/${{d.frames}} | ${{d.playing ? '▶ Playing' : '⏸ Idle'}}`;
@@ -366,23 +369,23 @@ The extension provides:
 
     # Open standalone viewer link
     st.caption(
-        f"[Open full-screen RTX viewer ↗]({kit_base}/streaming/client)"
+        f"[Open full-screen RTX viewer ↗]({kit_browser}/streaming/client)"
     )
 
-    # Playback controls
+    # Playback controls (server-side via localhost)
     col1, col2, col3, col4 = st.columns([1, 1, 6, 1])
     with col1:
         if st.button("▶ Play", key="omni_play"):
             try:
                 urllib.request.urlopen(urllib.request.Request(
-                    f"{kit_base}/cognisom/diapedesis/play", method="POST"), timeout=3)
+                    f"{kit_server}/cognisom/diapedesis/play", method="POST"), timeout=3)
             except Exception:
                 pass
     with col2:
         if st.button("⏸ Pause", key="omni_pause"):
             try:
                 urllib.request.urlopen(urllib.request.Request(
-                    f"{kit_base}/cognisom/diapedesis/pause", method="POST"), timeout=3)
+                    f"{kit_server}/cognisom/diapedesis/pause", method="POST"), timeout=3)
             except Exception:
                 pass
     with col3:
@@ -390,7 +393,7 @@ The extension provides:
         frame_idx = st.slider("Frame", 0, n_frames, 0, key="omni_frame_slider")
         try:
             urllib.request.urlopen(urllib.request.Request(
-                f"{kit_base}/cognisom/diapedesis/seek?frame={frame_idx}",
+                f"{kit_server}/cognisom/diapedesis/seek?frame={frame_idx}",
                 method="POST"), timeout=3)
         except Exception:
             pass
@@ -398,7 +401,7 @@ The extension provides:
         if st.button("⏹ Stop", key="omni_stop"):
             try:
                 urllib.request.urlopen(urllib.request.Request(
-                    f"{kit_base}/cognisom/diapedesis/stop", method="POST"), timeout=3)
+                    f"{kit_server}/cognisom/diapedesis/stop", method="POST"), timeout=3)
             except Exception:
                 pass
 
