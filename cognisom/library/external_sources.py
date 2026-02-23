@@ -672,6 +672,509 @@ class ReactomeClient:
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# PDB / RCSB Integration
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class PDBEntry:
+    """RCSB PDB entry with structural metadata for visualization."""
+    pdb_id: str = ""
+    title: str = ""
+    resolution: float = 0.0
+    method: str = ""  # X-RAY DIFFRACTION, ELECTRON MICROSCOPY, NMR
+    chain_count: int = 0
+    molecular_weight: float = 0.0
+    organism: str = ""
+    ligand_ids: List[str] = field(default_factory=list)
+    deposition_date: str = ""
+    doi: str = ""
+    url: str = ""
+
+
+class PDBClient:
+    """Client for RCSB PDB Search and Data APIs.
+
+    Provides structural metadata needed for RTX-accelerated
+    molecular visualization (resolution, method, chain count).
+
+    API docs: https://search.rcsb.org/ and https://data.rcsb.org/
+    """
+
+    SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
+    DATA_URL = "https://data.rcsb.org/rest/v1/core/entry"
+
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({
+            "User-Agent": "Cognisom/1.0 (cognisom.com; research)",
+            "Content-Type": "application/json",
+        })
+
+    def search_by_gene(self, gene_name: str, limit: int = 5) -> List[str]:
+        """Search PDB for structures of a gene/protein.
+
+        Args:
+            gene_name: Gene symbol (e.g., "TP53", "BRCA1")
+            limit: Maximum PDB IDs to return
+
+        Returns:
+            List of PDB IDs sorted by resolution (best first)
+        """
+        query = {
+            "query": {
+                "type": "group",
+                "logical_operator": "and",
+                "nodes": [
+                    {
+                        "type": "terminal",
+                        "service": "full_text",
+                        "parameters": {"value": gene_name}
+                    },
+                    {
+                        "type": "terminal",
+                        "service": "text",
+                        "parameters": {
+                            "attribute": "rcsb_entity_source_organism.ncbi_scientific_name",
+                            "operator": "exact_match",
+                            "value": "Homo sapiens"
+                        }
+                    }
+                ]
+            },
+            "return_type": "entry",
+            "request_options": {
+                "sort": [{"sort_by": "rcsb_entry_info.resolution_combined", "direction": "asc"}],
+                "paginate": {"start": 0, "rows": limit}
+            }
+        }
+
+        try:
+            resp = self._session.post(self.SEARCH_URL, json=query, timeout=30)
+            if resp.status_code == 204:
+                return []
+            resp.raise_for_status()
+            data = resp.json()
+            return [hit["identifier"] for hit in data.get("result_set", [])]
+        except Exception as e:
+            log.error("PDB search for %s failed: %s", gene_name, e)
+            return []
+
+    def get_entry_info(self, pdb_id: str) -> Optional[PDBEntry]:
+        """Get structural metadata for a PDB entry.
+
+        Args:
+            pdb_id: PDB ID (e.g., "1TUP", "6GGF")
+
+        Returns:
+            PDBEntry with resolution, method, chain count
+        """
+        try:
+            url = f"{self.DATA_URL}/{pdb_id}"
+            resp = self._session.get(url, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            info = data.get("rcsb_entry_info", {})
+            container = data.get("rcsb_entry_container_identifiers", {})
+
+            # Get ligand IDs
+            ligands = []
+            for comp_id in container.get("non_polymer_entity_ids", []):
+                ligands.append(comp_id)
+
+            # Get citation DOI
+            doi = ""
+            citations = data.get("rcsb_primary_citation", {})
+            if citations:
+                doi = citations.get("pdbx_database_id_DOI", "")
+
+            entry = PDBEntry(
+                pdb_id=pdb_id,
+                title=data.get("struct", {}).get("title", ""),
+                resolution=info.get("resolution_combined", [0.0])[0] if info.get("resolution_combined") else 0.0,
+                method=info.get("experimental_method", ""),
+                chain_count=info.get("polymer_entity_count", 0),
+                molecular_weight=info.get("molecular_weight", 0.0),
+                ligand_ids=ligands,
+                deposition_date=info.get("deposit_date", ""),
+                doi=doi,
+                url=f"https://www.rcsb.org/structure/{pdb_id}",
+            )
+
+            return entry
+
+        except Exception as e:
+            log.error("PDB get entry %s failed: %s", pdb_id, e)
+            return None
+
+    def get_best_structure(self, gene_name: str) -> Optional[PDBEntry]:
+        """Get the best (highest resolution) structure for a gene."""
+        pdb_ids = self.search_by_gene(gene_name, limit=1)
+        if pdb_ids:
+            return self.get_entry_info(pdb_ids[0])
+        return None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# ChEBI Integration
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class ChEBIEntity:
+    """ChEBI chemical entity."""
+    chebi_id: str = ""
+    name: str = ""
+    definition: str = ""
+    formula: str = ""
+    mass: float = 0.0
+    inchi: str = ""
+    inchi_key: str = ""
+    smiles: str = ""
+
+
+class ChEBIClient:
+    """Client for ChEBI (Chemical Entities of Biological Interest).
+
+    API docs: https://www.ebi.ac.uk/chebi/webServices.do
+    """
+
+    BASE_URL = "https://www.ebi.ac.uk/chebi/searchId.do"
+    SEARCH_URL = "https://www.ebi.ac.uk/chebi/advancedSearchFwd.do"
+    REST_URL = "https://www.ebi.ac.uk/webservices/chebi/2.0/test"
+
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({
+            "User-Agent": "Cognisom/1.0 (cognisom.com; research)"
+        })
+
+    def get_entity(self, chebi_id: str) -> Optional[ChEBIEntity]:
+        """Get ChEBI entity by ID.
+
+        Args:
+            chebi_id: ChEBI ID (e.g., "CHEBI:15377" for water)
+
+        Returns:
+            ChEBI entity with formula, mass, InChI
+        """
+        clean_id = chebi_id.replace("CHEBI:", "")
+        try:
+            url = f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:{clean_id}"
+            # Use the OLS API for structured data
+            ols_url = f"https://www.ebi.ac.uk/ols4/api/ontologies/chebi/terms?iri=http://purl.obolibrary.org/obo/CHEBI_{clean_id}"
+            resp = self._session.get(ols_url, timeout=30)
+            if resp.status_code != 200:
+                return None
+
+            data = resp.json()
+            terms = data.get("_embedded", {}).get("terms", [])
+            if not terms:
+                return None
+
+            term = terms[0]
+            annot = term.get("annotation", {})
+
+            return ChEBIEntity(
+                chebi_id=f"CHEBI:{clean_id}",
+                name=term.get("label", ""),
+                definition=term.get("description", [""])[0] if term.get("description") else "",
+                formula=annot.get("formula", [""])[0] if annot.get("formula") else "",
+                mass=float(annot.get("mass", ["0"])[0]) if annot.get("mass") else 0.0,
+                inchi=annot.get("inchi", [""])[0] if annot.get("inchi") else "",
+                inchi_key=annot.get("inchikey", [""])[0] if annot.get("inchikey") else "",
+                smiles=annot.get("smiles", [""])[0] if annot.get("smiles") else "",
+            )
+        except Exception as e:
+            log.error("ChEBI get entity %s failed: %s", chebi_id, e)
+            return None
+
+    def search(self, query: str, limit: int = 10) -> List[ChEBIEntity]:
+        """Search ChEBI by name.
+
+        Args:
+            query: Chemical name (e.g., "testosterone", "glucose")
+            limit: Max results
+
+        Returns:
+            List of matching ChEBI entities
+        """
+        try:
+            url = f"https://www.ebi.ac.uk/ols4/api/search?q={query}&ontology=chebi&rows={limit}"
+            resp = self._session.get(url, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+
+            results = []
+            for doc in data.get("response", {}).get("docs", []):
+                obo_id = doc.get("obo_id", "")
+                if obo_id.startswith("CHEBI:"):
+                    results.append(ChEBIEntity(
+                        chebi_id=obo_id,
+                        name=doc.get("label", ""),
+                        definition=doc.get("description", [""])[0] if doc.get("description") else "",
+                    ))
+
+            return results
+        except Exception as e:
+            log.error("ChEBI search '%s' failed: %s", query, e)
+            return []
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# AlphaFold DB Integration
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class AlphaFoldEntry:
+    """AlphaFold predicted structure entry."""
+    uniprot_id: str = ""
+    model_url: str = ""      # .pdb file URL
+    cif_url: str = ""        # .cif file URL
+    pae_url: str = ""        # predicted aligned error
+    confidence_url: str = ""  # per-residue confidence
+    mean_plddt: float = 0.0  # overall confidence 0-100
+
+
+class AlphaFoldClient:
+    """Client for AlphaFold Protein Structure Database.
+
+    Provides predicted structures for proteins without experimental PDB entries.
+    These are visualization-ready PDB files for RTX ray tracing.
+    """
+
+    BASE_URL = "https://alphafold.ebi.ac.uk/api"
+
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({
+            "User-Agent": "Cognisom/1.0 (cognisom.com; research)"
+        })
+
+    def get_prediction(self, uniprot_id: str) -> Optional[AlphaFoldEntry]:
+        """Get AlphaFold prediction for a UniProt ID.
+
+        Args:
+            uniprot_id: UniProt accession (e.g., "P04637" for TP53)
+
+        Returns:
+            AlphaFoldEntry with model URLs and confidence
+        """
+        try:
+            url = f"{self.BASE_URL}/prediction/{uniprot_id}"
+            resp = self._session.get(url, timeout=30)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+
+            if not data:
+                return None
+
+            entry_data = data[0] if isinstance(data, list) else data
+            return AlphaFoldEntry(
+                uniprot_id=uniprot_id,
+                model_url=entry_data.get("pdbUrl", ""),
+                cif_url=entry_data.get("cifUrl", ""),
+                pae_url=entry_data.get("paeImageUrl", ""),
+                confidence_url=entry_data.get("confidenceUrl", ""),
+                mean_plddt=entry_data.get("globalMetrics", {}).get("globalMetricValue", 0.0)
+                           if entry_data.get("globalMetrics") else 0.0,
+            )
+        except Exception as e:
+            log.error("AlphaFold prediction for %s failed: %s", uniprot_id, e)
+            return None
+
+    def get_model_url(self, uniprot_id: str) -> str:
+        """Get direct URL to AlphaFold PDB model file."""
+        return f"https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v4.pdb"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# UniProt REST Integration
+# ═══════════════════════════════════════════════════════════════════════
+
+@dataclass
+class UniProtEntry:
+    """UniProt protein entry with rich annotation."""
+    accession: str = ""
+    gene_name: str = ""
+    protein_name: str = ""
+    organism: str = ""
+    sequence: str = ""
+    length: int = 0
+    mass: float = 0.0
+    function_summary: str = ""
+    subcellular_location: str = ""
+    tissue_specificity: str = ""
+    go_terms: List[str] = field(default_factory=list)
+    domains: List[str] = field(default_factory=list)
+    disease_associations: List[str] = field(default_factory=list)
+    pdb_ids: List[str] = field(default_factory=list)
+    keywords: List[str] = field(default_factory=list)
+
+
+class UniProtClient:
+    """Client for UniProt REST API.
+
+    Provides comprehensive protein annotation including function,
+    structure, location, and disease associations.
+
+    API docs: https://rest.uniprot.org/
+    """
+
+    BASE_URL = "https://rest.uniprot.org/uniprotkb"
+
+    def __init__(self):
+        self._session = requests.Session()
+        self._session.headers.update({
+            "User-Agent": "Cognisom/1.0 (cognisom.com; research)",
+            "Accept": "application/json",
+        })
+
+    def get_entry(self, accession: str) -> Optional[UniProtEntry]:
+        """Get full UniProt entry by accession.
+
+        Args:
+            accession: UniProt accession (e.g., "P04637")
+
+        Returns:
+            UniProtEntry with comprehensive annotation
+        """
+        try:
+            url = f"{self.BASE_URL}/{accession}"
+            resp = self._session.get(url, timeout=30)
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            data = resp.json()
+
+            # Gene name
+            gene_name = ""
+            genes = data.get("genes", [])
+            if genes:
+                gene_name = genes[0].get("geneName", {}).get("value", "")
+
+            # Protein name
+            protein_name = ""
+            prot_desc = data.get("proteinDescription", {})
+            rec_name = prot_desc.get("recommendedName", {})
+            if rec_name:
+                protein_name = rec_name.get("fullName", {}).get("value", "")
+
+            # Function from comments
+            function_summary = ""
+            subcellular = ""
+            tissue_spec = ""
+            diseases = []
+            for comment in data.get("comments", []):
+                ctype = comment.get("commentType", "")
+                if ctype == "FUNCTION":
+                    texts = comment.get("texts", [])
+                    if texts:
+                        function_summary = texts[0].get("value", "")
+                elif ctype == "SUBCELLULAR LOCATION":
+                    locs = comment.get("subcellularLocations", [])
+                    parts = []
+                    for loc in locs:
+                        loc_val = loc.get("location", {}).get("value", "")
+                        if loc_val:
+                            parts.append(loc_val)
+                    subcellular = "; ".join(parts[:5])
+                elif ctype == "TISSUE SPECIFICITY":
+                    texts = comment.get("texts", [])
+                    if texts:
+                        tissue_spec = texts[0].get("value", "")[:500]
+                elif ctype == "DISEASE":
+                    disease = comment.get("disease", {})
+                    dname = disease.get("diseaseId", "")
+                    if dname:
+                        diseases.append(dname)
+
+            # GO terms
+            go_terms = []
+            for xref in data.get("uniProtKBCrossReferences", []):
+                if xref.get("database") == "GO":
+                    go_id = xref.get("id", "")
+                    props = xref.get("properties", [])
+                    term_name = ""
+                    for p in props:
+                        if p.get("key") == "GoTerm":
+                            term_name = p.get("value", "")
+                    go_terms.append(f"{go_id}: {term_name}" if term_name else go_id)
+
+            # Domains
+            domains = []
+            for feat in data.get("features", []):
+                if feat.get("type") == "Domain":
+                    desc = feat.get("description", "")
+                    if desc:
+                        domains.append(desc)
+
+            # PDB cross-refs
+            pdb_ids = []
+            for xref in data.get("uniProtKBCrossReferences", []):
+                if xref.get("database") == "PDB":
+                    pdb_ids.append(xref.get("id", ""))
+
+            # Keywords
+            keywords = [kw.get("name", "") for kw in data.get("keywords", []) if kw.get("name")]
+
+            # Sequence
+            seq_data = data.get("sequence", {})
+
+            return UniProtEntry(
+                accession=accession,
+                gene_name=gene_name,
+                protein_name=protein_name,
+                organism=data.get("organism", {}).get("scientificName", ""),
+                sequence=seq_data.get("value", "")[:100],
+                length=seq_data.get("length", 0),
+                mass=seq_data.get("molWeight", 0.0),
+                function_summary=function_summary[:1000],
+                subcellular_location=subcellular,
+                tissue_specificity=tissue_spec,
+                go_terms=go_terms[:50],
+                domains=domains[:20],
+                disease_associations=diseases[:10],
+                pdb_ids=pdb_ids[:20],
+                keywords=keywords[:30],
+            )
+
+        except Exception as e:
+            log.error("UniProt get %s failed: %s", accession, e)
+            return None
+
+    def search_by_gene(self, gene_name: str, organism: str = "Homo sapiens") -> Optional[str]:
+        """Search UniProt by gene name and return the best accession.
+
+        Args:
+            gene_name: Gene symbol (e.g., "TP53")
+            organism: Organism name
+
+        Returns:
+            UniProt accession or None
+        """
+        try:
+            url = f"{self.BASE_URL}/search"
+            params = {
+                "query": f"gene_exact:{gene_name} AND organism_name:\"{organism}\" AND reviewed:true",
+                "format": "json",
+                "size": 1,
+                "fields": "accession",
+            }
+            resp = self._session.get(url, params=params, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+            results = data.get("results", [])
+            if results:
+                return results[0].get("primaryAccession", "")
+            return None
+        except Exception as e:
+            log.error("UniProt search for %s failed: %s", gene_name, e)
+            return None
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # Unified Data Source Manager
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -683,6 +1186,10 @@ class ExternalDataManager:
         self._pubchem = PubChemClient()
         self._string = STRINGClient()
         self._reactome = ReactomeClient()
+        self._pdb = PDBClient()
+        self._chebi = ChEBIClient()
+        self._alphafold = AlphaFoldClient()
+        self._uniprot = UniProtClient()
 
     @property
     def kegg(self) -> KEGGClient:
@@ -699,6 +1206,22 @@ class ExternalDataManager:
     @property
     def reactome(self) -> ReactomeClient:
         return self._reactome
+
+    @property
+    def pdb(self) -> PDBClient:
+        return self._pdb
+
+    @property
+    def chebi(self) -> ChEBIClient:
+        return self._chebi
+
+    @property
+    def alphafold(self) -> AlphaFoldClient:
+        return self._alphafold
+
+    @property
+    def uniprot(self) -> UniProtClient:
+        return self._uniprot
 
     def search_all(self, query: str) -> Dict[str, Any]:
         """Search across all data sources.

@@ -409,6 +409,182 @@ class EntityStore:
         self.conn.commit()
         return cursor.rowcount > 0
 
+    # ── Batch Operations ──────────────────────────────────────────────
+
+    def add_entities_batch(self, entities: List[BioEntity]) -> int:
+        """Batch insert entities in a single transaction. Returns count inserted.
+
+        Skips entities that already exist (ON CONFLICT DO NOTHING for Postgres,
+        INSERT OR IGNORE for SQLite). Updates FTS index for SQLite.
+        """
+        if not entities:
+            return 0
+
+        inserted = 0
+        try:
+            cursor = self.conn.cursor()
+            for entity in entities:
+                data = entity.to_dict()
+                try:
+                    if self._use_postgres:
+                        cursor.execute(
+                            """INSERT INTO entities
+                               (entity_id, entity_type, name, display_name, description,
+                                status, source, data_json, created_at, updated_at, created_by)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               ON CONFLICT (entity_id) DO NOTHING""",
+                            (
+                                entity.entity_id, entity.entity_type.value,
+                                entity.name, entity.display_name, entity.description,
+                                entity.status.value, entity.source,
+                                json.dumps(data), entity.created_at,
+                                entity.updated_at, entity.created_by,
+                            ),
+                        )
+                    else:
+                        cursor.execute(
+                            """INSERT OR IGNORE INTO entities
+                               (entity_id, entity_type, name, display_name, description,
+                                status, source, data_json, created_at, updated_at, created_by)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                entity.entity_id, entity.entity_type.value,
+                                entity.name, entity.display_name, entity.description,
+                                entity.status.value, entity.source,
+                                json.dumps(data), entity.created_at,
+                                entity.updated_at, entity.created_by,
+                            ),
+                        )
+
+                    if cursor.rowcount > 0:
+                        inserted += 1
+                        # FTS for SQLite
+                        if not self._use_postgres:
+                            cursor.execute(
+                                """INSERT OR IGNORE INTO entities_fts
+                                   (entity_id, name, display_name, description, synonyms, tags)
+                                   VALUES (?, ?, ?, ?, ?, ?)""",
+                                (
+                                    entity.entity_id, entity.name,
+                                    entity.display_name, entity.description,
+                                    " ".join(entity.synonyms), " ".join(entity.tags),
+                                ),
+                            )
+                except Exception as e:
+                    log.debug("Batch insert skip %s: %s", entity.entity_id, e)
+
+            self.conn.commit()
+            log.info("Batch inserted %d/%d entities", inserted, len(entities))
+            return inserted
+
+        except Exception as e:
+            log.error("Batch insert failed: %s", e)
+            self.conn.rollback()
+            return 0
+
+    def add_relationships_batch(self, rels: List[Relationship]) -> int:
+        """Batch insert relationships in a single transaction. Returns count inserted."""
+        if not rels:
+            return 0
+
+        inserted = 0
+        try:
+            cursor = self.conn.cursor()
+            for rel in rels:
+                try:
+                    if self._use_postgres:
+                        cursor.execute(
+                            """INSERT INTO relationships
+                               (rel_id, source_id, target_id, rel_type, confidence,
+                                evidence, props_json, created_at)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                               ON CONFLICT (rel_id) DO NOTHING""",
+                            (
+                                rel.rel_id, rel.source_id, rel.target_id,
+                                rel.rel_type.value, rel.confidence,
+                                rel.evidence, json.dumps(rel.properties),
+                                rel.created_at,
+                            ),
+                        )
+                    else:
+                        cursor.execute(
+                            """INSERT OR IGNORE INTO relationships
+                               (rel_id, source_id, target_id, rel_type, confidence,
+                                evidence, props_json, created_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                rel.rel_id, rel.source_id, rel.target_id,
+                                rel.rel_type.value, rel.confidence,
+                                rel.evidence, json.dumps(rel.properties),
+                                rel.created_at,
+                            ),
+                        )
+
+                    if cursor.rowcount > 0:
+                        inserted += 1
+                except Exception as e:
+                    log.debug("Batch rel skip %s: %s", rel.rel_id, e)
+
+            self.conn.commit()
+            log.info("Batch inserted %d/%d relationships", inserted, len(rels))
+            return inserted
+
+        except Exception as e:
+            log.error("Batch rel insert failed: %s", e)
+            self.conn.rollback()
+            return 0
+
+    def upsert_entity(self, entity: BioEntity) -> bool:
+        """Insert or update entity. Merges non-empty fields on conflict."""
+        existing = self.get_entity(entity.entity_id)
+        if existing is None:
+            return self.add_entity(entity)
+        # Merge: only overwrite fields that are non-empty in the new entity
+        return self.update_entity(entity, changed_by="enrichment")
+
+    def find_entity_by_external_id(self, key: str, value: str) -> Optional[BioEntity]:
+        """Find an entity by external_ids key/value (e.g., 'ncbi_gene'/'7157')."""
+        if self._use_postgres:
+            cursor = self.conn.cursor()
+            import psycopg2.extras
+            cursor = self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute(
+                "SELECT data_json FROM entities WHERE data_json->'external_ids'->>%s = %s LIMIT 1",
+                (key, value),
+            )
+        else:
+            cursor = self._execute(
+                "SELECT data_json FROM entities WHERE json_extract(data_json, ?) = ? LIMIT 1",
+                (f"$.external_ids.{key}", value),
+            )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        data_json = row["data_json"] if isinstance(row, dict) else row[0]
+        if isinstance(data_json, str):
+            data_json = json.loads(data_json)
+        return BioEntity.from_dict(data_json)
+
+    def find_entity_by_name(self, name: str, entity_type: Optional[str] = None) -> Optional[BioEntity]:
+        """Find an entity by exact name match."""
+        if entity_type:
+            cursor = self._execute(
+                "SELECT data_json FROM entities WHERE name = ? AND entity_type = ? LIMIT 1",
+                (name, entity_type),
+            )
+        else:
+            cursor = self._execute(
+                "SELECT data_json FROM entities WHERE name = ? LIMIT 1",
+                (name,),
+            )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        data_json = row["data_json"] if isinstance(row, dict) else row[0]
+        if isinstance(data_json, str):
+            data_json = json.loads(data_json)
+        return BioEntity.from_dict(data_json)
+
     # ── Search & Query ───────────────────────────────────────────────
 
     def search(

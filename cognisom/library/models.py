@@ -345,6 +345,17 @@ class Gene(BioEntity):
     gene_type: str = ""  # oncogene, tumor_suppressor, housekeeping, etc.
     map_location: str = ""
     organism: str = "Homo sapiens"
+    # Extended identifiers for cross-referencing
+    ncbi_gene_id: str = ""
+    ensembl_id: str = ""
+    hgnc_id: str = ""
+    refseq_mrna: str = ""
+    refseq_protein: str = ""
+    # Rich content for human interpretation
+    summary: str = ""  # NCBI Gene functional summary
+    gene_group: str = ""
+    phenotype_ids: List[str] = field(default_factory=list)
+    expression_tissues: List[str] = field(default_factory=list)
 
     def _extra_properties(self) -> dict:
         return {
@@ -354,6 +365,15 @@ class Gene(BioEntity):
             "gene_type": self.gene_type,
             "map_location": self.map_location,
             "organism": self.organism,
+            "ncbi_gene_id": self.ncbi_gene_id,
+            "ensembl_id": self.ensembl_id,
+            "hgnc_id": self.hgnc_id,
+            "refseq_mrna": self.refseq_mrna,
+            "refseq_protein": self.refseq_protein,
+            "summary": self.summary,
+            "gene_group": self.gene_group,
+            "phenotype_ids": self.phenotype_ids,
+            "expression_tissues": self.expression_tissues,
         }
 
     def _apply_properties(self, props: dict):
@@ -363,6 +383,15 @@ class Gene(BioEntity):
         self.gene_type = props.get("gene_type", "")
         self.map_location = props.get("map_location", "")
         self.organism = props.get("organism", "Homo sapiens")
+        self.ncbi_gene_id = props.get("ncbi_gene_id", "")
+        self.ensembl_id = props.get("ensembl_id", "")
+        self.hgnc_id = props.get("hgnc_id", "")
+        self.refseq_mrna = props.get("refseq_mrna", "")
+        self.refseq_protein = props.get("refseq_protein", "")
+        self.summary = props.get("summary", "")
+        self.gene_group = props.get("gene_group", "")
+        self.phenotype_ids = props.get("phenotype_ids", [])
+        self.expression_tissues = props.get("expression_tissues", [])
 
 
 @dataclass
@@ -377,6 +406,19 @@ class Protein(BioEntity):
     function_summary: str = ""
     go_terms: List[str] = field(default_factory=list)
     pathways: List[str] = field(default_factory=list)
+    # 3D structure for RTX visualization
+    alphafold_id: str = ""
+    alphafold_url: str = ""
+    mass_daltons: float = 0.0
+    subcellular_location: str = ""
+    domains: List[str] = field(default_factory=list)
+    tissue_specificity: str = ""
+    disease_associations: List[str] = field(default_factory=list)
+    # Best experimental structure
+    structure_method: str = ""  # X-ray, Cryo-EM, NMR, AlphaFold
+    resolution_angstrom: float = 0.0
+    structure_url: str = ""
+    chain_count: int = 0
 
     def _extra_properties(self) -> dict:
         return {
@@ -388,6 +430,17 @@ class Protein(BioEntity):
             "function_summary": self.function_summary,
             "go_terms": self.go_terms,
             "pathways": self.pathways,
+            "alphafold_id": self.alphafold_id,
+            "alphafold_url": self.alphafold_url,
+            "mass_daltons": self.mass_daltons,
+            "subcellular_location": self.subcellular_location,
+            "domains": self.domains,
+            "tissue_specificity": self.tissue_specificity,
+            "disease_associations": self.disease_associations,
+            "structure_method": self.structure_method,
+            "resolution_angstrom": self.resolution_angstrom,
+            "structure_url": self.structure_url,
+            "chain_count": self.chain_count,
         }
 
     def _apply_properties(self, props: dict):
@@ -399,6 +452,17 @@ class Protein(BioEntity):
         self.function_summary = props.get("function_summary", "")
         self.go_terms = props.get("go_terms", [])
         self.pathways = props.get("pathways", [])
+        self.alphafold_id = props.get("alphafold_id", "")
+        self.alphafold_url = props.get("alphafold_url", "")
+        self.mass_daltons = props.get("mass_daltons", 0.0)
+        self.subcellular_location = props.get("subcellular_location", "")
+        self.domains = props.get("domains", [])
+        self.tissue_specificity = props.get("tissue_specificity", "")
+        self.disease_associations = props.get("disease_associations", [])
+        self.structure_method = props.get("structure_method", "")
+        self.resolution_angstrom = props.get("resolution_angstrom", 0.0)
+        self.structure_url = props.get("structure_url", "")
+        self.chain_count = props.get("chain_count", 0)
 
 
 @dataclass
@@ -439,6 +503,20 @@ class Drug(BioEntity):
     molecular_weight: float = 0.0
     approval_status: str = ""  # "approved", "clinical_trial", "experimental"
     drugbank_id: str = ""
+    # PubChem properties for visualization
+    pubchem_cid: int = 0
+    inchi: str = ""
+    inchi_key: str = ""
+    logp: float = 0.0  # XLogP (lipophilicity → surface texture)
+    tpsa: float = 0.0  # topological polar surface area
+    hbd: int = 0  # H-bond donors
+    hba: int = 0  # H-bond acceptors
+    rotatable_bonds: int = 0
+    molecular_formula: str = ""
+    indication: str = ""
+    # 3D structure URLs for RTX rendering
+    conformer_3d_url: str = ""
+    structure_2d_url: str = ""
 
     def _extra_properties(self) -> dict:
         return {
@@ -449,6 +527,18 @@ class Drug(BioEntity):
             "molecular_weight": self.molecular_weight,
             "approval_status": self.approval_status,
             "drugbank_id": self.drugbank_id,
+            "pubchem_cid": self.pubchem_cid,
+            "inchi": self.inchi,
+            "inchi_key": self.inchi_key,
+            "logp": self.logp,
+            "tpsa": self.tpsa,
+            "hbd": self.hbd,
+            "hba": self.hba,
+            "rotatable_bonds": self.rotatable_bonds,
+            "molecular_formula": self.molecular_formula,
+            "indication": self.indication,
+            "conformer_3d_url": self.conformer_3d_url,
+            "structure_2d_url": self.structure_2d_url,
         }
 
     def _apply_properties(self, props: dict):
@@ -459,6 +549,18 @@ class Drug(BioEntity):
         self.molecular_weight = props.get("molecular_weight", 0.0)
         self.approval_status = props.get("approval_status", "")
         self.drugbank_id = props.get("drugbank_id", "")
+        self.pubchem_cid = props.get("pubchem_cid", 0)
+        self.inchi = props.get("inchi", "")
+        self.inchi_key = props.get("inchi_key", "")
+        self.logp = props.get("logp", 0.0)
+        self.tpsa = props.get("tpsa", 0.0)
+        self.hbd = props.get("hbd", 0)
+        self.hba = props.get("hba", 0)
+        self.rotatable_bonds = props.get("rotatable_bonds", 0)
+        self.molecular_formula = props.get("molecular_formula", "")
+        self.indication = props.get("indication", "")
+        self.conformer_3d_url = props.get("conformer_3d_url", "")
+        self.structure_2d_url = props.get("structure_2d_url", "")
 
 
 @dataclass
@@ -515,6 +617,11 @@ class Pathway(BioEntity):
     kegg_id: str = ""
     genes: List[str] = field(default_factory=list)
     proteins: List[str] = field(default_factory=list)
+    # Extended pathway metadata
+    reaction_count: int = 0
+    diagram_url: str = ""
+    go_terms: List[str] = field(default_factory=list)
+    disease_associations: List[str] = field(default_factory=list)
 
     def _extra_properties(self) -> dict:
         return {
@@ -523,6 +630,10 @@ class Pathway(BioEntity):
             "kegg_id": self.kegg_id,
             "genes": self.genes,
             "proteins": self.proteins,
+            "reaction_count": self.reaction_count,
+            "diagram_url": self.diagram_url,
+            "go_terms": self.go_terms,
+            "disease_associations": self.disease_associations,
         }
 
     def _apply_properties(self, props: dict):
@@ -531,6 +642,10 @@ class Pathway(BioEntity):
         self.kegg_id = props.get("kegg_id", "")
         self.genes = props.get("genes", [])
         self.proteins = props.get("proteins", [])
+        self.reaction_count = props.get("reaction_count", 0)
+        self.diagram_url = props.get("diagram_url", "")
+        self.go_terms = props.get("go_terms", [])
+        self.disease_associations = props.get("disease_associations", [])
 
 
 @dataclass

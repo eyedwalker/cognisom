@@ -132,7 +132,24 @@ with tab1:
 
                             # Import to entity library
                             if st.button("📥 Import to Entity Library"):
-                                st.info("Import functionality - would add pathway and genes to library")
+                                with st.spinner(f"Importing {selected_id} with gene members..."):
+                                    try:
+                                        from cognisom.library.store import EntityStore
+                                        from cognisom.library.bulk_import import BulkImporter
+                                        _store = EntityStore()
+                                        _importer = BulkImporter(_store)
+                                        report = _importer.import_kegg_pathway(
+                                            selected_id, import_genes=True,
+                                            tags=["kegg_import"],
+                                        )
+                                        st.success(
+                                            f"Imported: {report.entities_created} entities, "
+                                            f"{report.relationships_created} relationships"
+                                        )
+                                        if report.errors:
+                                            st.warning(f"{len(report.errors)} errors (see Data Pipeline page)")
+                                    except Exception as e:
+                                        st.error(f"Import failed: {e}")
 
                     except Exception as e:
                         st.error(f"Failed: {e}")
@@ -224,6 +241,22 @@ with tab2:
                         st.code(compound.smiles, language=None)
 
                     st.markdown(f"[View on PubChem]({compound.url})")
+
+                    # Import to entity library
+                    if st.button(f"📥 Import {compound.name or 'compound'}", key=f"import_cid_{compound.cid}"):
+                        with st.spinner("Importing drug..."):
+                            try:
+                                from cognisom.library.store import EntityStore
+                                from cognisom.library.bulk_import import BulkImporter
+                                _store = EntityStore()
+                                _importer = BulkImporter(_store)
+                                report = _importer.import_drug_list(
+                                    [compound.name],
+                                    tags=["pubchem_import"],
+                                )
+                                st.success(f"Imported: {report.entities_created} drug entity")
+                            except Exception as e:
+                                st.error(f"Import failed: {e}")
 
                     # Lipinski's Rule of Five
                     ro5_pass = (
@@ -387,6 +420,26 @@ with tab3:
             ]
             st.dataframe(interaction_data, use_container_width=True)
 
+            # Import network to entity library
+            if st.button("📥 Import Network to Entity Library", key="import_string_network"):
+                with st.spinner("Importing STRING network..."):
+                    try:
+                        from cognisom.library.store import EntityStore
+                        from cognisom.library.bulk_import import BulkImporter
+                        _store = EntityStore()
+                        _importer = BulkImporter(_store)
+                        report = _importer.import_string_network(
+                            proteins, score_threshold=score_threshold,
+                            import_partners=True,
+                            tags=["string_import"],
+                        )
+                        st.success(
+                            f"Imported: {report.entities_created} entities, "
+                            f"{report.relationships_created} relationships"
+                        )
+                    except Exception as e:
+                        st.error(f"Import failed: {e}")
+
             # Get network image from STRING
             if proteins:
                 from cognisom.library.external_sources import STRINGClient
@@ -463,14 +516,14 @@ with tab4:
             top_pathways = results[:15]
 
             # Bar chart
+            import numpy as np
+
             fig = go.Figure(data=[go.Bar(
                 y=[p["name"][:40] for p in reversed(top_pathways)],
-                x=[-np.log10(p["fdr"]) for p in reversed(top_pathways)],
+                x=[-np.log10(max(p["fdr"], 1e-300)) for p in reversed(top_pathways)],
                 orientation='h',
                 marker_color='purple',
             )])
-
-            import numpy as np
 
             fig.update_layout(
                 title="Top Enriched Pathways",
