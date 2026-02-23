@@ -293,16 +293,17 @@ class _StreamHandler(BaseHTTPRequestHandler):
 
         try:
             if path == "/cognisom/diapedesis":
-                # Load frames — scene build is queued for Kit main thread
+                # Load frames and build USD scene
                 content_len = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_len)
                 data = json.loads(body)
                 frames = data.get("frames", [])
                 mgr.load_frames(frames, fps=data.get("fps", 30))
-                mgr.request_build_scene()
+                built = mgr.build_scene()
                 self._send_json({
-                    "message": f"Loaded {len(frames)} frames, scene build queued",
+                    "message": f"Loaded {len(frames)} frames, scene {'built' if built else 'build failed'}",
                     "total_frames": mgr.total_frames,
+                    "scene_built": built,
                 })
 
             elif path == "/cognisom/diapedesis/play":
@@ -334,10 +335,11 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 duration = data.get("duration", 60)
                 success = mgr.load_preset(preset, duration=duration)
                 if success:
-                    mgr.request_build_scene()
+                    built = mgr.build_scene()
                     self._send_json({
-                        "message": f"Preset '{preset}' loaded, scene build queued",
+                        "message": f"Preset '{preset}' loaded, scene {'built' if built else 'pending'}",
                         "total_frames": mgr.total_frames,
+                        "scene_built": built,
                     })
                 else:
                     self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
