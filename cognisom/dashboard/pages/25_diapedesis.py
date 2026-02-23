@@ -187,9 +187,9 @@ with st.sidebar:
 
     if use_omniverse:
         omni_host = st.text_input(
-            "Kit Streaming URL",
-            value="ws://localhost:8211/streaming/webrtc",
-            help="WebRTC streaming endpoint from Omniverse Kit",
+            "Kit Server URL",
+            value="http://52.32.247.131:8211",
+            help="HTTP endpoint for Kit viewport streaming",
         )
 
     st.divider()
@@ -245,139 +245,160 @@ if run_btn:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Omniverse RTX Viewer (WebRTC streaming from Kit)
+# Omniverse RTX Viewer (HTTP MJPEG streaming from Kit)
 # ═══════════════════════════════════════════════════════════════════════
 
 def _render_omniverse_viewer(frames, streaming_url: str):
-    """Render the Omniverse Kit WebRTC streaming viewer.
+    """Render the Omniverse Kit viewport via HTTP MJPEG streaming.
 
-    When Kit is running with the cognisom.sim extension on the GPU server,
-    this sends frame data to Kit via its REST API and displays the RTX-
-    rendered viewport streamed back via WebRTC.
-
-    If Kit is not available, shows setup instructions.
+    Sends simulation frames to Kit via REST API, then displays the
+    RTX-rendered viewport as an MJPEG stream (no WebRTC needed).
+    Falls back to Three.js if Kit is unreachable.
     """
+    import urllib.request
+
     st.markdown("### Omniverse RTX Viewer")
 
-    # Check if Kit streaming endpoint is reachable
-    kit_base = streaming_url.replace("/streaming/webrtc", "").replace("ws://", "http://").replace("wss://", "https://")
+    # Normalize base URL
+    kit_base = streaming_url.rstrip("/")
 
-    kit_available = False
+    # Check if Kit is reachable
+    kit_status = None
     try:
-        import urllib.request
         req = urllib.request.Request(f"{kit_base}/status", method="GET")
         req.add_header("Accept", "application/json")
         with urllib.request.urlopen(req, timeout=3) as resp:
-            kit_available = resp.status == 200
+            kit_status = json.loads(resp.read())
     except Exception:
         pass
 
-    if not kit_available:
+    if not kit_status:
         st.warning(
-            "Omniverse Kit streaming not detected. "
-            "Make sure Kit is running on the GPU server with the cognisom.sim extension loaded."
+            "Omniverse Kit not detected at " + kit_base + ". "
+            "Make sure the Kit container is running with the cognisom.sim extension."
         )
         with st.expander("Setup Instructions"):
             st.markdown(f"""
 **To enable Omniverse RTX rendering:**
 
-1. **Start Kit on the GPU server** (L4/L40S):
+1. **Launch Kit container on the GPU server** (L4/L40S):
    ```bash
-   ./kit --ext-folder /path/to/cognisom/omniverse/kit_extension \\
-         --enable cognisom.sim \\
-         --enable omni.kit.livestream.webrtc \\
-         --/app/livestream/port=8211
+   docker run -d --name cognisom-kit --gpus all \\
+       --restart unless-stopped \\
+       -p 8211:8211 \\
+       -v /path/to/cognisom.sim:/exts/cognisom.sim:ro \\
+       nvcr.io/nvidia/omniverse/kit:105.1.2 \\
+       --ext-folder /exts --enable cognisom.sim \\
+       --/renderer/active="rtx"
    ```
 
-2. **Or use the Docker container**:
-   ```bash
-   docker run --gpus all -p 8211:8211 -p 8899:8899 \\
-       nvcr.io/nvidia/omniverse/kit:105.1 \\
-       --ext-folder /cognisom/omniverse/kit_extension \\
-       --enable cognisom.sim \\
-       --enable omni.kit.livestream.webrtc
-   ```
+2. **Set the Kit Server URL** in the sidebar to:
+   `{kit_base}`
 
-3. **Set the streaming URL** in the sidebar to:
-   `{streaming_url}`
-
-The Kit extension will:
-- Build the diapedesis scene with PBR materials + subsurface scattering
-- Stream the RTX-rendered viewport back to this browser via WebRTC
-- Support real-time scrubbing through simulation frames
+The extension provides:
+- PBR materials with subsurface scattering
+- RTX viewport rendered at 1920x1080
+- HTTP frame streaming (MJPEG) on port 8211
+- REST API for playback control
 """)
-        # Fall back to Three.js
         st.info("Falling back to Three.js viewer.")
         viewer_html = _build_vessel_viewer(frames, 2.0)
         st.components.v1.html(viewer_html, height=700, scrolling=False)
         return
 
-    # Kit is available — send frames and embed WebRTC viewer
-    st.success("Connected to Omniverse Kit RTX renderer")
+    # Kit is available
+    st.success(
+        f"Connected to Kit — {kit_status.get('extension', 'cognisom.sim')} "
+        f"({'playing' if kit_status.get('playing') else 'idle'})"
+    )
 
-    # Send first frame to Kit to build scene
-    try:
-        import urllib.request
-        frame_data = json.dumps({"action": "load_frames", "frames": frames}).encode()
-        req = urllib.request.Request(
-            f"{kit_base}/cognisom/diapedesis",
-            data=frame_data,
-            method="POST",
-        )
-        req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
-            st.caption(f"Scene loaded: {result.get('message', 'OK')}")
-    except Exception as e:
-        st.error(f"Failed to send frames to Kit: {e}")
+    # Send simulation frames to Kit
+    if frames:
+        try:
+            payload = json.dumps({"frames": frames}).encode()
+            req = urllib.request.Request(
+                f"{kit_base}/cognisom/diapedesis",
+                data=payload,
+                method="POST",
+            )
+            req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read())
+                st.caption(f"Scene: {result.get('message', 'OK')}")
+        except Exception as e:
+            st.error(f"Failed to load frames into Kit: {e}")
 
-    # Embed WebRTC streaming viewport
-    webrtc_html = f"""
+    # Embed MJPEG viewport stream
+    viewer_html = f"""
     <div id="omniViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;
          background:#0a0a1a;position:relative;">
-        <iframe src="{kit_base}/streaming/client"
-                style="width:100%;height:100%;border:none;"
-                allow="autoplay; fullscreen">
-        </iframe>
-        <div style="position:absolute;top:8px;right:8px;background:rgba(0,180,0,0.8);
-             color:white;padding:4px 10px;border-radius:4px;font:12px monospace;">
+        <img id="rtxStream" src="{kit_base}/stream"
+             style="width:100%;height:100%;object-fit:contain;"
+             onerror="this.style.display='none';document.getElementById('rtxFallback').style.display='flex';" />
+        <div id="rtxFallback" style="display:none;width:100%;height:100%;align-items:center;
+             justify-content:center;color:#556;font:18px monospace;flex-direction:column;">
+            <div style="font-size:28px;margin-bottom:12px;">Omniverse Kit RTX</div>
+            <div>Waiting for viewport render...</div>
+            <div style="margin-top:8px;font-size:13px;color:#445;">
+                Stream: <a href="{kit_base}/stream" target="_blank" style="color:#68a">{kit_base}/stream</a>
+            </div>
+        </div>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,180,0,0.85);
+             color:white;padding:4px 12px;border-radius:4px;font:13px monospace;z-index:2;">
             RTX HD
         </div>
+        <div id="rtxStatus" style="position:absolute;bottom:8px;left:8px;color:#8899aa;
+             font:12px monospace;z-index:2;"></div>
     </div>
+    <script>
+        // Poll status for frame counter overlay
+        setInterval(async () => {{
+            try {{
+                const r = await fetch("{kit_base}/status");
+                const d = await r.json();
+                const el = document.getElementById('rtxStatus');
+                if (el) el.textContent = `Frame ${{d.current_frame}}/${{d.frames}} | ${{d.playing ? '▶ Playing' : '⏸ Idle'}}`;
+            }} catch(e) {{}}
+        }}, 500);
+    </script>
     """
-    st.components.v1.html(webrtc_html, height=680, scrolling=False)
+    st.components.v1.html(viewer_html, height=680, scrolling=False)
 
-    # Playback controls for Kit
-    col1, col2, col3 = st.columns([1, 6, 1])
+    # Open standalone viewer link
+    st.caption(
+        f"[Open full-screen RTX viewer ↗]({kit_base}/streaming/client)"
+    )
+
+    # Playback controls
+    col1, col2, col3, col4 = st.columns([1, 1, 6, 1])
     with col1:
-        if st.button("Play", key="omni_play"):
+        if st.button("▶ Play", key="omni_play"):
             try:
-                urllib.request.urlopen(
-                    urllib.request.Request(
-                        f"{kit_base}/cognisom/diapedesis/play",
-                        method="POST"),
-                    timeout=3)
+                urllib.request.urlopen(urllib.request.Request(
+                    f"{kit_base}/cognisom/diapedesis/play", method="POST"), timeout=3)
             except Exception:
                 pass
     with col2:
-        frame_idx = st.slider(
-            "Frame", 0, len(frames) - 1, 0, key="omni_frame_slider")
+        if st.button("⏸ Pause", key="omni_pause"):
+            try:
+                urllib.request.urlopen(urllib.request.Request(
+                    f"{kit_base}/cognisom/diapedesis/pause", method="POST"), timeout=3)
+            except Exception:
+                pass
+    with col3:
+        n_frames = max(len(frames) - 1, 1)
+        frame_idx = st.slider("Frame", 0, n_frames, 0, key="omni_frame_slider")
         try:
-            urllib.request.urlopen(
-                urllib.request.Request(
-                    f"{kit_base}/cognisom/diapedesis/seek?frame={frame_idx}",
-                    method="POST"),
-                timeout=3)
+            urllib.request.urlopen(urllib.request.Request(
+                f"{kit_base}/cognisom/diapedesis/seek?frame={frame_idx}",
+                method="POST"), timeout=3)
         except Exception:
             pass
-    with col3:
-        if st.button("Stop", key="omni_stop"):
+    with col4:
+        if st.button("⏹ Stop", key="omni_stop"):
             try:
-                urllib.request.urlopen(
-                    urllib.request.Request(
-                        f"{kit_base}/cognisom/diapedesis/stop",
-                        method="POST"),
-                    timeout=3)
+                urllib.request.urlopen(urllib.request.Request(
+                    f"{kit_base}/cognisom/diapedesis/stop", method="POST"), timeout=3)
             except Exception:
                 pass
 

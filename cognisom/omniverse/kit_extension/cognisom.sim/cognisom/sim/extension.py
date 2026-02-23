@@ -15,6 +15,7 @@ import omni.usd
 
 from .simulation_manager import SimulationManager
 from .diapedesis_manager import DiapedesisManager
+from .streaming_server import StreamingServer
 from .ui_panel import CognisomPanel
 
 
@@ -27,6 +28,7 @@ class CognisomSimExtension(omni.ext.IExt):
         self._panel = None
         self._simulation_manager = None
         self._diapedesis_manager = None
+        self._streaming_server = None
         self._menu_items = []
         self._update_sub = None
         self._mode = "cell_sim"  # "cell_sim" or "diapedesis"
@@ -43,6 +45,11 @@ class CognisomSimExtension(omni.ext.IExt):
         # Initialize both managers
         self._simulation_manager = SimulationManager()
         self._diapedesis_manager = DiapedesisManager()
+
+        # Start HTTP streaming server (port 8211)
+        self._streaming_server = StreamingServer(
+            self._diapedesis_manager, port=8211)
+        self._streaming_server.start()
 
         # Create UI window
         self._create_ui()
@@ -70,6 +77,10 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._simulation_manager:
             self._simulation_manager.stop()
             self._simulation_manager = None
+
+        if self._streaming_server:
+            self._streaming_server.shutdown()
+            self._streaming_server = None
 
         if self._diapedesis_manager:
             self._diapedesis_manager.stop()
