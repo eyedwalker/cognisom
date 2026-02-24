@@ -729,8 +729,8 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
 
     function buildIntegrinExtended() {{
         const g = new THREE.Group();
-        const legMat = new THREE.MeshPhongMaterial({{ color: 0x00ccdd }});
-        const headMat = new THREE.MeshPhongMaterial({{ color: 0x00ffff, emissive: 0x003344 }});
+        const legMat = new THREE.MeshPhongMaterial({{ color: 0x3399aa }});
+        const headMat = new THREE.MeshPhongMaterial({{ color: 0x44bbcc, emissive: 0x112233 }});
         // Tall extended: two straight legs, headpiece at top
         const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 4), legMat);
         leg1.position.set(0.12, 0.9, 0);
@@ -749,7 +749,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         g.add(knob);
         // Hybrid domain swung out
         const hybrid = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.15),
-            new THREE.MeshPhongMaterial({{ color: 0x00eeff }}));
+            new THREE.MeshPhongMaterial({{ color: 0x44aacc }}));
         hybrid.position.set(0.45, 1.7, 0);
         g.add(hybrid);
         return g;
@@ -951,8 +951,8 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         for (let j = 0; j < 4; j++) {{
             const angle = (j / 4) * Math.PI * 2;
             const ig = {{ bent: integrinBentProto.clone(), ext: integrinExtProto.clone(), angle: angle }};
-            ig.bent.position.set(Math.cos(angle)*rad*0.9, -rad*0.7, Math.sin(angle)*rad*0.9);
-            ig.bent.scale.set(rad*0.4, rad*0.4, rad*0.4);
+            ig.bent.position.set(Math.cos(angle)*rad*0.85, -rad*0.8, Math.sin(angle)*rad*0.85);
+            ig.bent.scale.set(rad*0.15, rad*0.15, rad*0.15);
             ig.ext.position.copy(ig.bent.position);
             ig.ext.scale.copy(ig.bent.scale);
             ig.ext.visible = false;
@@ -1303,7 +1303,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
         + '<span style="color:#ffaa00;font-size:16px">\\u25CF</span> Selectin (E-sel)<br>'
         + '<span style="color:#4488ff;font-size:16px">\\u25CF</span> ICAM-1<br>'
         + '<span style="color:#33bb88;font-size:16px">\\u25CF</span> PECAM-1 (junction)<br>'
-        + '<span style="color:#00ccdd;font-size:16px">\\u25CF</span> Integrin (LFA-1)<br>'
+        + '<span style="color:#3399aa;font-size:16px">\\u25CF</span> Integrin (LFA-1)<br>'
         + '<span style="color:#cc9933;font-size:16px">\\u25CF</span> Complement (C3b)<br>'
         + '<b style="color:#dde;font-size:15px">Cells &amp; Tissue</b><br>'
         + '<span style="color:#cc2222;font-size:16px">\\u25CF</span> RBC (biconcave)<br>'
