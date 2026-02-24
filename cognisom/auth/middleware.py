@@ -759,7 +759,7 @@ def streamlit_require_permission(permission: str):
     return user
 
 
-def streamlit_page_gate(page_name: str = ""):
+def streamlit_page_gate(page_name: str = "", required_tier: str = ""):
     """Auth + subscription tier gate for Streamlit pages.
 
     Call this at the top of any page that requires auth and tier checking.
@@ -768,14 +768,19 @@ def streamlit_page_gate(page_name: str = ""):
     Args:
         page_name: The page identifier (e.g. "3_simulation"). If empty,
                    only auth is checked, not tier access.
+        required_tier: Minimum tier required (e.g. "researcher", "institution").
+                       Used as page_name for tier checking if page_name is empty.
     """
     import streamlit as st
 
     # First: require authentication (includes password change check)
     user = streamlit_login_gate()
 
-    # If no page_name specified, skip tier check
-    if not page_name:
+    # Use required_tier as fallback for page_name
+    effective_page = page_name or required_tier
+
+    # If no page gate specified, skip tier check
+    if not effective_page:
         return user
 
     # ADMIN users (system org) bypass tier checks
@@ -806,7 +811,7 @@ def streamlit_page_gate(page_name: str = ""):
         return None
 
     allowed_pages = org_mgr.get_page_access(user.org_id)
-    if page_name not in allowed_pages:
+    if effective_page not in allowed_pages:
         tier_name = org.plan.value.title()
         st.error(
             f"This page requires a higher subscription tier. "
