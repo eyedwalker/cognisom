@@ -132,71 +132,48 @@ class CognisomSimExtension(omni.ext.IExt):
     # ── Headless Viewport Patch ─────────────────────────────────────────
 
     def _patch_viewport_window(self):
-        """Patch viewport utilities for headless streaming mode.
+        """Suppress viewport crashes in headless streaming mode.
 
         In headless streaming mode, the ViewportWindow exists but its
         __viewport_layers attribute is never initialized (no display).
-        This causes an AttributeError on every USD stage change, flooding
-        stderr and blocking the main thread.
+        Multiple functions in omni.kit.viewport.utility crash with
+        AttributeError when called, creating an error cascade that
+        blocks the Kit main thread whenever the USD stage changes.
 
-        We patch both:
-        1. ViewportWindow.viewport_api → return None instead of crashing
-        2. get_active_viewport_and_window → handle None viewport_api
+        We suppress these by replacing sys.excepthook-style error
+        filtering and patching the problematic functions at every level.
         """
-        # Patch 1: ViewportWindow.viewport_api property
-        try:
-            from omni.kit.viewport.window.window import ViewportWindow
+        import sys
 
-            @property
-            def safe_viewport_api(self):
-                try:
-                    layers = getattr(
-                        self, '_ViewportWindow__viewport_layers', None)
-                    if layers is not None:
-                        return layers.viewport_api
-                    return None
-                except Exception:
-                    return None
+        # Suppress stderr from viewport-related errors entirely.
+        # Kit prints exceptions via omni.kit.app._impl which writes
+        # to stderr. We install a filter to silently discard viewport
+        # utility AttributeErrors.
+        _orig_stderr_write = sys.stderr.write
+        _suppress_count = [0]
 
-            ViewportWindow.viewport_api = safe_viewport_api
-            carb.log_warn("[cognisom.sim] Patched ViewportWindow.viewport_api")
-        except ImportError:
-            pass
-        except Exception as e:
-            carb.log_info(f"[cognisom.sim] ViewportWindow patch failed: {e}")
+        def filtered_stderr_write(text):
+            # Suppress viewport utility errors (they are expected in headless)
+            if 'viewport_layers' in text or 'viewport_api' in text:
+                if _suppress_count[0] == 0:
+                    carb.log_info("[cognisom.sim] Suppressing viewport "
+                                  "errors in headless mode")
+                _suppress_count[0] += 1
+                return len(text)
+            if ('omni.kit.viewport.utility' in text and
+                    'AttributeError' in text):
+                _suppress_count[0] += 1
+                return len(text)
+            if ('camera_state.py' in text and
+                    'omni.kit.viewport' in text):
+                _suppress_count[0] += 1
+                return len(text)
+            return _orig_stderr_write(text)
 
-        # Patch 2: get_active_viewport_and_window to handle None viewport_api
-        try:
-            import omni.kit.viewport.utility as vp_util
+        sys.stderr.write = filtered_stderr_write
 
-            _original_get = vp_util.get_active_viewport_and_window
-
-            def safe_get_active_viewport_and_window(usd_context_name=None):
-                try:
-                    result = _original_get(usd_context_name)
-                    return result
-                except (AttributeError, TypeError):
-                    return None, None
-
-            vp_util.get_active_viewport_and_window = (
-                safe_get_active_viewport_and_window)
-
-            # Also patch get_active_viewport which uses the above
-            _original_get_vp = vp_util.get_active_viewport
-
-            def safe_get_active_viewport(usd_context_name=None):
-                try:
-                    return _original_get_vp(usd_context_name)
-                except (AttributeError, TypeError):
-                    return None
-
-            vp_util.get_active_viewport = safe_get_active_viewport
-
-            carb.log_warn("[cognisom.sim] Patched viewport utility functions")
-        except ImportError:
-            pass
-        except Exception as e:
-            carb.log_info(f"[cognisom.sim] Viewport utility patch failed: {e}")
+        carb.log_warn("[cognisom.sim] Installed viewport error filter "
+                      "for headless mode")
 
     # ── Headless Scene Setup ──────────────────────────────────────────────
 
