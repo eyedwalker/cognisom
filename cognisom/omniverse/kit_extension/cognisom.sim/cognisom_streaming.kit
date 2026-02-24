@@ -220,6 +220,11 @@ enabled = false
 [settings.app.livestream]
 allowResize = false
 outDirectory = "${data}"
+# WebRTC signaling — use the extension default port (49100)
+# Do NOT override app.livestream.port here; let omni.kit.livestream.webrtc
+# use its default (49100) which the NVIDIA streaming library expects.
+proto = "websocket"
+ipversion = "ipv4"
 
 [settings.app.renderer]
 resolution.height = 720

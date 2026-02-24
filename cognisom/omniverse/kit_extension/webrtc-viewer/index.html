@@ -162,7 +162,7 @@
         // With ?server=HOST: use direct connection (local development)
         const params = new URLSearchParams(window.location.search);
         const KIT_SERVER = params.get('server') || null;
-        const SIGNALING_PORT = parseInt(params.get('signalingPort') || '8899');
+        const SIGNALING_PORT = parseInt(params.get('signalingPort') || '49100');
         const API_PORT = parseInt(params.get('apiPort') || '8211');
         const API_BASE = KIT_SERVER ? `http://${KIT_SERVER}:${API_PORT}` : '/kit';
 
@@ -194,29 +194,34 @@
             }
 
             // Step 2: Try WebRTC connection (with timeout fallback to MJPEG)
+            // NVIDIA streaming library uses HTTP /sign_in on the signaling port,
+            // then upgrades to WebSocket for the actual signaling protocol.
             const signalingHost = KIT_SERVER || window.location.hostname;
             const useProxy = !KIT_SERVER;
+            // When behind nginx proxy: connect via wss://host:443/streaming/
+            // Direct connection: connect to signaling port directly
             const signalingActualPort = useProxy ? 443 : SIGNALING_PORT;
             const signalingPath = useProxy ? '/streaming/' : undefined;
             statusDetail.textContent = useProxy
                 ? `WebRTC: connecting via ${signalingHost}/streaming/...`
                 : `WebRTC: connecting to ${signalingHost}:${SIGNALING_PORT}...`;
 
-            // Fall back to MJPEG after 5s if WebRTC doesn't connect
+            // Fall back to MJPEG after 8s if WebRTC doesn't connect
             const mjpegTimer = setTimeout(() => {
                 if (!streamConnected) {
                     console.log('[cognisom] WebRTC timeout, falling back to MJPEG');
                     statusDetail.textContent = 'WebRTC unavailable, using MJPEG...';
                     connectMJPEG();
                 }
-            }, 5000);
+            }, 8000);
 
             try {
                 const streamConfig = {
                     videoElementId: 'remote-video',
                     audioElementId: 'remote-audio',
-                    authenticate: true,
+                    authenticate: false,
                     maxReconnects: 3,
+                    server: signalingHost,
                     signalingServer: signalingHost,
                     signalingPort: signalingActualPort,
                     signalingPath: signalingPath,
@@ -227,12 +232,12 @@
                     fps: 60,
                     onStart: (msg) => {
                         console.log('[cognisom] Stream started:', msg);
-                        if (msg.action === 'start' && msg.status === 'success') {
+                        if (msg.status === 'success') {
                             clearTimeout(mjpegTimer);
                             onStreamConnected();
                         } else if (msg.status === 'error') {
                             clearTimeout(mjpegTimer);
-                            onStreamError(msg.description || 'Connection failed');
+                            onStreamError(msg.info || 'Connection failed');
                         }
                     },
                     onUpdate: (msg) => {
@@ -251,7 +256,8 @@
                     },
                 };
 
-                await AppStreamer.connect({ source: 'local', streamConfig });
+                // streamSource: 'direct' for non-GFN connections (replaces 'local')
+                await AppStreamer.connect({ streamSource: 'direct', streamConfig });
 
             } catch (e) {
                 console.warn('[cognisom] WebRTC connect failed:', e);
