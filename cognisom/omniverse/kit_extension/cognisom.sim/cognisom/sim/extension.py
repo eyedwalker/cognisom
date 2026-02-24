@@ -57,6 +57,12 @@ class CognisomSimExtension(omni.ext.IExt):
 
         carb.log_info(f"[cognisom.sim] Headless mode: {self._headless}")
 
+        # Patch viewport_api property to prevent crash in headless mode
+        # The ViewportWindow's __viewport_layers is not initialized without
+        # a real display, causing AttributeError spam on every stage change.
+        if self._headless:
+            self._patch_viewport_window()
+
         # Initialize both managers
         self._simulation_manager = SimulationManager()
         self._diapedesis_manager = DiapedesisManager()
@@ -122,6 +128,40 @@ class CognisomSimExtension(omni.ext.IExt):
         self._menu_items.clear()
 
         carb.log_info("[cognisom.sim] Extension shutdown complete")
+
+    # ── Headless Viewport Patch ─────────────────────────────────────────
+
+    def _patch_viewport_window(self):
+        """Patch ViewportWindow.viewport_api to return None instead of crashing.
+
+        In headless streaming mode, the ViewportWindow exists but its
+        __viewport_layers attribute is never initialized (no display).
+        This causes an AttributeError on every USD stage change, flooding
+        stderr and blocking the main thread. This patch makes the property
+        return None gracefully.
+        """
+        try:
+            from omni.kit.viewport.window.window import ViewportWindow
+            original_prop = ViewportWindow.viewport_api
+
+            @property
+            def safe_viewport_api(self):
+                try:
+                    layers = getattr(self, '_ViewportWindow__viewport_layers', None)
+                    if layers is not None:
+                        return layers.viewport_api
+                    return None
+                except Exception:
+                    return None
+
+            ViewportWindow.viewport_api = safe_viewport_api
+            carb.log_warn("[cognisom.sim] Patched ViewportWindow.viewport_api "
+                          "for headless mode")
+        except ImportError:
+            carb.log_info("[cognisom.sim] ViewportWindow not available, "
+                          "no patch needed")
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] Could not patch ViewportWindow: {e}")
 
     # ── Headless Scene Setup ──────────────────────────────────────────────
 
