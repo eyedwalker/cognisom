@@ -162,7 +162,7 @@
         // With ?server=HOST: use direct connection (local development)
         const params = new URLSearchParams(window.location.search);
         const KIT_SERVER = params.get('server') || null;
-        const SIGNALING_PORT = parseInt(params.get('signalingPort') || '49100');
+        const SIGNALING_PORT = parseInt(params.get('signalingPort') || '8899');
         const API_PORT = parseInt(params.get('apiPort') || '8211');
         const API_BASE = KIT_SERVER ? `http://${KIT_SERVER}:${API_PORT}` : '/kit';
 
@@ -187,7 +187,14 @@
                 const { AppStreamer } = await import('@nvidia/omniverse-webrtc-streaming-library');
 
                 const signalingHost = KIT_SERVER || window.location.hostname;
-                statusDetail.textContent = `Connecting to ${signalingHost}:${SIGNALING_PORT}...`;
+                // In production (no KIT_SERVER), use nginx proxy path
+                // with port 443 (same origin, WSS via SSL)
+                const useProxy = !KIT_SERVER;
+                const signalingActualPort = useProxy ? 443 : SIGNALING_PORT;
+                const signalingPath = useProxy ? '/streaming/' : undefined;
+                statusDetail.textContent = useProxy
+                    ? `Connecting via ${signalingHost}/streaming/...`
+                    : `Connecting to ${signalingHost}:${SIGNALING_PORT}...`;
 
                 const streamConfig = {
                     videoElementId: 'remote-video',
@@ -195,7 +202,8 @@
                     authenticate: true,
                     maxReconnects: 20,
                     signalingServer: signalingHost,
-                    signalingPort: SIGNALING_PORT,
+                    signalingPort: signalingActualPort,
+                    signalingPath: signalingPath,
                     mediaServer: signalingHost,
                     nativeTouchEvents: true,
                     width: 1920,
