@@ -16,12 +16,12 @@ app.version = "1.0.0"
 app.vulkan = true
 
 [settings.app.exts]
-folders = [
-    "${app}/../exts",
-    "${app}/../extscache",
-    "${app}/../extsPhysics",
-    "${app}/../extsUser",
-    "${app}/../extsDeprecated",
+folders.'++' = [
+    "/isaac-sim/exts",
+    "/isaac-sim/extscache",
+    "/isaac-sim/extsPhysics",
+    "/isaac-sim/extsUser",
+    "/isaac-sim/extsDeprecated",
 ]
 
 [settings.app.window]
