@@ -1,17 +1,206 @@
 [package]
 title = "Cognisom Diapedesis Streaming"
-description = "Isaac Sim + Cognisom biological simulation with RTX WebRTC streaming"
-version = "1.0.0"
+description = "Headless RTX streaming for biological simulation — custom dependency chain that excludes omni.physx.ui"
+version = "1.1.0"
+
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
+# This file replaces isaacsim.exp.full.streaming → isaacsim.exp.full → isaacsim.exp.base
+# with a FLAT dependency list copied from isaacsim.exp.base.kit, but with
+# omni.physx.bundle replaced by individual physx components (minus omni.physx.ui).
+#
+# WHY: omni.physx.ui's on_stage_update handler calls ViewportCameraState() on
+# every USD stage change, which crashes in headless mode and blocks the main
+# thread, making the HTTP API unresponsive during simulation playback.
+# omni.physx.bundle hard-depends on omni.physx.ui, and isaacsim.exp.base
+# hard-depends on omni.physx.bundle, so we must break the chain here.
+# ============================================================================
 
 [dependencies]
-# Use the streaming variant which is pre-configured for headless WebRTC
-"isaacsim.exp.full.streaming" = {}
+
+# === Our extension ===
 "cognisom.sim" = {}
+
+# === Livestream (from isaacsim.exp.full.streaming.kit) ===
+"omni.kit.livestream.core" = { version = "6.1.0", exact = true }
+"omni.kit.livestream.webrtc" = { version = "6.0.0", exact = true }
+"omni.kit.streamsdk.plugins" = { version = "6.1.7", exact = true }
+
+# === Isaac Sim core (from isaacsim.exp.base.kit) ===
+"isaacsim.app.about" = {}
+"isaacsim.asset.browser" = {}
+"isaacsim.core.api" = {}
+"isaacsim.core.cloner" = {}
+"isaacsim.core.deprecation_manager" = { order = -100 }
+"isaacsim.core.nodes" = {}
+"isaacsim.core.simulation_manager" = {}
+"isaacsim.core.throttling" = {}
+"isaacsim.core.utils" = {}
+"isaacsim.core.version" = {}
+"isaacsim.cortex.behaviors" = {}
+"isaacsim.cortex.framework" = {}
+"isaacsim.gui.menu" = {}
+"isaacsim.gui.property" = {}
+"isaacsim.replicator.behavior" = {}
+"isaacsim.replicator.domain_randomization" = {}
+"isaacsim.replicator.writers" = {}
+"isaacsim.robot_motion.lula" = {}
+"isaacsim.robot_motion.motion_generation" = {}
+"isaacsim.robot.manipulators" = {}
+"isaacsim.robot.policy.examples" = {}
+"isaacsim.robot.schema" = {}
+"isaacsim.robot.surface_gripper" = {}
+"isaacsim.robot.wheeled_robots" = {}
+"isaacsim.sensors.camera" = {}
+"isaacsim.sensors.physics" = {}
+"isaacsim.sensors.physx" = {}
+"isaacsim.sensors.rtx" = {}
+"isaacsim.simulation_app" = {}
+"isaacsim.storage.native" = {}
+"isaacsim.util.debug_draw" = {}
+"omni.isaac.core_archive" = {}
+"isaacsim.asset.importer.mjcf" = {}
+"isaacsim.asset.importer.urdf" = {}
+
+# === Deprecated Isaac shims (from isaacsim.exp.base.kit) ===
+"omni.isaac.asset_browser" = {}
+"omni.isaac.assets_check" = {}
+"omni.isaac.cloner" = {}
+"omni.isaac.core_nodes" = {}
+"omni.isaac.core" = {}
+"omni.isaac.cortex.sample_behaviors" = {}
+"omni.isaac.cortex" = {}
+"omni.isaac.dynamic_control" = {}
+"omni.isaac.franka" = {}
+"omni.isaac.kit" = {}
+"omni.isaac.lula_test_widget" = {}
+"omni.isaac.lula" = {}
+"omni.isaac.manipulators" = {}
+"omni.isaac.menu" = {}
+"omni.isaac.motion_generation" = {}
+"omni.isaac.nucleus" = {}
+"omni.isaac.quadruped" = {}
+"omni.isaac.range_sensor" = {}
+"omni.isaac.sensor" = {}
+"omni.isaac.surface_gripper" = {}
+"omni.isaac.universal_robots" = {}
+"omni.isaac.utils" = {}
+"omni.isaac.version" = {}
+"omni.isaac.wheeled_robots" = {}
+"omni.isaac.window.about" = {}
+"omni.kit.property.isaac" = {}
+"omni.replicator.isaac" = {}
+"omni.usd.schema.isaac" = {}
+
+# === Physics — INDIVIDUAL COMPONENTS (replaces omni.physx.bundle) ===
+# omni.physx.bundle hard-depends on omni.physx.ui which crashes headless.
+# We include only what we need:
+"omni.physx" = {}
+"omni.physx.stageupdate" = {}
+"omni.physx.commands" = {}
+"omni.usdphysics" = {}
+"omni.physx.tensors" = {}
+# EXCLUDED from omni.physx.bundle:
+#   omni.physx.ui           — CRASHES headless (ViewportCameraState)
+#   omni.usdphysics.ui      — UI only
+#   omni.kit.property.physx  — UI only
+#   omni.physx.supportui     — UI only
+#   omni.physx.demos         — not needed
+#   omni.physx.vehicle       — not needed
+#   omni.physx.cct           — not needed
+#   omni.physx.camera        — not needed headless
+#   omni.usd.schema.forcefield — not needed
+#   omni.physx.graph         — not needed
+#   omni.physx.telemetry     — not needed
+
+# === Replicator / synthetic data (from isaacsim.exp.base.kit) ===
+"omni.replicator.core" = {}
+"omni.replicator.replicator_yaml" = {}
+"omni.syntheticdata" = {}
+"semantics.schema.editor" = {}
+"semantics.schema.property" = {}
+
+# === Kit core / editor (from isaacsim.exp.base.kit) ===
+"omni.anim.curve.core" = {}
+"omni.graph.action" = {}
+"omni.graph.core" = {}
+"omni.graph.nodes" = {}
+"omni.graph.scriptnode" = {}
+"omni.graph.ui_nodes" = {}
+"omni.hydra.engine.stats" = {}
+"omni.hydra.rtx" = {}
+"omni.kit.mainwindow" = {}
+"omni.kit.manipulator.camera" = {}
+"omni.kit.manipulator.prim" = {}
+"omni.kit.manipulator.selection" = {}
+"omni.kit.material.library" = {}
+"omni.kit.menu.common" = { order = 1000 }
+"omni.kit.menu.create" = {}
+"omni.kit.menu.stage" = {}
+"omni.kit.menu.utils" = {}
+"omni.kit.primitive.mesh" = {}
+"omni.kit.property.bundle" = {}
+"omni.kit.raycast.query" = {}
+"omni.kit.stage_template.core" = {}
+"omni.kit.telemetry" = {}
+"omni.kit.tool.asset_importer" = {}
+"omni.kit.tool.collect" = {}
+"omni.kit.viewport.legacy_gizmos" = {}
+"omni.kit.viewport.menubar.camera" = {}
+"omni.kit.viewport.menubar.display" = {}
+"omni.kit.viewport.menubar.lighting" = {}
+"omni.kit.viewport.menubar.render" = {}
+"omni.kit.viewport.menubar.settings" = {}
+"omni.kit.viewport.scene_camera_model" = {}
+"omni.kit.viewport.window" = {}
+"omni.kit.window.console" = {}
+"omni.kit.window.content_browser" = {}
+"omni.kit.window.property" = {}
+"omni.kit.window.stage" = {}
+"omni.kit.window.status_bar" = {}
+"omni.kit.window.toolbar" = {}
+"omni.rtx.settings.core" = {}
+"omni.uiaudio" = {}
+"omni.usd.metrics.assembler.ui" = {}
+"omni.usd.schema.metrics.assembler" = {}
+"omni.warp.core" = {}
+
+# === Other archives / pip ===
+"omni.isaac.ml_archive" = {}
+"omni.kit.loop-isaac" = {}
+"omni.pip.cloud" = {}
+"omni.pip.compute" = {}
+
+# ============================================================================
+# SETTINGS
+# ============================================================================
 
 [settings]
 app.name = "Cognisom-Sim"
-app.version = "1.0.0"
+app.version = "1.1.0"
 app.vulkan = true
+app.fastShutdown = true
+app.file.ignoreUnsavedOnExit = true
+app.content.emptyStageOnStart = true
+app.hangDetector.enabled = true
+app.hangDetector.timeout = 120
+
+# Renderer
+renderer.asyncInit = true
+renderer.gpuEnumeration.glInterop.enabled = false
+rtx.hydra.mdlMaterialWarmup = true
+rtx.post.dlss.execMode = 0
+rtx-transient.dlssg.enabled = false
+omni.replicator.asyncRendering = false
+
+# Disable simulation output popup
+physics.autoPopupSimulationOutputWindow = false
+
+# Extension settings
+exts."omni.kit.renderer.core".present.enabled = false
+exts."omni.kit.viewport.window".windowMenu.entryCount = 2
+exts."omni.kit.viewport.window".windowMenu.label = ""
 
 [settings.app.exts]
 folders = [
@@ -26,6 +215,69 @@ folders = [
 hideUi = true
 title = "Cognisom Diapedesis"
 drawMouse = false
+enabled = false
 
 [settings.app.livestream]
 allowResize = false
+outDirectory = "${data}"
+
+[settings.app.renderer]
+resolution.height = 720
+resolution.width = 1280
+skipWhileMinimized = false
+sleepMsOnFocus = 0
+sleepMsOutOfFocus = 0
+
+[settings.app.viewport]
+defaultCamPos.x = 5
+defaultCamPos.y = 5
+defaultCamPos.z = 5
+defaults.fillViewport = false
+grid.enabled = true
+outline.enabled = true
+boundingBoxes.enabled = false
+show.camera = false
+show.lights = false
+
+[settings.persistent]
+app.primCreation.DefaultXformOpOrder = "xformOp:translate, xformOp:orient, xformOp:scale"
+app.primCreation.DefaultXformOpType = "Scale, Orient, Translate"
+app.primCreation.typedDefaults.camera.clippingRange = [0.01, 10000000.0]
+app.primCreation.DefaultXformOpPrecision = "Double"
+app.primCreation.DefaultRotationOrder = "ZYX"
+app.primCreation.PrimCreationWithDefaultXformOps = true
+app.stage.timeCodeRange = [0, 1000000]
+app.stage.upAxis = "Z"
+app.viewport.camMoveVelocity = 0.05
+app.viewport.gizmo.scale = 0.01
+app.viewport.grid.scale = 1.0
+app.viewport.camShowSpeedOnStart = false
+app.omniverse.gamepadCameraControl = false
+physics.visualizationDisplayJoints = false
+physics.visualizationSimulationOutput = false
+physics.resetOnStop = true
+renderer.startupMessageDisplayed = true
+resourcemonitor.timeBetweenQueries = 100
+simulation.defaultMetersPerUnit = 1.0
+omni.replicator.captureOnPlay = true
+
+[settings.exts."omni.kit.material.library"]
+ui_show_list = [
+    "OmniPBR",
+    "OmniGlass",
+    "OmniSurface",
+    "USD Preview Surface",
+]
+
+[settings.exts."omni.kit.registry.nucleus"]
+registries = [
+    { name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/106/shared" },
+    { name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
+    { name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
+]
+
+privacy.externalBuild = true
+
+# Disable OS version check
+[settings]
+foundation.verifyOsVersion.enabled = false
