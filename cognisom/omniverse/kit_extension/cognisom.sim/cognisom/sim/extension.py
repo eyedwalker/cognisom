@@ -128,17 +128,18 @@ class CognisomSimExtension(omni.ext.IExt):
     async def _setup_headless_scene(self):
         """Set up camera and scene for headless WebRTC streaming.
 
-        With isaacsim.exp.full.streaming, the WebRTC streamer handles
-        rendering and streaming. We set up:
+        With isaacsim.exp.full.streaming, the WebRTC streamer
+        (omni.kit.livestream.webrtc) handles RTX rendering and streaming
+        directly — no replicator capture needed. We set up:
         1. USD stage with wait-for-ready
         2. Camera with good viewing angle for diapedesis scene
         3. RTX 2.0 settings for bio-specific rendering
-        4. Replicator capture as MJPEG fallback
+        4. The PIL fallback renderer handles MJPEG for non-WebRTC clients
         """
         app = omni.kit.app.get_app()
 
         # Wait for Kit to fully initialize (stage may take time to be ready)
-        carb.log_info("[cognisom.sim] Waiting for Kit initialization...")
+        carb.log_warn("[cognisom.sim] Waiting for Kit initialization...")
         context = omni.usd.get_context()
         stage = None
         for attempt in range(60):  # Up to ~2 seconds
@@ -147,10 +148,10 @@ class CognisomSimExtension(omni.ext.IExt):
             if stage:
                 break
             if attempt == 15:
-                carb.log_info("[cognisom.sim] Still waiting for stage...")
+                carb.log_warn("[cognisom.sim] Still waiting for stage...")
 
         if not stage:
-            carb.log_info("[cognisom.sim] No stage after init, creating new...")
+            carb.log_warn("[cognisom.sim] No stage after init, creating new...")
             result, error = await context.new_stage_async()
             if not result:
                 carb.log_error(f"[cognisom.sim] Failed to create stage: {error}")
@@ -166,13 +167,13 @@ class CognisomSimExtension(omni.ext.IExt):
             carb.log_error("[cognisom.sim] Stage still not available after creation")
             return
 
-        carb.log_info(f"[cognisom.sim] USD stage ready: "
+        carb.log_warn(f"[cognisom.sim] USD stage ready: "
                       f"{stage.GetRootLayer().identifier}")
 
         # Update diapedesis manager to use the Kit context stage
         if self._diapedesis_manager:
             self._diapedesis_manager._stage = stage
-            carb.log_info("[cognisom.sim] DiapedesisManager stage updated")
+            carb.log_warn("[cognisom.sim] DiapedesisManager stage updated")
 
         # Create camera for the diapedesis scene
         camera_path = self._create_scene_camera(stage)
@@ -181,7 +182,7 @@ class CognisomSimExtension(omni.ext.IExt):
         for _ in range(3):
             await app.next_update_async()
 
-        # Set camera as active viewport camera
+        # Set camera as active viewport camera (best effort — may fail headless)
         self._set_active_camera(camera_path)
 
         # Apply RTX 2.0 + bio-specific rendering settings
@@ -191,11 +192,36 @@ class CognisomSimExtension(omni.ext.IExt):
         for _ in range(10):
             await app.next_update_async()
 
-        # Set up RTX frame capture via replicator for MJPEG fallback
-        await self._setup_rtx_capture(camera_path)
+        # Check if WebRTC streaming is available
+        webrtc_available = self._check_webrtc_streaming()
 
-        carb.log_info("[cognisom.sim] Headless scene setup complete — "
-                      "RTX 2.0 + bio rendering, HTTP API on port 8211")
+        if webrtc_available:
+            carb.log_warn("[cognisom.sim] WebRTC streaming active — "
+                          "RTX frames streamed directly via WebRTC. "
+                          "MJPEG fallback uses PIL 2D renderer.")
+        else:
+            # Only try replicator capture if WebRTC is not available
+            carb.log_warn("[cognisom.sim] No WebRTC streaming, "
+                          "trying replicator capture for MJPEG...")
+            await self._setup_rtx_capture(camera_path)
+
+        carb.log_warn("[cognisom.sim] Headless scene setup complete — "
+                      "HTTP API on port 8211")
+
+    def _check_webrtc_streaming(self) -> bool:
+        """Check if the Kit WebRTC livestream extension is active."""
+        try:
+            import omni.ext
+            manager = omni.ext.get_extension_manager()
+            # Check for the WebRTC livestream extension
+            for ext_id in ["omni.kit.livestream.webrtc",
+                           "omni.services.livestream.webrtc"]:
+                if manager.is_extension_enabled(ext_id):
+                    carb.log_warn(f"[cognisom.sim] Found active: {ext_id}")
+                    return True
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] Extension check failed: {e}")
+        return False
 
     def _create_scene_camera(self, stage) -> str:
         """Create and position a camera to view the diapedesis scene."""
@@ -512,9 +538,17 @@ class CognisomSimExtension(omni.ext.IExt):
             if self._diapedesis_manager and self._diapedesis_manager.is_playing:
                 self._diapedesis_manager.update(dt)
 
-        # Capture RTX frame from replicator annotator (must be on main thread)
+        # Capture RTX frame from replicator annotator (only when NOT using WebRTC)
         if self._rgb_annotator and self._streaming_server:
             self._capture_rtx_frame()
+
+        # In headless mode with PIL fallback active, trigger a capture
+        # so MJPEG clients get updated frames
+        if (self._headless and self._streaming_server
+                and not self._rgb_annotator):
+            vc = self._streaming_server._viewport_capture
+            if not vc._rtx_active:
+                vc.capture()
 
         # Update UI (GUI mode only)
         if self._panel:
