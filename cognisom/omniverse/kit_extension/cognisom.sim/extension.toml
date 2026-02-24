@@ -11,14 +11,14 @@ preview_image = "data/preview.png"
 icon = "data/icon.png"
 
 [dependencies]
-"omni.kit.uiapp" = {}
-"omni.ui" = {}
+# Required (always available)
 "omni.usd" = {}
-"omni.kit.window.toolbar" = {}
-"omni.physx" = {}
 
-# Optional: WebRTC streaming for remote viewport
-# "omni.kit.livestream.webrtc" = {optional = true}
+# Optional GUI deps (not available in headless streaming mode)
+"omni.kit.uiapp" = {optional = true}
+"omni.ui" = {optional = true}
+"omni.kit.window.toolbar" = {optional = true}
+"omni.physx" = {optional = true}
 
 [[python.module]]
 name = "cognisom.sim"

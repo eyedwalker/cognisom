@@ -89,7 +89,13 @@ def _encode_jpeg(rgba_buffer, width: int, height: int, quality: int = 85) -> byt
 
 
 class _ViewportCapture:
-    """Captures Kit viewport or renders simulation frames via PIL fallback."""
+    """Captures Kit viewport or renders simulation frames via PIL fallback.
+
+    Supports three capture modes (tried in order):
+    1. Viewport API: capture from Kit viewport (set_viewport)
+    2. Replicator annotator: read from render product (set_annotator)
+    3. PIL fallback: 2D scientific visualization from simulation data
+    """
 
     # Leukocyte state colors (matches Three.js viewer)
     STATE_COLORS = {
@@ -104,48 +110,112 @@ class _ViewportCapture:
 
     def __init__(self):
         self._buffer: Optional[bytes] = None
-        self._width = 960
-        self._height = 540
+        self._width = 1920
+        self._height = 1080
         self._last_capture_time = 0.0
         self._diapedesis_mgr = None  # Set by StreamingServer
+        self._viewport_api = None    # Set by extension (approach 1 or 2)
+        self._rgb_annotator = None   # Set by extension (approach 3)
+        self._rtx_active = False     # True once RTX frames are confirmed
+        self._capture_attempt_count = 0  # Throttle error logging
 
     @property
     def jpeg_bytes(self) -> Optional[bytes]:
         return self._buffer
 
     def capture(self) -> bool:
-        """Capture current viewport frame, or render from simulation data."""
-        # Try real viewport capture first
-        if VIEWPORT_AVAILABLE:
-            try:
-                viewport_api = vp_util.get_active_viewport()
-                if viewport_api:
-                    import omni.kit.viewport.utility.capture as cap
-                    self._width = viewport_api.resolution[0]
-                    self._height = viewport_api.resolution[1]
-                    captured = [False]
-                    buffer_holder = [None]
+        """Capture current frame.
 
-                    def on_done(buf, buf_size, w, h, fmt):
-                        if buf:
-                            buffer_holder[0] = bytes(buf)
-                            captured[0] = True
+        Viewport capture is driven from Kit's main thread (_on_update in
+        extension.py) because schedule_capture needs an asyncio event loop.
+        This method is called from the daemon capture thread and handles:
+        - Replicator annotator capture (if configured)
+        - PIL fallback (if no RTX buffer is available yet)
 
-                    cap.capture_viewport_to_buffer(viewport_api, on_done)
-                    for _ in range(10):
-                        if captured[0]:
-                            break
-                        time.sleep(0.01)
-                    if buffer_holder[0]:
+        When RTX capture is active (main thread writing to _buffer), this
+        method returns True without doing anything extra.
+        """
+        # If RTX capture is active (main thread updating buffer), just return
+        if self._rtx_active and self._buffer:
+            return True
+
+        # ── Replicator annotator capture ──
+        if self._rgb_annotator:
+            result = self._capture_from_annotator()
+            if result:
+                if not self._rtx_active:
+                    carb.log_info("[streaming] Replicator capture active!")
+                    self._rtx_active = True
+                return True
+
+        # ── Fallback: PIL ──
+        return self._render_sim_frame()
+
+    def _capture_from_viewport(self) -> bool:
+        """Capture frame from Kit viewport API."""
+        try:
+            from omni.kit.viewport.utility import capture_viewport_to_buffer
+
+            viewport_api = self._viewport_api
+            res = viewport_api.resolution
+            if res[0] > 0 and res[1] > 0:
+                self._width = res[0]
+                self._height = res[1]
+
+            captured = [False]
+            buffer_holder = [None]
+            dims = [0, 0]
+
+            def on_done(buf, buf_size, w, h, fmt):
+                if buf:
+                    buffer_holder[0] = bytes(buf)
+                    dims[0] = w
+                    dims[1] = h
+                    captured[0] = True
+
+            capture_viewport_to_buffer(viewport_api, on_done)
+
+            # Wait for capture callback (up to 200ms)
+            for _ in range(20):
+                if captured[0]:
+                    break
+                time.sleep(0.01)
+
+            if buffer_holder[0]:
+                w = dims[0] if dims[0] > 0 else self._width
+                h = dims[1] if dims[1] > 0 else self._height
+                self._buffer = _encode_jpeg(buffer_holder[0], w, h)
+                self._last_capture_time = time.time()
+                return True
+        except Exception as e:
+            self._capture_attempt_count += 1
+            if self._capture_attempt_count <= 3:
+                carb.log_info(f"[streaming] Viewport capture attempt {self._capture_attempt_count}: {e}")
+        return False
+
+    def _capture_from_annotator(self) -> bool:
+        """Capture frame from replicator RGB annotator."""
+        try:
+            data = self._rgb_annotator.get_data()
+            if data is not None and NP_AVAILABLE:
+                import numpy as np
+                arr = np.array(data)
+                if arr.size > 0 and arr.ndim >= 2:
+                    h, w = arr.shape[:2]
+                    self._width = w
+                    self._height = h
+                    # Annotator returns RGBA or RGB
+                    if arr.ndim == 3 and arr.shape[2] >= 3:
+                        rgba = arr[:, :, :4] if arr.shape[2] >= 4 else arr
                         self._buffer = _encode_jpeg(
-                            buffer_holder[0], self._width, self._height)
+                            rgba.tobytes(), w, h)
                         self._last_capture_time = time.time()
                         return True
-            except Exception:
-                pass
-
-        # Fallback: render from simulation data using PIL
-        return self._render_sim_frame()
+        except Exception as e:
+            self._capture_attempt_count += 1
+            if self._capture_attempt_count <= 3:
+                carb.log_info(f"[streaming] Annotator capture attempt {self._capture_attempt_count}: {e}")
+        return False
 
     def _render_sim_frame(self) -> bool:
         """Render current simulation frame as a 2D scientific visualization."""
@@ -404,10 +474,12 @@ class _StreamHandler(BaseHTTPRequestHandler):
 
         if path == "/status":
             mgr = self.diapedesis_manager
+            vc = self.viewport_capture
             self._send_json({
                 "status": "ok",
                 "kit": "running",
                 "extension": "cognisom.sim-2.0.0",
+                "renderer": "rtx" if (vc and vc._rtx_active) else "pil",
                 "diapedesis_loaded": mgr is not None and mgr.total_frames > 0,
                 "frames": mgr.total_frames if mgr else 0,
                 "current_frame": mgr.current_frame if mgr else 0,
@@ -472,17 +544,17 @@ class _StreamHandler(BaseHTTPRequestHandler):
 
         try:
             if path == "/cognisom/diapedesis":
-                # Load frames and build USD scene
+                # Load frames, queue scene build for Kit main thread
                 content_len = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_len)
                 data = json.loads(body)
                 frames = data.get("frames", [])
                 mgr.load_frames(frames, fps=data.get("fps", 30))
-                built = mgr.build_scene()
+                mgr.request_build_scene()
                 self._send_json({
-                    "message": f"Loaded {len(frames)} frames, scene {'built' if built else 'build failed'}",
+                    "message": f"Loaded {len(frames)} frames, scene build queued",
                     "total_frames": mgr.total_frames,
-                    "scene_built": built,
+                    "scene_built": False,
                 })
 
             elif path == "/cognisom/diapedesis/play":
@@ -514,11 +586,12 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 duration = data.get("duration", 60)
                 success = mgr.load_preset(preset, duration=duration)
                 if success:
-                    built = mgr.build_scene()
+                    # Queue scene build for Kit main thread
+                    mgr.request_build_scene()
                     self._send_json({
-                        "message": f"Preset '{preset}' loaded, scene {'built' if built else 'pending'}",
+                        "message": f"Preset '{preset}' loaded, scene build queued",
                         "total_frames": mgr.total_frames,
-                        "scene_built": built,
+                        "scene_built": False,
                     })
                 else:
                     self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
@@ -530,55 +603,84 @@ class _StreamHandler(BaseHTTPRequestHandler):
             self._send_json({"error": str(e)}, 500)
 
     def _serve_viewer_html(self):
-        """Serve a standalone HTML viewer for the MJPEG stream."""
+        """Serve a standalone HTML viewer with MJPEG streaming + controls.
+
+        This viewer uses MJPEG for video (works everywhere) plus the REST
+        API for simulation control. For the WebRTC viewer that uses
+        NVIDIA's streaming library, build and serve webrtc-viewer/.
+        """
         html = """<!DOCTYPE html>
 <html>
 <head>
     <title>Cognisom RTX Viewer</title>
     <style>
-        body { margin: 0; background: #0a0a1a; overflow: hidden; }
-        #viewer { width: 100vw; height: 100vh; object-fit: contain; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #040412; overflow: hidden; font: 13px monospace; color: #ccc; }
+        #viewer { width: 100vw; height: calc(100vh - 44px); object-fit: contain; background: #040412; }
         #badge {
             position: fixed; top: 8px; right: 8px;
-            background: rgba(0,180,0,0.85); color: white;
-            padding: 4px 12px; border-radius: 4px;
-            font: 13px monospace; z-index: 10;
+            background: rgba(180, 140, 0, 0.85); color: white;
+            padding: 4px 12px; border-radius: 4px; font: 13px monospace; z-index: 10;
+        }
+        #info {
+            position: fixed; top: 8px; left: 8px;
+            background: rgba(4, 4, 18, 0.85); color: #aab;
+            padding: 8px 14px; border-radius: 6px; font: 11px monospace;
+            z-index: 10; line-height: 1.6; border: 1px solid rgba(100,100,150,0.15);
         }
         #controls {
             position: fixed; bottom: 0; left: 0; right: 0;
-            background: rgba(10,10,30,0.9); padding: 8px 16px;
+            background: rgba(4, 4, 18, 0.92); padding: 8px 16px;
             display: flex; align-items: center; gap: 12px;
-            font: 13px monospace; color: #ccc; z-index: 10;
+            z-index: 10; border-top: 1px solid rgba(100,100,150,0.2);
         }
         button {
-            padding: 4px 14px; cursor: pointer; background: #2a2a4a;
-            color: #ccc; border: 1px solid #555; border-radius: 4px;
+            padding: 5px 16px; cursor: pointer; background: #2a2a4a;
+            color: #ccc; border: 1px solid #555; border-radius: 4px; font: 13px monospace;
         }
         button:hover { background: #3a3a6a; }
+        #status { flex: 1; text-align: right; color: #778; }
     </style>
 </head>
 <body>
-    <div id="badge">RTX HD</div>
+    <div id="badge">MJPEG</div>
+    <div id="info"><b style="color:#00a0ff">Cognisom Diapedesis</b><br><span id="sim-info">Loading...</span></div>
     <img id="viewer" />
     <div id="controls">
-        <button onclick="api('cognisom/diapedesis/play',{method:'POST'})">Play</button>
-        <button onclick="api('cognisom/diapedesis/pause',{method:'POST'})">Pause</button>
-        <button onclick="api('cognisom/diapedesis/stop',{method:'POST'})">Stop</button>
+        <button onclick="api('cognisom/diapedesis/play')">Play</button>
+        <button onclick="api('cognisom/diapedesis/pause')">Pause</button>
+        <button onclick="api('cognisom/diapedesis/stop')">Stop</button>
+        <button onclick="loadPreset()">Load Preset</button>
         <span id="status">Connecting...</span>
     </div>
     <script>
-        // Derive base URL so paths work both directly (host:8211) and via proxy (/kit/)
         const base = window.location.pathname.replace(/\\/streaming\\/client.*$/, '');
         document.getElementById('viewer').src = base + '/stream';
-        function api(path, opts) { return fetch(base + '/' + path, opts); }
+        function api(path) { return fetch(base + '/' + path, {method:'POST'}); }
+        function loadPreset() {
+            fetch(base + '/cognisom/diapedesis/preset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({preset: 'inflammation', duration: 120}),
+            }).then(r => r.json()).then(d => {
+                document.getElementById('sim-info').textContent = d.message || 'Loaded';
+            }).catch(() => {});
+        }
         setInterval(async () => {
             try {
                 const r = await fetch(base + '/status');
                 const d = await r.json();
-                document.getElementById('status').textContent =
-                    `Frame ${d.current_frame}/${d.frames} | ${d.playing ? 'Playing' : 'Stopped'}`;
-            } catch(e) {}
-        }, 500);
+                const parts = [];
+                if (d.diapedesis_loaded) parts.push(`Frame ${d.current_frame}/${d.frames}`);
+                parts.push(d.playing ? 'Playing' : 'Idle');
+                parts.push(`Renderer: ${d.renderer}`);
+                document.getElementById('status').textContent = parts.join(' | ');
+                const info = d.diapedesis_loaded
+                    ? `Loaded: ${d.frames} frames | ${d.playing ? 'Playing' : 'Idle'}`
+                    : 'No simulation loaded';
+                document.getElementById('sim-info').textContent = info;
+            } catch(e) { document.getElementById('status').textContent = 'Disconnected'; }
+        }, 800);
     </script>
 </body>
 </html>"""
@@ -648,21 +750,36 @@ class StreamingServer:
     def _capture_loop(self):
         """Continuously capture viewport frames and drive playback.
 
-        In headless mode (--no-window), Kit's main loop doesn't pump
-        update events, so we drive the DiapedesisManager's update()
-        from here to advance frames during playback.
+        When RTX capture is active (main thread driving viewport capture),
+        this loop only drives PIL fallback and playback advancement.
+        When RTX is NOT active (e.g. no viewport), this loop drives both
+        playback and PIL-based rendering.
         """
         mgr = _StreamHandler.diapedesis_manager
         interval = 1.0 / 30.0
         while self._running:
             try:
-                # Advance playback (headless: Kit main loop doesn't call update)
-                if mgr and mgr.is_playing and not mgr._is_paused:
-                    mgr.update(interval)
-                self._viewport_capture.capture()
+                vc = self._viewport_capture
+                # Only drive playback from daemon thread when RTX is NOT active
+                # (when RTX is active, Kit main thread drives both playback
+                #  and capture to avoid USD stage race conditions)
+                if not vc._rtx_active:
+                    if mgr and mgr.is_playing and not mgr._is_paused:
+                        mgr.update(interval)
+                vc.capture()
             except Exception:
                 pass
             time.sleep(interval)
+
+    def set_viewport(self, viewport_api):
+        """Set viewport API reference for RTX frame capture."""
+        self._viewport_capture._viewport_api = viewport_api
+        carb.log_info("[streaming] Viewport API set for RTX capture")
+
+    def set_annotator(self, rgb_annotator):
+        """Set replicator annotator for render product capture."""
+        self._viewport_capture._rgb_annotator = rgb_annotator
+        carb.log_info("[streaming] Replicator annotator set for capture")
 
     def shutdown(self):
         """Stop the server."""

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cognisom RTX Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #040412;
+            color: #ccc;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #stream-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #remote-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #040412;
+        }
+        #remote-audio { display: none; }
+
+        /* Connection status overlay */
+        #status-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            background: rgba(4, 4, 18, 0.95);
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+        #status-overlay.connected {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .status-spinner {
+            width: 48px; height: 48px;
+            border: 3px solid rgba(0, 160, 255, 0.2);
+            border-top-color: #00a0ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-title { font-size: 20px; color: #00a0ff; margin-bottom: 8px; }
+        .status-msg { font-size: 13px; color: #667; }
+        .status-error { color: #ff4444; }
+
+        /* HUD badges */
+        #rtx-badge {
+            position: fixed;
+            top: 10px; right: 10px;
+            background: rgba(0, 180, 0, 0.85);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 4px;
+            font: 13px monospace;
+            z-index: 10;
+        }
+        #rtx-badge.offline { background: rgba(180, 0, 0, 0.85); }
+
+        /* Controls bar */
+        #controls {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: rgba(4, 4, 18, 0.92);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font: 13px monospace;
+            z-index: 10;
+            border-top: 1px solid rgba(100, 100, 150, 0.2);
+        }
+        .ctrl-btn {
+            padding: 5px 16px;
+            cursor: pointer;
+            background: #2a2a4a;
+            color: #ccc;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font: 13px monospace;
+        }
+        .ctrl-btn:hover { background: #3a3a6a; }
+        .ctrl-btn.active { background: #1a4a1a; border-color: #2a8a2a; }
+        #status-text { flex: 1; text-align: right; color: #778; }
+
+        /* Sim info overlay */
+        #sim-info {
+            position: fixed;
+            top: 10px; left: 10px;
+            font: 11px monospace;
+            color: #aab;
+            background: rgba(4, 4, 18, 0.85);
+            padding: 8px 14px;
+            border-radius: 6px;
+            z-index: 10;
+            line-height: 1.6;
+            border: 1px solid rgba(100, 100, 150, 0.15);
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="stream-container">
+        <video id="remote-video" autoplay playsinline muted></video>
+        <audio id="remote-audio" autoplay></audio>
+    </div>
+
+    <div id="status-overlay">
+        <div class="status-spinner"></div>
+        <div class="status-title">Cognisom RTX Streaming</div>
+        <div class="status-msg" id="status-detail">Connecting to Kit server...</div>
+    </div>
+
+    <div id="rtx-badge" class="offline">RTX HD</div>
+
+    <div id="sim-info">
+        <b style="color:#00a0ff">Cognisom Diapedesis</b><br>
+        <span id="sim-status">Waiting for connection...</span>
+    </div>
+
+    <div id="controls">
+        <button class="ctrl-btn" id="btn-play" onclick="simAPI('play')">Play</button>
+        <button class="ctrl-btn" id="btn-pause" onclick="simAPI('pause')">Pause</button>
+        <button class="ctrl-btn" id="btn-stop" onclick="simAPI('stop')">Stop</button>
+        <button class="ctrl-btn" id="btn-preset" onclick="loadPreset()">Load Inflammation</button>
+        <span id="status-text">Disconnected</span>
+    </div>
+
+    <!--
+    NVIDIA Omniverse WebRTC Streaming Library
+    ===========================================
+    This library handles the proprietary Kit signaling protocol.
+    Install: npm install @nvidia/omniverse-webrtc-streaming-library
+    Registry: https://edge.urm.nvidia.com:443/artifactory/api/npm/omniverse-client-npm/
+
+    For local development, build from web-viewer-sample:
+      git clone https://github.com/NVIDIA-Omniverse/web-viewer-sample
+      npm install
+      npm run build
+    -->
+    <script type="module">
+        // ═══════════════════════════════════════════════════════════════
+        // Configuration
+        // ═══════════════════════════════════════════════════════════════
+
+        // Parse URL params for server configuration
+        const params = new URLSearchParams(window.location.search);
+        const KIT_SERVER = params.get('server') || window.location.hostname || '127.0.0.1';
+        const SIGNALING_PORT = parseInt(params.get('signalingPort') || '49100');
+        const API_PORT = parseInt(params.get('apiPort') || '8211');
+        const API_BASE = `http://${KIT_SERVER}:${API_PORT}`;
+
+        const statusOverlay = document.getElementById('status-overlay');
+        const statusDetail = document.getElementById('status-detail');
+        const rtxBadge = document.getElementById('rtx-badge');
+        const simStatus = document.getElementById('sim-status');
+        const statusText = document.getElementById('status-text');
+
+        // ═══════════════════════════════════════════════════════════════
+        // WebRTC Connection via NVIDIA Streaming Library
+        // ═══════════════════════════════════════════════════════════════
+
+        let streamConnected = false;
+
+        async function connectStream() {
+            statusDetail.textContent = 'Loading streaming library...';
+
+            try {
+                // Try to import the NVIDIA streaming library
+                // This works when the library is installed and bundled
+                const { AppStreamer } = await import('@nvidia/omniverse-webrtc-streaming-library');
+
+                statusDetail.textContent = `Connecting to ${KIT_SERVER}:${SIGNALING_PORT}...`;
+
+                const streamConfig = {
+                    videoElementId: 'remote-video',
+                    audioElementId: 'remote-audio',
+                    authenticate: true,
+                    maxReconnects: 20,
+                    signalingServer: KIT_SERVER,
+                    signalingPort: SIGNALING_PORT,
+                    mediaServer: KIT_SERVER,
+                    nativeTouchEvents: true,
+                    width: 1920,
+                    height: 1080,
+                    fps: 60,
+                    onStart: (msg) => {
+                        console.log('[cognisom] Stream started:', msg);
+                        if (msg.action === 'start' && msg.status === 'success') {
+                            onStreamConnected();
+                        } else if (msg.status === 'error') {
+                            onStreamError(msg.description || 'Connection failed');
+                        }
+                    },
+                    onUpdate: (msg) => {
+                        console.log('[cognisom] Stream update:', msg);
+                    },
+                    onCustomEvent: (msg) => {
+                        console.log('[cognisom] Custom event:', msg);
+                    },
+                    onStop: (msg) => {
+                        console.log('[cognisom] Stream stopped:', msg);
+                        onStreamDisconnected();
+                    },
+                    onTerminate: (msg) => {
+                        console.log('[cognisom] Stream terminated:', msg);
+                        onStreamDisconnected();
+                    },
+                };
+
+                await AppStreamer.connect({ source: 'local', streamConfig });
+
+            } catch (e) {
+                console.warn('[cognisom] NVIDIA streaming library not available:', e);
+                statusDetail.innerHTML =
+                    'NVIDIA streaming library not loaded.<br><br>' +
+                    '<span style="color:#889">The <code>@nvidia/omniverse-webrtc-streaming-library</code> ' +
+                    'npm package is required for WebRTC streaming.</span><br><br>' +
+                    '<span style="color:#889">Falling back to MJPEG...</span>';
+
+                // Fallback to MJPEG stream after 2s
+                setTimeout(() => connectMJPEG(), 2000);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // MJPEG Fallback (works without NVIDIA library)
+        // ═══════════════════════════════════════════════════════════════
+
+        function connectMJPEG() {
+            statusDetail.textContent = 'Connecting via MJPEG fallback...';
+
+            const video = document.getElementById('remote-video');
+            video.style.display = 'none';
+
+            // Replace video with img for MJPEG
+            const img = document.createElement('img');
+            img.id = 'mjpeg-stream';
+            img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+            img.src = `${API_BASE}/stream`;
+            img.onload = () => {
+                statusOverlay.classList.add('connected');
+                rtxBadge.textContent = 'MJPEG';
+                rtxBadge.classList.remove('offline');
+                rtxBadge.style.background = 'rgba(180, 140, 0, 0.85)';
+                statusText.textContent = 'MJPEG stream active';
+                streamConnected = true;
+            };
+            img.onerror = () => {
+                statusDetail.innerHTML =
+                    '<span class="status-error">Cannot connect to Kit server</span><br><br>' +
+                    `<span style="color:#889">Tried: ${API_BASE}/stream</span><br>` +
+                    '<span style="color:#889">Ensure the Kit container is running.</span>';
+                retryConnection();
+            };
+
+            video.parentElement.appendChild(img);
+        }
+
+        function retryConnection() {
+            setTimeout(async () => {
+                try {
+                    const r = await fetch(`${API_BASE}/status`);
+                    if (r.ok) {
+                        window.location.reload();
+                    } else {
+                        retryConnection();
+                    }
+                } catch {
+                    retryConnection();
+                }
+            }, 5000);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Stream State Handlers
+        // ═══════════════════════════════════════════════════════════════
+
+        function onStreamConnected() {
+            streamConnected = true;
+            statusOverlay.classList.add('connected');
+            rtxBadge.textContent = 'RTX HD';
+            rtxBadge.classList.remove('offline');
+            statusText.textContent = 'WebRTC stream active';
+        }
+
+        function onStreamError(msg) {
+            statusDetail.innerHTML =
+                `<span class="status-error">${msg}</span><br><br>` +
+                '<span style="color:#889">Falling back to MJPEG...</span>';
+            setTimeout(() => connectMJPEG(), 2000);
+        }
+
+        function onStreamDisconnected() {
+            streamConnected = false;
+            rtxBadge.classList.add('offline');
+            rtxBadge.textContent = 'Disconnected';
+            statusText.textContent = 'Disconnected';
+            statusOverlay.classList.remove('connected');
+            statusDetail.textContent = 'Reconnecting...';
+            setTimeout(() => connectStream(), 3000);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Simulation API (REST on port 8211)
+        // ═══════════════════════════════════════════════════════════════
+
+        window.simAPI = async function(action) {
+            try {
+                await fetch(`${API_BASE}/cognisom/diapedesis/${action}`, {
+                    method: 'POST',
+                });
+            } catch (e) {
+                console.warn(`[cognisom] API ${action} failed:`, e);
+            }
+        };
+
+        window.loadPreset = async function() {
+            try {
+                const r = await fetch(`${API_BASE}/cognisom/diapedesis/preset`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preset: 'inflammation', duration: 120 }),
+                });
+                const data = await r.json();
+                simStatus.textContent = data.message || 'Preset loaded';
+            } catch (e) {
+                console.warn('[cognisom] Load preset failed:', e);
+            }
+        };
+
+        // Poll simulation status
+        setInterval(async () => {
+            try {
+                const r = await fetch(`${API_BASE}/status`);
+                const d = await r.json();
+                const parts = [];
+                if (d.diapedesis_loaded) {
+                    parts.push(`Frame ${d.current_frame}/${d.frames}`);
+                    parts.push(d.playing ? 'Playing' : 'Idle');
+                }
+                parts.push(`Renderer: ${d.renderer || 'unknown'}`);
+                simStatus.innerHTML = parts.join(' | ');
+                statusText.textContent = parts.join(' | ');
+            } catch {
+                // Kit not reachable
+            }
+        }, 1000);
+
+        // ═══════════════════════════════════════════════════════════════
+        // Initialize
+        // ═══════════════════════════════════════════════════════════════
+
+        // Start connection
+        connectStream();
+    </script>
+</body>
+</html>

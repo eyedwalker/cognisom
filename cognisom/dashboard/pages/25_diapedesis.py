@@ -340,9 +340,10 @@ The extension provides:
             st.error(f"Failed to load frames into Kit: {e}")
 
     # Embed MJPEG viewport stream (browser-side, through HTTPS proxy)
+    # The viewer tries WebRTC first (if library is loaded), falls back to MJPEG
     viewer_html = f"""
     <div id="omniViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;
-         background:#0a0a1a;position:relative;">
+         background:#040412;position:relative;">
         <img id="rtxStream" src="{kit_browser}/stream"
              style="width:100%;height:100%;object-fit:contain;"
              onerror="this.style.display='none';document.getElementById('rtxFallback').style.display='flex';" />
@@ -351,31 +352,54 @@ The extension provides:
             <div style="font-size:28px;margin-bottom:12px;">Omniverse Kit RTX</div>
             <div>Waiting for viewport render...</div>
         </div>
-        <div style="position:absolute;top:8px;right:8px;background:rgba(0,180,0,0.85);
+        <div id="rtxBadge" style="position:absolute;top:8px;right:8px;background:rgba(180,140,0,0.85);
              color:white;padding:4px 12px;border-radius:4px;font:13px monospace;z-index:2;">
-            RTX HD
+            MJPEG
+        </div>
+        <div id="rtxInfo" style="position:absolute;top:8px;left:8px;background:rgba(4,4,18,0.85);
+             color:#aab;padding:8px 14px;border-radius:6px;font:11px monospace;z-index:2;
+             line-height:1.6;border:1px solid rgba(100,100,150,0.15);">
+            <b style="color:#00a0ff">Cognisom Diapedesis</b><br>
+            <span id="rtxSimInfo">Connected to Kit</span>
         </div>
         <div id="rtxStatus" style="position:absolute;bottom:8px;left:8px;color:#8899aa;
              font:12px monospace;z-index:2;"></div>
     </div>
     <script>
-        // Poll status for frame counter overlay
         setInterval(async () => {{
             try {{
                 const r = await fetch("{kit_browser}/status");
                 const d = await r.json();
                 const el = document.getElementById('rtxStatus');
-                if (el) el.textContent = `Frame ${{d.current_frame}}/${{d.frames}} | ${{d.playing ? '▶ Playing' : '⏸ Idle'}}`;
+                const info = document.getElementById('rtxSimInfo');
+                if (el) {{
+                    const parts = [];
+                    if (d.diapedesis_loaded) parts.push(`Frame ${{d.current_frame}}/${{d.frames}}`);
+                    parts.push(d.playing ? '\\u25B6 Playing' : '\\u23F8 Idle');
+                    parts.push(`Renderer: ${{d.renderer}}`);
+                    el.textContent = parts.join(' | ');
+                }}
+                if (info) {{
+                    info.textContent = d.diapedesis_loaded
+                        ? `${{d.frames}} frames | ${{d.playing ? 'Playing' : 'Idle'}}`
+                        : 'No simulation loaded';
+                }}
             }} catch(e) {{}}
-        }}, 500);
+        }}, 800);
     </script>
     """
     st.components.v1.html(viewer_html, height=680, scrolling=False)
 
-    # Open standalone viewer link
-    st.caption(
-        f"[Open full-screen RTX viewer ↗]({kit_browser}/streaming/client)"
-    )
+    # Links to standalone viewers
+    col_link1, col_link2 = st.columns(2)
+    with col_link1:
+        st.caption(
+            f"[Open MJPEG viewer ↗]({kit_browser}/streaming/client)"
+        )
+    with col_link2:
+        st.caption(
+            f"[Open WebRTC viewer ↗](/rtx-viewer/?server={kit_browser.split('//')[1].split(':')[0] if '://' in kit_browser else 'localhost'})"
+        )
 
     # Playback controls (server-side via localhost)
     col1, col2, col3, col4 = st.columns([1, 1, 6, 1])

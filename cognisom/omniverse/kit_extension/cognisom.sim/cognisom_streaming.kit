@@ -1,13 +1,11 @@
 [package]
 title = "Cognisom Diapedesis Streaming"
-description = "Isaac Sim + Cognisom biological simulation extension"
+description = "Isaac Sim + Cognisom biological simulation with RTX WebRTC streaming"
 version = "1.0.0"
 
 [dependencies]
-"isaacsim.exp.full" = {}
-"omni.kit.livestream.core" = { version = "6.1.0", exact = true }
-"omni.kit.livestream.webrtc" = { version = "6.0.0", exact = true }
-"omni.kit.streamsdk.plugins" = { version = "6.1.7", exact = true }
+# Use the streaming variant which is pre-configured for headless WebRTC
+"isaacsim.exp.full.streaming" = {}
 "cognisom.sim" = {}
 
 [settings]
@@ -16,17 +14,18 @@ app.version = "1.0.0"
 app.vulkan = true
 
 [settings.app.exts]
-folders.'++' = [
-    "/isaac-sim/exts",
-    "/isaac-sim/extscache",
-    "/isaac-sim/extsPhysics",
-    "/isaac-sim/extsUser",
-    "/isaac-sim/extsDeprecated",
+folders = [
+    "${app}/../exts",
+    "${app}/../extscache",
+    "${app}/../extsPhysics",
+    "${app}/../extsUser",
+    "${app}/../extsDeprecated",
 ]
 
 [settings.app.window]
 hideUi = true
 title = "Cognisom Diapedesis"
+drawMouse = false
 
 [settings.app.livestream]
 allowResize = false
