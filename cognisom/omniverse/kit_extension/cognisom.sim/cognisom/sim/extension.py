@@ -536,9 +536,10 @@ class CognisomSimExtension(omni.ext.IExt):
         #   Tissue: below vessel, Y from -25 to -75
         #   Scene center ~ (100, -15, 0)
         #
-        # Camera: elevated 3/4 view from Z+, looking down at the vessel
-        cam_pos = Gf.Vec3d(100.0, 60.0, 180.0)
-        target = Gf.Vec3d(100.0, -15.0, 0.0)
+        # Camera: closer elevated 3/4 view showing 3D depth
+        # Offset in X to show length perspective, high Y for drama
+        cam_pos = Gf.Vec3d(160.0, 55.0, 120.0)
+        target = Gf.Vec3d(90.0, -20.0, 0.0)
 
         xformable = UsdGeom.Xformable(camera_prim)
         xformable.AddTranslateOp().Set(cam_pos)

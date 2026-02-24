@@ -339,10 +339,9 @@ The extension provides:
         except Exception as e:
             st.error(f"Failed to load frames into Kit: {e}")
 
-    # Embed MJPEG viewport stream (browser-side, through HTTPS proxy)
-    # The viewer tries WebRTC first (if library is loaded), falls back to MJPEG
+    # Embed MJPEG viewport stream with legend + camera controls overlay
     viewer_html = f"""
-    <div id="omniViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;
+    <div id="omniViewer" style="width:100%;height:700px;border-radius:8px;overflow:hidden;
          background:#040412;position:relative;">
         <img id="rtxStream" src="{kit_browser}/stream"
              style="width:100%;height:100%;object-fit:contain;"
@@ -353,22 +352,80 @@ The extension provides:
             <div>Waiting for viewport render...</div>
         </div>
         <div id="rtxBadge" style="position:absolute;top:8px;right:8px;background:rgba(180,140,0,0.85);
-             color:white;padding:4px 12px;border-radius:4px;font:13px monospace;z-index:2;">
-            MJPEG
+             color:white;padding:6px 14px;border-radius:4px;font:14px monospace;z-index:2;">
+            RTX HD
         </div>
-        <div id="rtxInfo" style="position:absolute;top:8px;left:8px;background:rgba(4,4,18,0.85);
-             color:#aab;padding:8px 14px;border-radius:6px;font:11px monospace;z-index:2;
-             line-height:1.6;border:1px solid rgba(100,100,150,0.15);">
-            <b style="color:#00a0ff">Cognisom Diapedesis</b><br>
+        <div id="rtxInfo" style="position:absolute;top:8px;left:8px;background:rgba(4,4,18,0.9);
+             color:#aab;padding:10px 16px;border-radius:6px;font:13px monospace;z-index:2;
+             line-height:1.7;border:1px solid rgba(100,100,150,0.2);">
+            <b style="color:#00a0ff;font-size:14px">Cognisom Diapedesis</b><br>
             <span id="rtxSimInfo">Connected to Kit</span>
         </div>
-        <div id="rtxStatus" style="position:absolute;bottom:8px;left:8px;color:#8899aa;
-             font:12px monospace;z-index:2;"></div>
+
+        <!-- Legend overlay (bottom-left) -->
+        <div style="position:absolute;bottom:10px;left:10px;background:rgba(4,4,18,0.92);
+             color:#bbc;padding:14px 18px;border-radius:8px;font:13px monospace;z-index:2;
+             line-height:1.8;border:1px solid rgba(100,100,150,0.25);pointer-events:none;">
+            <b style="color:#dde;font-size:14px">Scene Elements</b><br>
+            <span style="color:#ddddee;font-size:15px">&#9679;</span> Neutrophils (color = state)<br>
+            <span style="color:#cc2222;font-size:15px">&#9679;</span> RBCs (biconcave)<br>
+            <span style="color:#ffaa00;font-size:15px">&#9679;</span> E-Selectin lollipops<br>
+            <span style="color:#4488ff;font-size:15px">&#9679;</span> ICAM-1 bead-rods<br>
+            <span style="color:#33bb88;font-size:15px">&#9679;</span> PECAM-1 at junctions<br>
+            <span style="color:#336633;font-size:15px">&#9679;</span> Bacteria (C3b coated)<br>
+            <span style="color:#dd5522;font-size:15px">&#9679;</span> Macrophages<br>
+            <span style="color:#55bbff;font-size:15px">&#9679;</span> Chemokine gradient
+        </div>
+
+        <!-- Camera controls (bottom-right) -->
+        <div id="camControls" style="position:absolute;bottom:10px;right:10px;background:rgba(4,4,18,0.92);
+             padding:10px 14px;border-radius:8px;font:12px monospace;z-index:3;
+             border:1px solid rgba(100,100,150,0.25);display:flex;flex-direction:column;gap:6px;">
+            <b style="color:#aab;font-size:13px">Camera</b>
+            <div style="display:flex;gap:4px;justify-content:center;">
+                <button onclick="orbitCam(0,-15)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9650;</button>
+            </div>
+            <div style="display:flex;gap:4px;justify-content:center;">
+                <button onclick="orbitCam(-20,0)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9664;</button>
+                <button onclick="resetCam()" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 8px;border-radius:3px;border:1px solid #555;">&#8634;</button>
+                <button onclick="orbitCam(20,0)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9654;</button>
+            </div>
+            <div style="display:flex;gap:4px;justify-content:center;">
+                <button onclick="orbitCam(0,15)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9660;</button>
+            </div>
+            <div style="display:flex;gap:4px;justify-content:center;">
+                <button onclick="zoomCam(0.8)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#43;</button>
+                <button onclick="zoomCam(1.25)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#8722;</button>
+            </div>
+        </div>
+
+        <div id="rtxStatus" style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+             color:#8899aa;font:13px monospace;z-index:2;background:rgba(4,4,18,0.8);
+             padding:4px 12px;border-radius:4px;"></div>
     </div>
     <script>
+        const KB = "{kit_browser}";
+        function orbitCam(yaw, pitch) {{
+            fetch(KB + '/cognisom/camera/orbit', {{
+                method: 'POST', headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{yaw: yaw, pitch: pitch}})
+            }}).catch(() => {{}});
+        }}
+        function zoomCam(factor) {{
+            fetch(KB + '/cognisom/camera/zoom', {{
+                method: 'POST', headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{factor: factor}})
+            }}).catch(() => {{}});
+        }}
+        function resetCam() {{
+            fetch(KB + '/cognisom/camera/reset', {{
+                method: 'POST', headers: {{'Content-Type': 'application/json'}},
+                body: '{{}}'
+            }}).catch(() => {{}});
+        }}
         setInterval(async () => {{
             try {{
-                const r = await fetch("{kit_browser}/status");
+                const r = await fetch(KB + "/status");
                 const d = await r.json();
                 const el = document.getElementById('rtxStatus');
                 const info = document.getElementById('rtxSimInfo');
@@ -388,7 +445,7 @@ The extension provides:
         }}, 800);
     </script>
     """
-    st.components.v1.html(viewer_html, height=680, scrolling=False)
+    st.components.v1.html(viewer_html, height=730, scrolling=False)
 
     # Links to standalone viewers
     col_link1, col_link2 = st.columns(2)
@@ -1232,28 +1289,40 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
 
     /* ═══════════ Overlays ═══════════ */
     const metricsOverlay = document.createElement('div');
-    metricsOverlay.style.cssText = 'position:absolute;top:10px;left:10px;color:#ccc;font:11px monospace;background:rgba(4,4,18,0.85);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.6;border:1px solid rgba(100,100,150,0.2);';
+    metricsOverlay.style.cssText = 'position:absolute;top:10px;left:10px;color:#ccc;font:13px monospace;background:rgba(4,4,18,0.9);padding:12px 16px;border-radius:8px;pointer-events:none;line-height:1.7;border:1px solid rgba(100,100,150,0.25);';
     container.appendChild(metricsOverlay);
 
     const stepsOverlay = document.createElement('div');
-    stepsOverlay.style.cssText = 'position:absolute;top:10px;right:10px;color:#ccc;font:11px monospace;background:rgba(4,4,18,0.85);padding:10px 14px;border-radius:8px;pointer-events:none;line-height:1.8;border:1px solid rgba(100,100,150,0.2);';
+    stepsOverlay.style.cssText = 'position:absolute;top:10px;right:10px;color:#ccc;font:13px monospace;background:rgba(4,4,18,0.9);padding:12px 16px;border-radius:8px;pointer-events:none;line-height:1.9;border:1px solid rgba(100,100,150,0.25);';
     container.appendChild(stepsOverlay);
 
     // Legend overlay (bottom-left)
     const legendOverlay = document.createElement('div');
-    legendOverlay.style.cssText = 'position:absolute;bottom:10px;left:10px;color:#999;font:10px monospace;background:rgba(4,4,18,0.85);padding:8px 12px;border-radius:6px;pointer-events:none;line-height:1.5;border:1px solid rgba(100,100,150,0.15);';
-    legendOverlay.innerHTML = '<b style="color:#aab">Molecules</b><br>'
-        + '<span style="color:#ffaa00">\\u25CF</span> Selectin (E-sel)<br>'
-        + '<span style="color:#4488ff">\\u25CF</span> ICAM-1<br>'
-        + '<span style="color:#33bb88">\\u25CF</span> PECAM-1 (junction)<br>'
-        + '<span style="color:#00ccdd">\\u25CF</span> Integrin (LFA-1)<br>'
-        + '<span style="color:#cc9933">\\u25CF</span> Complement (C3b)<br>'
-        + '<b style="color:#aab">Tissue</b><br>'
-        + '<span style="color:#336633">\\u25CF</span> Bacteria<br>'
-        + '<span style="color:#dd5522">\\u25CF</span> Macrophage<br>'
-        + '<span style="color:#eee8cc">\\u25CF</span> Fibrin<br>'
-        + '<span style="color:#55bbff">\\u25CF</span> Chemokines';
+    legendOverlay.style.cssText = 'position:absolute;bottom:10px;left:10px;color:#bbc;font:14px monospace;background:rgba(4,4,18,0.92);padding:14px 18px;border-radius:8px;pointer-events:none;line-height:1.8;border:1px solid rgba(100,100,150,0.25);';
+    legendOverlay.innerHTML = '<b style="color:#dde;font-size:15px">Molecules</b><br>'
+        + '<span style="color:#ffaa00;font-size:16px">\\u25CF</span> Selectin (E-sel)<br>'
+        + '<span style="color:#4488ff;font-size:16px">\\u25CF</span> ICAM-1<br>'
+        + '<span style="color:#33bb88;font-size:16px">\\u25CF</span> PECAM-1 (junction)<br>'
+        + '<span style="color:#00ccdd;font-size:16px">\\u25CF</span> Integrin (LFA-1)<br>'
+        + '<span style="color:#cc9933;font-size:16px">\\u25CF</span> Complement (C3b)<br>'
+        + '<b style="color:#dde;font-size:15px">Cells &amp; Tissue</b><br>'
+        + '<span style="color:#cc2222;font-size:16px">\\u25CF</span> RBC (biconcave)<br>'
+        + '<span style="color:#ddddee;font-size:16px">\\u25CF</span> Neutrophil<br>'
+        + '<span style="color:#336633;font-size:16px">\\u25CF</span> Bacteria (opsonized)<br>'
+        + '<span style="color:#dd5522;font-size:16px">\\u25CF</span> Macrophage<br>'
+        + '<span style="color:#eee8cc;font-size:16px">\\u25CF</span> Fibrin mesh<br>'
+        + '<span style="color:#ccbb99;font-size:16px">\\u25CF</span> Collagen (ECM)<br>'
+        + '<span style="color:#55bbff;font-size:16px">\\u25CF</span> Chemokine gradient';
     container.appendChild(legendOverlay);
+
+    // Navigation help overlay (bottom-right)
+    const navOverlay = document.createElement('div');
+    navOverlay.style.cssText = 'position:absolute;bottom:10px;right:10px;color:#889;font:12px monospace;background:rgba(4,4,18,0.88);padding:10px 14px;border-radius:6px;pointer-events:none;line-height:1.7;border:1px solid rgba(100,100,150,0.2);';
+    navOverlay.innerHTML = '<b style="color:#aab;font-size:13px">3D Navigation</b><br>'
+        + '\\u21BA Left-drag: Rotate<br>'
+        + '\\u2195 Scroll: Zoom<br>'
+        + '\\u2725 Right-drag: Pan';
+    container.appendChild(navOverlay);
 
     // Apply first frame
     applyFrame(0);

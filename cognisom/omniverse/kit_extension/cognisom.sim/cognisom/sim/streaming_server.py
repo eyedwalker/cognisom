@@ -596,11 +596,134 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 else:
                     self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
 
+            elif path == "/cognisom/camera/orbit":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len) if content_len else b"{}"
+                data = json.loads(body) if body else {}
+                yaw = data.get("yaw", 0)    # degrees
+                pitch = data.get("pitch", 0)  # degrees
+                self._orbit_camera(yaw, pitch)
+                self._send_json({"status": "orbited", "yaw": yaw, "pitch": pitch})
+
+            elif path == "/cognisom/camera/zoom":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len) if content_len else b"{}"
+                data = json.loads(body) if body else {}
+                factor = data.get("factor", 1.0)  # <1 zoom in, >1 zoom out
+                self._zoom_camera(factor)
+                self._send_json({"status": "zoomed", "factor": factor})
+
+            elif path == "/cognisom/camera/reset":
+                self._reset_camera()
+                self._send_json({"status": "camera reset"})
+
             else:
                 self._send_json({"error": "not found"}, 404)
         except Exception as e:
             carb.log_warn(f"[streaming] POST {path} error: {e}")
             self._send_json({"error": str(e)}, 500)
+
+    def _orbit_camera(self, yaw_deg: float, pitch_deg: float):
+        """Orbit the scene camera around the vessel center."""
+        import math
+        try:
+            import omni.usd
+            from pxr import UsdGeom, Gf
+            stage = omni.usd.get_context().get_stage()
+            cam = stage.GetPrimAtPath("/World/DiapedesisCam")
+            if not cam or not cam.IsValid():
+                return
+            xf = UsdGeom.Xformable(cam)
+            ops = xf.GetOrderedXformOps()
+            if len(ops) < 2:
+                return
+            # Current position and rotation
+            pos = ops[0].Get()  # translate
+            rot = ops[1].Get()  # rotateXYZ
+
+            # Target is vessel center
+            target = Gf.Vec3d(90.0, -20.0, 0.0)
+            dx, dy, dz = pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]
+            dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+            # Convert to spherical coordinates
+            theta = math.atan2(dz, dx)  # azimuth
+            phi = math.acos(max(-1, min(1, dy / dist)))  # elevation
+
+            # Apply orbit deltas
+            theta += math.radians(yaw_deg)
+            phi = max(0.1, min(math.pi - 0.1, phi - math.radians(pitch_deg)))
+
+            # Convert back to cartesian
+            new_x = target[0] + dist * math.sin(phi) * math.cos(theta)
+            new_y = target[1] + dist * math.cos(phi)
+            new_z = target[2] + dist * math.sin(phi) * math.sin(theta)
+            ops[0].Set(Gf.Vec3d(new_x, new_y, new_z))
+
+            # Update rotation to look at target
+            dx2 = target[0] - new_x
+            dy2 = target[1] - new_y
+            dz2 = target[2] - new_z
+            dist_xz = math.sqrt(dx2*dx2 + dz2*dz2)
+            new_pitch = math.degrees(math.atan2(-dy2, dist_xz))
+            new_yaw = math.degrees(math.atan2(dx2, -dz2))
+            ops[1].Set(Gf.Vec3f(-new_pitch, new_yaw, 0.0))
+        except Exception as e:
+            carb.log_warn(f"[streaming] orbit camera error: {e}")
+
+    def _zoom_camera(self, factor: float):
+        """Zoom camera by moving along look direction."""
+        import math
+        try:
+            import omni.usd
+            from pxr import UsdGeom, Gf
+            stage = omni.usd.get_context().get_stage()
+            cam = stage.GetPrimAtPath("/World/DiapedesisCam")
+            if not cam or not cam.IsValid():
+                return
+            xf = UsdGeom.Xformable(cam)
+            ops = xf.GetOrderedXformOps()
+            if not ops:
+                return
+            pos = ops[0].Get()
+            target = Gf.Vec3d(90.0, -20.0, 0.0)
+            dx, dy, dz = pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]
+            dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+            new_dist = max(30.0, min(500.0, dist * factor))
+            scale = new_dist / dist if dist > 0 else 1.0
+            ops[0].Set(Gf.Vec3d(
+                target[0] + dx * scale,
+                target[1] + dy * scale,
+                target[2] + dz * scale))
+        except Exception as e:
+            carb.log_warn(f"[streaming] zoom camera error: {e}")
+
+    def _reset_camera(self):
+        """Reset camera to default position."""
+        try:
+            import omni.usd
+            from pxr import UsdGeom, Gf
+            import math
+            stage = omni.usd.get_context().get_stage()
+            cam = stage.GetPrimAtPath("/World/DiapedesisCam")
+            if not cam or not cam.IsValid():
+                return
+            xf = UsdGeom.Xformable(cam)
+            ops = xf.GetOrderedXformOps()
+            if len(ops) < 2:
+                return
+            cam_pos = Gf.Vec3d(160.0, 55.0, 120.0)
+            target = Gf.Vec3d(90.0, -20.0, 0.0)
+            ops[0].Set(cam_pos)
+            dx = target[0] - cam_pos[0]
+            dy = target[1] - cam_pos[1]
+            dz = target[2] - cam_pos[2]
+            dist_xz = math.sqrt(dx*dx + dz*dz)
+            pitch = math.degrees(math.atan2(-dy, dist_xz))
+            yaw = math.degrees(math.atan2(dx, -dz))
+            ops[1].Set(Gf.Vec3f(-pitch, yaw, 0.0))
+        except Exception as e:
+            carb.log_warn(f"[streaming] reset camera error: {e}")
 
     def _serve_viewer_html(self):
         """Serve a standalone HTML viewer with MJPEG streaming + controls.
