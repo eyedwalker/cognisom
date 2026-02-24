@@ -380,17 +380,21 @@ class _StreamHandler(BaseHTTPRequestHandler):
 </head>
 <body>
     <div id="badge">RTX HD</div>
-    <img id="viewer" src="/stream" />
+    <img id="viewer" />
     <div id="controls">
-        <button onclick="fetch('/cognisom/diapedesis/play',{method:'POST'})">Play</button>
-        <button onclick="fetch('/cognisom/diapedesis/pause',{method:'POST'})">Pause</button>
-        <button onclick="fetch('/cognisom/diapedesis/stop',{method:'POST'})">Stop</button>
+        <button onclick="api('cognisom/diapedesis/play',{method:'POST'})">Play</button>
+        <button onclick="api('cognisom/diapedesis/pause',{method:'POST'})">Pause</button>
+        <button onclick="api('cognisom/diapedesis/stop',{method:'POST'})">Stop</button>
         <span id="status">Connecting...</span>
     </div>
     <script>
+        // Derive base URL so paths work both directly (host:8211) and via proxy (/kit/)
+        const base = window.location.pathname.replace(/\\/streaming\\/client.*$/, '');
+        document.getElementById('viewer').src = base + '/stream';
+        function api(path, opts) { return fetch(base + '/' + path, opts); }
         setInterval(async () => {
             try {
-                const r = await fetch('/status');
+                const r = await fetch(base + '/status');
                 const d = await r.json();
                 document.getElementById('status').textContent =
                     `Frame ${d.current_frame}/${d.frames} | ${d.playing ? 'Playing' : 'Stopped'}`;
