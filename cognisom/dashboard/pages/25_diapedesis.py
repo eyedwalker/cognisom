@@ -24,6 +24,7 @@ Features:
 
 import json
 import math
+import os
 import time
 
 import streamlit as st
@@ -264,8 +265,12 @@ def _render_omniverse_viewer(frames, streaming_url: str):
 
     st.markdown("### Omniverse RTX Viewer")
 
-    # Server-side URL (Python → Kit, same machine)
-    kit_server = "http://localhost:8211"
+    # Server-side URL (Python → Kit)
+    # Inside Docker, localhost is the container itself. Use KIT_SERVER_URL env var
+    # or fall back to host.docker.internal (requires --add-host flag on docker run).
+    kit_server = os.environ.get(
+        "KIT_SERVER_URL", "http://host.docker.internal:8211"
+    )
     # Browser-side URL (JS/HTML → Kit, through nginx HTTPS proxy)
     kit_browser = streaming_url.rstrip("/")
 
