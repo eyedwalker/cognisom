@@ -413,10 +413,13 @@ class DiapedesisManager:
     # ── Playback Control ────────────────────────────────────────────────
 
     def play(self):
-        """Start or resume playback."""
+        """Start or resume playback.
+
+        Safe to call from any thread. If the scene isn't built yet,
+        queues a build for the Kit main thread.
+        """
         if not self._scene_built:
-            if not self.build_scene():
-                return
+            self.request_build_scene()
         self._is_playing = True
         self._is_paused = False
         carb.log_info("[diapedesis] Playback started")

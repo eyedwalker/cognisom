@@ -537,13 +537,14 @@ class CognisomSimExtension(omni.ext.IExt):
                 self._diag_count = 0
             self._diag_count += 1
             if self._diag_count <= 5 or self._diag_count % 600 == 0:
+                log_fn = carb.log_warn if self._diag_count <= 5 else carb.log_info
                 if data is not None:
                     arr_tmp = np.array(data)
-                    carb.log_info(
+                    log_fn(
                         f"[cognisom.sim] Annotator: shape={arr_tmp.shape} "
                         f"size={arr_tmp.size} (frame {self._diag_count})")
                 else:
-                    carb.log_info(
+                    log_fn(
                         f"[cognisom.sim] Annotator: None (frame {self._diag_count})")
 
             if data is None:
