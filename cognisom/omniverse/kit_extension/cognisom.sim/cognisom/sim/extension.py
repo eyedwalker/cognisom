@@ -210,17 +210,43 @@ class CognisomSimExtension(omni.ext.IExt):
 
     def _check_webrtc_streaming(self) -> bool:
         """Check if the Kit WebRTC livestream extension is active."""
+        # Method 1: Check via extension manager
         try:
             import omni.ext
             manager = omni.ext.get_extension_manager()
-            # Check for the WebRTC livestream extension
             for ext_id in ["omni.kit.livestream.webrtc",
                            "omni.services.livestream.webrtc"]:
-                if manager.is_extension_enabled(ext_id):
-                    carb.log_warn(f"[cognisom.sim] Found active: {ext_id}")
-                    return True
+                try:
+                    if manager.is_extension_enabled(ext_id):
+                        carb.log_warn(f"[cognisom.sim] Found active: {ext_id}")
+                        return True
+                except Exception:
+                    pass
+            # Try iterating enabled extensions
+            try:
+                for ext_info in manager.get_extensions():
+                    name = ext_info.get("id", "") or ext_info.get("name", "")
+                    if "livestream" in name.lower() and "webrtc" in name.lower():
+                        enabled = ext_info.get("enabled", False)
+                        carb.log_warn(f"[cognisom.sim] Found extension: "
+                                      f"{name} enabled={enabled}")
+                        if enabled:
+                            return True
+            except Exception:
+                pass
         except Exception as e:
-            carb.log_info(f"[cognisom.sim] Extension check failed: {e}")
+            carb.log_warn(f"[cognisom.sim] Extension manager check failed: {e}")
+
+        # Method 2: Check carb settings for livestream
+        try:
+            settings = carb.settings.get_settings()
+            port = settings.get_as_int("/app/livestream/port")
+            if port and port > 0:
+                carb.log_warn(f"[cognisom.sim] Livestream port set: {port}")
+                return True
+        except Exception:
+            pass
+
         return False
 
     def _create_scene_camera(self, stage) -> str:
