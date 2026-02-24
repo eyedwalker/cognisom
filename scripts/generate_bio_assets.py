@@ -127,6 +127,9 @@ def generate_single_mesh_asset(
     # LOD0 is default (geometry already in place)
     vset.SetVariantSelection("LOD0")
 
+    # Set default prim so AddReference() works without explicit prim path
+    stage.SetDefaultPrim(root_prim)
+
     stage.GetRootLayer().Save()
 
 
@@ -140,13 +143,16 @@ def generate_multi_part_asset(
     stage.SetMetadata("comment", f"Cognisom biological mesh: {spec.name}")
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
 
-    UsdGeom.Xform.Define(stage, "/mesh")
+    root = UsdGeom.Xform.Define(stage, "/mesh")
 
     # Generate LOD0 parts
     parts = gen_func(lod=0)
     for part_name, mesh_data in parts.items():
         prim_path = f"/mesh/{part_name}"
         _write_mesh_to_prim(stage, prim_path, mesh_data, spec.subdiv_scheme)
+
+    # Set default prim so AddReference() works without explicit prim path
+    stage.SetDefaultPrim(root.GetPrim())
 
     stage.GetRootLayer().Save()
 

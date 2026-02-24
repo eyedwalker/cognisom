@@ -498,19 +498,19 @@ class DiapedesisSceneBuilder:
 
     def _build_selectin_prototype(self, path: str):
         """Build a selectin lollipop geometry: SCR stalk + EGF + lectin head."""
-        xform = UsdGeom.Xform.Define(self._stage, path)
+        UsdGeom.Xform.Define(self._stage, path)
 
         if self._use_mesh_assets:
-            # High-fidelity mesh with separate stalk and head sub-prims
-            xform.GetPrim().GetReferences().AddReference(
+            # Put mesh reference on a child Xform so the prototype's own
+            # xformOpOrder stays clean for AddInternalReference instances
+            child = UsdGeom.Xform.Define(self._stage, f"{path}/geo")
+            child.GetPrim().GetReferences().AddReference(
                 self._asset_paths["selectin"])
-            # Scale to match scene units (prototype is unit-scale)
-            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf = UsdGeom.Xformable(child.GetPrim())
             xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
             self._bind_material(path, "selectin_stalk",
                                 override_descendants=True)
-            # Override lectin head material on named sub-prim
-            self._bind_material(f"{path}/mesh/lectin_head", "selectin_head",
+            self._bind_material(f"{path}/geo/mesh/lectin_head", "selectin_head",
                                 override_descendants=True)
         else:
             # Fallback: primitive spheres
@@ -541,14 +541,16 @@ class DiapedesisSceneBuilder:
 
         # ICAM-1 prototype (5 Ig domains with kink)
         proto = f"{PROTOTYPES_PATH}/icam1"
-        xform = UsdGeom.Xform.Define(self._stage, proto)
+        UsdGeom.Xform.Define(self._stage, proto)
         if self._use_mesh_assets:
-            xform.GetPrim().GetReferences().AddReference(
+            # Child xform for mesh reference (keeps prototype xformOps clean)
+            child = UsdGeom.Xform.Define(self._stage, f"{proto}/geo")
+            child.GetPrim().GetReferences().AddReference(
                 self._asset_paths["icam1"])
-            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf = UsdGeom.Xformable(child.GetPrim())
             xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
             self._bind_material(proto, "icam1", override_descendants=True)
-            self._bind_material(f"{proto}/mesh/tip", "icam1_tip",
+            self._bind_material(f"{proto}/geo/mesh/tip", "icam1_tip",
                                 override_descendants=True)
         else:
             for k in range(5):
@@ -622,12 +624,14 @@ class DiapedesisSceneBuilder:
         With mesh assets: references pecam1.usd (antiparallel beaded rods).
         Fallback: two rows of 6 sphere beads.
         """
-        xform = UsdGeom.Xform.Define(self._stage, path)
+        UsdGeom.Xform.Define(self._stage, path)
 
         if self._use_mesh_assets:
-            xform.GetPrim().GetReferences().AddReference(
+            # Child xform for mesh reference (keeps prototype xformOps clean)
+            child = UsdGeom.Xform.Define(self._stage, f"{path}/geo")
+            child.GetPrim().GetReferences().AddReference(
                 self._asset_paths["pecam1"])
-            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf = UsdGeom.Xformable(child.GetPrim())
             xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
             self._bind_material(path, "pecam1", override_descendants=True)
         else:
