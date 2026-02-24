@@ -181,26 +181,42 @@
         async function connectStream() {
             statusDetail.textContent = 'Loading streaming library...';
 
+            // Step 1: Try loading the NVIDIA library
+            let AppStreamer;
             try {
-                // Try to import the NVIDIA streaming library
-                // This works when the library is installed and bundled
-                const { AppStreamer } = await import('@nvidia/omniverse-webrtc-streaming-library');
+                const lib = await import('@nvidia/omniverse-webrtc-streaming-library');
+                AppStreamer = lib.AppStreamer;
+            } catch (e) {
+                console.warn('[cognisom] NVIDIA streaming library not available:', e);
+                statusDetail.textContent = 'Connecting via MJPEG...';
+                connectMJPEG();
+                return;
+            }
 
-                const signalingHost = KIT_SERVER || window.location.hostname;
-                // In production (no KIT_SERVER), use nginx proxy path
-                // with port 443 (same origin, WSS via SSL)
-                const useProxy = !KIT_SERVER;
-                const signalingActualPort = useProxy ? 443 : SIGNALING_PORT;
-                const signalingPath = useProxy ? '/streaming/' : undefined;
-                statusDetail.textContent = useProxy
-                    ? `Connecting via ${signalingHost}/streaming/...`
-                    : `Connecting to ${signalingHost}:${SIGNALING_PORT}...`;
+            // Step 2: Try WebRTC connection (with timeout fallback to MJPEG)
+            const signalingHost = KIT_SERVER || window.location.hostname;
+            const useProxy = !KIT_SERVER;
+            const signalingActualPort = useProxy ? 443 : SIGNALING_PORT;
+            const signalingPath = useProxy ? '/streaming/' : undefined;
+            statusDetail.textContent = useProxy
+                ? `WebRTC: connecting via ${signalingHost}/streaming/...`
+                : `WebRTC: connecting to ${signalingHost}:${SIGNALING_PORT}...`;
 
+            // Fall back to MJPEG after 5s if WebRTC doesn't connect
+            const mjpegTimer = setTimeout(() => {
+                if (!streamConnected) {
+                    console.log('[cognisom] WebRTC timeout, falling back to MJPEG');
+                    statusDetail.textContent = 'WebRTC unavailable, using MJPEG...';
+                    connectMJPEG();
+                }
+            }, 5000);
+
+            try {
                 const streamConfig = {
                     videoElementId: 'remote-video',
                     audioElementId: 'remote-audio',
                     authenticate: true,
-                    maxReconnects: 20,
+                    maxReconnects: 3,
                     signalingServer: signalingHost,
                     signalingPort: signalingActualPort,
                     signalingPath: signalingPath,
@@ -212,8 +228,10 @@
                     onStart: (msg) => {
                         console.log('[cognisom] Stream started:', msg);
                         if (msg.action === 'start' && msg.status === 'success') {
+                            clearTimeout(mjpegTimer);
                             onStreamConnected();
                         } else if (msg.status === 'error') {
+                            clearTimeout(mjpegTimer);
                             onStreamError(msg.description || 'Connection failed');
                         }
                     },
@@ -236,15 +254,12 @@
                 await AppStreamer.connect({ source: 'local', streamConfig });
 
             } catch (e) {
-                console.warn('[cognisom] NVIDIA streaming library not available:', e);
-                statusDetail.innerHTML =
-                    'NVIDIA streaming library not loaded.<br><br>' +
-                    '<span style="color:#889">The <code>@nvidia/omniverse-webrtc-streaming-library</code> ' +
-                    'npm package is required for WebRTC streaming.</span><br><br>' +
-                    '<span style="color:#889">Falling back to MJPEG...</span>';
-
-                // Fallback to MJPEG stream after 2s
-                setTimeout(() => connectMJPEG(), 2000);
+                console.warn('[cognisom] WebRTC connect failed:', e);
+                clearTimeout(mjpegTimer);
+                if (!streamConnected) {
+                    statusDetail.textContent = 'WebRTC failed, using MJPEG...';
+                    connectMJPEG();
+                }
             }
         }
 
