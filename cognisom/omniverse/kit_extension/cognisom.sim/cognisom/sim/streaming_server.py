@@ -89,97 +89,276 @@ def _encode_jpeg(rgba_buffer, width: int, height: int, quality: int = 85) -> byt
 
 
 class _ViewportCapture:
-    """Captures the Kit viewport to a buffer."""
+    """Captures Kit viewport or renders simulation frames via PIL fallback."""
+
+    # Leukocyte state colors (matches Three.js viewer)
+    STATE_COLORS = {
+        0: (100, 200, 255),   # FLOWING — light blue
+        1: (255, 220, 50),    # TETHERED — yellow
+        2: (255, 165, 0),     # ROLLING — orange
+        3: (0, 255, 200),     # ACTIVATING — cyan
+        4: (255, 50, 50),     # ARRESTED — red
+        5: (180, 0, 255),     # TRANSMIGRATING — purple
+        6: (0, 255, 80),      # EXTRAVASATED — green
+    }
 
     def __init__(self):
         self._buffer: Optional[bytes] = None
-        self._width = 1920
-        self._height = 1080
+        self._width = 960
+        self._height = 540
         self._last_capture_time = 0.0
+        self._diapedesis_mgr = None  # Set by StreamingServer
 
     @property
     def jpeg_bytes(self) -> Optional[bytes]:
         return self._buffer
 
     def capture(self) -> bool:
-        """Capture current viewport frame."""
-        if not VIEWPORT_AVAILABLE:
+        """Capture current viewport frame, or render from simulation data."""
+        # Try real viewport capture first
+        if VIEWPORT_AVAILABLE:
+            try:
+                viewport_api = vp_util.get_active_viewport()
+                if viewport_api:
+                    import omni.kit.viewport.utility.capture as cap
+                    self._width = viewport_api.resolution[0]
+                    self._height = viewport_api.resolution[1]
+                    captured = [False]
+                    buffer_holder = [None]
+
+                    def on_done(buf, buf_size, w, h, fmt):
+                        if buf:
+                            buffer_holder[0] = bytes(buf)
+                            captured[0] = True
+
+                    cap.capture_viewport_to_buffer(viewport_api, on_done)
+                    for _ in range(10):
+                        if captured[0]:
+                            break
+                        time.sleep(0.01)
+                    if buffer_holder[0]:
+                        self._buffer = _encode_jpeg(
+                            buffer_holder[0], self._width, self._height)
+                        self._last_capture_time = time.time()
+                        return True
+            except Exception:
+                pass
+
+        # Fallback: render from simulation data using PIL
+        return self._render_sim_frame()
+
+    def _render_sim_frame(self) -> bool:
+        """Render current simulation frame as a 2D scientific visualization."""
+        mgr = self._diapedesis_mgr
+        if not mgr or not mgr._frames or mgr.current_frame >= len(mgr._frames):
             return False
 
         try:
-            viewport_api = vp_util.get_active_viewport()
-            if not viewport_api:
-                return False
+            from PIL import Image, ImageDraw, ImageFont
+            import math
+        except ImportError:
+            return False
 
-            # Use capture_viewport_to_buffer for synchronous capture
-            import asyncio
-            import omni.kit.viewport.utility.capture as cap
+        frame = mgr._frames[mgr.current_frame]
+        W, H = self._width, self._height
+        img = Image.new("RGB", (W, H), (8, 8, 20))
+        draw = ImageDraw.Draw(img)
 
-            self._width = viewport_api.resolution[0]
-            self._height = viewport_api.resolution[1]
+        try:
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 12)
+            font_sm = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 10)
+            font_lg = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 16)
+        except Exception:
+            font = font_sm = font_lg = ImageFont.load_default()
 
-            captured = [False]
-            buffer_holder = [None]
+        R = frame.get("vessel_radius", 25.0)
+        L = frame.get("vessel_length", 200.0)
 
-            def on_capture_complete(buffer, buffer_size, width, height, fmt):
-                if buffer:
-                    buffer_holder[0] = bytes(buffer)
-                    captured[0] = True
+        # Coordinate transform: simulation → pixel
+        margin_x, margin_y = 60, 80
+        sx = (W - 2 * margin_x) / L
+        sy = (H - 2 * margin_y) / (R * 3.5)
+        cx = margin_x
+        cy = H * 0.35  # Vessel center (upper portion of image)
 
-            cap.capture_viewport_to_buffer(
-                viewport_api,
-                on_capture_complete,
-            )
+        def sim_to_px(x, y):
+            return int(cx + x * sx), int(cy - y * sy)
 
-            # Wait briefly for async capture
-            for _ in range(10):
-                if captured[0]:
-                    break
-                time.sleep(0.01)
+        # ── Background: tissue space gradient ──
+        for row in range(int(cy + R * sy), H):
+            t = min(1.0, (row - cy - R * sy) / (H - cy - R * sy + 1))
+            r = int(15 + t * 10)
+            g = int(12 + t * 5)
+            b = int(25 + t * 8)
+            draw.line([(0, row), (W, row)], fill=(r, g, b))
 
-            if buffer_holder[0]:
-                self._buffer = _encode_jpeg(
-                    buffer_holder[0], self._width, self._height)
-                self._last_capture_time = time.time()
-                return True
+        # ── Vessel walls (top and bottom arcs) ──
+        wall_color = (180, 100, 120)
+        wall_inflamed = (220, 60, 80)
+        pts_top = []
+        pts_bot = []
+        for i in range(50):
+            x = (i / 49) * L
+            px_x = cx + x * sx
+            pts_top.append((px_x, cy - R * sy))
+            pts_bot.append((px_x, cy + R * sy))
 
-        except Exception as e:
-            carb.log_warn(f"[streaming] Viewport capture failed: {e}")
+        # Draw vessel wall bands
+        for i in range(len(pts_top) - 1):
+            selexpr = frame.get("endo_selectin_expr", [0.0])
+            idx = min(i * len(selexpr) // 50, len(selexpr) - 1)
+            se = selexpr[idx] if selexpr else 0.0
+            c = tuple(int(wall_color[j] + (wall_inflamed[j] - wall_color[j]) * se)
+                      for j in range(3))
+            # Top wall
+            draw.line([pts_top[i], pts_top[i + 1]], fill=c, width=3)
+            # Bottom wall
+            draw.line([pts_bot[i], pts_bot[i + 1]], fill=c, width=3)
 
-        return False
+        # ── Lumen fill (dark blue) ──
+        draw.rectangle(
+            [pts_top[0][0], pts_top[0][1] + 2, pts_bot[-1][0], pts_bot[-1][1] - 2],
+            fill=(10, 12, 30))
+
+        # ── Endothelial cells (wall tiles) ──
+        endo_pos = frame.get("endo_positions", [])
+        selexpr = frame.get("endo_selectin_expr", [])
+        junc = frame.get("endo_junction_integrity", [])
+        for i, pos in enumerate(endo_pos):
+            px, py = sim_to_px(pos[0], pos[1])
+            se = selexpr[i] if i < len(selexpr) else 0.0
+            ji = junc[i] if i < len(junc) else 1.0
+            # Draw as small rectangles on vessel wall
+            c = (int(160 + 80 * se), int(80 - 40 * se), int(100 - 60 * se))
+            hw = int(4 + 3 * se)
+            # Clamp to near vessel walls
+            if pos[1] < 0:
+                wall_y = int(cy + R * sy)
+            else:
+                wall_y = int(cy - R * sy)
+            draw.rectangle([px - hw, wall_y - 2, px + hw, wall_y + 2], fill=c)
+            # Selectin markers (yellow dots above endothelial cell)
+            if se > 0.3:
+                for si in range(int(se * 3)):
+                    sy_off = 4 + si * 3
+                    draw.ellipse([px - 1, wall_y - sy_off - 1,
+                                  px + 1, wall_y - sy_off + 1],
+                                 fill=(255, 220, 50))
+
+        # ── RBCs (red ellipses) ──
+        rbc_pos = frame.get("rbc_positions", [])
+        for pos in rbc_pos:
+            px, py = sim_to_px(pos[0], pos[1])
+            # Only draw if inside vessel
+            if pts_top[0][1] < py < pts_bot[0][1]:
+                draw.ellipse([px - 4, py - 2, px + 4, py + 2],
+                             fill=(180, 30, 30), outline=(120, 20, 20))
+
+        # ── Leukocytes (colored circles by state) ──
+        leuko_pos = frame.get("leukocyte_positions", [])
+        leuko_states = frame.get("leukocyte_states", [])
+        leuko_radii = frame.get("leukocyte_radii", [])
+        integrin_act = frame.get("integrin_activation", [])
+        for i, pos in enumerate(leuko_pos):
+            px, py = sim_to_px(pos[0], pos[1])
+            state = leuko_states[i] if i < len(leuko_states) else 0
+            r = leuko_radii[i] if i < len(leuko_radii) else 6.0
+            pr = max(3, int(r * sx * 0.4))
+            color = self.STATE_COLORS.get(state, (200, 200, 200))
+            # Draw cell body
+            draw.ellipse([px - pr, py - pr, px + pr, py + pr],
+                         fill=color, outline=(255, 255, 255))
+            # Nucleus hint (darker inner circle)
+            nr = max(1, pr // 2)
+            nc = tuple(max(0, c - 60) for c in color)
+            draw.ellipse([px - nr, py - nr, px + nr, py + nr], fill=nc)
+            # Integrin activation indicator (bright ring)
+            ia = integrin_act[i] if i < len(integrin_act) else 0.0
+            if ia > 0.3:
+                draw.ellipse([px - pr - 2, py - pr - 2, px + pr + 2, py + pr + 2],
+                             outline=(0, 255, 255), width=1)
+
+        # ── Bacteria (green in tissue space) ──
+        bact_pos = frame.get("bacteria_positions", [])
+        bact_alive = frame.get("bacteria_alive", [])
+        bact_phago = frame.get("bacteria_phagocytosis", [])
+        for i, pos in enumerate(bact_pos):
+            px, py = sim_to_px(pos[0], pos[1])
+            alive = bact_alive[i] if i < len(bact_alive) else True
+            if alive:
+                draw.ellipse([px - 3, py - 2, px + 3, py + 2],
+                             fill=(40, 160, 40), outline=(200, 180, 60))
+            else:
+                draw.ellipse([px - 2, py - 1, px + 2, py + 1],
+                             fill=(60, 60, 40), outline=(100, 80, 40))
+
+        # ── Legend ──
+        ly = 10
+        draw.text((10, ly), "Cognisom Diapedesis", fill=(0, 160, 255), font=font_lg)
+        ly += 22
+        state_names = ["Flowing", "Tethered", "Rolling",
+                       "Activating", "Arrested", "Transmigrating", "Extravasated"]
+        for si, name in enumerate(state_names):
+            c = self.STATE_COLORS.get(si, (200, 200, 200))
+            draw.ellipse([10, ly, 18, ly + 8], fill=c)
+            draw.text((22, ly - 1), name, fill=(180, 180, 200), font=font_sm)
+            ly += 13
+
+        # ── Metrics overlay (bottom-right) ──
+        metrics = frame.get("metrics", {})
+        t_val = frame.get("time", 0.0)
+        step = frame.get("step", mgr.current_frame)
+        info_lines = [
+            f"Frame {mgr.current_frame}/{mgr.total_frames}",
+            f"t = {t_val:.2f}s",
+            f"Bacteria: {metrics.get('bacteria_alive', '?')}/{metrics.get('bacteria_total', '?')}",
+        ]
+        iy = H - 14 * len(info_lines) - 8
+        for line in info_lines:
+            draw.text((W - 200, iy), line, fill=(160, 170, 190), font=font)
+            iy += 14
+
+        # ── Flow arrow ──
+        arrow_y = int(cy)
+        draw.line([(margin_x, arrow_y), (W - margin_x, arrow_y)],
+                  fill=(40, 50, 80), width=1)
+        # Arrowhead
+        ax = W - margin_x - 8
+        draw.polygon([(ax, arrow_y - 4), (ax + 8, arrow_y), (ax, arrow_y + 4)],
+                     fill=(60, 70, 100))
+        draw.text((W - margin_x - 60, arrow_y - 14), "flow",
+                  fill=(60, 80, 120), font=font_sm)
+
+        # Encode
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=88)
+        self._buffer = buf.getvalue()
+        self._last_capture_time = time.time()
+        return True
 
     def get_placeholder_jpeg(self) -> bytes:
-        """Generate a placeholder "waiting for RTX" image."""
+        """Generate a placeholder image when no data is loaded."""
         try:
             from PIL import Image, ImageDraw, ImageFont
-            img = Image.new("RGB", (960, 540), (10, 10, 30))
+            img = Image.new("RGB", (self._width, self._height), (10, 10, 30))
             draw = ImageDraw.Draw(img)
             try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 24)
+                font = ImageFont.truetype(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 24)
             except Exception:
                 font = ImageFont.load_default()
-            draw.text((300, 240), "Omniverse Kit RTX", fill=(0, 160, 255), font=font)
-            draw.text((320, 280), "Waiting for scene...", fill=(100, 100, 140), font=font)
+            draw.text((self._width // 2 - 140, self._height // 2 - 20),
+                      "Cognisom Kit Server", fill=(0, 160, 255), font=font)
+            draw.text((self._width // 2 - 120, self._height // 2 + 20),
+                      "Waiting for data...", fill=(100, 100, 140), font=font)
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=90)
             return buf.getvalue()
         except Exception:
-            # Minimal 1x1 white JPEG
-            return (
-                b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01"
-                b"\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07"
-                b"\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14"
-                b"\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' \",#\x1c\x1c(7),01444"
-                b"\x1f\'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01"
-                b"\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01"
-                b"\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06"
-                b"\x07\x08\t\n\x0b\xff\xc4\x00\xb5\x10\x00\x02\x01\x03\x03\x02"
-                b"\x04\x03\x05\x05\x04\x04\x00\x00\x01}\x01\x02\x03\x00\x04\x11"
-                b"\x05\x12!1A\x06\x13Qa\x07\"q\x142\x81\x91\xa1\x08#B\xb1\xc1"
-                b"\x15R\xd1\xf0$3br\x82\t\n\x16\x17\x18\x19\x1a%&\'()*456789"
-                b":CDEFGHIJSTUVWXYZcdefghijstuvwxyz\xff\xda\x00\x08\x01\x01\x00"
-                b"\x00?\x00\xfb\xd2\x8a(\x03\xff\xd9"
-            )
+            return b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
 
 
 class _StreamHandler(BaseHTTPRequestHandler):
@@ -425,6 +604,7 @@ class StreamingServer:
         self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._viewport_capture = _ViewportCapture()
+        self._viewport_capture._diapedesis_mgr = diapedesis_manager
         self._capture_thread: Optional[threading.Thread] = None
         self._running = False
 
