@@ -786,20 +786,10 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._rgb_annotator and self._streaming_server:
             self._capture_rtx_frame()
 
-        # In headless mode with PIL fallback active, trigger a capture
-        # so MJPEG clients get updated frames.
-        # Once RTX capture is active, PIL rendering stops automatically.
-        # Rate-limit to ~10fps to avoid starving the GIL.
-        if self._headless and self._streaming_server:
-            vc = self._streaming_server._viewport_capture
-            if not vc._rtx_active:
-                import time as _time
-                now = _time.monotonic()
-                if not hasattr(self, '_last_pil_capture'):
-                    self._last_pil_capture = 0.0
-                if now - self._last_pil_capture >= 0.1:  # 10fps cap
-                    vc.capture()
-                    self._last_pil_capture = now
+        # PIL fallback capture is handled ONLY by _capture_loop() in the
+        # streaming server's daemon thread. Do NOT also capture here —
+        # running PIL rendering from both the main thread and the capture
+        # thread saturates the GIL and starves the HTTP server.
 
         # Update UI (GUI mode only)
         if self._panel:

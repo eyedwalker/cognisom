@@ -266,23 +266,32 @@ def _render_omniverse_viewer(frames, streaming_url: str):
     st.markdown("### Omniverse RTX Viewer")
 
     # Server-side URL (Python → Kit)
-    # Inside Docker, localhost is the container itself. Use KIT_SERVER_URL env var
-    # or fall back to host.docker.internal (requires --add-host flag on docker run).
-    kit_server = os.environ.get(
-        "KIT_SERVER_URL", "http://host.docker.internal:8211"
-    )
+    # Try multiple addresses: env var, host.docker.internal, Docker bridge gateway.
+    # host.docker.internal requires --add-host flag; 172.17.0.1 is the default
+    # Docker bridge gateway that works without special flags on Linux.
+    kit_server = None
+    kit_status = None
+    kit_candidates = [
+        os.environ.get("KIT_SERVER_URL", ""),
+        "http://host.docker.internal:8211",
+        "http://172.17.0.1:8211",
+        "http://localhost:8211",
+    ]
+    for candidate in kit_candidates:
+        if not candidate:
+            continue
+        try:
+            req = urllib.request.Request(f"{candidate}/status", method="GET")
+            req.add_header("Accept", "application/json")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                kit_status = json.loads(resp.read())
+                kit_server = candidate
+                break
+        except Exception:
+            continue
+
     # Browser-side URL (JS/HTML → Kit, through nginx HTTPS proxy)
     kit_browser = streaming_url.rstrip("/")
-
-    # Check if Kit is reachable (server-side)
-    kit_status = None
-    try:
-        req = urllib.request.Request(f"{kit_server}/status", method="GET")
-        req.add_header("Accept", "application/json")
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            kit_status = json.loads(resp.read())
-    except Exception:
-        pass
 
     if not kit_status:
         st.warning(
@@ -314,7 +323,7 @@ The extension provides:
 """)
         st.info("Falling back to Three.js viewer.")
         viewer_html = _build_vessel_viewer(frames, 2.0)
-        st.components.v1.html(viewer_html, height=700, scrolling=False)
+        st.components.v1.html(viewer_html, height=780, scrolling=False)
         return
 
     # Kit is available
@@ -339,7 +348,7 @@ The extension provides:
         except Exception as e:
             st.error(f"Failed to load frames into Kit: {e}")
 
-    # Embed MJPEG viewport stream with legend + camera controls overlay
+    # Embed MJPEG viewport stream with legend overlay
     viewer_html = f"""
     <div id="omniViewer" style="width:100%;height:700px;border-radius:8px;overflow:hidden;
          background:#040412;position:relative;">
@@ -377,52 +386,12 @@ The extension provides:
             <span style="color:#55bbff;font-size:15px">&#9679;</span> Chemokine gradient
         </div>
 
-        <!-- Camera controls (bottom-right) -->
-        <div id="camControls" style="position:absolute;bottom:10px;right:10px;background:rgba(4,4,18,0.92);
-             padding:10px 14px;border-radius:8px;font:12px monospace;z-index:3;
-             border:1px solid rgba(100,100,150,0.25);display:flex;flex-direction:column;gap:6px;">
-            <b style="color:#aab;font-size:13px">Camera</b>
-            <div style="display:flex;gap:4px;justify-content:center;">
-                <button onclick="orbitCam(0,-15)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9650;</button>
-            </div>
-            <div style="display:flex;gap:4px;justify-content:center;">
-                <button onclick="orbitCam(-20,0)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9664;</button>
-                <button onclick="resetCam()" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 8px;border-radius:3px;border:1px solid #555;">&#8634;</button>
-                <button onclick="orbitCam(20,0)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9654;</button>
-            </div>
-            <div style="display:flex;gap:4px;justify-content:center;">
-                <button onclick="orbitCam(0,15)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#9660;</button>
-            </div>
-            <div style="display:flex;gap:4px;justify-content:center;">
-                <button onclick="zoomCam(0.8)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#43;</button>
-                <button onclick="zoomCam(1.25)" style="all:unset;cursor:pointer;background:#2a2a4a;color:#ccc;padding:4px 10px;border-radius:3px;border:1px solid #555;">&#8722;</button>
-            </div>
-        </div>
-
         <div id="rtxStatus" style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
              color:#8899aa;font:13px monospace;z-index:2;background:rgba(4,4,18,0.8);
              padding:4px 12px;border-radius:4px;"></div>
     </div>
     <script>
         const KB = "{kit_browser}";
-        function orbitCam(yaw, pitch) {{
-            fetch(KB + '/cognisom/camera/orbit', {{
-                method: 'POST', headers: {{'Content-Type': 'application/json'}},
-                body: JSON.stringify({{yaw: yaw, pitch: pitch}})
-            }}).catch(() => {{}});
-        }}
-        function zoomCam(factor) {{
-            fetch(KB + '/cognisom/camera/zoom', {{
-                method: 'POST', headers: {{'Content-Type': 'application/json'}},
-                body: JSON.stringify({{factor: factor}})
-            }}).catch(() => {{}});
-        }}
-        function resetCam() {{
-            fetch(KB + '/cognisom/camera/reset', {{
-                method: 'POST', headers: {{'Content-Type': 'application/json'}},
-                body: '{{}}'
-            }}).catch(() => {{}});
-        }}
         setInterval(async () => {{
             try {{
                 const r = await fetch(KB + "/status");
@@ -519,7 +488,7 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
     L = first["vessel_length"]
 
     return f'''
-<div id="vesselViewer" style="width:100%;height:650px;border-radius:8px;overflow:hidden;background:#040412;position:relative;"></div>
+<div id="vesselViewer" style="width:100%;height:720px;border-radius:8px;overflow:hidden;background:#040412;position:relative;"></div>
 <div id="vesselControls" style="width:100%;padding:8px 0;display:flex;align-items:center;gap:10px;font:13px monospace;color:#ccc;">
     <button id="vPlayBtn" style="padding:4px 12px;cursor:pointer;background:#2a2a4a;color:#ccc;border:1px solid #555;border-radius:4px;">Play</button>
     <input id="vSlider" type="range" min="0" max="{n_frames - 1}" value="0" style="flex:1;">
@@ -1140,6 +1109,11 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
                         'Arrested','Crawling','Transmigrating','Migrated'];
     const dummy = new THREE.Object3D();
 
+    /* ═══════════ Compact status bar ═══════════ */
+    const statusBar = document.createElement('div');
+    statusBar.style.cssText = 'position:absolute;top:6px;left:50%;transform:translateX(-50%);color:#99aabb;font:12px monospace;background:rgba(4,4,18,0.85);padding:4px 14px;border-radius:4px;pointer-events:none;white-space:nowrap;';
+    container.appendChild(statusBar);
+
     /* ═══════════ Frame Application ═══════════ */
     function applyFrame(fi) {{
         const f = frames[fi];
@@ -1247,82 +1221,18 @@ def _build_vessel_viewer(frames, playback_speed=2.0):
             }}
         }}
 
-        // --- Metrics overlay ---
+        // --- Compact status bar (top of canvas) ---
         const m = f.metrics;
         const sc2 = m.state_counts;
-        let metricsHTML = '<b style="color:#aabbcc">Diapedesis State</b><br>';
-        stateNames.forEach((name, si) => {{
-            const count = sc2[name.toLowerCase()] || 0;
-            const c = stateColors[si];
-            const hex = '#' + new THREE.Color(c[0],c[1],c[2]).getHexString();
-            if (count > 0) {{
-                metricsHTML += '<span style="color:'+hex+'">\\u25CF</span> '+name+': '+count+'<br>';
-            }}
-        }});
-        metricsHTML += '<br>t = ' + f.time.toFixed(1) + 's';
-        metricsHTML += '<br>Rolling v: ' + m.avg_rolling_velocity.toFixed(0) + ' \\u03BCm/s';
-        metricsHTML += '<br>Junction: ' + (m.avg_junction_integrity * 100).toFixed(0) + '%';
-        metricsHTML += '<br>Integrin: ' + (m.avg_integrin_activation * 100).toFixed(0) + '%';
-        const bAlive = m.bacteria_alive !== undefined ? m.bacteria_alive : '?';
-        const bTotal = m.bacteria_total !== undefined ? m.bacteria_total : '?';
-        metricsHTML += '<br><span style="color:#ff6644">\\u2620</span> Bacteria: ' + bAlive + '/' + bTotal + ' alive';
-        if (metricsOverlay) metricsOverlay.innerHTML = metricsHTML;
-
-        // Step annotations
-        let stepsHTML = '<b style="color:#aabbcc">Diapedesis Steps</b><br>';
-        const bKilled = (m.bacteria_total || 0) - (m.bacteria_alive || 0);
-        const steps = [
-            ['1. Cytokine \\u2192 E-selectin', sc2.rolling > 0 || sc2.activating > 0 || sc2.arrested > 0],
-            ['2. Selectin rolling', sc2.rolling > 0],
-            ['3. Integrin activation', sc2.activating > 0 || sc2.arrested > 0],
-            ['4. Firm adhesion', sc2.arrested > 0 || sc2.crawling > 0],
-            ['5. Transmigration', sc2.transmigrating > 0],
-            ['6. Tissue migration', sc2.migrated > 0],
-            ['7. Phagocytosis (' + bKilled + ' killed)', bKilled > 0],
-        ];
-        steps.forEach(([label, active]) => {{
-            const icon = active ? '\\u2705' : '\\u2B1C';
-            stepsHTML += icon + ' ' + label + '<br>';
-        }});
-        if (stepsOverlay) stepsOverlay.innerHTML = stepsHTML;
+        if (statusBar) {{
+            const parts = ['t=' + f.time.toFixed(1) + 's'];
+            stateNames.forEach((name, si) => {{
+                const count = sc2[name.toLowerCase()] || 0;
+                if (count > 0) parts.push(name + ':' + count);
+            }});
+            statusBar.textContent = parts.join(' | ');
+        }}
     }}
-
-    /* ═══════════ Overlays ═══════════ */
-    const metricsOverlay = document.createElement('div');
-    metricsOverlay.style.cssText = 'position:absolute;top:10px;left:10px;color:#ccc;font:13px monospace;background:rgba(4,4,18,0.9);padding:12px 16px;border-radius:8px;pointer-events:none;line-height:1.7;border:1px solid rgba(100,100,150,0.25);';
-    container.appendChild(metricsOverlay);
-
-    const stepsOverlay = document.createElement('div');
-    stepsOverlay.style.cssText = 'position:absolute;top:10px;right:10px;color:#ccc;font:13px monospace;background:rgba(4,4,18,0.9);padding:12px 16px;border-radius:8px;pointer-events:none;line-height:1.9;border:1px solid rgba(100,100,150,0.25);';
-    container.appendChild(stepsOverlay);
-
-    // Legend overlay (bottom-left)
-    const legendOverlay = document.createElement('div');
-    legendOverlay.style.cssText = 'position:absolute;bottom:10px;left:10px;color:#bbc;font:14px monospace;background:rgba(4,4,18,0.92);padding:14px 18px;border-radius:8px;pointer-events:none;line-height:1.8;border:1px solid rgba(100,100,150,0.25);';
-    legendOverlay.innerHTML = '<b style="color:#dde;font-size:15px">Molecules</b><br>'
-        + '<span style="color:#ffaa00;font-size:16px">\\u25CF</span> Selectin (E-sel)<br>'
-        + '<span style="color:#4488ff;font-size:16px">\\u25CF</span> ICAM-1<br>'
-        + '<span style="color:#33bb88;font-size:16px">\\u25CF</span> PECAM-1 (junction)<br>'
-        + '<span style="color:#3399aa;font-size:16px">\\u25CF</span> Integrin (LFA-1)<br>'
-        + '<span style="color:#cc9933;font-size:16px">\\u25CF</span> Complement (C3b)<br>'
-        + '<b style="color:#dde;font-size:15px">Cells &amp; Tissue</b><br>'
-        + '<span style="color:#cc2222;font-size:16px">\\u25CF</span> RBC (biconcave)<br>'
-        + '<span style="color:#ddddee;font-size:16px">\\u25CF</span> Neutrophil<br>'
-        + '<span style="color:#336633;font-size:16px">\\u25CF</span> Bacteria (opsonized)<br>'
-        + '<span style="color:#dd5522;font-size:16px">\\u25CF</span> Macrophage<br>'
-        + '<span style="color:#eee8cc;font-size:16px">\\u25CF</span> Fibrin mesh<br>'
-        + '<span style="color:#ccbb99;font-size:16px">\\u25CF</span> Collagen (ECM)<br>'
-        + '<span style="color:#55bbff;font-size:16px">\\u25CF</span> Chemokine gradient';
-    container.appendChild(legendOverlay);
-
-    // Navigation help overlay (bottom-right)
-    const navOverlay = document.createElement('div');
-    navOverlay.style.cssText = 'position:absolute;bottom:10px;right:10px;color:#889;font:12px monospace;background:rgba(4,4,18,0.88);padding:10px 14px;border-radius:6px;pointer-events:none;line-height:1.7;border:1px solid rgba(100,100,150,0.2);';
-    navOverlay.innerHTML = '<b style="color:#aab;font-size:13px">3D Navigation</b><br>'
-        + '\\u21BA Left-drag: Rotate<br>'
-        + '\\u2195 Scroll: Zoom<br>'
-        + '\\u2725 Right-drag: Pan';
-    container.appendChild(navOverlay);
 
     // Apply first frame
     applyFrame(0);
@@ -1392,7 +1302,58 @@ if frames:
         _render_omniverse_viewer(frames, omni_host)
     else:
         viewer_html = _build_vessel_viewer(frames, playback_speed)
-        st.components.v1.html(viewer_html, height=700, scrolling=False)
+        st.components.v1.html(viewer_html, height=780, scrolling=False)
+
+        # Legend, diapedesis steps, and navigation below the viewer
+        leg_col1, leg_col2, leg_col3 = st.columns([2, 2, 1])
+
+        with leg_col1:
+            st.markdown(
+                '<span style="font-size:14px;font-weight:600">Molecules</span><br>'
+                '<span style="color:#ffaa00">&#9679;</span> Selectin (E-sel) &nbsp; '
+                '<span style="color:#4488ff">&#9679;</span> ICAM-1 &nbsp; '
+                '<span style="color:#33bb88">&#9679;</span> PECAM-1 &nbsp; '
+                '<span style="color:#3399aa">&#9679;</span> Integrin (LFA-1) &nbsp; '
+                '<span style="color:#cc9933">&#9679;</span> Complement (C3b)<br>'
+                '<span style="font-size:14px;font-weight:600">Cells &amp; Tissue</span><br>'
+                '<span style="color:#cc2222">&#9679;</span> RBC &nbsp; '
+                '<span style="color:#ddddee">&#9679;</span> Neutrophil &nbsp; '
+                '<span style="color:#336633">&#9679;</span> Bacteria &nbsp; '
+                '<span style="color:#dd5522">&#9679;</span> Macrophage &nbsp; '
+                '<span style="color:#eee8cc">&#9679;</span> Fibrin &nbsp; '
+                '<span style="color:#ccbb99">&#9679;</span> Collagen &nbsp; '
+                '<span style="color:#55bbff">&#9679;</span> Chemokine',
+                unsafe_allow_html=True,
+            )
+
+        with leg_col2:
+            last_m = frames[-1]["metrics"]
+            last_sc = last_m["state_counts"]
+            b_k = last_m.get("bacteria_total", 0) - last_m.get("bacteria_alive", 0)
+            step_checks = [
+                ("1. Cytokine \u2192 E-selectin",
+                 last_sc.get("rolling", 0) > 0 or last_sc.get("activating", 0) > 0 or last_sc.get("arrested", 0) > 0),
+                ("2. Selectin rolling", last_sc.get("rolling", 0) > 0),
+                ("3. Integrin activation", last_sc.get("activating", 0) > 0 or last_sc.get("arrested", 0) > 0),
+                ("4. Firm adhesion", last_sc.get("arrested", 0) > 0 or last_sc.get("crawling", 0) > 0),
+                ("5. Transmigration", last_sc.get("transmigrating", 0) > 0),
+                ("6. Tissue migration", last_sc.get("migrated", 0) > 0),
+                (f"7. Phagocytosis ({b_k} killed)", b_k > 0),
+            ]
+            steps_html = '<span style="font-size:14px;font-weight:600">Diapedesis Steps</span><br>'
+            for label, active in step_checks:
+                icon = "\u2705" if active else "\u2B1C"
+                steps_html += f"{icon} {label}<br>"
+            st.markdown(steps_html, unsafe_allow_html=True)
+
+        with leg_col3:
+            st.markdown(
+                '<span style="font-size:13px;font-weight:600">3D Navigation</span><br>'
+                '\u21BA Left-drag: Rotate<br>'
+                '\u2195 Scroll: Zoom<br>'
+                '\u2725 Right-drag: Pan',
+                unsafe_allow_html=True,
+            )
 
     # Metrics summary
     st.subheader("Simulation Summary")

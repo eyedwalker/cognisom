@@ -873,21 +873,22 @@ class StreamingServer:
     def _capture_loop(self):
         """Continuously capture viewport frames for MJPEG streaming.
 
-        IMPORTANT: This thread must NOT drive playback (mgr.update) because
-        the Kit main thread (_on_update in extension.py) already drives
-        playback AND modifies the USD stage. Having two threads modify the
-        USD stage concurrently causes race conditions and hangs.
+        IMPORTANT: This is the ONLY place PIL fallback frames are rendered.
+        Do NOT also render PIL frames from the Kit main thread (_on_update)
+        — running PIL from both threads saturates the GIL and starves the
+        HTTP server, making it unresponsive.
 
-        This loop only captures frames for MJPEG clients.
+        Rate: 10fps for PIL fallback, 30fps when RTX capture is active
+        (RTX just reads the buffer, no CPU rendering needed).
         """
-        interval = 1.0 / 30.0
         while self._running:
             try:
                 vc = self._viewport_capture
-                # Only capture — playback is driven by Kit main thread
                 vc.capture()
+                # Use lower rate for PIL (CPU-intensive) vs RTX (just buffer read)
+                interval = 1.0 / 30.0 if vc._rtx_active else 1.0 / 10.0
             except Exception:
-                pass
+                interval = 1.0 / 10.0
             time.sleep(interval)
 
     def set_viewport(self, viewport_api):
