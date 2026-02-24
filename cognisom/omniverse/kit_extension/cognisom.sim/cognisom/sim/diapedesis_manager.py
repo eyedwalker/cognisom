@@ -32,6 +32,12 @@ except ImportError:
 
 from .diapedesis_scene import DiapedesisSceneBuilder
 
+try:
+    from .entity_registry import verify_assets as _verify_entity_assets
+    _HAS_ENTITY_REGISTRY = True
+except ImportError:
+    _HAS_ENTITY_REGISTRY = False
+
 
 # ── Preset Configurations ────────────────────────────────────────────────
 
@@ -381,7 +387,14 @@ class DiapedesisManager:
         """Process queued actions — MUST be called from Kit main thread."""
         if self._build_requested:
             self._build_requested = False
-            self.build_scene()
+            carb.log_warn("[diapedesis] Processing queued build_scene()...")
+            try:
+                result = self.build_scene()
+                carb.log_warn(f"[diapedesis] build_scene() returned: {result}")
+            except Exception as e:
+                carb.log_warn(f"[diapedesis] build_scene() CRASHED: {e}")
+                import traceback
+                carb.log_warn(f"[diapedesis] {traceback.format_exc()}")
 
     def build_scene(self) -> bool:
         """Build the USD scene from the first frame."""
@@ -395,19 +408,34 @@ class DiapedesisManager:
             carb.log_warn("[diapedesis] No USD stage available")
             return False
 
+        carb.log_warn(f"[diapedesis] Building scene from {len(self._frames)} "
+                      f"frames, stage={self._stage}")
+
+        # Verify mesh assets availability
+        if _HAS_ENTITY_REGISTRY:
+            asset_status = _verify_entity_assets()
+            missing = [n for n, ok in asset_status.items() if not ok]
+            if missing:
+                carb.log_warn(f"[diapedesis] Missing mesh assets: {missing}. "
+                              f"Will fall back to primitive geometry.")
+            else:
+                carb.log_info("[diapedesis] All mesh assets verified OK")
+
         # Clear previous scene to avoid duplicate xformOp errors
         from .diapedesis_scene import ROOT
         old_prim = self._stage.GetPrimAtPath(ROOT)
         if old_prim and old_prim.IsValid():
             self._stage.RemovePrim(ROOT)
-            carb.log_info("[diapedesis] Cleared previous scene")
+            carb.log_warn("[diapedesis] Cleared previous scene")
 
         self._scene_builder = DiapedesisSceneBuilder(self._stage)
+        carb.log_warn("[diapedesis] Scene builder created, calling build_scene...")
         self._scene_builder.build_scene(self._frames[0])
         self._scene_built = True
         self._current_frame = 0
 
-        carb.log_info("[diapedesis] Scene built from first frame")
+        carb.log_warn(f"[diapedesis] Scene built successfully! "
+                      f"scene_built={self._scene_built}")
         return True
 
     # ── Playback Control ────────────────────────────────────────────────

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
@@ -26,6 +27,13 @@ try:
     USD_AVAILABLE = True
 except ImportError:
     USD_AVAILABLE = False
+
+try:
+    from .entity_registry import ENTITY_REGISTRY, get_asset_path, verify_assets
+    from .mdl_materials import create_omnipbr_material
+    _HAS_MESH_ASSETS = True
+except ImportError:
+    _HAS_MESH_ASSETS = False
 
 
 # ── Constants ────────────────────────────────────────────────────────────
@@ -216,6 +224,21 @@ class DiapedesisSceneBuilder:
         self._endo_last_mat: List[str] = []  # cache to skip redundant endo material binds
         self._bacteria_scale_attrs: List[Optional[Any]] = []
 
+        # Check if high-fidelity mesh assets are available
+        self._use_mesh_assets = False
+        if _HAS_MESH_ASSETS:
+            asset_status = verify_assets()
+            self._use_mesh_assets = all(asset_status.values())
+            if self._use_mesh_assets:
+                self._asset_paths = {
+                    name: get_asset_path(name) for name in ENTITY_REGISTRY
+                }
+                log.info("[cognisom.sim] Using high-fidelity mesh assets")
+            else:
+                missing = [n for n, ok in asset_status.items() if not ok]
+                log.warning(f"[cognisom.sim] Missing mesh assets: {missing}. "
+                            f"Falling back to primitive geometry.")
+
     # ── Scene Construction ──────────────────────────────────────────────
 
     def build_scene(self, frame: Dict[str, Any]) -> None:
@@ -283,13 +306,17 @@ class DiapedesisSceneBuilder:
                 UsdGeom.Xform.Define(self._stage, p)
 
     def _create_all_materials(self):
-        """Create all PBR materials."""
+        """Create all PBR materials (OmniPBR MDL + UsdPreviewSurface fallback)."""
         for name, spec in MATERIALS.items():
             path = f"{MATERIALS_PATH}/{name}"
-            self._materials[name] = self._create_pbr_material(path, spec)
+            if _HAS_MESH_ASSETS:
+                self._materials[name] = create_omnipbr_material(
+                    self._stage, path, spec)
+            else:
+                self._materials[name] = self._create_pbr_material(path, spec)
 
     def _create_pbr_material(self, path: str, spec: Dict) -> str:
-        """Create a UsdPreviewSurface material with optional SSS."""
+        """Create a UsdPreviewSurface material (legacy fallback)."""
         material = UsdShade.Material.Define(self._stage, path)
         shader = UsdShade.Shader.Define(self._stage, f"{path}/PBRShader")
         shader.CreateIdAttr("UsdPreviewSurface")
@@ -312,16 +339,16 @@ class DiapedesisSceneBuilder:
         material.CreateSurfaceOutput().ConnectToSource(
             shader.ConnectableAPI(), "surface")
 
-        # Note: subsurface scattering is an MDL feature in Omniverse RTX,
-        # not part of UsdPreviewSurface. When running in Kit with RTX,
-        # we'd use an OmniPBR material with SSS enabled. For portability
-        # we use UsdPreviewSurface here and the RTX renderer will still
-        # provide better results than WebGL.
-
         return path
 
-    def _bind_material(self, prim_path: str, mat_name: str):
-        """Bind a material to a prim."""
+    def _bind_material(self, prim_path: str, mat_name: str,
+                       override_descendants: bool = False):
+        """Bind a material to a prim.
+
+        Args:
+            override_descendants: If True, use strongerThanDescendants
+                binding strength to override materials in referenced meshes.
+        """
         mat_path = self._materials.get(mat_name)
         if not mat_path:
             return
@@ -329,7 +356,12 @@ class DiapedesisSceneBuilder:
         if not prim:
             return
         material = UsdShade.Material.Get(self._stage, mat_path)
-        UsdShade.MaterialBindingAPI(prim).Bind(material)
+        UsdShade.MaterialBindingAPI.Apply(prim)
+        if override_descendants:
+            UsdShade.MaterialBindingAPI(prim).Bind(
+                material, UsdShade.Tokens.strongerThanDescendants)
+        else:
+            UsdShade.MaterialBindingAPI(prim).Bind(material)
 
     # ── Lighting ─────────────────────────────────────────────────────────
 
@@ -395,7 +427,11 @@ class DiapedesisSceneBuilder:
     # ── Endothelial Cells ────────────────────────────────────────────────
 
     def _build_endothelium(self, frame: Dict):
-        """Build endothelial cells as flattened spheres on vessel wall."""
+        """Build endothelial cells on vessel wall.
+
+        With mesh assets: references endothelial_cell.usd (hexagonal tile with relief).
+        Fallback: flattened spheres.
+        """
         positions = frame.get("endo_positions", [])
         selectin_expr = frame.get("endo_selectin_expr", [])
         self._n_endo = len(positions)
@@ -404,18 +440,28 @@ class DiapedesisSceneBuilder:
 
         for i, pos in enumerate(positions):
             path = f"{ENDOTHELIUM_PATH}/endo_{i:03d}"
-            sphere = UsdGeom.Sphere.Define(self._stage, path)
-            sphere.CreateRadiusAttr().Set(10.0)
 
-            xf = UsdGeom.Xformable(sphere.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(*pos))
-            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 0.12))
-            # Orient to face vessel center
-            xf.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, 0))  # simplified
+            if self._use_mesh_assets:
+                xform = UsdGeom.Xform.Define(self._stage, path)
+                xform.GetPrim().GetReferences().AddReference(
+                    self._asset_paths["endothelial_cell"])
+                xf = UsdGeom.Xformable(xform.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(*pos))
+                # Scale hexagonal tile to ~10 unit radius, flatten slightly
+                xf.AddScaleOp().Set(Gf.Vec3f(10.0, 10.0, 10.0))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, 0))
+            else:
+                sphere = UsdGeom.Sphere.Define(self._stage, path)
+                sphere.CreateRadiusAttr().Set(10.0)
+                xf = UsdGeom.Xformable(sphere.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(*pos))
+                xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.0, 0.12))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, 0))
 
             expr = selectin_expr[i] if i < len(selectin_expr) else 0.0
             mat = "endothelial_inflamed" if expr > 0.5 else "endothelial_healthy"
-            self._bind_material(path, mat)
+            self._bind_material(path, mat,
+                                override_descendants=self._use_mesh_assets)
             self._endo_prims.append(path)
             self._endo_last_mat.append(mat)
 
@@ -454,28 +500,39 @@ class DiapedesisSceneBuilder:
         """Build a selectin lollipop geometry: SCR stalk + EGF + lectin head."""
         xform = UsdGeom.Xform.Define(self._stage, path)
 
-        # SCR stalk: 5 small beads
-        for k in range(5):
-            bead = UsdGeom.Sphere.Define(self._stage, f"{path}/scr_{k}")
-            bead.CreateRadiusAttr().Set(0.25)
-            xf = UsdGeom.Xformable(bead.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(0, k * 0.45 + 0.2, 0))
-            self._bind_material(bead.GetPath().pathString, "selectin_stalk")
+        if self._use_mesh_assets:
+            # High-fidelity mesh with separate stalk and head sub-prims
+            xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["selectin"])
+            # Scale to match scene units (prototype is unit-scale)
+            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
+            self._bind_material(path, "selectin_stalk",
+                                override_descendants=True)
+            # Override lectin head material on named sub-prim
+            self._bind_material(f"{path}/mesh/lectin_head", "selectin_head",
+                                override_descendants=True)
+        else:
+            # Fallback: primitive spheres
+            for k in range(5):
+                bead = UsdGeom.Sphere.Define(self._stage, f"{path}/scr_{k}")
+                bead.CreateRadiusAttr().Set(0.25)
+                xf = UsdGeom.Xformable(bead.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(0, k * 0.45 + 0.2, 0))
+                self._bind_material(bead.GetPath().pathString, "selectin_stalk")
 
-        # EGF domain
-        egf = UsdGeom.Sphere.Define(self._stage, f"{path}/egf")
-        egf.CreateRadiusAttr().Set(0.3)
-        xf = UsdGeom.Xformable(egf.GetPrim())
-        xf.AddTranslateOp().Set(Gf.Vec3d(0, 2.5, 0))
-        self._bind_material(egf.GetPath().pathString, "selectin_stalk")
+            egf = UsdGeom.Sphere.Define(self._stage, f"{path}/egf")
+            egf.CreateRadiusAttr().Set(0.3)
+            xf = UsdGeom.Xformable(egf.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(0, 2.5, 0))
+            self._bind_material(egf.GetPath().pathString, "selectin_stalk")
 
-        # Lectin head (oblate spheroid)
-        head = UsdGeom.Sphere.Define(self._stage, f"{path}/lectin_head")
-        head.CreateRadiusAttr().Set(0.55)
-        xf = UsdGeom.Xformable(head.GetPrim())
-        xf.AddTranslateOp().Set(Gf.Vec3d(0, 3.1, 0))
-        xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.7, 1.0))
-        self._bind_material(head.GetPath().pathString, "selectin_head")
+            head = UsdGeom.Sphere.Define(self._stage, f"{path}/lectin_head")
+            head.CreateRadiusAttr().Set(0.55)
+            xf = UsdGeom.Xformable(head.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(0, 3.1, 0))
+            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.7, 1.0))
+            self._bind_material(head.GetPath().pathString, "selectin_head")
 
     def _build_icam1(self, frame: Dict):
         """Build ICAM-1 bead-rods on endothelium."""
@@ -485,21 +542,30 @@ class DiapedesisSceneBuilder:
         # ICAM-1 prototype (5 Ig domains with kink)
         proto = f"{PROTOTYPES_PATH}/icam1"
         xform = UsdGeom.Xform.Define(self._stage, proto)
-        for k in range(5):
-            is_d1 = (k == 4)
-            domain = UsdGeom.Sphere.Define(self._stage, f"{proto}/d{k}")
-            domain.CreateRadiusAttr().Set(0.22)
-            y = k * 0.5
-            x = 0.0
-            if k >= 3:
-                kink_angle = 0.4
-                x = (k - 2) * 0.5 * math.sin(kink_angle)
-                y = 1.0 + (k - 2) * 0.5 * math.cos(kink_angle)
-            xf = UsdGeom.Xformable(domain.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(x, y, 0))
-            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.4, 1.0))
-            self._bind_material(domain.GetPath().pathString,
-                                "icam1_tip" if is_d1 else "icam1")
+        if self._use_mesh_assets:
+            xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["icam1"])
+            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
+            self._bind_material(proto, "icam1", override_descendants=True)
+            self._bind_material(f"{proto}/mesh/tip", "icam1_tip",
+                                override_descendants=True)
+        else:
+            for k in range(5):
+                is_d1 = (k == 4)
+                domain = UsdGeom.Sphere.Define(self._stage, f"{proto}/d{k}")
+                domain.CreateRadiusAttr().Set(0.22)
+                y = k * 0.5
+                x = 0.0
+                if k >= 3:
+                    kink_angle = 0.4
+                    x = (k - 2) * 0.5 * math.sin(kink_angle)
+                    y = 1.0 + (k - 2) * 0.5 * math.cos(kink_angle)
+                xf = UsdGeom.Xformable(domain.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(x, y, 0))
+                xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.4, 1.0))
+                self._bind_material(domain.GetPath().pathString,
+                                    "icam1_tip" if is_d1 else "icam1")
 
         # Place on inflamed endothelium
         idx = 0
@@ -515,9 +581,17 @@ class DiapedesisSceneBuilder:
             idx += 1
 
     def _build_pecam1(self, frame: Dict):
-        """Build PECAM-1 dimer pairs at endothelial junctions."""
+        """Build PECAM-1 dimer pairs at endothelial junctions.
+
+        With mesh assets: uses a prototype referencing pecam1.usd.
+        Fallback: inline sphere beads.
+        """
         positions = frame.get("endo_positions", [])
         self._pecam_prims = []
+
+        # Build prototype
+        proto_path = f"{PROTOTYPES_PATH}/pecam1"
+        self._build_pecam1_prototype(proto_path)
 
         idx = 0
         for i in range(len(positions) - 1):
@@ -530,9 +604,33 @@ class DiapedesisSceneBuilder:
                 continue
 
             path = f"{PECAM1_PATH}/pecam_{idx:03d}"
-            xform = UsdGeom.Xform.Define(self._stage, path)
+            ref = UsdGeom.Xform.Define(self._stage, path)
+            ref.GetPrim().GetReferences().AddInternalReference(proto_path)
 
-            # Two rods of 6 beads pointing at each other
+            mx = (p1[0] + p2[0]) / 2
+            my = (p1[1] + p2[1]) / 2
+            mz = (p1[2] + p2[2]) / 2
+            xf = UsdGeom.Xformable(ref.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(mx, my, mz))
+            xf.AddScaleOp().Set(Gf.Vec3f(0.8, 0.8, 0.8))
+            self._pecam_prims.append((path, i))
+            idx += 1
+
+    def _build_pecam1_prototype(self, path: str):
+        """Build PECAM-1 dimer prototype.
+
+        With mesh assets: references pecam1.usd (antiparallel beaded rods).
+        Fallback: two rows of 6 sphere beads.
+        """
+        xform = UsdGeom.Xform.Define(self._stage, path)
+
+        if self._use_mesh_assets:
+            xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["pecam1"])
+            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
+            self._bind_material(path, "pecam1", override_descendants=True)
+        else:
             for side in (-1, 1):
                 for k in range(6):
                     bead = UsdGeom.Sphere.Define(
@@ -542,15 +640,6 @@ class DiapedesisSceneBuilder:
                     xf.AddTranslateOp().Set(Gf.Vec3d(0, side * (0.5 + k * 0.4), 0))
                     xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.3, 1.0))
                     self._bind_material(bead.GetPath().pathString, "pecam1")
-
-            mx = (p1[0] + p2[0]) / 2
-            my = (p1[1] + p2[1]) / 2
-            mz = (p1[2] + p2[2]) / 2
-            xf = UsdGeom.Xformable(xform.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(mx, my, mz))
-            xf.AddScaleOp().Set(Gf.Vec3f(0.8, 0.8, 0.8))
-            self._pecam_prims.append((path, i))
-            idx += 1
 
     # ── Leukocytes ───────────────────────────────────────────────────────
 
@@ -591,45 +680,82 @@ class DiapedesisSceneBuilder:
             self._leuko_last_state.append(state)
 
     def _build_neutrophil(self, path: str, radius: float):
-        """Build a neutrophil: body sphere + 4-lobe nucleus."""
+        """Build a neutrophil: body + multi-lobed nucleus.
+
+        Uses high-fidelity referenced meshes when available, with organic
+        surface texture and microvilli. Falls back to primitive spheres.
+        """
         xform = UsdGeom.Xform.Define(self._stage, path)
 
-        # Body (main sphere — RTX subsurface scattering will make it translucent)
-        body = UsdGeom.Sphere.Define(self._stage, f"{path}/body")
-        body.CreateRadiusAttr().Set(radius)
-        self._bind_material(body.GetPath().pathString, "leuko_flowing")
+        if self._use_mesh_assets:
+            # Body — reference external high-fidelity mesh
+            body_xform = UsdGeom.Xform.Define(self._stage, f"{path}/body")
+            body_xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["neutrophil_body"])
+            xf = UsdGeom.Xformable(body_xform.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(radius, radius, radius))
+            self._bind_material(f"{path}/body", "leuko_flowing",
+                                override_descendants=True)
 
-        # Multi-lobed nucleus (3-4 lobes visible through translucent body)
-        lobe_positions = [
-            (0.15, 0.1, 0), (-0.15, -0.05, 0.1),
-            (0, -0.1, -0.15), (0.1, 0.15, -0.05),
-        ]
-        for k, lp in enumerate(lobe_positions):
-            lobe = UsdGeom.Sphere.Define(self._stage, f"{path}/nucleus_{k}")
-            lobe.CreateRadiusAttr().Set(radius * 0.35)
-            xf = UsdGeom.Xformable(lobe.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(
-                lp[0] * radius, lp[1] * radius, lp[2] * radius))
-            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.9, 0.8))
-            self._bind_material(lobe.GetPath().pathString, "nucleus")
+            # Nucleus — single multi-lobe mesh replaces 4 separate spheres
+            nuc_xform = UsdGeom.Xform.Define(self._stage, f"{path}/nucleus")
+            nuc_xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["neutrophil_nucleus"])
+            xf = UsdGeom.Xformable(nuc_xform.GetPrim())
+            nuc_scale = radius * 0.8
+            xf.AddScaleOp().Set(Gf.Vec3f(nuc_scale, nuc_scale, nuc_scale))
+            self._bind_material(f"{path}/nucleus", "nucleus",
+                                override_descendants=True)
+        else:
+            # Fallback: primitive spheres
+            body = UsdGeom.Sphere.Define(self._stage, f"{path}/body")
+            body.CreateRadiusAttr().Set(radius)
+            self._bind_material(body.GetPath().pathString, "leuko_flowing")
+
+            lobe_positions = [
+                (0.15, 0.1, 0), (-0.15, -0.05, 0.1),
+                (0, -0.1, -0.15), (0.1, 0.15, -0.05),
+            ]
+            for k, lp in enumerate(lobe_positions):
+                lobe = UsdGeom.Sphere.Define(
+                    self._stage, f"{path}/nucleus_{k}")
+                lobe.CreateRadiusAttr().Set(radius * 0.35)
+                xf = UsdGeom.Xformable(lobe.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    lp[0] * radius, lp[1] * radius, lp[2] * radius))
+                xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.9, 0.8))
+                self._bind_material(lobe.GetPath().pathString, "nucleus")
 
     # ── RBCs ─────────────────────────────────────────────────────────────
 
     def _build_rbcs(self, frame: Dict):
-        """Build RBCs using PointInstancer for efficiency."""
+        """Build RBCs using PointInstancer for efficiency.
+
+        Uses high-fidelity Evans-Fung biconcave mesh when available.
+        """
         positions = frame.get("rbc_positions", [])
         self._n_rbc = len(positions)
 
         if self._n_rbc == 0:
             return
 
-        # Create prototype (flattened sphere — in Kit with mesh, biconcave)
         proto_path = f"{PROTOTYPES_PATH}/rbc"
-        rbc = UsdGeom.Sphere.Define(self._stage, proto_path)
-        rbc.CreateRadiusAttr().Set(3.75)
-        xf = UsdGeom.Xformable(rbc.GetPrim())
-        xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.35, 1.0))  # Biconcave-ish
-        self._bind_material(proto_path, "rbc")
+        if self._use_mesh_assets:
+            # High-fidelity biconcave mesh prototype
+            proto = UsdGeom.Xform.Define(self._stage, proto_path)
+            proto.GetPrim().GetReferences().AddReference(
+                self._asset_paths["rbc"])
+            xf = UsdGeom.Xformable(proto.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(3.75, 3.75, 3.75))
+            self._bind_material(proto_path, "rbc",
+                                override_descendants=True)
+        else:
+            # Fallback: flattened sphere
+            rbc = UsdGeom.Sphere.Define(self._stage, proto_path)
+            rbc.CreateRadiusAttr().Set(3.75)
+            xf = UsdGeom.Xformable(rbc.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.35, 1.0))
+            self._bind_material(proto_path, "rbc")
 
         # PointInstancer
         instancer_path = f"{RBCS_PATH}/Instancer"
@@ -673,26 +799,37 @@ class DiapedesisSceneBuilder:
         """Build a rod-shaped bacterium with complement coating."""
         xform = UsdGeom.Xform.Define(self._stage, path)
 
-        # Rod body (capsule)
-        body = UsdGeom.Capsule.Define(self._stage, f"{path}/body")
-        body.CreateRadiusAttr().Set(0.8)
-        body.CreateHeightAttr().Set(3.0)
-        body.CreateAxisAttr().Set("Y")
-        self._bind_material(body.GetPath().pathString, "bacterium_body")
+        if self._use_mesh_assets:
+            # High-fidelity E. coli with flagella and C3b coating baked in
+            xform.GetPrim().GetReferences().AddReference(
+                self._asset_paths["ecoli"])
+            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
+            self._bind_material(path, "bacterium_body",
+                                override_descendants=True)
+            self._bind_material(f"{path}/mesh/complement", "complement_c3b",
+                                override_descendants=True)
+        else:
+            # Fallback: capsule + scatter spheres
+            body = UsdGeom.Capsule.Define(self._stage, f"{path}/body")
+            body.CreateRadiusAttr().Set(0.8)
+            body.CreateHeightAttr().Set(3.0)
+            body.CreateAxisAttr().Set("Y")
+            self._bind_material(body.GetPath().pathString, "bacterium_body")
 
-        # Complement C3b coating (scattered spheres)
-        import random
-        rng = random.Random(hash(path))
-        for k in range(20):
-            c3b = UsdGeom.Sphere.Define(self._stage, f"{path}/c3b_{k:02d}")
-            c3b.CreateRadiusAttr().Set(0.15)
-            theta = rng.uniform(0, 2 * math.pi)
-            y = rng.uniform(-1.5, 1.5)
-            cr = 0.85 + rng.uniform(0, 0.1)
-            xf = UsdGeom.Xformable(c3b.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(
-                cr * math.cos(theta), y, cr * math.sin(theta)))
-            self._bind_material(c3b.GetPath().pathString, "complement_c3b")
+            import random
+            rng = random.Random(hash(path))
+            for k in range(20):
+                c3b = UsdGeom.Sphere.Define(
+                    self._stage, f"{path}/c3b_{k:02d}")
+                c3b.CreateRadiusAttr().Set(0.15)
+                theta = rng.uniform(0, 2 * math.pi)
+                y = rng.uniform(-1.5, 1.5)
+                cr = 0.85 + rng.uniform(0, 0.1)
+                xf = UsdGeom.Xformable(c3b.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    cr * math.cos(theta), y, cr * math.sin(theta)))
+                self._bind_material(c3b.GetPath().pathString, "complement_c3b")
 
     # ── Macrophages ──────────────────────────────────────────────────────
 
@@ -704,17 +841,29 @@ class DiapedesisSceneBuilder:
 
         for i in range(2):
             path = f"{MACROPHAGES_PATH}/mac_{i}"
-            body = UsdGeom.Sphere.Define(self._stage, path)
-            body.CreateRadiusAttr().Set(10.0)
-            self._bind_material(path, "macrophage")
-
             bp = bacteria_pos[i]
             offset_x = -5 if i == 0 else 5
             offset_z = 3 if i == 0 else -3
-            xf = UsdGeom.Xformable(body.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(
-                bp[0] + offset_x, bp[1] - 3, bp[2] + offset_z))
-            xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.7, 1.0))  # Flattened
+
+            if self._use_mesh_assets:
+                # Amoeboid mesh with pseudopods
+                mac_xform = UsdGeom.Xform.Define(self._stage, path)
+                mac_xform.GetPrim().GetReferences().AddReference(
+                    self._asset_paths["macrophage"])
+                xf = UsdGeom.Xformable(mac_xform.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    bp[0] + offset_x, bp[1] - 3, bp[2] + offset_z))
+                xf.AddScaleOp().Set(Gf.Vec3f(10.0, 7.0, 10.0))
+                self._bind_material(path, "macrophage",
+                                    override_descendants=True)
+            else:
+                body = UsdGeom.Sphere.Define(self._stage, path)
+                body.CreateRadiusAttr().Set(10.0)
+                self._bind_material(path, "macrophage")
+                xf = UsdGeom.Xformable(body.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    bp[0] + offset_x, bp[1] - 3, bp[2] + offset_z))
+                xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.7, 1.0))
 
     # ── Static Tissue Elements ───────────────────────────────────────────
 
@@ -728,20 +877,38 @@ class DiapedesisSceneBuilder:
         for i in range(40):
             path = f"{FIBRIN_PATH}/fiber_{i:03d}"
             flen = 5 + rng.uniform(0, 12)
-            fib = UsdGeom.Cylinder.Define(self._stage, path)
-            fib.CreateRadiusAttr().Set(0.12)
-            fib.CreateHeightAttr().Set(flen)
-            fib.CreateAxisAttr().Set("Y")
-            self._bind_material(path, "fibrin")
 
-            xf = UsdGeom.Xformable(fib.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(
-                L * 0.2 + rng.uniform(0, L * 0.6),
-                -R * 1.5 - rng.uniform(0, R * 1.5),
-                (rng.uniform(0, 1) - 0.5) * R,
-            ))
-            xf.AddRotateXYZOp().Set(Gf.Vec3f(
-                rng.uniform(0, 180), rng.uniform(0, 180), rng.uniform(0, 180)))
+            if self._use_mesh_assets:
+                fib_xform = UsdGeom.Xform.Define(self._stage, path)
+                fib_xform.GetPrim().GetReferences().AddReference(
+                    self._asset_paths["fibrin_fiber"])
+                self._bind_material(path, "fibrin",
+                                    override_descendants=True)
+                xf = UsdGeom.Xformable(fib_xform.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    L * 0.2 + rng.uniform(0, L * 0.6),
+                    -R * 1.5 - rng.uniform(0, R * 1.5),
+                    (rng.uniform(0, 1) - 0.5) * R,
+                ))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(
+                    rng.uniform(0, 180), rng.uniform(0, 180),
+                    rng.uniform(0, 180)))
+                xf.AddScaleOp().Set(Gf.Vec3f(1.0, flen, 1.0))
+            else:
+                fib = UsdGeom.Cylinder.Define(self._stage, path)
+                fib.CreateRadiusAttr().Set(0.12)
+                fib.CreateHeightAttr().Set(flen)
+                fib.CreateAxisAttr().Set("Y")
+                self._bind_material(path, "fibrin")
+                xf = UsdGeom.Xformable(fib.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    L * 0.2 + rng.uniform(0, L * 0.6),
+                    -R * 1.5 - rng.uniform(0, R * 1.5),
+                    (rng.uniform(0, 1) - 0.5) * R,
+                ))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(
+                    rng.uniform(0, 180), rng.uniform(0, 180),
+                    rng.uniform(0, 180)))
 
     def _build_collagen(self):
         """Build ECM collagen fiber bundles."""
@@ -753,20 +920,38 @@ class DiapedesisSceneBuilder:
         for i in range(20):
             path = f"{COLLAGEN_PATH}/col_{i:03d}"
             clen = 10 + rng.uniform(0, 15)
-            col = UsdGeom.Cylinder.Define(self._stage, path)
-            col.CreateRadiusAttr().Set(0.25 + rng.uniform(0, 0.15))
-            col.CreateHeightAttr().Set(clen)
-            col.CreateAxisAttr().Set("X")
-            self._bind_material(path, "collagen")
 
-            xf = UsdGeom.Xformable(col.GetPrim())
-            xf.AddTranslateOp().Set(Gf.Vec3d(
-                L * 0.1 + rng.uniform(0, L * 0.8),
-                -R * 1.3 - rng.uniform(0, R * 1.5),
-                (rng.uniform(0, 1) - 0.5) * R * 1.2,
-            ))
-            xf.AddRotateXYZOp().Set(Gf.Vec3f(
-                rng.uniform(-20, 20), rng.uniform(0, 180), rng.uniform(-10, 10)))
+            if self._use_mesh_assets:
+                col_xform = UsdGeom.Xform.Define(self._stage, path)
+                col_xform.GetPrim().GetReferences().AddReference(
+                    self._asset_paths["collagen_helix"])
+                self._bind_material(path, "collagen",
+                                    override_descendants=True)
+                xf = UsdGeom.Xformable(col_xform.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    L * 0.1 + rng.uniform(0, L * 0.8),
+                    -R * 1.3 - rng.uniform(0, R * 1.5),
+                    (rng.uniform(0, 1) - 0.5) * R * 1.2,
+                ))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(
+                    rng.uniform(-20, 20), rng.uniform(0, 180),
+                    rng.uniform(-10, 10)))
+                xf.AddScaleOp().Set(Gf.Vec3f(clen, clen, clen))
+            else:
+                col = UsdGeom.Cylinder.Define(self._stage, path)
+                col.CreateRadiusAttr().Set(0.25 + rng.uniform(0, 0.15))
+                col.CreateHeightAttr().Set(clen)
+                col.CreateAxisAttr().Set("X")
+                self._bind_material(path, "collagen")
+                xf = UsdGeom.Xformable(col.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    L * 0.1 + rng.uniform(0, L * 0.8),
+                    -R * 1.3 - rng.uniform(0, R * 1.5),
+                    (rng.uniform(0, 1) - 0.5) * R * 1.2,
+                ))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(
+                    rng.uniform(-20, 20), rng.uniform(0, 180),
+                    rng.uniform(-10, 10)))
 
     def _build_chemokine_cloud(self):
         """Build chemokine gradient as scattered translucent spheres."""
@@ -866,7 +1051,8 @@ class DiapedesisSceneBuilder:
                 if i < len(self._leuko_last_state) and self._leuko_last_state[i] != state:
                     mat_name = LEUKO_STATE_MATERIALS.get(state, "leuko_flowing")
                     body_path = f"{path}/body"
-                    self._bind_material(body_path, mat_name)
+                    self._bind_material(body_path, mat_name,
+                                        override_descendants=self._use_mesh_assets)
                     self._leuko_last_state[i] = state
 
     def _update_rbcs(self, frame: Dict):
@@ -898,7 +1084,8 @@ class DiapedesisSceneBuilder:
             expr = selectin_expr[i] if i < len(selectin_expr) else 0.0
             mat = "endothelial_inflamed" if expr > 0.5 else "endothelial_healthy"
             if i < len(self._endo_last_mat) and self._endo_last_mat[i] != mat:
-                self._bind_material(path, mat)
+                self._bind_material(path, mat,
+                                    override_descendants=self._use_mesh_assets)
                 self._endo_last_mat[i] = mat
 
     def _update_pecam_opacity(self, frame: Dict):
