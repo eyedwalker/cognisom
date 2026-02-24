@@ -57,11 +57,11 @@ class CognisomSimExtension(omni.ext.IExt):
 
         carb.log_info(f"[cognisom.sim] Headless mode: {self._headless}")
 
-        # Patch viewport_api property to prevent crash in headless mode
-        # The ViewportWindow's __viewport_layers is not initialized without
-        # a real display, causing AttributeError spam on every stage change.
+        # Patch crashing extensions for headless streaming mode.
+        # IMPORTANT: Do NOT patch get_active_viewport() — the WebRTC
+        # streamer needs it to find the pixel buffer to encode.
         if self._headless:
-            self._patch_viewport_window()
+            self._patch_headless_crashes()
 
         # Initialize both managers
         self._simulation_manager = SimulationManager()
@@ -129,51 +129,197 @@ class CognisomSimExtension(omni.ext.IExt):
 
         carb.log_info("[cognisom.sim] Extension shutdown complete")
 
-    # ── Headless Viewport Patch ─────────────────────────────────────────
+    # ── Headless Crash Patches ───────────────────────────────────────────
 
-    def _patch_viewport_window(self):
-        """Suppress viewport crashes in headless streaming mode.
+    def _patch_headless_crashes(self):
+        """Patch extensions that crash in headless streaming mode.
 
-        In headless streaming mode, the ViewportWindow exists but its
-        __viewport_layers attribute is never initialized (no display).
-        Multiple functions in omni.kit.viewport.utility crash with
-        AttributeError when called, creating an error cascade that
-        blocks the Kit main thread whenever the USD stage changes.
+        In headless mode, several extensions register stage-change or
+        per-frame listeners that assume a GUI viewport exists. When
+        they access viewport internals (ViewportWindow.__viewport_layers,
+        ViewportCameraState, etc.), they crash with AttributeError or
+        RuntimeError, flooding the main thread and blocking HTTP responses.
 
-        We suppress these by replacing sys.excepthook-style error
-        filtering and patching the problematic functions at every level.
+        Strategy:
+        - Wrap the specific crashing handler functions with try/except
+        - Do NOT patch get_active_viewport() — the WebRTC streamer needs
+          it to find the render target for encoding
+        - Filter stderr to suppress remaining error output noise
         """
         import sys
 
-        # Suppress stderr from viewport-related errors entirely.
-        # Kit prints exceptions via omni.kit.app._impl which writes
-        # to stderr. We install a filter to silently discard viewport
-        # utility AttributeErrors.
+        # ── Patch 1: omni.physx.ui on_stage_update ──
+        # This handler calls ViewportCameraState() on every USD change,
+        # causing "No default or provided Viewport" RuntimeError floods.
+        physx_patched = False
+        for mod_path in [
+            "omni.physxui.scripts.extension",
+            "omni.physx.ui.scripts.extension",
+            "omni.physxui.extension",
+        ]:
+            try:
+                import importlib
+                physx_ext_mod = importlib.import_module(mod_path)
+                # Find the Extension class (may be named differently)
+                for attr_name in dir(physx_ext_mod):
+                    cls = getattr(physx_ext_mod, attr_name)
+                    if (isinstance(cls, type) and
+                            hasattr(cls, 'on_stage_update')):
+                        _orig_fn = cls.on_stage_update
+
+                        def _safe_stage_update(self_ext, *a, _f=_orig_fn,
+                                               **kw):
+                            try:
+                                return _f(self_ext, *a, **kw)
+                            except (RuntimeError, AttributeError):
+                                pass
+
+                        cls.on_stage_update = _safe_stage_update
+                        carb.log_warn(f"[cognisom.sim] Patched "
+                                      f"{mod_path}.{attr_name}."
+                                      f"on_stage_update")
+                        physx_patched = True
+                        break
+                if physx_patched:
+                    break
+            except ImportError:
+                continue
+            except Exception as e:
+                carb.log_warn(f"[cognisom.sim] physx patch via "
+                              f"{mod_path} failed: {e}")
+        if not physx_patched:
+            carb.log_warn("[cognisom.sim] Could not patch physx.ui "
+                          "on_stage_update — will rely on stderr filter")
+
+        # ── Patch 2: ViewportCameraState.__init__ ──
+        # Any remaining code that creates ViewportCameraState() will
+        # crash in headless mode. Make the constructor safe.
+        try:
+            from omni.kit.viewport.utility.camera_state import \
+                ViewportCameraState
+
+            _orig_cam_init = ViewportCameraState.__init__
+
+            def _safe_camera_init(self_cam, *args, **kwargs):
+                try:
+                    _orig_cam_init(self_cam, *args, **kwargs)
+                except (RuntimeError, AttributeError):
+                    self_cam._viewport_api = None
+
+            ViewportCameraState.__init__ = _safe_camera_init
+
+            # Also patch position_world/target_world to not crash
+            # when _viewport_api is None
+            for prop_name in ('position_world', 'target_world'):
+                if hasattr(ViewportCameraState, prop_name):
+                    orig_prop = getattr(ViewportCameraState, prop_name)
+                    if isinstance(orig_prop, property) and orig_prop.fget:
+                        _fget = orig_prop.fget
+
+                        def _safe_fget(self_cam, _fget=_fget):
+                            if getattr(self_cam, '_viewport_api', None) is None:
+                                from pxr import Gf
+                                return Gf.Vec3d(0, 0, 0)
+                            try:
+                                return _fget(self_cam)
+                            except (RuntimeError, AttributeError):
+                                from pxr import Gf
+                                return Gf.Vec3d(0, 0, 0)
+
+                        _fset = orig_prop.fset
+                        setattr(ViewportCameraState, prop_name,
+                                property(_safe_fget, _fset))
+
+            carb.log_warn("[cognisom.sim] Patched ViewportCameraState "
+                          "for headless mode")
+        except ImportError:
+            carb.log_info("[cognisom.sim] ViewportCameraState not available")
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] ViewportCameraState "
+                          f"patch skipped: {e}")
+
+        # ── Patch 3: viewport_widgets_manager._on_update ──
+        # This per-frame handler crashes accessing viewport widget state.
+        try:
+            from omni.kit.viewport_widgets_manager import manager as vwm_mod
+            if hasattr(vwm_mod, 'ViewportWidgetManager'):
+                VWM = vwm_mod.ViewportWidgetManager
+                if hasattr(VWM, '_on_update'):
+                    _orig_vwm_update = VWM._on_update
+
+                    def _safe_vwm_update(self_mgr, *args, **kwargs):
+                        try:
+                            return _orig_vwm_update(self_mgr, *args, **kwargs)
+                        except (AttributeError, RuntimeError):
+                            pass
+
+                    VWM._on_update = _safe_vwm_update
+                    carb.log_warn("[cognisom.sim] Patched "
+                                  "viewport_widgets_manager for headless")
+        except ImportError:
+            pass
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] widgets_manager patch skipped: {e}")
+
+        # ── Patch 4: ViewportWindow.viewport_api property ──
+        # Prevent AttributeError on __viewport_layers access
+        try:
+            from omni.kit.viewport.window import ViewportWindow
+            if hasattr(ViewportWindow, 'viewport_api'):
+                orig_prop = ViewportWindow.viewport_api
+                if isinstance(orig_prop, property) and orig_prop.fget:
+                    _orig_fget = orig_prop.fget
+
+                    def safe_viewport_api(self_win):
+                        try:
+                            return _orig_fget(self_win)
+                        except AttributeError:
+                            return None
+
+                    ViewportWindow.viewport_api = property(safe_viewport_api)
+                    carb.log_warn("[cognisom.sim] Patched "
+                                  "ViewportWindow.viewport_api")
+        except ImportError:
+            pass
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] ViewportWindow patch skipped: {e}")
+
+        # ── Patch 5: Filter stderr for remaining error noise ──
         _orig_stderr_write = sys.stderr.write
         _suppress_count = [0]
 
         def filtered_stderr_write(text):
-            # Suppress viewport utility errors (they are expected in headless)
             if 'viewport_layers' in text or 'viewport_api' in text:
-                if _suppress_count[0] == 0:
-                    carb.log_info("[cognisom.sim] Suppressing viewport "
-                                  "errors in headless mode")
                 _suppress_count[0] += 1
                 return len(text)
-            if ('omni.kit.viewport.utility' in text and
+            if 'No default or provided Viewport' in text:
+                _suppress_count[0] += 1
+                return len(text)
+            if 'ViewportCameraState' in text:
+                _suppress_count[0] += 1
+                return len(text)
+            if ('omni.kit.viewport' in text and
+                    ('AttributeError' in text or 'RuntimeError' in text)):
+                _suppress_count[0] += 1
+                return len(text)
+            if ('physxui' in text and 'on_stage_update' in text):
+                _suppress_count[0] += 1
+                return len(text)
+            if ('camera_state' in text and 'AttributeError' in text):
+                _suppress_count[0] += 1
+                return len(text)
+            if ('viewport_widgets_manager' in text and
                     'AttributeError' in text):
                 _suppress_count[0] += 1
                 return len(text)
-            if ('camera_state.py' in text and
-                    'omni.kit.viewport' in text):
+            if '__legacy_window' in text:
                 _suppress_count[0] += 1
                 return len(text)
             return _orig_stderr_write(text)
 
         sys.stderr.write = filtered_stderr_write
 
-        carb.log_warn("[cognisom.sim] Installed viewport error filter "
-                      "for headless mode")
+        carb.log_warn("[cognisom.sim] Headless crash patches installed")
 
     # ── Headless Scene Setup ──────────────────────────────────────────────
 
@@ -182,11 +328,12 @@ class CognisomSimExtension(omni.ext.IExt):
 
         With isaacsim.exp.full.streaming, the WebRTC streamer
         (omni.kit.livestream.webrtc) handles RTX rendering and streaming
-        directly — no replicator capture needed. We set up:
+        directly. We set up:
         1. USD stage with wait-for-ready
         2. Camera with good viewing angle for diapedesis scene
         3. RTX 2.0 settings for bio-specific rendering
-        4. The PIL fallback renderer handles MJPEG for non-WebRTC clients
+        4. Explicit render product for the camera
+        5. Bind render product to livestream if possible
         """
         app = omni.kit.app.get_app()
 
@@ -244,21 +391,87 @@ class CognisomSimExtension(omni.ext.IExt):
         for _ in range(10):
             await app.next_update_async()
 
+        # Create explicit render product for this camera
+        rp_path = await self._create_render_product(camera_path)
+
         # Check if WebRTC streaming is available
         webrtc_available = self._check_webrtc_streaming()
 
         if webrtc_available:
-            carb.log_warn("[cognisom.sim] WebRTC streaming active — "
-                          "RTX frames streamed directly via WebRTC. "
-                          "MJPEG fallback uses PIL 2D renderer.")
+            carb.log_warn("[cognisom.sim] WebRTC streaming active.")
+            if rp_path:
+                self._bind_render_product_to_webrtc(rp_path)
         else:
-            # Only try replicator capture if WebRTC is not available
             carb.log_warn("[cognisom.sim] No WebRTC streaming, "
                           "trying replicator capture for MJPEG...")
             await self._setup_rtx_capture(camera_path)
 
         carb.log_warn("[cognisom.sim] Headless scene setup complete — "
                       "HTTP API on port 8211")
+
+    async def _create_render_product(self, camera_path: str):
+        """Create an explicit render product for the camera.
+
+        This render product can be bound to the WebRTC streamer or used
+        for MJPEG capture. It bypasses the UI viewport layer entirely.
+        """
+        app = omni.kit.app.get_app()
+        try:
+            import omni.replicator.core as rep
+            carb.log_warn(f"[cognisom.sim] Creating render product for "
+                          f"camera: {camera_path}")
+            rp = rep.create.render_product(camera_path, (1920, 1080))
+            self._render_product = rp
+
+            # Wait for render product to initialize
+            for _ in range(10):
+                await app.next_update_async()
+
+            # Get the render product prim path
+            rp_path = None
+            if hasattr(rp, 'path'):
+                rp_path = rp.path
+            elif isinstance(rp, str):
+                rp_path = rp
+
+            carb.log_warn(f"[cognisom.sim] Render product created: {rp_path}")
+            return rp_path
+        except Exception as e:
+            carb.log_warn(f"[cognisom.sim] Could not create render product: {e}")
+            return None
+
+    def _bind_render_product_to_webrtc(self, rp_path: str):
+        """Bind our render product to the WebRTC livestream."""
+        # Try multiple APIs for different Kit versions
+        bound = False
+
+        # Method 1: omni.kit.livestream.core (Kit 105+)
+        try:
+            import omni.kit.livestream.core as livestream_core
+            if hasattr(livestream_core, 'set_render_product'):
+                livestream_core.set_render_product(rp_path)
+                carb.log_warn(f"[cognisom.sim] WebRTC bound to {rp_path} "
+                              f"via livestream.core")
+                bound = True
+        except ImportError:
+            pass
+        except Exception as e:
+            carb.log_info(f"[cognisom.sim] livestream.core binding failed: {e}")
+
+        # Method 2: carb settings
+        if not bound:
+            try:
+                settings = carb.settings.get_settings()
+                settings.set_string("/app/livestream/renderProduct", rp_path)
+                carb.log_warn(f"[cognisom.sim] Set livestream render product "
+                              f"via settings: {rp_path}")
+                bound = True
+            except Exception as e:
+                carb.log_info(f"[cognisom.sim] Settings binding failed: {e}")
+
+        if not bound:
+            carb.log_warn("[cognisom.sim] Could not bind render product to "
+                          "WebRTC — it may use the default viewport instead")
 
     def _check_webrtc_streaming(self) -> bool:
         """Check if the Kit WebRTC livestream extension is active."""
@@ -321,7 +534,7 @@ class CognisomSimExtension(omni.ext.IExt):
         # Scene layout:
         #   Vessel: cylinder along X from 0→200, radius 25, center at Y=0
         #   Tissue: below vessel, Y from -25 to -75
-        #   Scene center ≈ (100, -15, 0)
+        #   Scene center ~ (100, -15, 0)
         #
         # Camera: elevated 3/4 view from Z+, looking down at the vessel
         cam_pos = Gf.Vec3d(100.0, 60.0, 180.0)
@@ -336,8 +549,8 @@ class CognisomSimExtension(omni.ext.IExt):
         dy = target[1] - cam_pos[1]  # -75
         dz = target[2] - cam_pos[2]  # -180
         dist_xz = math.sqrt(dx * dx + dz * dz)  # 180
-        pitch = math.degrees(math.atan2(-dy, dist_xz))  # ~22.6° down
-        yaw = math.degrees(math.atan2(dx, -dz))  # 0°
+        pitch = math.degrees(math.atan2(-dy, dist_xz))  # ~22.6 down
+        yaw = math.degrees(math.atan2(dx, -dz))  # 0
 
         xformable.AddRotateXYZOp().Set(Gf.Vec3f(-pitch, yaw, 0.0))
 
@@ -355,14 +568,16 @@ class CognisomSimExtension(omni.ext.IExt):
                 try:
                     viewport_api.camera_path = camera_path
                 except AttributeError:
-                    viewport_api.set_active_camera(camera_path)
-                carb.log_info(f"[cognisom.sim] Active camera set to {camera_path}")
+                    try:
+                        viewport_api.set_active_camera(camera_path)
+                    except Exception:
+                        pass
+                carb.log_warn(f"[cognisom.sim] Active camera: {camera_path}")
 
                 # Set render resolution
                 try:
                     viewport_api.set_texture_resolution((1920, 1080))
-                    carb.log_info("[cognisom.sim] Viewport texture resolution set to 1920x1080")
-                except AttributeError:
+                except (AttributeError, Exception):
                     try:
                         viewport_api.resolution = (1920, 1080)
                     except Exception:
@@ -395,22 +610,21 @@ class CognisomSimExtension(omni.ext.IExt):
         """
         settings = carb.settings.get_settings()
 
-        # ── Disable ground grid and helpers ──
+        # Disable ground grid and helpers
         settings.set_bool("/app/viewport/grid/enabled", False)
         settings.set_bool("/persistent/app/viewport/displayOptions/grid", False)
         settings.set_bool("/app/viewport/show/grid", False)
         settings.set_bool("/app/viewport/show/groundPlane", False)
 
-        # ── Dark background (deep space) ──
+        # Dark background (deep space)
         settings.set_float_array("/rtx/post/tonemap/backgroundDefaultColor",
                                  [0.02, 0.02, 0.04])
 
-        # ── RTX Real-Time 2.0 (RT2) ──
+        # RTX Real-Time 2.0 (RT2)
         settings.set_string("/rtx/rendermode", "RTX-Realtime")
         settings.set_bool("/rtx/rt2/enabled", True)
         carb.log_info("[cognisom.sim] RTX-Realtime mode + RT2 enabled")
 
-        # ── Bio-specific rendering fidelity ──
         # Translucency: critical for cell membranes, tissue sections
         settings.set_bool("/rtx/translucency/enabled", True)
         settings.set_int("/rtx/translucency/maxRefractionBounces", 4)
@@ -425,13 +639,13 @@ class CognisomSimExtension(omni.ext.IExt):
         settings.set_bool("/rtx/post/aa/op", True)
         settings.set_bool("/rtx/ambientOcclusion/enabled", True)
 
-        # Depth of field: subtle focus on vessel center
-        settings.set_bool("/rtx/post/dof/enabled", False)  # Off by default
+        # Depth of field off by default
+        settings.set_bool("/rtx/post/dof/enabled", False)
 
         # Anti-aliasing
         settings.set_bool("/rtx/post/aa/enabled", True)
 
-        # Higher sample count for quality (reduce noise in translucent areas)
+        # Higher sample count for quality
         settings.set_int("/rtx/pathtracing/totalSpp", 64)
         settings.set_int("/rtx/directLighting/sampledLighting/autoNumberOfLights", 8)
 
@@ -439,90 +653,39 @@ class CognisomSimExtension(omni.ext.IExt):
                       "(translucency, GI, SSS, AO)")
 
     async def _setup_rtx_capture(self, camera_path: str):
-        """Set up RTX frame capture for MJPEG fallback streaming.
-
-        Tries three approaches in order:
-        1. Viewport render product (uses the existing streaming viewport)
-        2. Replicator render product (creates a new one from camera)
-        3. Viewport API capture callback
-
-        The render pipeline needs significant warm-up time (50+ frames)
-        before the annotator produces data.
-        """
+        """Set up RTX frame capture for MJPEG fallback streaming."""
         app = omni.kit.app.get_app()
 
-        # ── Approach 1: Use viewport's existing render product ──
-        try:
-            import omni.kit.viewport.utility as vp_util
-            viewport_api = vp_util.get_active_viewport()
-            if viewport_api:
-                rp_path = viewport_api.render_product_path
-                if rp_path:
-                    carb.log_info(f"[cognisom.sim] Viewport render product: {rp_path}")
-                    import omni.replicator.core as rep
-                    rgb = rep.AnnotatorRegistry.get_annotator("rgb")
-                    rgb.attach([rp_path])
+        # Use the render product we already created
+        if self._render_product:
+            try:
+                import omni.replicator.core as rep
+                rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+                rgb.attach([self._render_product])
 
-                    # Extended warm-up: renderer needs time to produce pixels
-                    carb.log_info("[cognisom.sim] Warming up renderer (50 frames)...")
-                    for i in range(50):
-                        await app.next_update_async()
-                        if i == 25:
-                            # Check mid-warm-up
-                            import numpy as np
-                            test = rgb.get_data()
-                            if test is not None:
-                                arr = np.array(test)
-                                if arr.size > 100:
-                                    carb.log_info(
-                                        f"[cognisom.sim] Render product active at "
-                                        f"frame {i}: shape={arr.shape}")
-                                    break
+                # Warm up
+                carb.log_warn("[cognisom.sim] Warming up MJPEG capture...")
+                for _ in range(30):
+                    await app.next_update_async()
 
-                    if self._streaming_server:
-                        self._streaming_server.set_annotator(rgb)
-                    self._rgb_annotator = rgb
-                    carb.log_warn("[cognisom.sim] RTX capture via viewport "
-                                  "render product initialized")
-                    return
-        except Exception as e:
-            carb.log_info(f"[cognisom.sim] Viewport render product approach "
-                          f"failed: {e}")
+                # Try stepping the orchestrator for headless
+                try:
+                    rep.orchestrator.run()
+                except Exception:
+                    pass
 
-        # ── Approach 2: Create new replicator render product ──
-        try:
-            import omni.replicator.core as rep
+                if self._streaming_server:
+                    self._streaming_server.set_annotator(rgb)
+                self._rgb_annotator = rgb
+                carb.log_warn("[cognisom.sim] MJPEG capture via "
+                              "render product initialized")
+                return
+            except Exception as e:
+                carb.log_warn(f"[cognisom.sim] Render product capture "
+                              f"failed: {e}")
 
-            rp = rep.create.render_product(camera_path, (1920, 1080))
-
-            # Extended warm-up
-            carb.log_info("[cognisom.sim] Warming up new render product (60 frames)...")
-            for _ in range(30):
-                await app.next_update_async()
-
-            rgb = rep.AnnotatorRegistry.get_annotator("rgb")
-            rgb.attach([rp])
-
-            for _ in range(30):
-                await app.next_update_async()
-
-            if self._streaming_server:
-                self._streaming_server.set_annotator(rgb)
-
-            self._render_product = rp
-            self._rgb_annotator = rgb
-            carb.log_warn("[cognisom.sim] RTX capture via new replicator "
-                          "render product initialized")
-            return
-
-        except ImportError:
-            carb.log_info("[cognisom.sim] omni.replicator.core not available")
-        except Exception as e:
-            carb.log_info(f"[cognisom.sim] Replicator capture failed: {e}")
-
-        # ── Approach 3: Viewport API fallback ──
+        # Fallback: viewport capture
         self._setup_viewport_capture()
-        carb.log_warn("[cognisom.sim] Using viewport API capture fallback")
 
     def _setup_viewport_capture(self):
         """Fallback: set viewport API on streaming server for frame capture."""
@@ -621,12 +784,20 @@ class CognisomSimExtension(omni.ext.IExt):
             self._capture_rtx_frame()
 
         # In headless mode with PIL fallback active, trigger a capture
-        # so MJPEG clients get updated frames
+        # so MJPEG clients get updated frames.
+        # Rate-limit to ~10fps to avoid starving the GIL — PIL rendering
+        # is CPU-intensive and blocks the main thread if called every tick.
         if (self._headless and self._streaming_server
                 and not self._rgb_annotator):
             vc = self._streaming_server._viewport_capture
             if not vc._rtx_active:
-                vc.capture()
+                import time as _time
+                now = _time.monotonic()
+                if not hasattr(self, '_last_pil_capture'):
+                    self._last_pil_capture = 0.0
+                if now - self._last_pil_capture >= 0.1:  # 10fps cap
+                    vc.capture()
+                    self._last_pil_capture = now
 
         # Update UI (GUI mode only)
         if self._panel:

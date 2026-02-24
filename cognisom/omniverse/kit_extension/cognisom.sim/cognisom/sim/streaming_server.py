@@ -748,24 +748,20 @@ class StreamingServer:
             self._server.handle_request()
 
     def _capture_loop(self):
-        """Continuously capture viewport frames and drive playback.
+        """Continuously capture viewport frames for MJPEG streaming.
 
-        When RTX capture is active (main thread driving viewport capture),
-        this loop only drives PIL fallback and playback advancement.
-        When RTX is NOT active (e.g. no viewport), this loop drives both
-        playback and PIL-based rendering.
+        IMPORTANT: This thread must NOT drive playback (mgr.update) because
+        the Kit main thread (_on_update in extension.py) already drives
+        playback AND modifies the USD stage. Having two threads modify the
+        USD stage concurrently causes race conditions and hangs.
+
+        This loop only captures frames for MJPEG clients.
         """
-        mgr = _StreamHandler.diapedesis_manager
         interval = 1.0 / 30.0
         while self._running:
             try:
                 vc = self._viewport_capture
-                # Only drive playback from daemon thread when RTX is NOT active
-                # (when RTX is active, Kit main thread drives both playback
-                #  and capture to avoid USD stage race conditions)
-                if not vc._rtx_active:
-                    if mgr and mgr.is_playing and not mgr._is_paused:
-                        mgr.update(interval)
+                # Only capture — playback is driven by Kit main thread
                 vc.capture()
             except Exception:
                 pass

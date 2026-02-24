@@ -208,10 +208,23 @@ class DiapedesisSceneBuilder:
         self._vessel_radius = 25.0
         self._vessel_length = 200.0
 
+        # Cached USD attribute handles for per-frame updates
+        # (avoids ClearXformOpOrder + AddTranslateOp schema churn)
+        self._leuko_translate_attrs: List[Optional[Any]] = []
+        self._leuko_scale_attrs: List[Optional[Any]] = []
+        self._leuko_last_state: List[int] = []  # cache to skip redundant material binds
+        self._endo_last_mat: List[str] = []  # cache to skip redundant endo material binds
+        self._bacteria_scale_attrs: List[Optional[Any]] = []
+
     # ── Scene Construction ──────────────────────────────────────────────
 
     def build_scene(self, frame: Dict[str, Any]) -> None:
-        """Build the complete diapedesis scene from first frame data."""
+        """Build the complete diapedesis scene from first frame data.
+
+        Note: build_scene does NOT use Sdf.ChangeBlock because DefinePrim
+        fails inside ChangeBlock contexts. The per-frame apply_frame()
+        method uses ChangeBlock for batching position/attribute updates.
+        """
         self._vessel_radius = frame.get("vessel_radius", 25.0)
         self._vessel_length = frame.get("vessel_length", 200.0)
         R = self._vessel_radius
@@ -387,6 +400,7 @@ class DiapedesisSceneBuilder:
         selectin_expr = frame.get("endo_selectin_expr", [])
         self._n_endo = len(positions)
         self._endo_prims = []
+        self._endo_last_mat = []
 
         for i, pos in enumerate(positions):
             path = f"{ENDOTHELIUM_PATH}/endo_{i:03d}"
@@ -403,6 +417,7 @@ class DiapedesisSceneBuilder:
             mat = "endothelial_inflamed" if expr > 0.5 else "endothelial_healthy"
             self._bind_material(path, mat)
             self._endo_prims.append(path)
+            self._endo_last_mat.append(mat)
 
     # ── Surface Molecules ────────────────────────────────────────────────
 
@@ -540,11 +555,19 @@ class DiapedesisSceneBuilder:
     # ── Leukocytes ───────────────────────────────────────────────────────
 
     def _build_leukocytes(self, frame: Dict):
-        """Build neutrophil leukocytes as individual prims."""
+        """Build neutrophil leukocytes as individual prims.
+
+        Caches translate and scale xform op attribute handles so that
+        apply_frame() can .Set() values directly without ClearXformOpOrder.
+        """
         positions = frame.get("leukocyte_positions", [])
         radii = frame.get("leukocyte_radii", [])
+        states = frame.get("leukocyte_states", [])
         self._n_leuko = len(positions)
         self._leuko_prims = []
+        self._leuko_translate_attrs = []
+        self._leuko_scale_attrs = []
+        self._leuko_last_state = []
 
         for i in range(self._n_leuko):
             path = f"{LEUKOCYTES_PATH}/neutrophil_{i:03d}"
@@ -553,8 +576,19 @@ class DiapedesisSceneBuilder:
 
             pos = positions[i]
             xf = UsdGeom.Xformable(self._stage.GetPrimAtPath(path))
-            xf.AddTranslateOp().Set(Gf.Vec3d(*pos))
+            translate_op = xf.AddTranslateOp()
+            translate_op.Set(Gf.Vec3d(*pos))
+            scale_op = xf.AddScaleOp()
+            scale_op.Set(Gf.Vec3f(1.0, 1.0, 1.0))
+
+            # Cache the underlying USD attributes for fast per-frame .Set()
+            self._leuko_translate_attrs.append(
+                self._stage.GetPrimAtPath(path).GetAttribute("xformOp:translate"))
+            self._leuko_scale_attrs.append(
+                self._stage.GetPrimAtPath(path).GetAttribute("xformOp:scale"))
             self._leuko_prims.append(path)
+            state = states[i] if i < len(states) else 0
+            self._leuko_last_state.append(state)
 
     def _build_neutrophil(self, path: str, radius: float):
         """Build a neutrophil: body sphere + 4-lobe nucleus."""
@@ -622,6 +656,7 @@ class DiapedesisSceneBuilder:
         positions = frame.get("bacteria_positions", [])
         self._n_bacteria = len(positions)
         self._bacteria_prims = []
+        self._bacteria_scale_attrs = []
 
         for i, pos in enumerate(positions):
             path = f"{BACTERIA_PATH}/bact_{i:02d}"
@@ -631,6 +666,8 @@ class DiapedesisSceneBuilder:
             xf.AddTranslateOp().Set(Gf.Vec3d(*pos))
             xf.AddScaleOp().Set(Gf.Vec3f(1.5, 1.5, 1.5))
             self._bacteria_prims.append(path)
+            self._bacteria_scale_attrs.append(
+                self._stage.GetPrimAtPath(path).GetAttribute("xformOp:scale"))
 
     def _build_single_bacterium(self, path: str):
         """Build a rod-shaped bacterium with complement coating."""
@@ -780,49 +817,57 @@ class DiapedesisSceneBuilder:
         """Update scene from a simulation frame snapshot.
 
         Updates positions, colors/materials, visibility, and deformation
-        for all dynamic elements.
+        for all dynamic elements. Uses Sdf.ChangeBlock to batch all USD
+        modifications into a single notification, preventing per-change
+        viewport update cascades that block the main thread in headless mode.
         """
-        self._update_leukocytes(frame)
-        self._update_rbcs(frame)
-        self._update_endothelium(frame)
-        self._update_pecam_opacity(frame)
-        self._update_bacteria(frame)
+        with Sdf.ChangeBlock():
+            self._update_leukocytes(frame)
+            self._update_rbcs(frame)
+            self._update_endothelium(frame)
+            self._update_pecam_opacity(frame)
+            self._update_bacteria(frame)
 
     def _update_leukocytes(self, frame: Dict):
-        """Update leukocyte positions, materials, and deformation."""
+        """Update leukocyte positions, materials, and deformation.
+
+        Uses cached xform attribute handles for fast .Set() without
+        ClearXformOpOrder schema churn. Only rebinds material when
+        state actually changes.
+        """
         positions = frame.get("leukocyte_positions", [])
         states = frame.get("leukocyte_states", [])
-        radii = frame.get("leukocyte_radii", [])
-        integrin_act = frame.get("integrin_activation", [])
         trans_prog = frame.get("transmigration_progress", [])
 
         for i, path in enumerate(self._leuko_prims):
-            prim = self._stage.GetPrimAtPath(path)
-            if not prim:
-                continue
+            # Position — set directly on cached attribute (no schema change)
+            if i < len(positions) and i < len(self._leuko_translate_attrs):
+                attr = self._leuko_translate_attrs[i]
+                if attr:
+                    attr.Set(Gf.Vec3d(*positions[i]))
 
-            # Position
-            if i < len(positions):
-                xf = UsdGeom.Xformable(prim)
-                xf.ClearXformOpOrder()
-                xf.AddTranslateOp().Set(Gf.Vec3d(*positions[i]))
-
-                # State-dependent deformation
-                rad = radii[i] if i < len(radii) else 6.0
+            # Scale — set directly on cached attribute
+            if i < len(self._leuko_scale_attrs):
                 state = states[i] if i < len(states) else 0
                 prog = trans_prog[i] if i < len(trans_prog) else 0.0
+                attr = self._leuko_scale_attrs[i]
+                if attr:
+                    if state == 6:  # TRANSMIGRATING
+                        attr.Set(Gf.Vec3f(
+                            1.0 - prog * 0.3, 1.0 + prog * 0.5, 1.0 - prog * 0.3))
+                    elif 2 <= state <= 5:  # ROLLING-CRAWLING
+                        attr.Set(Gf.Vec3f(1.1, 0.9, 1.1))
+                    else:
+                        attr.Set(Gf.Vec3f(1.0, 1.0, 1.0))
 
-                if state == 6:  # TRANSMIGRATING
-                    xf.AddScaleOp().Set(Gf.Vec3f(
-                        1.0 - prog * 0.3, 1.0 + prog * 0.5, 1.0 - prog * 0.3))
-                elif 2 <= state <= 5:  # ROLLING-CRAWLING
-                    xf.AddScaleOp().Set(Gf.Vec3f(1.1, 0.9, 1.1))
-
-            # Material based on state
+            # Material — only rebind if state changed
             if i < len(states):
-                mat_name = LEUKO_STATE_MATERIALS.get(states[i], "leuko_flowing")
-                body_path = f"{path}/body"
-                self._bind_material(body_path, mat_name)
+                state = states[i]
+                if i < len(self._leuko_last_state) and self._leuko_last_state[i] != state:
+                    mat_name = LEUKO_STATE_MATERIALS.get(state, "leuko_flowing")
+                    body_path = f"{path}/body"
+                    self._bind_material(body_path, mat_name)
+                    self._leuko_last_state[i] = state
 
     def _update_rbcs(self, frame: Dict):
         """Update RBC positions via PointInstancer."""
@@ -844,12 +889,17 @@ class DiapedesisSceneBuilder:
         instancer.CreatePositionsAttr().Set(pos_array)
 
     def _update_endothelium(self, frame: Dict):
-        """Update endothelial cell colors based on inflammation."""
+        """Update endothelial cell colors based on inflammation.
+
+        Only rebinds material when the threshold crossing changes.
+        """
         selectin_expr = frame.get("endo_selectin_expr", [])
         for i, path in enumerate(self._endo_prims):
             expr = selectin_expr[i] if i < len(selectin_expr) else 0.0
             mat = "endothelial_inflamed" if expr > 0.5 else "endothelial_healthy"
-            self._bind_material(path, mat)
+            if i < len(self._endo_last_mat) and self._endo_last_mat[i] != mat:
+                self._bind_material(path, mat)
+                self._endo_last_mat[i] = mat
 
     def _update_pecam_opacity(self, frame: Dict):
         """Update PECAM-1 visibility based on junction integrity."""
@@ -867,7 +917,10 @@ class DiapedesisSceneBuilder:
                     imageable.MakeVisible()
 
     def _update_bacteria(self, frame: Dict):
-        """Update bacteria visibility and scale based on phagocytosis."""
+        """Update bacteria visibility and scale based on phagocytosis.
+
+        Uses cached scale attribute handles for fast updates.
+        """
         alive = frame.get("bacteria_alive", [])
         phago = frame.get("bacteria_phagocytosis", [])
 
@@ -884,12 +937,8 @@ class DiapedesisSceneBuilder:
                 imageable.MakeInvisible()
             else:
                 imageable.MakeVisible()
-                if progress > 0.01:
-                    # Shrink during phagocytosis
+                if progress > 0.01 and i < len(self._bacteria_scale_attrs):
                     s = 1.5 * (1.0 - progress * 0.8)
-                    xf = UsdGeom.Xformable(prim)
-                    # Update scale (preserve translate)
-                    for op in xf.GetOrderedXformOps():
-                        if op.GetOpType() == UsdGeom.XformOp.TypeScale:
-                            op.Set(Gf.Vec3f(s, s, s))
-                            break
+                    attr = self._bacteria_scale_attrs[i]
+                    if attr:
+                        attr.Set(Gf.Vec3f(s, s, s))
