@@ -658,15 +658,14 @@ class CognisomSimExtension(omni.ext.IExt):
     async def _setup_rtx_capture(self, camera_path: str):
         """Set up RTX frame capture for MJPEG streaming.
 
-        Tries multiple approaches:
-        1. Replicator annotator (non-blocking, with timeout)
-        2. Viewport schedule_capture callback
-        3. PIL fallback (automatic if nothing else works)
+        Creates a replicator annotator and attaches it, then lets the
+        per-frame _capture_rtx_frame() handler poll it continuously.
+        The annotator may not produce frames immediately — RTX needs
+        time to compile shaders and warm up in headless mode.
+        Meanwhile, the PIL fallback serves frames.
         """
         app = omni.kit.app.get_app()
-        import numpy as np
 
-        # ── Approach 1: Replicator annotator (with strict timeout) ──
         try:
             import omni.replicator.core as rep
 
@@ -680,79 +679,24 @@ class CognisomSimExtension(omni.ext.IExt):
             rgb = rep.AnnotatorRegistry.get_annotator("rgb")
             rgb.attach([mjpeg_rp])
 
-            # Sync step only (step_async can hang in headless mode)
-            try:
-                rep.orchestrator.step()
-            except Exception as e:
-                carb.log_warn(f"[cognisom.sim] orchestrator.step(): {e}")
-
-            # Wait for renderer to produce frames
-            carb.log_warn("[cognisom.sim] Warming up annotator (2s)...")
-            for i in range(120):
+            # Brief warmup — don't block setup waiting for frames.
+            # The per-frame _capture_rtx_frame() will keep polling
+            # and switch from PIL→RTX as soon as frames appear.
+            carb.log_warn("[cognisom.sim] Annotator attached, warming up...")
+            for _ in range(30):
                 await app.next_update_async()
-                if i > 0 and i % 30 == 0:
-                    data = rgb.get_data()
-                    if data is not None:
-                        arr = np.array(data)
-                        if arr.ndim >= 2 and arr.size > 100:
-                            h, w = arr.shape[:2]
-                            carb.log_warn(
-                                f"[cognisom.sim] RTX capture active! "
-                                f"{w}x{h}")
-                            if self._streaming_server:
-                                self._streaming_server.set_annotator(rgb)
-                            self._rgb_annotator = rgb
-                            return
-                        else:
-                            carb.log_warn(
-                                f"[cognisom.sim] Annotator @{i}: "
-                                f"shape={arr.shape}")
 
-            carb.log_warn("[cognisom.sim] Annotator did not produce frames")
+            # Always set the annotator — _capture_rtx_frame() handles
+            # empty data gracefully and will activate RTX when ready
+            if self._streaming_server:
+                self._streaming_server.set_annotator(rgb)
+            self._rgb_annotator = rgb
+            carb.log_warn("[cognisom.sim] RTX annotator installed — "
+                          "will auto-switch from PIL when frames appear")
+            return
+
         except Exception as e:
             carb.log_warn(f"[cognisom.sim] Replicator capture failed: {e}")
-
-        # ── Approach 2: Viewport schedule_capture ──
-        # Use the viewport's own capture mechanism which triggers
-        # rendering + readback automatically
-        carb.log_warn("[cognisom.sim] Trying viewport capture...")
-        try:
-            import omni.kit.viewport.utility as vp_util
-            viewport_api = vp_util.get_active_viewport()
-            if viewport_api:
-                if self._streaming_server:
-                    self._streaming_server.set_viewport(viewport_api)
-                carb.log_warn("[cognisom.sim] Viewport API capture set up")
-                return
-        except Exception as e:
-            carb.log_warn(f"[cognisom.sim] Viewport capture: {e}")
-
-        # Use stored viewport from _set_active_camera
-        if self._viewport_api and self._streaming_server:
-            self._streaming_server.set_viewport(self._viewport_api)
-            carb.log_warn("[cognisom.sim] Using stored viewport API")
-            return
-
-        carb.log_warn("[cognisom.sim] No RTX capture available — "
-                      "MJPEG will use PIL fallback")
-
-    def _setup_viewport_capture(self):
-        """Fallback: set viewport API on streaming server for frame capture."""
-        try:
-            import omni.kit.viewport.utility as vp_util
-            viewport_api = vp_util.get_active_viewport()
-            if viewport_api and self._streaming_server:
-                self._streaming_server.set_viewport(viewport_api)
-                carb.log_warn("[cognisom.sim] Viewport API capture configured")
-                return
-        except Exception as e:
-            carb.log_warn(f"[cognisom.sim] Viewport capture failed: {e}")
-
-        # If we also stored one from _set_active_camera
-        if self._viewport_api and self._streaming_server:
-            self._streaming_server.set_viewport(self._viewport_api)
-            carb.log_warn("[cognisom.sim] Viewport capture via stored API")
-            return
 
         carb.log_warn("[cognisom.sim] No RTX capture available — "
                       "MJPEG will use PIL fallback")
@@ -844,10 +788,9 @@ class CognisomSimExtension(omni.ext.IExt):
 
         # In headless mode with PIL fallback active, trigger a capture
         # so MJPEG clients get updated frames.
-        # Rate-limit to ~10fps to avoid starving the GIL — PIL rendering
-        # is CPU-intensive and blocks the main thread if called every tick.
-        if (self._headless and self._streaming_server
-                and not self._rgb_annotator):
+        # Once RTX capture is active, PIL rendering stops automatically.
+        # Rate-limit to ~10fps to avoid starving the GIL.
+        if self._headless and self._streaming_server:
             vc = self._streaming_server._viewport_capture
             if not vc._rtx_active:
                 import time as _time
