@@ -401,10 +401,12 @@ class CognisomSimExtension(omni.ext.IExt):
             carb.log_warn("[cognisom.sim] WebRTC streaming active.")
             if rp_path:
                 self._bind_render_product_to_webrtc(rp_path)
-        else:
-            carb.log_warn("[cognisom.sim] No WebRTC streaming, "
-                          "trying replicator capture for MJPEG...")
-            await self._setup_rtx_capture(camera_path)
+
+        # ALWAYS set up replicator annotator for MJPEG capture.
+        # This ensures /stream serves RTX-rendered frames even when
+        # WebRTC is available (clients may not have the NVIDIA JS library).
+        carb.log_warn("[cognisom.sim] Setting up RTX capture for MJPEG...")
+        await self._setup_rtx_capture(camera_path)
 
         carb.log_warn("[cognisom.sim] Headless scene setup complete — "
                       "HTTP API on port 8211")
