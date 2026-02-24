@@ -1,0 +1,32 @@
+[package]
+title = "Cognisom Diapedesis Streaming"
+description = "Isaac Sim + Cognisom biological simulation extension"
+version = "1.0.0"
+
+[dependencies]
+"isaacsim.exp.full" = {}
+"omni.kit.livestream.core" = { version = "6.1.0", exact = true }
+"omni.kit.livestream.webrtc" = { version = "6.0.0", exact = true }
+"omni.kit.streamsdk.plugins" = { version = "6.1.7", exact = true }
+"cognisom.sim" = {}
+
+[settings]
+app.name = "Cognisom-Sim"
+app.version = "1.0.0"
+app.vulkan = true
+
+[settings.app.exts]
+folders = [
+    "${app}/../exts",
+    "${app}/../extscache",
+    "${app}/../extsPhysics",
+    "${app}/../extsUser",
+    "${app}/../extsDeprecated",
+]
+
+[settings.app.window]
+hideUi = true
+title = "Cognisom Diapedesis"
+
+[settings.app.livestream]
+allowResize = false
