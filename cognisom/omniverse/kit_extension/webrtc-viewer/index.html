@@ -158,11 +158,13 @@
         // ═══════════════════════════════════════════════════════════════
 
         // Parse URL params for server configuration
+        // Default: use /kit/ nginx proxy (production on cognisom.com)
+        // With ?server=HOST: use direct connection (local development)
         const params = new URLSearchParams(window.location.search);
-        const KIT_SERVER = params.get('server') || window.location.hostname || '127.0.0.1';
+        const KIT_SERVER = params.get('server') || null;
         const SIGNALING_PORT = parseInt(params.get('signalingPort') || '49100');
         const API_PORT = parseInt(params.get('apiPort') || '8211');
-        const API_BASE = `http://${KIT_SERVER}:${API_PORT}`;
+        const API_BASE = KIT_SERVER ? `http://${KIT_SERVER}:${API_PORT}` : '/kit';
 
         const statusOverlay = document.getElementById('status-overlay');
         const statusDetail = document.getElementById('status-detail');
@@ -184,16 +186,17 @@
                 // This works when the library is installed and bundled
                 const { AppStreamer } = await import('@nvidia/omniverse-webrtc-streaming-library');
 
-                statusDetail.textContent = `Connecting to ${KIT_SERVER}:${SIGNALING_PORT}...`;
+                const signalingHost = KIT_SERVER || window.location.hostname;
+                statusDetail.textContent = `Connecting to ${signalingHost}:${SIGNALING_PORT}...`;
 
                 const streamConfig = {
                     videoElementId: 'remote-video',
                     audioElementId: 'remote-audio',
                     authenticate: true,
                     maxReconnects: 20,
-                    signalingServer: KIT_SERVER,
+                    signalingServer: signalingHost,
                     signalingPort: SIGNALING_PORT,
-                    mediaServer: KIT_SERVER,
+                    mediaServer: signalingHost,
                     nativeTouchEvents: true,
                     width: 1920,
                     height: 1080,

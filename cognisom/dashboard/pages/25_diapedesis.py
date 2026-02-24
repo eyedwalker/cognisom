@@ -455,7 +455,7 @@ The extension provides:
         )
     with col_link2:
         st.caption(
-            f"[Open WebRTC viewer ↗](/rtx-viewer/?server={kit_browser.split('//')[1].split(':')[0] if '://' in kit_browser else 'localhost'})"
+            "[Open WebRTC viewer ↗](/rtx-viewer/)"
         )
 
     # Playback controls (server-side via localhost)
