@@ -658,101 +658,83 @@ class CognisomSimExtension(omni.ext.IExt):
     async def _setup_rtx_capture(self, camera_path: str):
         """Set up RTX frame capture for MJPEG streaming.
 
-        Tries multiple approaches in order:
-        1. Replicator annotator with dedicated render product
-        2. Replicator annotator with orchestrator-driven rendering
-        3. Viewport API capture
-        4. PIL fallback (automatic if nothing else works)
+        Tries multiple approaches:
+        1. Replicator annotator (non-blocking, with timeout)
+        2. Viewport schedule_capture callback
+        3. PIL fallback (automatic if nothing else works)
         """
         app = omni.kit.app.get_app()
         import numpy as np
 
+        # ── Approach 1: Replicator annotator (with strict timeout) ──
         try:
             import omni.replicator.core as rep
-        except ImportError:
-            carb.log_warn("[cognisom.sim] omni.replicator not available")
-            self._setup_viewport_capture()
-            return
 
-        # Create a dedicated render product for MJPEG (separate from WebRTC)
-        carb.log_warn("[cognisom.sim] Creating dedicated render product "
-                      "for MJPEG capture...")
-        try:
+            carb.log_warn("[cognisom.sim] Creating render product for "
+                          "MJPEG capture...")
             mjpeg_rp = rep.create.render_product(camera_path, (1920, 1080))
+
+            for _ in range(5):
+                await app.next_update_async()
+
+            rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+            rgb.attach([mjpeg_rp])
+
+            # Sync step only (step_async can hang in headless mode)
+            try:
+                rep.orchestrator.step()
+            except Exception as e:
+                carb.log_warn(f"[cognisom.sim] orchestrator.step(): {e}")
+
+            # Wait for renderer to produce frames
+            carb.log_warn("[cognisom.sim] Warming up annotator (2s)...")
+            for i in range(120):
+                await app.next_update_async()
+                if i > 0 and i % 30 == 0:
+                    data = rgb.get_data()
+                    if data is not None:
+                        arr = np.array(data)
+                        if arr.ndim >= 2 and arr.size > 100:
+                            h, w = arr.shape[:2]
+                            carb.log_warn(
+                                f"[cognisom.sim] RTX capture active! "
+                                f"{w}x{h}")
+                            if self._streaming_server:
+                                self._streaming_server.set_annotator(rgb)
+                            self._rgb_annotator = rgb
+                            return
+                        else:
+                            carb.log_warn(
+                                f"[cognisom.sim] Annotator @{i}: "
+                                f"shape={arr.shape}")
+
+            carb.log_warn("[cognisom.sim] Annotator did not produce frames")
         except Exception as e:
-            carb.log_warn(f"[cognisom.sim] render_product creation failed: {e}")
-            self._setup_viewport_capture()
+            carb.log_warn(f"[cognisom.sim] Replicator capture failed: {e}")
+
+        # ── Approach 2: Viewport schedule_capture ──
+        # Use the viewport's own capture mechanism which triggers
+        # rendering + readback automatically
+        carb.log_warn("[cognisom.sim] Trying viewport capture...")
+        try:
+            import omni.kit.viewport.utility as vp_util
+            viewport_api = vp_util.get_active_viewport()
+            if viewport_api:
+                if self._streaming_server:
+                    self._streaming_server.set_viewport(viewport_api)
+                carb.log_warn("[cognisom.sim] Viewport API capture set up")
+                return
+        except Exception as e:
+            carb.log_warn(f"[cognisom.sim] Viewport capture: {e}")
+
+        # Use stored viewport from _set_active_camera
+        if self._viewport_api and self._streaming_server:
+            self._streaming_server.set_viewport(self._viewport_api)
+            carb.log_warn("[cognisom.sim] Using stored viewport API")
             return
 
-        for _ in range(5):
-            await app.next_update_async()
-
-        rgb = rep.AnnotatorRegistry.get_annotator("rgb")
-        rgb.attach([mjpeg_rp])
-
-        # Extended warmup with multiple orchestrator step attempts.
-        # In headless Kit, the RTX renderer needs the orchestrator to
-        # explicitly trigger GPU→CPU pixel readback for the annotator.
-        carb.log_warn("[cognisom.sim] Warming up RTX capture (5s)...")
-
-        for phase in range(5):
-            # Each phase: step orchestrator, then wait for frames
-            try:
-                await rep.orchestrator.step_async()
-            except Exception:
-                try:
-                    rep.orchestrator.step()
-                except Exception:
-                    pass
-
-            for _ in range(60):
-                await app.next_update_async()
-
-            # Check if we got data
-            data = rgb.get_data()
-            if data is not None:
-                arr = np.array(data)
-                if arr.ndim >= 2 and arr.size > 100:
-                    h, w = arr.shape[:2]
-                    carb.log_warn(
-                        f"[cognisom.sim] RTX capture active! "
-                        f"{w}x{h} after phase {phase}")
-                    if self._streaming_server:
-                        self._streaming_server.set_annotator(rgb)
-                    self._rgb_annotator = rgb
-                    return
-                else:
-                    if phase == 0:
-                        carb.log_warn(
-                            f"[cognisom.sim] Annotator phase {phase}: "
-                            f"shape={arr.shape} (waiting...)")
-
-        # Annotator never produced frames. Try the run_until_complete pattern.
-        carb.log_warn("[cognisom.sim] Annotator still empty after warmup, "
-                      "trying orchestrator.run()...")
-        try:
-            rep.orchestrator.run()
-            for _ in range(120):
-                await app.next_update_async()
-                data = rgb.get_data()
-                if data is not None:
-                    arr = np.array(data)
-                    if arr.ndim >= 2 and arr.size > 100:
-                        h, w = arr.shape[:2]
-                        carb.log_warn(
-                            f"[cognisom.sim] RTX capture active "
-                            f"via orchestrator.run()! {w}x{h}")
-                        if self._streaming_server:
-                            self._streaming_server.set_annotator(rgb)
-                        self._rgb_annotator = rgb
-                        return
-        except Exception as e:
-            carb.log_warn(f"[cognisom.sim] orchestrator.run() failed: {e}")
-
-        # All annotator approaches failed — try viewport API
-        carb.log_warn("[cognisom.sim] Annotator capture not producing "
-                      "frames, trying viewport API...")
-        self._setup_viewport_capture()
+        carb.log_warn("[cognisom.sim] No RTX capture available — "
+                      "MJPEG will use PIL fallback")
 
     def _setup_viewport_capture(self):
         """Fallback: set viewport API on streaming server for frame capture."""
