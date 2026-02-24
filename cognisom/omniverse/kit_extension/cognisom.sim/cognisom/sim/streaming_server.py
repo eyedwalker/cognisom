@@ -646,13 +646,23 @@ class StreamingServer:
             self._server.handle_request()
 
     def _capture_loop(self):
-        """Continuously capture viewport frames."""
+        """Continuously capture viewport frames and drive playback.
+
+        In headless mode (--no-window), Kit's main loop doesn't pump
+        update events, so we drive the DiapedesisManager's update()
+        from here to advance frames during playback.
+        """
+        mgr = _StreamHandler.diapedesis_manager
+        interval = 1.0 / 30.0
         while self._running:
             try:
+                # Advance playback (headless: Kit main loop doesn't call update)
+                if mgr and mgr.is_playing and not mgr._is_paused:
+                    mgr.update(interval)
                 self._viewport_capture.capture()
             except Exception:
                 pass
-            time.sleep(1.0 / 30.0)
+            time.sleep(interval)
 
     def shutdown(self):
         """Stop the server."""
