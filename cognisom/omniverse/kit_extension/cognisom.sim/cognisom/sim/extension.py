@@ -656,38 +656,103 @@ class CognisomSimExtension(omni.ext.IExt):
                       "(translucency, GI, SSS, AO)")
 
     async def _setup_rtx_capture(self, camera_path: str):
-        """Set up RTX frame capture for MJPEG fallback streaming."""
-        app = omni.kit.app.get_app()
+        """Set up RTX frame capture for MJPEG streaming.
 
-        # Use the render product we already created
-        if self._render_product:
+        Tries multiple approaches in order:
+        1. Dedicated render product + replicator annotator (best quality)
+        2. Shared render product + annotator (if dedicated fails)
+        3. Viewport API capture (last resort)
+        """
+        app = omni.kit.app.get_app()
+        import numpy as np
+
+        # ── Approach 1: Create a DEDICATED render product for MJPEG ──
+        # The main render product may be claimed by the WebRTC livestream.
+        # A separate one ensures the annotator can read frames independently.
+        annotator_working = False
+        try:
+            import omni.replicator.core as rep
+
+            carb.log_warn("[cognisom.sim] Creating dedicated render product "
+                          "for MJPEG capture...")
+            mjpeg_rp = rep.create.render_product(camera_path, (1920, 1080))
+
+            for _ in range(5):
+                await app.next_update_async()
+
+            rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+            rgb.attach([mjpeg_rp])
+
+            # Warm up — give the renderer time to produce frames
+            carb.log_warn("[cognisom.sim] Warming up MJPEG capture...")
+            for _ in range(60):
+                await app.next_update_async()
+
+            # Try stepping the orchestrator for headless
+            try:
+                rep.orchestrator.step()
+            except Exception:
+                pass
+
+            for _ in range(10):
+                await app.next_update_async()
+
+            # Validate: check if annotator returns actual pixel data
+            data = rgb.get_data()
+            if data is not None:
+                arr = np.array(data)
+                carb.log_warn(f"[cognisom.sim] Dedicated RP annotator: "
+                              f"shape={arr.shape} size={arr.size}")
+                if arr.ndim >= 2 and arr.size > 100:
+                    annotator_working = True
+                    if self._streaming_server:
+                        self._streaming_server.set_annotator(rgb)
+                    self._rgb_annotator = rgb
+                    carb.log_warn("[cognisom.sim] RTX MJPEG capture active "
+                                  "via dedicated render product!")
+                    return
+        except Exception as e:
+            carb.log_warn(f"[cognisom.sim] Dedicated RP failed: {e}")
+
+        # ── Approach 2: Use shared render product ──
+        if not annotator_working and self._render_product:
             try:
                 import omni.replicator.core as rep
+
+                carb.log_warn("[cognisom.sim] Trying shared render product "
+                              "for annotator...")
                 rgb = rep.AnnotatorRegistry.get_annotator("rgb")
                 rgb.attach([self._render_product])
 
-                # Warm up
-                carb.log_warn("[cognisom.sim] Warming up MJPEG capture...")
                 for _ in range(30):
                     await app.next_update_async()
 
-                # Try stepping the orchestrator for headless
                 try:
-                    rep.orchestrator.run()
+                    rep.orchestrator.step()
                 except Exception:
                     pass
 
-                if self._streaming_server:
-                    self._streaming_server.set_annotator(rgb)
-                self._rgb_annotator = rgb
-                carb.log_warn("[cognisom.sim] MJPEG capture via "
-                              "render product initialized")
-                return
-            except Exception as e:
-                carb.log_warn(f"[cognisom.sim] Render product capture "
-                              f"failed: {e}")
+                for _ in range(10):
+                    await app.next_update_async()
 
-        # Fallback: viewport capture
+                data = rgb.get_data()
+                if data is not None:
+                    arr = np.array(data)
+                    carb.log_warn(f"[cognisom.sim] Shared RP annotator: "
+                                  f"shape={arr.shape} size={arr.size}")
+                    if arr.ndim >= 2 and arr.size > 100:
+                        if self._streaming_server:
+                            self._streaming_server.set_annotator(rgb)
+                        self._rgb_annotator = rgb
+                        carb.log_warn("[cognisom.sim] RTX MJPEG capture "
+                                      "active via shared render product!")
+                        return
+            except Exception as e:
+                carb.log_warn(f"[cognisom.sim] Shared RP capture failed: {e}")
+
+        # ── Approach 3: Viewport API capture ──
+        carb.log_warn("[cognisom.sim] Annotator capture not producing "
+                      "frames, trying viewport API...")
         self._setup_viewport_capture()
 
     def _setup_viewport_capture(self):
@@ -698,8 +763,18 @@ class CognisomSimExtension(omni.ext.IExt):
             if viewport_api and self._streaming_server:
                 self._streaming_server.set_viewport(viewport_api)
                 carb.log_warn("[cognisom.sim] Viewport API capture configured")
+                return
         except Exception as e:
-            carb.log_warn(f"[cognisom.sim] Viewport capture also failed: {e}")
+            carb.log_warn(f"[cognisom.sim] Viewport capture failed: {e}")
+
+        # If we also stored one from _set_active_camera
+        if self._viewport_api and self._streaming_server:
+            self._streaming_server.set_viewport(self._viewport_api)
+            carb.log_warn("[cognisom.sim] Viewport capture via stored API")
+            return
+
+        carb.log_warn("[cognisom.sim] No RTX capture available — "
+                      "MJPEG will use PIL fallback")
 
     # ── GUI Mode ─────────────────────────────────────────────────────────
 
