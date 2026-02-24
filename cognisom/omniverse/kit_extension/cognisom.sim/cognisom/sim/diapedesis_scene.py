@@ -801,17 +801,18 @@ class DiapedesisSceneBuilder:
 
     def _build_single_bacterium(self, path: str):
         """Build a rod-shaped bacterium with complement coating."""
-        xform = UsdGeom.Xform.Define(self._stage, path)
+        UsdGeom.Xform.Define(self._stage, path)
 
         if self._use_mesh_assets:
-            # High-fidelity E. coli with flagella and C3b coating baked in
-            xform.GetPrim().GetReferences().AddReference(
+            # Child xform for mesh reference (parent needs translate + scale)
+            child = UsdGeom.Xform.Define(self._stage, f"{path}/geo")
+            child.GetPrim().GetReferences().AddReference(
                 self._asset_paths["ecoli"])
-            xf = UsdGeom.Xformable(xform.GetPrim())
+            xf = UsdGeom.Xformable(child.GetPrim())
             xf.AddScaleOp().Set(Gf.Vec3f(3.0, 3.0, 3.0))
             self._bind_material(path, "bacterium_body",
                                 override_descendants=True)
-            self._bind_material(f"{path}/mesh/complement", "complement_c3b",
+            self._bind_material(f"{path}/geo/mesh/complement", "complement_c3b",
                                 override_descendants=True)
         else:
             # Fallback: capsule + scatter spheres
