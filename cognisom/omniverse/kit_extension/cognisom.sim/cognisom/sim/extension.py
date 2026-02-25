@@ -458,9 +458,11 @@ class CognisomSimExtension(omni.ext.IExt):
         """
         app = omni.kit.app.get_app()
 
-        # Brief wait for streaming extension to create a viewport
+        # Wait for streaming extension to create a viewport.
+        # On first boot, viewport appears at frame 0. On docker restart,
+        # the streaming extension may take several seconds to create it.
         carb.log_warn("[cognisom.sim] Waiting for viewport API...")
-        for attempt in range(60):  # ~2 seconds
+        for attempt in range(600):  # ~20 seconds
             try:
                 import omni.kit.viewport.utility as vp_util
                 viewport_api = vp_util.get_active_viewport()
@@ -1084,6 +1086,28 @@ class CognisomSimExtension(omni.ext.IExt):
         # Wait for Hydra to process the new scene
         for _ in range(30):
             await app.next_update_async()
+
+        # Re-check for viewport API (may have appeared since startup)
+        try:
+            import omni.kit.viewport.utility as vp_util
+            viewport_api = vp_util.get_active_viewport()
+            if viewport_api and not self._viewport_api:
+                carb.log_warn(
+                    "[cognisom.sim] Viewport API now available "
+                    "(found during post-build)")
+                self._viewport_api = viewport_api
+                self._set_active_camera(camera_path)
+                # Get the viewport's render product (more reliable)
+                try:
+                    rp = viewport_api.get_render_product_path()
+                    if rp:
+                        self._hydra_rp_path = rp
+                        carb.log_warn(
+                            f"[cognisom.sim] Using viewport RP: {rp}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         try:
             import omni.replicator.core as rep
