@@ -773,8 +773,8 @@ class _StreamHandler(BaseHTTPRequestHandler):
             pos = ops[0].Get()  # translate
             rot = ops[1].Get()  # rotateXYZ
 
-            # Target is vessel center (matching Three.js lookAt)
-            target = Gf.Vec3d(100.0, -7.5, 0.0)
+            # Target is vessel center
+            target = Gf.Vec3d(100.0, -5.0, 0.0)
             dx, dy, dz = pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]
             dist = math.sqrt(dx*dx + dy*dy + dz*dz)
 
@@ -844,8 +844,8 @@ class _StreamHandler(BaseHTTPRequestHandler):
             ops = xf.GetOrderedXformOps()
             if len(ops) < 2:
                 return
-            cam_pos = Gf.Vec3d(100.0, 55.0, 87.5)
-            target = Gf.Vec3d(100.0, -7.5, 0.0)
+            cam_pos = Gf.Vec3d(100.0, 60.0, 100.0)
+            target = Gf.Vec3d(100.0, -5.0, 0.0)
             ops[0].Set(cam_pos)
             dx = target[0] - cam_pos[0]
             dy = target[1] - cam_pos[1]
@@ -886,11 +886,11 @@ class _StreamHandler(BaseHTTPRequestHandler):
                     ops = xf.GetOrderedXformOps()
                     if len(ops) >= 2:
                         cx = cam_data.get("x", 100.0)
-                        cy = cam_data.get("y", 55.0)
-                        cz = cam_data.get("z", 87.5)
+                        cy = cam_data.get("y", 60.0)
+                        cz = cam_data.get("z", 100.0)
                         cam_pos = Gf.Vec3d(cx, cy, cz)
                         tx = tgt_data.get("x", 100.0) if tgt_data else 100.0
-                        ty = tgt_data.get("y", -7.5) if tgt_data else -7.5
+                        ty = tgt_data.get("y", -5.0) if tgt_data else -5.0
                         tz = tgt_data.get("z", 0.0) if tgt_data else 0.0
                         target = Gf.Vec3d(tx, ty, tz)
                         ops[0].Set(cam_pos)

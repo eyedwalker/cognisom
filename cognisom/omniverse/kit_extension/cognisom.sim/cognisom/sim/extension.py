@@ -696,11 +696,10 @@ class CognisomSimExtension(omni.ext.IExt):
         camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.1, 10000.0))
         camera.GetHorizontalApertureAttr().Set(36.0)
 
-        # Match Three.js camera: position=(L*0.5, R*2.2, R*3.5)
-        #   lookAt=(L*0.5, -R*0.3, 0) with R=25, L=200
-        # Elevated 3/4 view centered on vessel midpoint
-        cam_pos = Gf.Vec3d(100.0, 55.0, 87.5)
-        target = Gf.Vec3d(100.0, -7.5, 0.0)
+        # 3/4 elevated view looking into the vessel cutaway
+        # Camera above and in front, looking down into the lumen
+        cam_pos = Gf.Vec3d(100.0, 60.0, 100.0)
+        target = Gf.Vec3d(100.0, -5.0, 0.0)
 
         xformable = UsdGeom.Xformable(camera_prim)
         xformable.AddTranslateOp().Set(cam_pos)
@@ -807,9 +806,10 @@ class CognisomSimExtension(omni.ext.IExt):
         # Anti-aliasing
         settings.set_bool("/rtx/post/aa/enabled", True)
 
-        # Higher sample count for quality
-        settings.set_int("/rtx/pathtracing/totalSpp", 64)
-        settings.set_int("/rtx/directLighting/sampledLighting/autoNumberOfLights", 8)
+        # Low sample count for real-time MJPEG streaming
+        settings.set_int("/rtx/pathtracing/totalSpp", 4)
+        settings.set_int("/rtx/pathtracing/spp", 1)
+        settings.set_int("/rtx/directLighting/sampledLighting/autoNumberOfLights", 4)
 
         # Render resolution
         settings.set_int("/app/renderer/resolution/width", 1920)

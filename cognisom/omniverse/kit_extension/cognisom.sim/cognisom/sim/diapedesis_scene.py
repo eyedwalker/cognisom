@@ -66,11 +66,11 @@ MATERIALS = {
     # Vessel & endothelium
     "vessel_wall": {
         "color": (0.91, 0.69, 0.69), "roughness": 0.6,
-        "opacity": 0.18, "subsurface": 0.3,
+        "opacity": 0.45, "subsurface": 0.3,
     },
     "basement_membrane": {
         "color": (0.55, 0.45, 0.38), "roughness": 0.85,
-        "opacity": 0.12,
+        "opacity": 0.35,
     },
     "endothelial_healthy": {
         "color": (0.9, 0.75, 0.75), "roughness": 0.65,
