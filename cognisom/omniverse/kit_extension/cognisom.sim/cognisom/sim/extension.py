@@ -41,6 +41,8 @@ class CognisomSimExtension(omni.ext.IExt):
         self._render_product = None
         self._rgb_annotator = None
         self._viewport_api = None
+        self._camera_path = None
+        self._scene_build_count = 0  # Track scene rebuilds
 
     def on_startup(self, ext_id: str):
         """Called when extension is loaded."""
@@ -376,6 +378,7 @@ class CognisomSimExtension(omni.ext.IExt):
 
         # Create camera for the diapedesis scene
         camera_path = self._create_scene_camera(stage)
+        self._camera_path = camera_path
 
         # Wait for prims to propagate
         for _ in range(3):
@@ -391,8 +394,11 @@ class CognisomSimExtension(omni.ext.IExt):
         for _ in range(10):
             await app.next_update_async()
 
-        # Create explicit render product for this camera
-        rp_path = await self._create_render_product(camera_path)
+        # Try to get the viewport's existing render product first
+        # (created by Isaac Sim's streaming app), then fall back to creating one
+        rp_path = self._get_viewport_render_product()
+        if not rp_path:
+            rp_path = await self._create_render_product(camera_path)
 
         # Check if WebRTC streaming is available
         webrtc_available = self._check_webrtc_streaming()
@@ -410,6 +416,47 @@ class CognisomSimExtension(omni.ext.IExt):
 
         carb.log_warn("[cognisom.sim] Headless scene setup complete — "
                       "HTTP API on port 8211")
+
+    def _get_viewport_render_product(self) -> str:
+        """Try to get the active viewport's existing render product.
+
+        Isaac Sim's streaming app creates its own viewport + render product.
+        Using that instead of creating a new one ensures we read from the
+        same pipeline that the WebRTC streamer uses.
+        """
+        try:
+            import omni.kit.viewport.utility as vp_util
+            viewport_api = vp_util.get_active_viewport()
+            if viewport_api:
+                # Try different API methods for getting render product path
+                for method_name in ['get_render_product_path',
+                                    'render_product_path']:
+                    try:
+                        if hasattr(viewport_api, method_name):
+                            val = getattr(viewport_api, method_name)
+                            rp_path = val() if callable(val) else val
+                            if rp_path:
+                                carb.log_warn(
+                                    f"[cognisom.sim] Using viewport render "
+                                    f"product: {rp_path}")
+                                return rp_path
+                    except Exception:
+                        pass
+
+                # Try hydra texture path
+                try:
+                    hydra_tex = viewport_api.get_texture("color")
+                    if hydra_tex:
+                        carb.log_warn(
+                            f"[cognisom.sim] Viewport has color texture: "
+                            f"{type(hydra_tex)}")
+                except Exception:
+                    pass
+
+        except Exception as e:
+            carb.log_info(
+                f"[cognisom.sim] Could not get viewport render product: {e}")
+        return None
 
     async def _create_render_product(self, camera_path: str):
         """Create an explicit render product for the camera.
@@ -769,6 +816,18 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._diapedesis_manager:
             self._diapedesis_manager.process_pending()
 
+            # Check if scene was just rebuilt — recreate annotator
+            if (self._headless and
+                    self._diapedesis_manager._scene_built and
+                    hasattr(self._diapedesis_manager, '_scene_build_count')):
+                mgr_count = self._diapedesis_manager._scene_build_count
+                if mgr_count > self._scene_build_count:
+                    self._scene_build_count = mgr_count
+                    carb.log_warn(
+                        "[cognisom.sim] Scene rebuilt — recreating annotator")
+                    asyncio.ensure_future(
+                        self._recreate_annotator_after_build())
+
         if self._mode == "cell_sim":
             if self._simulation_manager and self._simulation_manager.is_running:
                 self._simulation_manager.update(dt)
@@ -782,7 +841,7 @@ class CognisomSimExtension(omni.ext.IExt):
             if self._diapedesis_manager and self._diapedesis_manager.is_playing:
                 self._diapedesis_manager.update(dt)
 
-        # Capture RTX frame from replicator annotator (only when NOT using WebRTC)
+        # Capture RTX frame from replicator annotator
         if self._rgb_annotator and self._streaming_server:
             self._capture_rtx_frame()
 
@@ -794,6 +853,80 @@ class CognisomSimExtension(omni.ext.IExt):
         # Update UI (GUI mode only)
         if self._panel:
             self._panel.update_stats()
+
+    async def _recreate_annotator_after_build(self):
+        """Recreate the render product and annotator after scene build.
+
+        The initial render product was created on an empty stage, so the
+        annotator returns empty data. After scene geometry is added, we
+        need to recreate the render product so the RTX renderer picks up
+        the new content and the annotator starts returning pixels.
+        """
+        app = omni.kit.app.get_app()
+        camera_path = self._camera_path or "/World/DiapedesisCam"
+
+        carb.log_warn("[cognisom.sim] Waiting for scene to settle...")
+        # Wait for Hydra to process the new scene
+        for _ in range(30):
+            await app.next_update_async()
+
+        try:
+            import omni.replicator.core as rep
+
+            carb.log_warn(
+                f"[cognisom.sim] Recreating render product for {camera_path}")
+            rp = rep.create.render_product(camera_path, (1920, 1080))
+            self._render_product = rp
+
+            # Wait for render product to initialize with scene content
+            for _ in range(20):
+                await app.next_update_async()
+
+            rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+            rgb.attach([rp])
+
+            # Longer warmup — RTX needs to compile shaders for new materials
+            carb.log_warn("[cognisom.sim] Annotator re-attached, "
+                          "warming up with scene content...")
+            for _ in range(60):
+                await app.next_update_async()
+
+            # Check if we're getting data now
+            import numpy as np
+            data = rgb.get_data()
+            if data is not None:
+                arr = np.array(data)
+                carb.log_warn(
+                    f"[cognisom.sim] Post-build annotator: "
+                    f"shape={arr.shape} size={arr.size}")
+                if arr.size > 0 and arr.ndim >= 2:
+                    carb.log_warn(
+                        f"[cognisom.sim] RTX producing frames! "
+                        f"{arr.shape[1]}x{arr.shape[0]}")
+            else:
+                carb.log_warn(
+                    "[cognisom.sim] Post-build annotator: None")
+
+            # Install the new annotator
+            if self._streaming_server:
+                self._streaming_server.set_annotator(rgb)
+            self._rgb_annotator = rgb
+
+            # Reset RTX active flag so it can be detected fresh
+            if self._streaming_server:
+                self._streaming_server._viewport_capture._rtx_active = False
+
+            # Reset diagnostic counter
+            self._diag_count = 0
+
+            carb.log_warn("[cognisom.sim] Annotator recreated after "
+                          "scene build")
+
+        except Exception as e:
+            carb.log_warn(
+                f"[cognisom.sim] Failed to recreate annotator: {e}")
+            import traceback
+            carb.log_warn(f"[cognisom.sim] {traceback.format_exc()}")
 
     def _capture_rtx_frame(self):
         """Read RTX frame from replicator annotator and push to streaming buffer.
@@ -808,11 +941,12 @@ class CognisomSimExtension(omni.ext.IExt):
             data = self._rgb_annotator.get_data()
 
             # Diagnostic logging (throttled)
+            # Use carb.log_warn for first 20 frames so they show in docker logs
             if not hasattr(self, '_diag_count'):
                 self._diag_count = 0
             self._diag_count += 1
-            if self._diag_count <= 5 or self._diag_count % 600 == 0:
-                log_fn = carb.log_warn if self._diag_count <= 5 else carb.log_info
+            if self._diag_count <= 20 or self._diag_count % 300 == 0:
+                log_fn = carb.log_warn if self._diag_count <= 20 else carb.log_warn
                 if data is not None:
                     arr_tmp = np.array(data)
                     log_fn(

@@ -110,6 +110,7 @@ class DiapedesisManager:
         self._preset_name: str = ""
         self._scene_built: bool = False
         self._build_requested: bool = False  # queued for main thread
+        self._scene_build_count: int = 0  # Incremented on each build
 
         # Stats
         self._stats = {
@@ -433,9 +434,11 @@ class DiapedesisManager:
         self._scene_builder.build_scene(self._frames[0])
         self._scene_built = True
         self._current_frame = 0
+        self._scene_build_count += 1
 
         carb.log_warn(f"[diapedesis] Scene built successfully! "
-                      f"scene_built={self._scene_built}")
+                      f"scene_built={self._scene_built} "
+                      f"build_count={self._scene_build_count}")
         return True
 
     # ── Playback Control ────────────────────────────────────────────────

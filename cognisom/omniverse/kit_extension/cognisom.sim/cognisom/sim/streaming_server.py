@@ -529,6 +529,10 @@ class _StreamHandler(BaseHTTPRequestHandler):
             # Serve a simple HTML viewer page
             self._serve_viewer_html()
 
+        elif path == "/diag":
+            # Diagnostic endpoint — full renderer state for debugging
+            self._send_diag()
+
         else:
             self._send_json({"error": "not found"}, 404)
 
@@ -724,6 +728,92 @@ class _StreamHandler(BaseHTTPRequestHandler):
             ops[1].Set(Gf.Vec3f(-pitch, yaw, 0.0))
         except Exception as e:
             carb.log_warn(f"[streaming] reset camera error: {e}")
+
+    def _send_diag(self):
+        """Diagnostic endpoint for debugging renderer state."""
+        vc = self.viewport_capture
+        mgr = self.diapedesis_manager
+        diag = {
+            "viewport_capture": {
+                "rtx_active": vc._rtx_active if vc else None,
+                "has_buffer": vc._buffer is not None if vc else False,
+                "buffer_size": len(vc._buffer) if (vc and vc._buffer) else 0,
+                "width": vc._width if vc else 0,
+                "height": vc._height if vc else 0,
+                "has_annotator": vc._rgb_annotator is not None if vc else False,
+                "has_viewport_api": vc._viewport_api is not None if vc else False,
+            },
+            "diapedesis": {
+                "scene_built": mgr._scene_built if mgr else False,
+                "scene_build_count": getattr(mgr, '_scene_build_count', 0) if mgr else 0,
+                "total_frames": mgr.total_frames if mgr else 0,
+                "current_frame": mgr.current_frame if mgr else 0,
+                "playing": mgr.is_playing if mgr else False,
+            },
+        }
+
+        # Annotator state
+        if vc and vc._rgb_annotator:
+            try:
+                data = vc._rgb_annotator.get_data()
+                if data is not None:
+                    import numpy as np
+                    arr = np.array(data)
+                    diag["annotator"] = {
+                        "has_data": True,
+                        "shape": list(arr.shape),
+                        "size": int(arr.size),
+                        "dtype": str(arr.dtype),
+                    }
+                else:
+                    diag["annotator"] = {"has_data": False, "data": "None"}
+            except Exception as e:
+                diag["annotator"] = {"error": str(e)}
+        else:
+            diag["annotator"] = {"configured": False}
+
+        # Viewport state
+        try:
+            import omni.kit.viewport.utility as vp_util
+            viewport_api = vp_util.get_active_viewport()
+            if viewport_api:
+                vp_info = {"available": True}
+                try:
+                    vp_info["camera_path"] = str(viewport_api.camera_path)
+                except Exception:
+                    pass
+                try:
+                    vp_info["resolution"] = list(viewport_api.resolution)
+                except Exception:
+                    pass
+                for attr in ['get_render_product_path', 'render_product_path']:
+                    try:
+                        val = getattr(viewport_api, attr, None)
+                        if val:
+                            vp_info["render_product"] = val() if callable(val) else val
+                            break
+                    except Exception:
+                        pass
+                diag["viewport"] = vp_info
+            else:
+                diag["viewport"] = {"available": False}
+        except Exception as e:
+            diag["viewport"] = {"error": str(e)}
+
+        # Carb settings
+        try:
+            settings = carb.settings.get_settings()
+            diag["settings"] = {
+                "livestream_port": settings.get_as_int("/app/livestream/port"),
+                "renderer_active": settings.get_as_string("/renderer/active"),
+                "rtx_rendermode": settings.get_as_string("/rtx/rendermode"),
+                "window_enabled": settings.get_as_bool("/app/window/enabled"),
+                "livestream_enabled": settings.get_as_bool("/app/livestream/enabled"),
+            }
+        except Exception as e:
+            diag["settings"] = {"error": str(e)}
+
+        self._send_json(diag)
 
     def _serve_viewer_html(self):
         """Serve a standalone HTML viewer with MJPEG streaming + controls.
