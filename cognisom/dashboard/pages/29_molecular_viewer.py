@@ -103,6 +103,130 @@ def get_kit_status() -> dict:
         return None
 
 
+def _fetch_rcsb(pdb_id: str) -> str:
+    """Fetch PDB file from RCSB."""
+    import requests
+    pdb_id = pdb_id.strip().upper()
+    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+    try:
+        resp = requests.get(url, timeout=15)
+        if resp.status_code == 200:
+            st.success(f"Fetched {pdb_id} from RCSB ({len(resp.text)} bytes)")
+            return resp.text
+        else:
+            st.error(f"Could not fetch {pdb_id}: HTTP {resp.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"RCSB fetch failed: {e}")
+        return None
+
+
+def _render_2d_fallback(pdb_text: str, mutations: list):
+    """Render a simple 2D projection when Kit is not available."""
+    try:
+        import plotly.graph_objects as go
+
+        # Parse atoms
+        atoms_data = []
+        for line in pdb_text.splitlines():
+            if not line.startswith("ATOM"):
+                continue
+            try:
+                x = float(line[30:38])
+                y = float(line[38:46])
+                z = float(line[46:54])
+                name = line[12:16].strip()
+                res_seq = int(line[22:26].strip())
+                res_name = line[17:20].strip()
+                bfactor = float(line[60:66].strip()) if len(line) >= 66 and line[60:66].strip() else 50.0
+                element = line[76:78].strip() if len(line) >= 78 else name[0]
+                atoms_data.append({
+                    "x": x, "y": y, "z": z, "name": name,
+                    "res_seq": res_seq, "res_name": res_name,
+                    "bfactor": bfactor, "element": element,
+                    "is_ca": name == "CA",
+                    "is_mutation": res_seq in mutations,
+                })
+            except (ValueError, IndexError):
+                continue
+
+        if not atoms_data:
+            st.warning("No atoms to display")
+            return
+
+        import pandas as pd
+        df = pd.DataFrame(atoms_data)
+
+        # Filter to CA atoms for clean view
+        ca_df = df[df["is_ca"]].copy()
+
+        if len(ca_df) == 0:
+            ca_df = df.copy()
+
+        # Color by pLDDT
+        def plddt_color(val):
+            if val >= 90:
+                return "blue"
+            elif val >= 70:
+                return "cyan"
+            elif val >= 50:
+                return "yellow"
+            return "red"
+
+        ca_df["color"] = ca_df["bfactor"].apply(plddt_color)
+        # Override mutation sites
+        ca_df.loc[ca_df["is_mutation"], "color"] = "red"
+
+        fig = go.Figure()
+
+        # C-alpha trace
+        fig.add_trace(go.Scatter3d(
+            x=ca_df["x"], y=ca_df["y"], z=ca_df["z"],
+            mode="lines+markers",
+            line=dict(color="gray", width=3),
+            marker=dict(
+                size=ca_df["bfactor"].apply(lambda v: 5 if v >= 70 else 3),
+                color=ca_df["color"],
+            ),
+            text=ca_df.apply(lambda r: f"{r['res_name']} {r['res_seq']}", axis=1),
+            hoverinfo="text",
+        ))
+
+        # Highlight mutations
+        mut_df = ca_df[ca_df["is_mutation"]]
+        if len(mut_df) > 0:
+            fig.add_trace(go.Scatter3d(
+                x=mut_df["x"], y=mut_df["y"], z=mut_df["z"],
+                mode="markers",
+                marker=dict(size=10, color="red", symbol="diamond"),
+                text=mut_df.apply(
+                    lambda r: f"MUTATION: {r['res_name']} {r['res_seq']}", axis=1
+                ),
+                hoverinfo="text",
+                name="Mutations",
+            ))
+
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                zaxis=dict(visible=False),
+                bgcolor="rgb(10,10,30)",
+            ),
+            paper_bgcolor="rgb(10,10,30)",
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=550,
+            showlegend=False,
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    except ImportError:
+        st.warning("Install plotly for 2D fallback visualization")
+    except Exception as e:
+        st.error(f"2D rendering failed: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # SIDEBAR: SOURCE SELECTION
 # ─────────────────────────────────────────────────────────────────────────
@@ -275,28 +399,6 @@ elif source == "Demo":
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# HELPER: Fetch from RCSB
-# ─────────────────────────────────────────────────────────────────────────
-
-def _fetch_rcsb(pdb_id: str) -> str:
-    """Fetch PDB file from RCSB."""
-    import requests
-    pdb_id = pdb_id.strip().upper()
-    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-    try:
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 200:
-            st.success(f"Fetched {pdb_id} from RCSB ({len(resp.text)} bytes)")
-            return resp.text
-        else:
-            st.error(f"Could not fetch {pdb_id}: HTTP {resp.status_code}")
-            return None
-    except Exception as e:
-        st.error(f"RCSB fetch failed: {e}")
-        return None
-
-
-# ─────────────────────────────────────────────────────────────────────────
 # STRUCTURE INFO & SEND TO KIT
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -434,111 +536,3 @@ else:
     st.info("Select a structure source from the sidebar to get started.")
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# FALLBACK 2D RENDERER
-# ─────────────────────────────────────────────────────────────────────────
-
-def _render_2d_fallback(pdb_text: str, mutations: list):
-    """Render a simple 2D projection when Kit is not available."""
-    try:
-        import plotly.graph_objects as go
-
-        # Parse atoms
-        atoms_data = []
-        for line in pdb_text.splitlines():
-            if not line.startswith("ATOM"):
-                continue
-            try:
-                x = float(line[30:38])
-                y = float(line[38:46])
-                z = float(line[46:54])
-                name = line[12:16].strip()
-                res_seq = int(line[22:26].strip())
-                res_name = line[17:20].strip()
-                bfactor = float(line[60:66].strip()) if len(line) >= 66 and line[60:66].strip() else 50.0
-                element = line[76:78].strip() if len(line) >= 78 else name[0]
-                atoms_data.append({
-                    "x": x, "y": y, "z": z, "name": name,
-                    "res_seq": res_seq, "res_name": res_name,
-                    "bfactor": bfactor, "element": element,
-                    "is_ca": name == "CA",
-                    "is_mutation": res_seq in mutations,
-                })
-            except (ValueError, IndexError):
-                continue
-
-        if not atoms_data:
-            st.warning("No atoms to display")
-            return
-
-        import pandas as pd
-        df = pd.DataFrame(atoms_data)
-
-        # Filter to CA atoms for clean view
-        ca_df = df[df["is_ca"]].copy()
-
-        if len(ca_df) == 0:
-            ca_df = df.copy()
-
-        # Color by pLDDT
-        def plddt_color(val):
-            if val >= 90:
-                return "blue"
-            elif val >= 70:
-                return "cyan"
-            elif val >= 50:
-                return "yellow"
-            return "red"
-
-        ca_df["color"] = ca_df["bfactor"].apply(plddt_color)
-        # Override mutation sites
-        ca_df.loc[ca_df["is_mutation"], "color"] = "red"
-
-        fig = go.Figure()
-
-        # C-alpha trace
-        fig.add_trace(go.Scatter3d(
-            x=ca_df["x"], y=ca_df["y"], z=ca_df["z"],
-            mode="lines+markers",
-            line=dict(color="gray", width=3),
-            marker=dict(
-                size=ca_df["bfactor"].apply(lambda v: 5 if v >= 70 else 3),
-                color=ca_df["color"],
-            ),
-            text=ca_df.apply(lambda r: f"{r['res_name']} {r['res_seq']}", axis=1),
-            hoverinfo="text",
-        ))
-
-        # Highlight mutations
-        mut_df = ca_df[ca_df["is_mutation"]]
-        if len(mut_df) > 0:
-            fig.add_trace(go.Scatter3d(
-                x=mut_df["x"], y=mut_df["y"], z=mut_df["z"],
-                mode="markers",
-                marker=dict(size=10, color="red", symbol="diamond"),
-                text=mut_df.apply(
-                    lambda r: f"MUTATION: {r['res_name']} {r['res_seq']}", axis=1
-                ),
-                hoverinfo="text",
-                name="Mutations",
-            ))
-
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(visible=False),
-                yaxis=dict(visible=False),
-                zaxis=dict(visible=False),
-                bgcolor="rgb(10,10,30)",
-            ),
-            paper_bgcolor="rgb(10,10,30)",
-            margin=dict(l=0, r=0, t=0, b=0),
-            height=550,
-            showlegend=False,
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-    except ImportError:
-        st.warning("Install plotly for 2D fallback visualization")
-    except Exception as e:
-        st.error(f"2D rendering failed: {e}")

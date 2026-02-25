@@ -44,6 +44,48 @@ def _chrom_sort_key(chrom: str) -> tuple:
         return (99,)
 
 
+def _predict_structure(sequence: str, label: str):
+    """Run structure prediction via BioNeMo NIM."""
+    import os
+    api_key = os.environ.get("NVIDIA_API_KEY")
+    if not api_key:
+        st.error(
+            "NVIDIA_API_KEY not set. Add it to your .env file or "
+            "set it as an environment variable to use BioNeMo NIMs."
+        )
+        return
+
+    with st.spinner(f"Predicting structure for {label}..."):
+        try:
+            from cognisom.bridge.pipeline import DiscoveryPipeline
+            pipeline = DiscoveryPipeline(api_key=api_key)
+
+            # Truncate to first 1024 AA for ESM2 compatibility
+            seq = sequence[:1024] if len(sequence) > 1024 else sequence
+
+            result = pipeline.run_structure_prediction_pipeline(
+                sequence=seq, method="openfold3"
+            )
+
+            st.success(f"Structure predicted for {label}")
+
+            if "confidence" in result:
+                st.metric("Confidence", f"{result['confidence']:.2f}")
+            if "plddt" in result:
+                st.metric("Mean pLDDT", f"{result['plddt']:.1f}")
+            if "structure" in result:
+                st.text_area(
+                    "Structure (mmCIF/PDB)",
+                    value=result["structure"][:2000],
+                    height=200,
+                )
+                # Store for molecular viewer
+                st.session_state[f"structure_{label}"] = result
+
+        except Exception as e:
+            st.error(f"Structure prediction failed: {e}")
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────────────────────────────────
@@ -402,47 +444,3 @@ else:
         })
     gene_df = pd.DataFrame(gene_data)
     st.dataframe(gene_df, use_container_width=True, hide_index=True)
-
-
-
-
-def _predict_structure(sequence: str, label: str):
-    """Run structure prediction via BioNeMo NIM."""
-    import os
-    api_key = os.environ.get("NVIDIA_API_KEY")
-    if not api_key:
-        st.error(
-            "NVIDIA_API_KEY not set. Add it to your .env file or "
-            "set it as an environment variable to use BioNeMo NIMs."
-        )
-        return
-
-    with st.spinner(f"Predicting structure for {label}..."):
-        try:
-            from cognisom.bridge.pipeline import DiscoveryPipeline
-            pipeline = DiscoveryPipeline(api_key=api_key)
-
-            # Truncate to first 1024 AA for ESM2 compatibility
-            seq = sequence[:1024] if len(sequence) > 1024 else sequence
-
-            result = pipeline.run_structure_prediction_pipeline(
-                sequence=seq, method="openfold3"
-            )
-
-            st.success(f"Structure predicted for {label}")
-
-            if "confidence" in result:
-                st.metric("Confidence", f"{result['confidence']:.2f}")
-            if "plddt" in result:
-                st.metric("Mean pLDDT", f"{result['plddt']:.1f}")
-            if "structure" in result:
-                st.text_area(
-                    "Structure (mmCIF/PDB)",
-                    value=result["structure"][:2000],
-                    height=200,
-                )
-                # Store for molecular viewer
-                st.session_state[f"structure_{label}"] = result
-
-        except Exception as e:
-            st.error(f"Structure prediction failed: {e}")
