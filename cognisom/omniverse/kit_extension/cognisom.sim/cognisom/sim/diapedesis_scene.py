@@ -428,9 +428,9 @@ class DiapedesisSceneBuilder:
         Generates a semicircular tube with proper face winding for
         double-sided rendering in RTX.
         """
-        points = []
-        face_counts = []
-        face_indices = []
+        pts = []
+        fc = []
+        fi = []
 
         # Two rings of vertices: x=0 and x=length
         for ring in range(2):
@@ -439,7 +439,7 @@ class DiapedesisSceneBuilder:
                 theta = math.pi * seg / n_segments  # 0 to pi
                 y = radius * math.cos(theta)
                 z = radius * math.sin(theta)
-                points.append(Gf.Vec3f(float(x), float(y), float(z)))
+                pts.append(Gf.Vec3f(float(x), float(y), float(z)))
 
         # Quads between the two rings
         verts_per_ring = n_segments + 1
@@ -448,8 +448,13 @@ class DiapedesisSceneBuilder:
             i1 = seg + 1                   # ring 0, seg+1
             i2 = verts_per_ring + seg + 1  # ring 1, seg+1
             i3 = verts_per_ring + seg      # ring 1, seg
-            face_counts.append(4)
-            face_indices.extend([i0, i1, i2, i3])
+            fc.append(4)
+            fi.extend([i0, i1, i2, i3])
+
+        # Convert to Vt arrays (required by Fabric Scene Delegate)
+        points = Vt.Vec3fArray(pts)
+        face_counts = Vt.IntArray(fc)
+        face_indices = Vt.IntArray(fi)
 
         mesh = UsdGeom.Mesh.Define(self._stage, path)
         mesh.GetPointsAttr().Set(points)
@@ -457,6 +462,12 @@ class DiapedesisSceneBuilder:
         mesh.GetFaceVertexIndicesAttr().Set(face_indices)
         mesh.GetSubdivisionSchemeAttr().Set("none")
         mesh.GetDoubleSidedAttr().Set(True)
+
+        # Compute and set extent (required for Fabric/RTX rendering)
+        min_pt = Gf.Vec3f(0, -radius, 0)
+        max_pt = Gf.Vec3f(length, radius, radius)
+        mesh.GetExtentAttr().Set(Vt.Vec3fArray([min_pt, max_pt]))
+
         self._bind_material(path, mat)
 
     # ── Endothelial Cells ────────────────────────────────────────────────
@@ -941,9 +952,14 @@ class DiapedesisSceneBuilder:
         if self._n_rbc == 0:
             return
 
-        proto_path = f"{PROTOTYPES_PATH}/rbc"
+        # PointInstancer (must be defined BEFORE prototype so proto is a child)
+        instancer_path = f"{RBCS_PATH}/Instancer"
+        instancer = UsdGeom.PointInstancer.Define(self._stage, instancer_path)
+        self._rbc_instancer = instancer_path
+
+        # Prototype must be a child of the instancer for RTX rendering
+        proto_path = f"{instancer_path}/Prototypes/rbc"
         if self._use_mesh_assets:
-            # High-fidelity biconcave mesh prototype
             proto = UsdGeom.Xform.Define(self._stage, proto_path)
             proto.GetPrim().GetReferences().AddReference(
                 self._asset_paths["rbc"])
@@ -952,30 +968,35 @@ class DiapedesisSceneBuilder:
             self._bind_material(proto_path, "rbc",
                                 override_descendants=True)
         else:
-            # Fallback: flattened sphere
             rbc = UsdGeom.Sphere.Define(self._stage, proto_path)
             rbc.CreateRadiusAttr().Set(3.75)
+            rbc.CreateExtentAttr().Set(Vt.Vec3fArray([
+                Gf.Vec3f(-3.75, -3.75, -3.75),
+                Gf.Vec3f(3.75, 3.75, 3.75),
+            ]))
             xf = UsdGeom.Xformable(rbc.GetPrim())
             xf.AddScaleOp().Set(Gf.Vec3f(1.0, 0.35, 1.0))
             self._bind_material(proto_path, "rbc")
 
-        # PointInstancer
-        instancer_path = f"{RBCS_PATH}/Instancer"
-        instancer = UsdGeom.PointInstancer.Define(self._stage, instancer_path)
-        self._rbc_instancer = instancer_path
-
-        # Set prototype
+        # Link prototype
         instancer.CreatePrototypesRel().SetTargets([proto_path])
 
-        # Set positions
-        pos_array = Vt.Vec3fArray(len(positions))
-        idx_array = Vt.IntArray(len(positions))
+        # Positions, orientations, scales, proto indices
+        n = len(positions)
+        pos_array = Vt.Vec3fArray(n)
+        idx_array = Vt.IntArray(n)
+        orient_array = Vt.QuathArray(n)
+        scale_array = Vt.Vec3fArray(n)
         for i, p in enumerate(positions):
             pos_array[i] = Gf.Vec3f(*p)
-            idx_array[i] = 0  # All reference prototype 0
+            idx_array[i] = 0
+            orient_array[i] = Gf.Quath(1.0, 0.0, 0.0, 0.0)  # identity
+            scale_array[i] = Gf.Vec3f(1.0, 1.0, 1.0)
 
         instancer.CreatePositionsAttr().Set(pos_array)
         instancer.CreateProtoIndicesAttr().Set(idx_array)
+        instancer.CreateOrientationsAttr().Set(orient_array)
+        instancer.CreateScalesAttr().Set(scale_array)
 
     # ── Bacteria ─────────────────────────────────────────────────────────
 
