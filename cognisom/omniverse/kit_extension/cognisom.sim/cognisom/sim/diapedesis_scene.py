@@ -223,6 +223,10 @@ class DiapedesisSceneBuilder:
         self._leuko_last_state: List[int] = []  # cache to skip redundant material binds
         self._endo_last_mat: List[str] = []  # cache to skip redundant endo material binds
         self._bacteria_scale_attrs: List[Optional[Any]] = []
+        # Integrin prims per leukocyte: [[bent_paths], [extended_paths]]
+        self._integrin_bent_prims: List[List[str]] = []
+        self._integrin_ext_prims: List[List[str]] = []
+        self._integrin_last_active: List[bool] = []  # cache activation state
 
         # Check if high-fidelity mesh assets are available
         self._use_mesh_assets = False
@@ -273,7 +277,10 @@ class DiapedesisSceneBuilder:
         self._build_icam1(frame)
         self._build_pecam1(frame)
 
-        # Build leukocytes (individual prims with prototypes)
+        # Build integrin prototypes (bent + extended)
+        self._build_integrin_prototypes()
+
+        # Build leukocytes (individual prims with prototypes + integrins)
         self._build_leukocytes(frame)
 
         # Build RBCs (PointInstancer for 200 biconcave discs)
@@ -399,30 +406,58 @@ class DiapedesisSceneBuilder:
     # ── Vessel Geometry ──────────────────────────────────────────────────
 
     def _build_vessel(self):
-        """Build the vessel wall as a half-cylinder cutaway."""
+        """Build the vessel wall as a half-cylinder mesh cutaway.
+
+        Matches the Three.js CylinderGeometry(R, R, L, 48, 1, true, 0, pi)
+        which creates a semicircular tube open on one side for cutaway view.
+        """
         R = self._vessel_radius
         L = self._vessel_length
 
-        # Vessel wall — half cylinder (cutaway)
-        # USD doesn't have a native half-cylinder, so we use a full cylinder
-        # with transform and rely on camera clipping for cutaway effect.
-        # In Kit, a mesh-based half-cylinder would be better.
-        vessel = UsdGeom.Cylinder.Define(self._stage, f"{VESSEL_PATH}/Wall")
-        vessel.CreateRadiusAttr().Set(R)
-        vessel.CreateHeightAttr().Set(L)
-        vessel.CreateAxisAttr().Set("X")
-        xf = UsdGeom.Xformable(vessel.GetPrim())
-        xf.AddTranslateOp().Set(Gf.Vec3d(L / 2, 0, 0))
-        self._bind_material(vessel.GetPath().pathString, "vessel_wall")
+        self._build_half_cylinder_mesh(
+            f"{VESSEL_PATH}/Wall", R, L, n_segments=48, mat="vessel_wall")
+        self._build_half_cylinder_mesh(
+            f"{VESSEL_PATH}/BasementMembrane", R * 1.04, L * 0.95,
+            n_segments=32, mat="basement_membrane")
 
-        # Basement membrane (slightly larger cylinder)
-        bm = UsdGeom.Cylinder.Define(self._stage, f"{VESSEL_PATH}/BasementMembrane")
-        bm.CreateRadiusAttr().Set(R * 1.04)
-        bm.CreateHeightAttr().Set(L * 0.95)
-        bm.CreateAxisAttr().Set("X")
-        xf = UsdGeom.Xformable(bm.GetPrim())
-        xf.AddTranslateOp().Set(Gf.Vec3d(L / 2, 0, 0))
-        self._bind_material(bm.GetPath().pathString, "basement_membrane")
+    def _build_half_cylinder_mesh(self, path: str, radius: float,
+                                  length: float, n_segments: int = 48,
+                                  mat: str = "vessel_wall"):
+        """Build a half-cylinder mesh (0 to pi) along X axis.
+
+        Generates a semicircular tube with proper face winding for
+        double-sided rendering in RTX.
+        """
+        points = []
+        face_counts = []
+        face_indices = []
+
+        # Two rings of vertices: x=0 and x=length
+        for ring in range(2):
+            x = ring * length
+            for seg in range(n_segments + 1):
+                theta = math.pi * seg / n_segments  # 0 to pi
+                y = radius * math.cos(theta)
+                z = radius * math.sin(theta)
+                points.append(Gf.Vec3f(float(x), float(y), float(z)))
+
+        # Quads between the two rings
+        verts_per_ring = n_segments + 1
+        for seg in range(n_segments):
+            i0 = seg                       # ring 0, seg
+            i1 = seg + 1                   # ring 0, seg+1
+            i2 = verts_per_ring + seg + 1  # ring 1, seg+1
+            i3 = verts_per_ring + seg      # ring 1, seg
+            face_counts.append(4)
+            face_indices.extend([i0, i1, i2, i3])
+
+        mesh = UsdGeom.Mesh.Define(self._stage, path)
+        mesh.GetPointsAttr().Set(points)
+        mesh.GetFaceVertexCountsAttr().Set(face_counts)
+        mesh.GetFaceVertexIndicesAttr().Set(face_indices)
+        mesh.GetSubdivisionSchemeAttr().Set("none")
+        mesh.GetDoubleSidedAttr().Set(True)
+        self._bind_material(path, mat)
 
     # ── Endothelial Cells ────────────────────────────────────────────────
 
@@ -645,6 +680,128 @@ class DiapedesisSceneBuilder:
                     xf.AddScaleOp().Set(Gf.Vec3f(1.0, 1.3, 1.0))
                     self._bind_material(bead.GetPath().pathString, "pecam1")
 
+    # ── Integrins ─────────────────────────────────────────────────────────
+
+    def _build_integrin_prototypes(self):
+        """Build bent and extended integrin prototypes.
+
+        Bent (inactive): folded legs + headpiece (like LFA-1 bent conformation)
+        Extended (active): tall straight legs + headpiece + hybrid domain swing-out
+        Matches Three.js viewer integrin geometry.
+        """
+        # ── Bent integrin prototype ──
+        bent_path = f"{PROTOTYPES_PATH}/integrin_bent"
+        UsdGeom.Xform.Define(self._stage, bent_path)
+
+        # Headpiece disc
+        head = UsdGeom.Cylinder.Define(self._stage, f"{bent_path}/head")
+        head.CreateRadiusAttr().Set(0.4)
+        head.CreateHeightAttr().Set(0.15)
+        head.CreateAxisAttr().Set("Y")
+        xf = UsdGeom.Xformable(head.GetPrim())
+        xf.AddTranslateOp().Set(Gf.Vec3d(0, 0.5, 0))
+        self._bind_material(head.GetPath().pathString, "integrin_bent")
+
+        # Alpha-I knob
+        knob = UsdGeom.Sphere.Define(self._stage, f"{bent_path}/alphaI")
+        knob.CreateRadiusAttr().Set(0.2)
+        xf = UsdGeom.Xformable(knob.GetPrim())
+        xf.AddTranslateOp().Set(Gf.Vec3d(0, 0.7, 0))
+        self._bind_material(knob.GetPath().pathString, "integrin_bent")
+
+        # Two bent legs (angled ±28°)
+        for side, sign in enumerate([-1, 1]):
+            leg = UsdGeom.Cylinder.Define(
+                self._stage, f"{bent_path}/leg_{side}")
+            leg.CreateRadiusAttr().Set(0.08)
+            leg.CreateHeightAttr().Set(0.6)
+            leg.CreateAxisAttr().Set("Y")
+            xf = UsdGeom.Xformable(leg.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(sign * 0.15, -0.1, 0))
+            xf.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, sign * 28))
+            self._bind_material(leg.GetPath().pathString, "integrin_bent")
+
+        # ── Extended integrin prototype ──
+        ext_path = f"{PROTOTYPES_PATH}/integrin_ext"
+        UsdGeom.Xform.Define(self._stage, ext_path)
+
+        # Two straight tall legs
+        for side, sign in enumerate([-1, 1]):
+            leg = UsdGeom.Cylinder.Define(
+                self._stage, f"{ext_path}/leg_{side}")
+            leg.CreateRadiusAttr().Set(0.06)
+            leg.CreateHeightAttr().Set(1.8)
+            leg.CreateAxisAttr().Set("Y")
+            xf = UsdGeom.Xformable(leg.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(sign * 0.1, 0.9, 0))
+            xf.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, sign * 3))
+            self._bind_material(leg.GetPath().pathString, "integrin_extended")
+
+        # Headpiece disc
+        head = UsdGeom.Cylinder.Define(self._stage, f"{ext_path}/head")
+        head.CreateRadiusAttr().Set(0.35)
+        head.CreateHeightAttr().Set(0.12)
+        head.CreateAxisAttr().Set("Y")
+        xf = UsdGeom.Xformable(head.GetPrim())
+        xf.AddTranslateOp().Set(Gf.Vec3d(0, 1.85, 0))
+        self._bind_material(head.GetPath().pathString, "integrin_extended")
+
+        # Alpha-I knob
+        knob = UsdGeom.Sphere.Define(self._stage, f"{ext_path}/alphaI")
+        knob.CreateRadiusAttr().Set(0.18)
+        xf = UsdGeom.Xformable(knob.GetPrim())
+        xf.AddTranslateOp().Set(Gf.Vec3d(0, 2.05, 0))
+        self._bind_material(knob.GetPath().pathString, "integrin_extended")
+
+        # Hybrid domain (swung out)
+        hybrid = UsdGeom.Cube.Define(self._stage, f"{ext_path}/hybrid")
+        xf = UsdGeom.Xformable(hybrid.GetPrim())
+        xf.AddTranslateOp().Set(Gf.Vec3d(0.45, 1.7, 0))
+        xf.AddScaleOp().Set(Gf.Vec3f(0.2, 0.3, 0.15))
+        self._bind_material(hybrid.GetPath().pathString, "integrin_extended")
+
+    def _build_leuko_integrins(self, leuko_path: str, radius: float,
+                               leuko_idx: int):
+        """Add 4 bent + 4 extended integrins around lower hemisphere.
+
+        Placed at ~45° intervals around the cell equator/lower hemisphere,
+        pointing outward. Extended integrins start hidden.
+        """
+        bent_proto = f"{PROTOTYPES_PATH}/integrin_bent"
+        ext_proto = f"{PROTOTYPES_PATH}/integrin_ext"
+        bent_paths = []
+        ext_paths = []
+
+        for k in range(4):
+            angle = k * math.pi / 2 + math.pi / 4  # 45°, 135°, 225°, 315°
+            ox = radius * 0.9 * math.cos(angle)
+            oz = radius * 0.9 * math.sin(angle)
+            oy = -radius * 0.3  # Lower hemisphere
+            rot_y = math.degrees(angle)
+
+            # Bent integrin
+            bp = f"{leuko_path}/integrin_bent_{k}"
+            ref = UsdGeom.Xform.Define(self._stage, bp)
+            ref.GetPrim().GetReferences().AddInternalReference(bent_proto)
+            xf = UsdGeom.Xformable(ref.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(ox, oy, oz))
+            xf.AddRotateXYZOp().Set(Gf.Vec3f(0, rot_y, 0))
+            bent_paths.append(bp)
+
+            # Extended integrin (starts hidden)
+            ep = f"{leuko_path}/integrin_ext_{k}"
+            ref = UsdGeom.Xform.Define(self._stage, ep)
+            ref.GetPrim().GetReferences().AddInternalReference(ext_proto)
+            xf = UsdGeom.Xformable(ref.GetPrim())
+            xf.AddTranslateOp().Set(Gf.Vec3d(ox, oy, oz))
+            xf.AddRotateXYZOp().Set(Gf.Vec3f(0, rot_y, 0))
+            UsdGeom.Imageable(ref.GetPrim()).MakeInvisible()
+            ext_paths.append(ep)
+
+        self._integrin_bent_prims.append(bent_paths)
+        self._integrin_ext_prims.append(ext_paths)
+        self._integrin_last_active.append(False)
+
     # ── Leukocytes ───────────────────────────────────────────────────────
 
     def _build_leukocytes(self, frame: Dict):
@@ -662,10 +819,15 @@ class DiapedesisSceneBuilder:
         self._leuko_scale_attrs = []
         self._leuko_last_state = []
 
+        self._integrin_bent_prims = []
+        self._integrin_ext_prims = []
+        self._integrin_last_active = []
+
         for i in range(self._n_leuko):
             path = f"{LEUKOCYTES_PATH}/neutrophil_{i:03d}"
             rad = radii[i] if i < len(radii) else 6.0
             self._build_neutrophil(path, rad)
+            self._build_leuko_integrins(path, rad, i)
 
             pos = positions[i]
             xf = UsdGeom.Xformable(self._stage.GetPrimAtPath(path))
@@ -716,6 +878,42 @@ class DiapedesisSceneBuilder:
             body.CreateRadiusAttr().Set(radius)
             self._bind_material(body.GetPath().pathString, "leuko_flowing")
 
+            # Microvilli (20 tiny cylinders on sphere surface)
+            import random
+            mv_rng = random.Random(hash(path))
+            for mv in range(20):
+                theta = mv_rng.uniform(0, 2 * math.pi)
+                phi = mv_rng.uniform(0.3, math.pi - 0.3)
+                sx = math.sin(phi) * math.cos(theta)
+                sy = math.sin(phi) * math.sin(theta)
+                sz = math.cos(phi)
+                mv_path = f"{path}/mv_{mv:02d}"
+                cyl = UsdGeom.Cylinder.Define(self._stage, mv_path)
+                cyl.CreateRadiusAttr().Set(0.03 * radius)
+                cyl.CreateHeightAttr().Set(0.15 * radius)
+                cyl.CreateAxisAttr().Set("Y")
+                xf = UsdGeom.Xformable(cyl.GetPrim())
+                xf.AddTranslateOp().Set(Gf.Vec3d(
+                    sx * radius, sy * radius, sz * radius))
+                # Orient outward
+                pitch = math.degrees(math.atan2(
+                    math.sqrt(sx * sx + sz * sz), sy))
+                yaw = math.degrees(math.atan2(sx, sz))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(pitch, yaw, 0))
+                self._bind_material(mv_path, "leuko_flowing")
+
+                # PSGL-1 tip on every 5th microvillus
+                if mv % 5 == 0:
+                    tip = UsdGeom.Sphere.Define(
+                        self._stage, f"{mv_path}/psgl1")
+                    tip.CreateRadiusAttr().Set(0.05 * radius)
+                    xf = UsdGeom.Xformable(tip.GetPrim())
+                    xf.AddTranslateOp().Set(Gf.Vec3d(
+                        0, 0.1 * radius, 0))
+                    self._bind_material(tip.GetPath().pathString,
+                                        "selectin_head")
+
+            # Multi-lobed nucleus (4 lobes)
             lobe_positions = [
                 (0.15, 0.1, 0), (-0.15, -0.05, 0.1),
                 (0, -0.1, -0.15), (0.1, 0.15, -0.05),
@@ -835,6 +1033,22 @@ class DiapedesisSceneBuilder:
                 xf.AddTranslateOp().Set(Gf.Vec3d(
                     cr * math.cos(theta), y, cr * math.sin(theta)))
                 self._bind_material(c3b.GetPath().pathString, "complement_c3b")
+
+            # Flagellum — zigzag chain of small cylinders
+            for seg in range(8):
+                flag = UsdGeom.Cylinder.Define(
+                    self._stage, f"{path}/flag_{seg}")
+                flag.CreateRadiusAttr().Set(0.04)
+                flag.CreateHeightAttr().Set(0.5)
+                flag.CreateAxisAttr().Set("Y")
+                xf = UsdGeom.Xformable(flag.GetPrim())
+                fy = -1.8 - seg * 0.4
+                fx = 0.3 * math.sin(seg * 1.2)
+                fz = 0.3 * math.cos(seg * 1.2)
+                xf.AddTranslateOp().Set(Gf.Vec3d(fx, fy, fz))
+                xf.AddRotateXYZOp().Set(Gf.Vec3f(
+                    15 * math.sin(seg * 1.5), 0, 15 * math.cos(seg * 1.5)))
+                self._bind_material(flag.GetPath().pathString, "bacterium_body")
 
     # ── Macrophages ──────────────────────────────────────────────────────
 
@@ -1059,6 +1273,32 @@ class DiapedesisSceneBuilder:
                     self._bind_material(body_path, mat_name,
                                         override_descendants=self._use_mesh_assets)
                     self._leuko_last_state[i] = state
+
+        # Integrin activation toggle (bent ↔ extended)
+        integrin_act = frame.get("integrin_activation", [])
+        for i in range(min(len(self._integrin_bent_prims), len(integrin_act))):
+            active = integrin_act[i] > 0.5
+            if i < len(self._integrin_last_active) and self._integrin_last_active[i] == active:
+                continue  # No change
+            # Toggle visibility: show extended, hide bent (or vice versa)
+            for bp in self._integrin_bent_prims[i]:
+                prim = self._stage.GetPrimAtPath(bp)
+                if prim:
+                    img = UsdGeom.Imageable(prim)
+                    if active:
+                        img.MakeInvisible()
+                    else:
+                        img.MakeVisible()
+            for ep in self._integrin_ext_prims[i]:
+                prim = self._stage.GetPrimAtPath(ep)
+                if prim:
+                    img = UsdGeom.Imageable(prim)
+                    if active:
+                        img.MakeVisible()
+                    else:
+                        img.MakeInvisible()
+            if i < len(self._integrin_last_active):
+                self._integrin_last_active[i] = active
 
     def _update_rbcs(self, frame: Dict):
         """Update RBC positions via PointInstancer."""

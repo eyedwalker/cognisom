@@ -193,6 +193,56 @@ with st.sidebar:
             help="Browser-accessible Kit endpoint (proxied through nginx HTTPS)",
         )
 
+        with st.expander("Scene Editor"):
+            st.caption("Adjust RTX scene parameters (applied live)")
+            col_cam1, col_cam2 = st.columns(2)
+            with col_cam1:
+                cam_x = st.slider("Camera X", 0.0, 200.0, 100.0, key="scene_cam_x")
+                cam_y = st.slider("Camera Y", -50.0, 150.0, 55.0, key="scene_cam_y")
+                cam_z = st.slider("Camera Z", 0.0, 200.0, 87.5, key="scene_cam_z")
+            with col_cam2:
+                key_int = st.slider("Key Light", 0, 2000, 800, step=50, key="scene_key")
+                fill_int = st.slider("Fill Light", 0, 1000, 300, step=25, key="scene_fill")
+                rim_int = st.slider("Rim Light", 0, 500, 200, step=25, key="scene_rim")
+
+            if st.button("Apply Scene Changes", key="apply_scene"):
+                import urllib.request
+                kit_candidates = [
+                    os.environ.get("KIT_SERVER_URL", ""),
+                    "http://host.docker.internal:8600",
+                    "http://172.17.0.1:8600",
+                    "http://localhost:8600",
+                ]
+                kit_url = None
+                for c in kit_candidates:
+                    if not c:
+                        continue
+                    try:
+                        urllib.request.urlopen(f"{c}/status", timeout=2)
+                        kit_url = c
+                        break
+                    except Exception:
+                        continue
+                if kit_url:
+                    payload = json.dumps({
+                        "camera": {"x": cam_x, "y": cam_y, "z": cam_z},
+                        "key_light": key_int,
+                        "fill_light": fill_int,
+                        "rim_light": rim_int,
+                    }).encode()
+                    req = urllib.request.Request(
+                        f"{kit_url}/cognisom/scene/config",
+                        data=payload, method="POST")
+                    req.add_header("Content-Type", "application/json")
+                    try:
+                        with urllib.request.urlopen(req, timeout=5) as resp:
+                            result = json.loads(resp.read())
+                            st.success(f"Applied: {', '.join(result.get('changed', []))}")
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+                else:
+                    st.error("Kit not reachable")
+
     st.divider()
 
     run_btn = st.button("▶ Run Simulation", type="primary", use_container_width=True)

@@ -694,15 +694,11 @@ class CognisomSimExtension(omni.ext.IExt):
         camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.1, 10000.0))
         camera.GetHorizontalApertureAttr().Set(36.0)
 
-        # Scene layout:
-        #   Vessel: cylinder along X from 0→200, radius 25, center at Y=0
-        #   Tissue: below vessel, Y from -25 to -75
-        #   Scene center ~ (100, -15, 0)
-        #
-        # Camera: closer elevated 3/4 view showing 3D depth
-        # Offset in X to show length perspective, high Y for drama
-        cam_pos = Gf.Vec3d(160.0, 55.0, 120.0)
-        target = Gf.Vec3d(90.0, -20.0, 0.0)
+        # Match Three.js camera: position=(L*0.5, R*2.2, R*3.5)
+        #   lookAt=(L*0.5, -R*0.3, 0) with R=25, L=200
+        # Elevated 3/4 view centered on vessel midpoint
+        cam_pos = Gf.Vec3d(100.0, 55.0, 87.5)
+        target = Gf.Vec3d(100.0, -7.5, 0.0)
 
         xformable = UsdGeom.Xformable(camera_prim)
         xformable.AddTranslateOp().Set(cam_pos)

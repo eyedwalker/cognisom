@@ -742,6 +742,13 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 self._reset_camera()
                 self._send_json({"status": "camera reset"})
 
+            elif path == "/cognisom/scene/config":
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len) if content_len else b"{}"
+                data = json.loads(body) if body else {}
+                result = self._apply_scene_config(data)
+                self._send_json(result)
+
             else:
                 self._send_json({"error": "not found"}, 404)
         except Exception as e:
@@ -766,8 +773,8 @@ class _StreamHandler(BaseHTTPRequestHandler):
             pos = ops[0].Get()  # translate
             rot = ops[1].Get()  # rotateXYZ
 
-            # Target is vessel center
-            target = Gf.Vec3d(90.0, -20.0, 0.0)
+            # Target is vessel center (matching Three.js lookAt)
+            target = Gf.Vec3d(100.0, -7.5, 0.0)
             dx, dy, dz = pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]
             dist = math.sqrt(dx*dx + dy*dy + dz*dz)
 
@@ -837,8 +844,8 @@ class _StreamHandler(BaseHTTPRequestHandler):
             ops = xf.GetOrderedXformOps()
             if len(ops) < 2:
                 return
-            cam_pos = Gf.Vec3d(160.0, 55.0, 120.0)
-            target = Gf.Vec3d(90.0, -20.0, 0.0)
+            cam_pos = Gf.Vec3d(100.0, 55.0, 87.5)
+            target = Gf.Vec3d(100.0, -7.5, 0.0)
             ops[0].Set(cam_pos)
             dx = target[0] - cam_pos[0]
             dy = target[1] - cam_pos[1]
@@ -849,6 +856,74 @@ class _StreamHandler(BaseHTTPRequestHandler):
             ops[1].Set(Gf.Vec3f(-pitch, yaw, 0.0))
         except Exception as e:
             carb.log_warn(f"[streaming] reset camera error: {e}")
+
+    def _apply_scene_config(self, data: dict) -> dict:
+        """Apply scene configuration changes (camera, lights).
+
+        Args:
+            data: Dict with optional keys:
+                camera: {x, y, z} — camera position
+                target: {x, y, z} — look-at target
+                key_light: int — key light intensity
+                fill_light: int — fill light intensity
+                rim_light: int — rim light intensity
+                dome_light: int — dome light intensity
+        """
+        import math
+        applied = []
+        try:
+            import omni.usd
+            from pxr import UsdGeom, UsdLux, Gf
+            stage = omni.usd.get_context().get_stage()
+
+            # Camera position
+            cam_data = data.get("camera")
+            tgt_data = data.get("target")
+            if cam_data:
+                cam = stage.GetPrimAtPath("/World/DiapedesisCam")
+                if cam and cam.IsValid():
+                    xf = UsdGeom.Xformable(cam)
+                    ops = xf.GetOrderedXformOps()
+                    if len(ops) >= 2:
+                        cx = cam_data.get("x", 100.0)
+                        cy = cam_data.get("y", 55.0)
+                        cz = cam_data.get("z", 87.5)
+                        cam_pos = Gf.Vec3d(cx, cy, cz)
+                        tx = tgt_data.get("x", 100.0) if tgt_data else 100.0
+                        ty = tgt_data.get("y", -7.5) if tgt_data else -7.5
+                        tz = tgt_data.get("z", 0.0) if tgt_data else 0.0
+                        target = Gf.Vec3d(tx, ty, tz)
+                        ops[0].Set(cam_pos)
+                        dx = target[0] - cam_pos[0]
+                        dy = target[1] - cam_pos[1]
+                        dz = target[2] - cam_pos[2]
+                        dist_xz = math.sqrt(dx * dx + dz * dz)
+                        pitch = math.degrees(math.atan2(-dy, dist_xz))
+                        yaw = math.degrees(math.atan2(dx, -dz))
+                        ops[1].Set(Gf.Vec3f(-pitch, yaw, 0.0))
+                        applied.append("camera")
+
+            # Light intensities
+            light_map = {
+                "key_light": "/World/Diapedesis/Lights/KeyLight",
+                "fill_light": "/World/Diapedesis/Lights/FillLight",
+                "rim_light": "/World/Diapedesis/Lights/RimLight",
+                "dome_light": "/World/Diapedesis/Lights/DomeLight",
+            }
+            for key, light_path in light_map.items():
+                val = data.get(key)
+                if val is not None:
+                    prim = stage.GetPrimAtPath(light_path)
+                    if prim and prim.IsValid():
+                        attr = prim.GetAttribute("inputs:intensity")
+                        if attr:
+                            attr.Set(float(val))
+                            applied.append(key)
+
+        except Exception as e:
+            return {"error": str(e)}
+
+        return {"status": "applied", "changed": applied}
 
     def _send_diag(self):
         """Diagnostic endpoint for debugging renderer state."""
