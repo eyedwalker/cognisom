@@ -25,6 +25,16 @@ from core.module_base import SimulationModule
 from core.event_bus import EventTypes
 
 
+class ExhaustionState:
+    """T-cell exhaustion states (progressive loss of function)."""
+    NAIVE = "naive"
+    EFFECTOR = "effector"
+    MEMORY = "memory"
+    PRE_EXHAUSTED = "pre_exhausted"  # Progenitor exhausted (TCF1+, some function)
+    EXHAUSTED = "exhausted"          # Terminally exhausted (PD-1hi, TIM-3+, no function)
+    REACTIVATED = "reactivated"      # Checkpoint-blockade reactivated
+
+
 @dataclass
 class ImmuneCell:
     """State of an immune cell"""
@@ -32,17 +42,43 @@ class ImmuneCell:
     position: np.ndarray
     cell_type: str  # 'T_cell', 'NK_cell', 'macrophage'
     velocity: np.ndarray = None
-    
+
     # State
     activated: bool = False
     target_cell_id: int = None
     in_blood: bool = False
-    
+
     # Parameters
     speed: float = 10.0  # μm/min
     detection_radius: float = 10.0  # μm
     kill_radius: float = 5.0  # μm
-    
+
+    # Exhaustion (Digital Twin integration)
+    exhaustion_score: float = 0.0        # 0=fully functional, 1=terminally exhausted
+    exhaustion_state: str = "effector"   # ExhaustionState value
+    pd1_expression: float = 0.0         # PD-1 surface expression (0-1)
+    checkpoint_blocked: bool = False    # Under checkpoint inhibitor treatment
+
+    # Macrophage polarization
+    polarization: str = "M0"  # M0, M1, M2
+    polarization_score: float = 0.0  # -1=M1, +1=M2
+
+    @property
+    def kill_probability(self) -> float:
+        """Effective kill probability accounting for exhaustion."""
+        if self.exhaustion_state == ExhaustionState.EXHAUSTED:
+            return 0.05  # Minimal residual function
+        elif self.exhaustion_state == ExhaustionState.PRE_EXHAUSTED:
+            return 0.4  # Reduced but present
+        elif self.exhaustion_state == ExhaustionState.REACTIVATED:
+            return 0.7  # Partially restored
+        return 0.8  # Full effector function
+
+    @property
+    def is_functional(self) -> bool:
+        """Whether this cell can perform effector functions."""
+        return self.exhaustion_score < 0.8 or self.checkpoint_blocked
+
     def __post_init__(self):
         if self.velocity is None:
             self.velocity = np.zeros(3)

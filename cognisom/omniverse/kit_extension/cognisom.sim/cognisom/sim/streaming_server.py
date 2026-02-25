@@ -9,15 +9,22 @@ Endpoints:
     GET  /status                          → JSON health check
     GET  /frame.jpg                       → Current viewport as JPEG
     GET  /stream                          → MJPEG stream (multipart)
-    POST /diapedesis                      → Load frames JSON, build scene
-    POST /diapedesis/play                 → Start playback
-    POST /diapedesis/pause                → Pause playback
-    POST /diapedesis/stop                 → Stop playback
-    POST /diapedesis/seek?frame=N         → Seek to frame N
+    POST /cognisom/diapedesis             → Load frames JSON, build scene
+    POST /cognisom/diapedesis/play        → Start playback
+    POST /cognisom/diapedesis/pause       → Pause playback
+    POST /cognisom/diapedesis/stop        → Stop playback
+    POST /cognisom/diapedesis/seek?frame=N→ Seek to frame N
+    POST /cognisom/molecular/load         → Load PDB, build protein scene
+    POST /cognisom/molecular/dock         → Load protein+ligand docking
+    POST /cognisom/molecular/compare      → Load WT vs mutant comparison
+    POST /cognisom/molecular/mode         → Change visualization mode
+    GET  /cognisom/molecular/status       → Molecular viz status
 
 Usage from extension.py::
 
-    server = StreamingServer(diapedesis_manager, port=8211)
+    server = StreamingServer(diapedesis_manager,
+                             molecular_manager=molecular_manager,
+                             port=8211)
     server.start()           # Non-blocking, runs in daemon thread
     server.shutdown()        # Clean stop
 """
@@ -130,6 +137,7 @@ class _ViewportCapture:
         extension.py) because schedule_capture needs an asyncio event loop.
         This method is called from the daemon capture thread and handles:
         - Replicator annotator capture (if configured)
+        - Viewport API capture (if viewport is available)
         - PIL fallback (if no RTX buffer is available yet)
 
         When RTX capture is active (main thread writing to _buffer), this
@@ -145,6 +153,15 @@ class _ViewportCapture:
             if result:
                 if not self._rtx_active:
                     carb.log_info("[streaming] Replicator capture active!")
+                    self._rtx_active = True
+                return True
+
+        # ── Viewport API capture ──
+        if self._viewport_api:
+            result = self._capture_from_viewport()
+            if result:
+                if not self._rtx_active:
+                    carb.log_info("[streaming] Viewport capture active!")
                     self._rtx_active = True
                 return True
 
@@ -436,6 +453,7 @@ class _StreamHandler(BaseHTTPRequestHandler):
 
     # Class-level references (set by StreamingServer)
     diapedesis_manager = None
+    molecular_manager = None
     viewport_capture = None
 
     def log_message(self, format, *args):
@@ -474,17 +492,23 @@ class _StreamHandler(BaseHTTPRequestHandler):
 
         if path == "/status":
             mgr = self.diapedesis_manager
+            mol = self.molecular_manager
             vc = self.viewport_capture
-            self._send_json({
+            status = {
                 "status": "ok",
                 "kit": "running",
-                "extension": "cognisom.sim-2.0.0",
+                "extension": "cognisom.sim-2.1.0",
                 "renderer": "rtx" if (vc and vc._rtx_active) else "pil",
                 "diapedesis_loaded": mgr is not None and mgr.total_frames > 0,
                 "frames": mgr.total_frames if mgr else 0,
                 "current_frame": mgr.current_frame if mgr else 0,
                 "playing": mgr.is_playing if mgr else False,
-            })
+            }
+            if mol:
+                status["molecular_loaded"] = mol.is_loaded
+                status["molecular_scene_built"] = mol.scene_built
+                status["molecular_mode"] = mol.current_mode
+            self._send_json(status)
 
         elif path == "/frame.jpg":
             vc = self.viewport_capture
@@ -529,6 +553,13 @@ class _StreamHandler(BaseHTTPRequestHandler):
             # Serve a simple HTML viewer page
             self._serve_viewer_html()
 
+        elif path == "/cognisom/molecular/status":
+            mol = self.molecular_manager
+            if mol:
+                self._send_json(mol.get_status())
+            else:
+                self._send_json({"error": "molecular manager not available"}, 503)
+
         elif path == "/diag":
             # Diagnostic endpoint — full renderer state for debugging
             self._send_diag()
@@ -542,7 +573,10 @@ class _StreamHandler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
         mgr = self.diapedesis_manager
 
-        if not mgr:
+        # Molecular endpoints don't require diapedesis manager
+        is_molecular = path.startswith("/cognisom/molecular")
+
+        if not mgr and not is_molecular:
             self._send_json({"error": "diapedesis manager not available"}, 503)
             return
 
@@ -599,6 +633,93 @@ class _StreamHandler(BaseHTTPRequestHandler):
                     })
                 else:
                     self._send_json({"error": f"Failed to load preset '{preset}'"}, 400)
+
+            elif path == "/cognisom/molecular/load":
+                mol = self.molecular_manager
+                if not mol:
+                    self._send_json({"error": "molecular manager not available"}, 503)
+                    return
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                data = json.loads(body)
+                pdb_text = data.get("pdb_text", "")
+                if not pdb_text:
+                    self._send_json({"error": "pdb_text is required"}, 400)
+                    return
+                mol.load_pdb(
+                    pdb_text,
+                    mode=data.get("mode", "ribbon"),
+                    color_mode=data.get("color_mode", "bfactor"),
+                    mutations=data.get("mutations", []),
+                    title=data.get("title", ""),
+                )
+                mol.request_build_scene()
+                self._send_json({
+                    "message": "PDB loaded, scene build queued",
+                    "mode": mol.current_mode,
+                })
+
+            elif path == "/cognisom/molecular/dock":
+                mol = self.molecular_manager
+                if not mol:
+                    self._send_json({"error": "molecular manager not available"}, 503)
+                    return
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                data = json.loads(body)
+                protein_pdb = data.get("protein_pdb", "")
+                ligand_sdf = data.get("ligand_sdf", "")
+                if not protein_pdb or not ligand_sdf:
+                    self._send_json({"error": "protein_pdb and ligand_sdf required"}, 400)
+                    return
+                mol.load_docking(
+                    protein_pdb, ligand_sdf,
+                    binding_residues=data.get("binding_residues", []),
+                    protein_mode=data.get("protein_mode", "surface"),
+                )
+                mol.request_build_scene()
+                self._send_json({"message": "Docking data loaded, scene build queued"})
+
+            elif path == "/cognisom/molecular/compare":
+                mol = self.molecular_manager
+                if not mol:
+                    self._send_json({"error": "molecular manager not available"}, 503)
+                    return
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len)
+                data = json.loads(body)
+                wt_pdb = data.get("wt_pdb", "")
+                mut_pdb = data.get("mut_pdb", "")
+                if not wt_pdb or not mut_pdb:
+                    self._send_json({"error": "wt_pdb and mut_pdb required"}, 400)
+                    return
+                mol.load_comparison(
+                    wt_pdb, mut_pdb,
+                    mutations=data.get("mutations", []),
+                    mode=data.get("mode", "ribbon"),
+                )
+                mol.request_build_scene()
+                self._send_json({"message": "Comparison loaded, scene build queued"})
+
+            elif path == "/cognisom/molecular/mode":
+                mol = self.molecular_manager
+                if not mol:
+                    self._send_json({"error": "molecular manager not available"}, 503)
+                    return
+                content_len = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_len) if content_len else b"{}"
+                data = json.loads(body) if body else {}
+                new_mode = data.get("mode", "ribbon")
+                mol.set_mode(new_mode)
+                self._send_json({"message": f"Mode changed to {new_mode}"})
+
+            elif path == "/cognisom/molecular/clear":
+                mol = self.molecular_manager
+                if not mol:
+                    self._send_json({"error": "molecular manager not available"}, 503)
+                    return
+                mol.clear()
+                self._send_json({"message": "Molecular scene cleared"})
 
             elif path == "/cognisom/camera/orbit":
                 content_len = int(self.headers.get("Content-Length", 0))
@@ -742,6 +863,7 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 "height": vc._height if vc else 0,
                 "has_annotator": vc._rgb_annotator is not None if vc else False,
                 "has_viewport_api": vc._viewport_api is not None if vc else False,
+                "capture_attempts": vc._capture_attempt_count if vc else 0,
             },
             "diapedesis": {
                 "scene_built": mgr._scene_built if mgr else False,
@@ -951,7 +1073,8 @@ class _ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 class StreamingServer:
     """HTTP server for Kit viewport streaming."""
 
-    def __init__(self, diapedesis_manager, port: int = 8211):
+    def __init__(self, diapedesis_manager, molecular_manager=None,
+                 port: int = 8211):
         self._port = port
         self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
@@ -962,6 +1085,7 @@ class StreamingServer:
 
         # Set class-level references for the handler
         _StreamHandler.diapedesis_manager = diapedesis_manager
+        _StreamHandler.molecular_manager = molecular_manager
         _StreamHandler.viewport_capture = self._viewport_capture
 
     def start(self):

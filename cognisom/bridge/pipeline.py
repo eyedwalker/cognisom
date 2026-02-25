@@ -195,3 +195,103 @@ class DiscoveryPipeline:
         impact = esm2.mutation_impact(wt_sequence, mutant_sequence)
         logger.info("Mutation analysis: cosine_sim=%.4f", impact.get("cosine_similarity", 0))
         return impact
+
+    def run_patient_variant_pipeline(
+        self, vcf_text: str, patient_id: str = "anonymous",
+        predict_structures: bool = False,
+        analyze_mutations: bool = True,
+    ) -> Dict:
+        """Full genomic digital twin pipeline: VCF → profile → structures → mutation impact.
+
+        Chains:
+        1. VCF parsing + annotation → PatientProfile
+        2. (Optional) Structure prediction for mutant proteins
+        3. (Optional) ESM2 mutation impact analysis for each driver
+
+        Args:
+            vcf_text: VCF file content as text.
+            patient_id: Patient identifier.
+            predict_structures: Whether to run AlphaFold2/OpenFold3 on mutant proteins.
+            analyze_mutations: Whether to run ESM2 mutation impact scoring.
+
+        Returns:
+            Dict with patient_profile, structures, mutation_impacts.
+        """
+        from ..genomics.patient_profile import PatientProfileBuilder
+        from ..genomics.gene_protein_mapper import GeneProteinMapper
+
+        results: Dict = {"patient_id": patient_id}
+
+        # Step 1: Build patient profile
+        logger.info("Step 1: Building patient genomic profile from VCF")
+        builder = PatientProfileBuilder()
+        profile = builder.from_vcf_text(vcf_text, patient_id=patient_id)
+        results["patient_profile"] = profile.to_dict()
+        results["n_variants"] = len(profile.variants)
+        results["n_drivers"] = len(profile.cancer_driver_mutations)
+        results["tmb"] = profile.tumor_mutational_burden
+        results["therapy_recommendations"] = profile.get_therapy_recommendations()
+        logger.info(
+            f"  Profile: {len(profile.variants)} variants, "
+            f"{len(profile.cancer_driver_mutations)} drivers, "
+            f"TMB={profile.tumor_mutational_burden:.1f}"
+        )
+
+        # Step 2: Mutation impact analysis (ESM2)
+        if analyze_mutations and profile.cancer_driver_mutations:
+            logger.info("Step 2: Analyzing mutation impact via ESM2")
+            mapper = GeneProteinMapper()
+            mutation_impacts = {}
+
+            for variant in profile.cancer_driver_mutations:
+                if not variant.gene or not variant.protein_change:
+                    continue
+                protein = mapper.get_protein(variant.gene)
+                if not protein or not protein.sequence:
+                    continue
+
+                aa_change = variant.protein_change.replace("p.", "")
+                mutant = mapper.apply_mutation(protein, aa_change)
+                if not mutant:
+                    continue
+
+                try:
+                    # Truncate for ESM2 (max 1024 AA)
+                    wt_seq = protein.sequence[:1024]
+                    mut_seq = mutant.sequence[:1024]
+                    impact = self.run_mutation_analysis_pipeline(wt_seq, mut_seq)
+                    mutation_impacts[f"{variant.gene}_{aa_change}"] = impact
+                    logger.info(
+                        f"  {variant.gene} {aa_change}: "
+                        f"impact={impact.get('impact_score', 0):.3f}"
+                    )
+                except Exception as e:
+                    logger.warning(f"  ESM2 failed for {variant.gene} {aa_change}: {e}")
+
+            results["mutation_impacts"] = mutation_impacts
+
+        # Step 3: Structure prediction for driver proteins
+        if predict_structures and profile.affected_proteins:
+            logger.info("Step 3: Predicting structures for mutant proteins")
+            structures = {}
+
+            for gene, protein in profile.affected_proteins.items():
+                if not protein.sequence:
+                    continue
+                try:
+                    seq = protein.sequence[:1024]
+                    struct_result = self.run_structure_prediction_pipeline(seq)
+                    structures[gene] = {
+                        "method": struct_result.get("method"),
+                        "confidence": struct_result.get("confidence"),
+                        "plddt": struct_result.get("plddt"),
+                        "has_structure": bool(struct_result.get("structure")),
+                    }
+                    logger.info(f"  {gene}: structure predicted")
+                except Exception as e:
+                    logger.warning(f"  Structure prediction failed for {gene}: {e}")
+
+            results["structures"] = structures
+
+        logger.info("Patient variant pipeline complete.")
+        return results
