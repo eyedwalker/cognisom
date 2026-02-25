@@ -28,6 +28,22 @@ from cognisom.genomics.synthetic_vcf import get_synthetic_vcf, get_synthetic_pro
 
 logger = logging.getLogger(__name__)
 
+
+def _chrom_sort_key(chrom: str) -> tuple:
+    """Sort chromosomes numerically (chr1, chr2, ... chr22, chrX, chrY)."""
+    chrom = chrom.replace("chr", "")
+    if chrom == "X":
+        return (23,)
+    elif chrom == "Y":
+        return (24,)
+    elif chrom == "M" or chrom == "MT":
+        return (25,)
+    try:
+        return (int(chrom),)
+    except ValueError:
+        return (99,)
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────────────────────────────────
@@ -388,23 +404,6 @@ else:
     st.dataframe(gene_df, use_container_width=True, hide_index=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# HELPER FUNCTIONS
-# ─────────────────────────────────────────────────────────────────────────
-
-def _chrom_sort_key(chrom: str) -> tuple:
-    """Sort chromosomes numerically (chr1, chr2, ... chr22, chrX, chrY)."""
-    chrom = chrom.replace("chr", "")
-    if chrom == "X":
-        return (23,)
-    elif chrom == "Y":
-        return (24,)
-    elif chrom == "M" or chrom == "MT":
-        return (25,)
-    try:
-        return (int(chrom),)
-    except ValueError:
-        return (99,)
 
 
 def _predict_structure(sequence: str, label: str):

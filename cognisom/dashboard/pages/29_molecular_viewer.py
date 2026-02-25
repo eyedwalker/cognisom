@@ -38,7 +38,8 @@ st.caption(
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────
 
-KIT_BASE_URL = "http://host.docker.internal:8211"
+KIT_BASE_URL = "http://host.docker.internal:8211"  # Server-side (container→container)
+KIT_PUBLIC_URL = "/kit"  # Client-side (browser→nginx→Kit, HTTPS)
 
 # Sample PDB for demo (small beta-hairpin)
 DEMO_PDB = """HEADER    DEMO PROTEIN
@@ -343,7 +344,7 @@ if pdb_text:
 
             # MJPEG viewer
             st.markdown(
-                f'<iframe src="{KIT_BASE_URL}/stream" '
+                f'<iframe src="{KIT_PUBLIC_URL}/stream" '
                 f'width="100%" height="600" '
                 f'style="border:1px solid #333; border-radius:8px;" '
                 f'></iframe>',
