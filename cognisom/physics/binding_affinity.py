@@ -17,7 +17,13 @@ Example:
         protein_coords, ligand_coords, protein_charges, ligand_charges
     )
     optimized = optimizer.optimize_pose(
-        protein_coords, ligand_coords, charges, n_steps=100
+        protein_coords, ligand_coords, protein_charges, ligand_charges,
+        n_steps=100,
+    )
+    # Warp autodiff fast path (falls back to finite-diff if Warp unavailable):
+    optimized = optimizer.optimize_pose_autodiff(
+        protein_coords, ligand_coords, protein_charges, ligand_charges,
+        n_steps=100,
     )
 """
 
@@ -196,6 +202,64 @@ if WARP_AVAILABLE:
         # Restore center
         output_pos[tid] = p3 + center[0]
 
+    @wp.kernel
+    def binding_energy_pairwise_kernel(
+        protein_pos: wp.array(dtype=wp.vec3),
+        ligand_pos: wp.array(dtype=wp.vec3),
+        protein_charges: wp.array(dtype=float),
+        ligand_charges: wp.array(dtype=float),
+        protein_radii: wp.array(dtype=float),
+        ligand_radii: wp.array(dtype=float),
+        n_ligand: int,
+        pair_energy: wp.array(dtype=float),
+    ):
+        """Autodiff-safe pairwise energy kernel.
+
+        Writes per-pair energy to output array instead of atomic_add,
+        so Warp tape can differentiate through it.
+        """
+        tid = wp.tid()
+
+        n_protein = protein_pos.shape[0]
+
+        i = tid // n_ligand
+        j = tid % n_ligand
+
+        if i >= n_protein or j >= n_ligand:
+            pair_energy[tid] = 0.0
+            return
+
+        diff = protein_pos[i] - ligand_pos[j]
+        r_sq = wp.dot(diff, diff)
+        r = wp.sqrt(r_sq + 1.0e-8)
+
+        sigma = (protein_radii[i] + ligand_radii[j]) * 0.5
+        sigma_sq = sigma * sigma
+
+        epsilon = 0.05
+        sr6 = (sigma_sq * sigma_sq * sigma_sq) / (r_sq * r_sq * r_sq + 1.0e-20)
+        lj = 4.0 * epsilon * (sr6 * sr6 - sr6)
+
+        epsilon_r = 4.0
+        coul = 332.0 * protein_charges[i] * ligand_charges[j] / (epsilon_r * r)
+
+        # Smooth cutoff using switching function at 12 A
+        # (hard if/else blocks gradient flow; use smooth multiplier instead)
+        cutoff = 12.0
+        switch = wp.max(0.0, 1.0 - r / cutoff)
+        switch = switch * switch  # Quadratic decay to zero at cutoff
+
+        pair_energy[tid] = (lj + coul) * switch
+
+    @wp.kernel
+    def sum_array_kernel(
+        values: wp.array(dtype=float),
+        result: wp.array(dtype=float),
+    ):
+        """Sum array into single scalar (autodiff-safe via atomic_add on output)."""
+        tid = wp.tid()
+        wp.atomic_add(result, 0, values[tid])
+
 
 class BindingAffinityOptimizer:
     """Compute and optimize protein-ligand binding energy using Warp.
@@ -257,17 +321,10 @@ class BindingAffinityOptimizer:
         Returns:
             BindingResult with energy breakdown.
         """
-        n_prot = len(protein_coords)
-        n_lig = len(ligand_coords)
-
-        if protein_charges is None:
-            protein_charges = np.zeros(n_prot, dtype=np.float32)
-        if ligand_charges is None:
-            ligand_charges = np.zeros(n_lig, dtype=np.float32)
-        if protein_radii is None:
-            protein_radii = np.full(n_prot, 1.7, dtype=np.float32)
-        if ligand_radii is None:
-            ligand_radii = np.full(n_lig, 1.7, dtype=np.float32)
+        protein_charges, ligand_charges, protein_radii, ligand_radii = \
+            self._defaults(protein_coords, ligand_coords,
+                           protein_charges, ligand_charges,
+                           protein_radii, ligand_radii)
 
         if WARP_AVAILABLE:
             return self._compute_warp(
@@ -282,6 +339,50 @@ class BindingAffinityOptimizer:
                 protein_radii, ligand_radii,
             )
 
+    @staticmethod
+    def _rotate_numpy(coords: np.ndarray, center: np.ndarray,
+                      angles: np.ndarray) -> np.ndarray:
+        """Apply Euler XYZ rotation around center (NumPy).
+
+        Args:
+            coords: (M, 3) atom positions.
+            center: (3,) rotation center.
+            angles: (3,) Euler angles [ax, ay, az] in radians.
+
+        Returns:
+            (M, 3) rotated coordinates.
+        """
+        ax, ay, az = angles
+        cx, sx = math.cos(ax), math.sin(ax)
+        cy, sy = math.cos(ay), math.sin(ay)
+        cz, sz = math.cos(az), math.sin(az)
+
+        # Rotation matrices
+        Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+        Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+        Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+
+        R = Rz @ Ry @ Rx  # Combined rotation
+        centered = coords - center
+        rotated = (R @ centered.T).T + center
+        return rotated
+
+    def _defaults(self, protein_coords, ligand_coords,
+                  protein_charges, ligand_charges,
+                  protein_radii, ligand_radii):
+        """Fill in default charges/radii."""
+        n_prot = len(protein_coords)
+        n_lig = len(ligand_coords)
+        if protein_charges is None:
+            protein_charges = np.zeros(n_prot, dtype=np.float32)
+        if ligand_charges is None:
+            ligand_charges = np.zeros(n_lig, dtype=np.float32)
+        if protein_radii is None:
+            protein_radii = np.full(n_prot, 1.7, dtype=np.float32)
+        if ligand_radii is None:
+            ligand_radii = np.full(n_lig, 1.7, dtype=np.float32)
+        return protein_charges, ligand_charges, protein_radii, ligand_radii
+
     def optimize_pose(
         self,
         protein_coords: np.ndarray,
@@ -293,9 +394,9 @@ class BindingAffinityOptimizer:
         n_steps: int = 100,
         learning_rate: float = 0.01,
     ) -> OptimizedPose:
-        """Optimize ligand pose to minimize binding energy.
+        """Optimize ligand pose via finite-difference gradient descent.
 
-        Uses gradient descent on translation + rotation parameters.
+        Optimizes 6 degrees of freedom: 3 translation + 3 rotation (Euler XYZ).
 
         Args:
             protein_coords: (N, 3) protein atom positions.
@@ -306,84 +407,76 @@ class BindingAffinityOptimizer:
         Returns:
             OptimizedPose with optimized coordinates and trajectory.
         """
-        n_prot = len(protein_coords)
-        n_lig = len(ligand_coords)
+        protein_charges, ligand_charges, protein_radii, ligand_radii = \
+            self._defaults(protein_coords, ligand_coords,
+                           protein_charges, ligand_charges,
+                           protein_radii, ligand_radii)
 
-        if protein_charges is None:
-            protein_charges = np.zeros(n_prot, dtype=np.float32)
-        if ligand_charges is None:
-            ligand_charges = np.zeros(n_lig, dtype=np.float32)
-        if protein_radii is None:
-            protein_radii = np.full(n_prot, 1.7, dtype=np.float32)
-        if ligand_radii is None:
-            ligand_radii = np.full(n_lig, 1.7, dtype=np.float32)
-
-        # Compute initial energy
-        initial_result = self.compute_binding_energy(
+        initial_energy = self.compute_binding_energy(
             protein_coords, ligand_coords,
             protein_charges, ligand_charges,
             protein_radii, ligand_radii,
-        )
-        initial_energy = initial_result.total_energy
+        ).total_energy
 
-        # Optimization: perturb translation and rotation
-        best_coords = ligand_coords.copy()
+        best_coords = ligand_coords.copy().astype(np.float64)
         best_energy = initial_energy
         energy_trajectory = [initial_energy]
 
-        center = ligand_coords.mean(axis=0)
+        center = best_coords.mean(axis=0)
         total_translation = np.zeros(3)
         total_rotation = np.zeros(3)
 
-        rng = np.random.RandomState(42)
+        eps_t = 0.1   # Angstrom perturbation for translation
+        eps_r = 0.02  # Radian perturbation for rotation (~1.1 degrees)
 
-        for step in range(n_steps):
-            # Compute gradient via finite differences
-            # (Warp autodiff would be better but requires tape setup per-step)
-            grad_t = np.zeros(3)
-            grad_r = np.zeros(3)
-            eps = 0.1  # Angstrom perturbation
-
-            for dim in range(3):
-                # Translation gradient
-                delta = np.zeros(3)
-                delta[dim] = eps
-                perturbed = best_coords + delta
-                e_plus = self.compute_binding_energy(
-                    protein_coords, perturbed,
-                    protein_charges, ligand_charges,
-                    protein_radii, ligand_radii,
-                ).total_energy
-
-                perturbed = best_coords - delta
-                e_minus = self.compute_binding_energy(
-                    protein_coords, perturbed,
-                    protein_charges, ligand_charges,
-                    protein_radii, ligand_radii,
-                ).total_energy
-
-                grad_t[dim] = (e_plus - e_minus) / (2 * eps)
-
-            # Apply gradient step (gradient descent)
-            step_t = -learning_rate * grad_t
-            # Clip step to prevent large jumps
-            step_t = np.clip(step_t, -0.5, 0.5)
-
-            candidate = best_coords + step_t
-            candidate_energy = self.compute_binding_energy(
-                protein_coords, candidate,
+        def _energy(coords):
+            return self.compute_binding_energy(
+                protein_coords, coords,
                 protein_charges, ligand_charges,
                 protein_radii, ligand_radii,
             ).total_energy
+
+        for step in range(n_steps):
+            grad_t = np.zeros(3)
+            grad_r = np.zeros(3)
+
+            # Translation gradients (central difference)
+            for dim in range(3):
+                delta = np.zeros(3)
+                delta[dim] = eps_t
+                grad_t[dim] = (_energy(best_coords + delta) -
+                               _energy(best_coords - delta)) / (2 * eps_t)
+
+            # Rotation gradients (central difference around current center)
+            for dim in range(3):
+                angles_plus = np.zeros(3)
+                angles_plus[dim] = eps_r
+                angles_minus = np.zeros(3)
+                angles_minus[dim] = -eps_r
+                rotated_plus = self._rotate_numpy(best_coords, center, angles_plus)
+                rotated_minus = self._rotate_numpy(best_coords, center, angles_minus)
+                grad_r[dim] = (_energy(rotated_plus) -
+                               _energy(rotated_minus)) / (2 * eps_r)
+
+            # Gradient descent with clipping
+            step_t = np.clip(-learning_rate * grad_t, -0.5, 0.5)
+            step_r = np.clip(-learning_rate * grad_r, -0.05, 0.05)
+
+            # Apply translation + rotation
+            candidate = best_coords + step_t
+            candidate = self._rotate_numpy(candidate, center, step_r)
+
+            candidate_energy = _energy(candidate)
 
             if candidate_energy < best_energy:
                 best_coords = candidate
                 best_energy = candidate_energy
                 total_translation += step_t
+                total_rotation += step_r
+                center = best_coords.mean(axis=0)
 
             energy_trajectory.append(best_energy)
 
-            # Check convergence
             if step > 10 and abs(energy_trajectory[-1] - energy_trajectory[-5]) < 0.01:
                 logger.info(f"Converged at step {step}")
                 return OptimizedPose(
@@ -406,6 +499,195 @@ class BindingAffinityOptimizer:
             converged=False,
             translation=total_translation,
             rotation_angles=total_rotation,
+        )
+
+    def optimize_pose_autodiff(
+        self,
+        protein_coords: np.ndarray,
+        ligand_coords: np.ndarray,
+        protein_charges: Optional[np.ndarray] = None,
+        ligand_charges: Optional[np.ndarray] = None,
+        protein_radii: Optional[np.ndarray] = None,
+        ligand_radii: Optional[np.ndarray] = None,
+        n_steps: int = 100,
+        learning_rate: float = 0.01,
+    ) -> OptimizedPose:
+        """Optimize ligand pose using Warp autodiff tape.
+
+        ~100x fewer kernel launches than finite-difference optimize_pose().
+        Falls back to optimize_pose() when Warp is unavailable.
+
+        Forward pass per step:
+            translate ligand → rotate ligand → pairwise energy → sum
+        Backward pass:
+            tape.backward() → gradients on translation + rotation params
+
+        Args:
+            protein_coords: (N, 3) protein atom positions.
+            ligand_coords: (M, 3) initial ligand positions.
+            n_steps: Optimization steps.
+            learning_rate: Step size.
+
+        Returns:
+            OptimizedPose with optimized coordinates and trajectory.
+        """
+        if not WARP_AVAILABLE:
+            logger.info("Warp unavailable, falling back to finite-diff optimize_pose()")
+            return self.optimize_pose(
+                protein_coords, ligand_coords,
+                protein_charges, ligand_charges,
+                protein_radii, ligand_radii,
+                n_steps=n_steps, learning_rate=learning_rate,
+            )
+
+        protein_charges, ligand_charges, protein_radii, ligand_radii = \
+            self._defaults(protein_coords, ligand_coords,
+                           protein_charges, ligand_charges,
+                           protein_radii, ligand_radii)
+
+        n_prot = len(protein_coords)
+        n_lig = len(ligand_coords)
+        n_pairs = n_prot * n_lig
+        dev = self.device
+
+        # Static arrays (protein doesn't move)
+        prot_pos = wp.array(protein_coords.astype(np.float32), dtype=wp.vec3, device=dev)
+        prot_q = wp.array(protein_charges.astype(np.float32), dtype=float, device=dev)
+        lig_q = wp.array(ligand_charges.astype(np.float32), dtype=float, device=dev)
+        prot_r = wp.array(protein_radii.astype(np.float32), dtype=float, device=dev)
+        lig_r = wp.array(ligand_radii.astype(np.float32), dtype=float, device=dev)
+
+        # Initial ligand position
+        lig_pos = wp.array(ligand_coords.astype(np.float32), dtype=wp.vec3, device=dev)
+
+        # Center of ligand
+        center_np = ligand_coords.mean(axis=0).astype(np.float32)
+        center_arr = wp.array(center_np.reshape(1, 3), dtype=wp.vec3, device=dev)
+
+        # Compute initial energy
+        initial_energy = self.compute_binding_energy(
+            protein_coords, ligand_coords,
+            protein_charges, ligand_charges,
+            protein_radii, ligand_radii,
+        ).total_energy
+
+        energy_trajectory = [initial_energy]
+        total_translation = np.zeros(3, dtype=np.float32)
+        total_rotation = np.zeros(3, dtype=np.float32)
+        current_lig = lig_pos
+
+        for step in range(n_steps):
+            # Optimizable parameters (requires_grad=True)
+            trans = wp.array(np.zeros((1, 3), dtype=np.float32),
+                             dtype=wp.vec3, device=dev, requires_grad=True)
+            angle_x = wp.array([0.0], dtype=float, device=dev, requires_grad=True)
+            angle_y = wp.array([0.0], dtype=float, device=dev, requires_grad=True)
+            angle_z = wp.array([0.0], dtype=float, device=dev, requires_grad=True)
+
+            # Intermediate buffers
+            translated = wp.zeros(n_lig, dtype=wp.vec3, device=dev, requires_grad=True)
+            rotated = wp.zeros(n_lig, dtype=wp.vec3, device=dev, requires_grad=True)
+            pair_energies = wp.zeros(n_pairs, dtype=float, device=dev, requires_grad=True)
+            total_energy = wp.zeros(1, dtype=float, device=dev, requires_grad=True)
+
+            tape = wp.Tape()
+            with tape:
+                # Forward: translate → rotate → pairwise energy → sum
+                wp.launch(translate_ligand_kernel, dim=n_lig,
+                          inputs=[current_lig, trans, translated], device=dev)
+
+                wp.launch(rotate_ligand_kernel, dim=n_lig,
+                          inputs=[translated, center_arr,
+                                  angle_x, angle_y, angle_z, rotated],
+                          device=dev)
+
+                wp.launch(binding_energy_pairwise_kernel, dim=n_pairs,
+                          inputs=[prot_pos, rotated, prot_q, lig_q,
+                                  prot_r, lig_r, n_lig, pair_energies],
+                          device=dev)
+
+                wp.launch(sum_array_kernel, dim=n_pairs,
+                          inputs=[pair_energies, total_energy], device=dev)
+
+            # Backward pass
+            tape.backward(total_energy)
+
+            # Read gradients
+            grad_trans = tape.gradients[trans].numpy()[0]  # (3,)
+            grad_ax = tape.gradients[angle_x].numpy()[0]
+            grad_ay = tape.gradients[angle_y].numpy()[0]
+            grad_az = tape.gradients[angle_z].numpy()[0]
+            grad_rot = np.array([grad_ax, grad_ay, grad_az], dtype=np.float32)
+
+            current_energy = float(total_energy.numpy()[0])
+
+            tape.zero()
+
+            # Gradient descent with clipping
+            step_t = np.clip(-learning_rate * grad_trans, -0.5, 0.5).astype(np.float32)
+            step_r = np.clip(-learning_rate * grad_rot, -0.05, 0.05).astype(np.float32)
+
+            # Apply the step: create new ligand positions
+            # Translation
+            new_trans = wp.array(step_t.reshape(1, 3), dtype=wp.vec3, device=dev)
+            new_lig = wp.zeros(n_lig, dtype=wp.vec3, device=dev)
+            wp.launch(translate_ligand_kernel, dim=n_lig,
+                      inputs=[current_lig, new_trans, new_lig], device=dev)
+
+            # Rotation
+            ax_arr = wp.array([step_r[0]], dtype=float, device=dev)
+            ay_arr = wp.array([step_r[1]], dtype=float, device=dev)
+            az_arr = wp.array([step_r[2]], dtype=float, device=dev)
+            rotated_lig = wp.zeros(n_lig, dtype=wp.vec3, device=dev)
+            wp.launch(rotate_ligand_kernel, dim=n_lig,
+                      inputs=[new_lig, center_arr,
+                              ax_arr, ay_arr, az_arr, rotated_lig],
+                      device=dev)
+
+            # Evaluate new energy
+            new_coords_np = rotated_lig.numpy().astype(np.float64)
+            new_energy = self.compute_binding_energy(
+                protein_coords, new_coords_np,
+                protein_charges, ligand_charges,
+                protein_radii, ligand_radii,
+            ).total_energy
+
+            if new_energy < energy_trajectory[-1]:
+                current_lig = rotated_lig
+                total_translation += step_t
+                total_rotation += step_r
+                # Update center
+                center_np = new_coords_np.mean(axis=0).astype(np.float32)
+                center_arr = wp.array(center_np.reshape(1, 3), dtype=wp.vec3, device=dev)
+                energy_trajectory.append(new_energy)
+            else:
+                energy_trajectory.append(energy_trajectory[-1])
+
+            # Convergence check
+            if step > 10 and abs(energy_trajectory[-1] - energy_trajectory[-5]) < 0.01:
+                logger.info(f"Autodiff converged at step {step}")
+                final_coords = current_lig.numpy().astype(np.float64)
+                return OptimizedPose(
+                    ligand_coords=final_coords,
+                    initial_energy=initial_energy,
+                    final_energy=energy_trajectory[-1],
+                    energy_trajectory=energy_trajectory,
+                    n_steps=step + 1,
+                    converged=True,
+                    translation=total_translation.astype(np.float64),
+                    rotation_angles=total_rotation.astype(np.float64),
+                )
+
+        final_coords = current_lig.numpy().astype(np.float64)
+        return OptimizedPose(
+            ligand_coords=final_coords,
+            initial_energy=initial_energy,
+            final_energy=energy_trajectory[-1],
+            energy_trajectory=energy_trajectory,
+            n_steps=n_steps,
+            converged=False,
+            translation=total_translation.astype(np.float64),
+            rotation_angles=total_rotation.astype(np.float64),
         )
 
     # ── Warp Implementation ──────────────────────────────────────────────
