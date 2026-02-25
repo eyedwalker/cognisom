@@ -2,16 +2,16 @@
 Page 29: Molecular Viewer
 =========================
 
-3D protein structure visualization powered by Kit RTX.
+Interactive 3D protein structure visualization.
+
+Default renderer: 3Dmol.js (WebGL) — works everywhere, no GPU server needed.
+Optional upgrade: Kit RTX (MJPEG stream) — when Isaac Sim container is running.
 
 Loads protein structures from:
 - Patient profile (Page 26) — mutant proteins from VCF data
 - BioNeMo NIM predictions (AlphaFold2, OpenFold3)
 - Direct PDB upload or RCSB PDB fetch
 - DiffDock docking results
-
-Sends PDB data to the Kit streaming server for RTX rendering,
-displays MJPEG stream in an iframe.
 
 Phase 4 of the Molecular Digital Twin pipeline.
 """
@@ -38,7 +38,7 @@ st.caption(
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────
 
-KIT_BASE_URL = "http://host.docker.internal:8211"  # Server-side (container→container)
+KIT_BASE_URL = "http://host.docker.internal:8600"  # Server-side (container→container)
 KIT_PUBLIC_URL = "/kit"  # Client-side (browser→nginx→Kit, HTTPS)
 
 # Sample PDB for demo (small beta-hairpin)
@@ -121,110 +121,127 @@ def _fetch_rcsb(pdb_id: str) -> str:
         return None
 
 
-def _render_2d_fallback(pdb_text: str, mutations: list):
-    """Render a simple 2D projection when Kit is not available."""
-    try:
-        import plotly.graph_objects as go
+def _render_3d_viewer(pdb_text: str, mutations: list, mode: str = "ribbon",
+                      color_mode: str = "bfactor"):
+    """Render interactive 3D protein structure using 3Dmol.js.
 
-        # Parse atoms
-        atoms_data = []
-        for line in pdb_text.splitlines():
-            if not line.startswith("ATOM"):
-                continue
-            try:
-                x = float(line[30:38])
-                y = float(line[38:46])
-                z = float(line[46:54])
-                name = line[12:16].strip()
-                res_seq = int(line[22:26].strip())
-                res_name = line[17:20].strip()
-                bfactor = float(line[60:66].strip()) if len(line) >= 66 and line[60:66].strip() else 50.0
-                element = line[76:78].strip() if len(line) >= 78 else name[0]
-                atoms_data.append({
-                    "x": x, "y": y, "z": z, "name": name,
-                    "res_seq": res_seq, "res_name": res_name,
-                    "bfactor": bfactor, "element": element,
-                    "is_ca": name == "CA",
-                    "is_mutation": res_seq in mutations,
-                })
-            except (ValueError, IndexError):
-                continue
+    Embeds a full WebGL molecular viewer in the browser — no Kit required.
+    Supports ribbon, ball-and-stick, and surface modes with pLDDT coloring
+    and mutation highlighting.
+    """
+    import streamlit.components.v1 as components
 
-        if not atoms_data:
-            st.warning("No atoms to display")
-            return
+    # Escape PDB text for safe embedding in JavaScript
+    pdb_escaped = json.dumps(pdb_text)
+    mutations_js = json.dumps(mutations)
 
-        import pandas as pd
-        df = pd.DataFrame(atoms_data)
+    # Map mode names to 3Dmol.js style functions
+    style_map = {
+        "ribbon": "cartoon",
+        "ball_and_stick": "stick",
+        "surface": "cartoon",  # show cartoon + surface overlay
+    }
+    style_name = style_map.get(mode, "cartoon")
 
-        # Filter to CA atoms for clean view
-        ca_df = df[df["is_ca"]].copy()
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<style>
+  * {{ margin: 0; padding: 0; }}
+  body {{ background: #0a0a1e; overflow: hidden; }}
+  #viewer {{ width: 100%; height: 580px; position: relative; }}
+  #mode-badge {{
+    position: absolute; top: 8px; right: 8px; z-index: 10;
+    background: rgba(0,160,255,0.85); color: white;
+    padding: 3px 10px; border-radius: 4px; font: 11px monospace;
+  }}
+</style>
+</head>
+<body>
+<div id="viewer">
+  <div id="mode-badge">3Dmol.js WebGL</div>
+</div>
+<script>
+(function() {{
+  var viewer = $3Dmol.createViewer("viewer", {{
+    backgroundColor: "0x0a0a1e",
+    antialias: true,
+  }});
 
-        if len(ca_df) == 0:
-            ca_df = df.copy()
+  var pdbData = {pdb_escaped};
+  var mutations = {mutations_js};
+  var styleName = "{style_name}";
+  var colorMode = "{color_mode}";
+  var showSurface = {"true" if mode == "surface" else "false"};
 
-        # Color by pLDDT
-        def plddt_color(val):
-            if val >= 90:
-                return "blue"
-            elif val >= 70:
-                return "cyan"
-            elif val >= 50:
-                return "yellow"
-            return "red"
+  viewer.addModel(pdbData, "pdb");
 
-        ca_df["color"] = ca_df["bfactor"].apply(plddt_color)
-        # Override mutation sites
-        ca_df.loc[ca_df["is_mutation"], "color"] = "red"
+  // --- Color scheme based on mode ---
+  if (colorMode === "bfactor") {{
+    // pLDDT confidence coloring (AlphaFold convention)
+    viewer.setStyle({{}}, {{
+      {style_name}: {{
+        colorfunc: function(atom) {{
+          var b = atom.b;
+          if (b >= 90) return 0x3333e6;  // blue: very high
+          if (b >= 70) return 0x33cccc;  // cyan: high
+          if (b >= 50) return 0xe6cc33;  // yellow: low
+          return 0xe63333;               // red: very low
+        }}
+      }}
+    }});
+  }} else if (colorMode === "element") {{
+    viewer.setStyle({{}}, {{ {style_name}: {{ colorscheme: "Jmol" }} }});
+  }} else if (colorMode === "chain") {{
+    viewer.setStyle({{}}, {{ {style_name}: {{ colorscheme: "chain" }} }});
+  }} else {{
+    viewer.setStyle({{}}, {{ {style_name}: {{ color: "spectrum" }} }});
+  }}
 
-        fig = go.Figure()
+  // --- Surface overlay (transparent) ---
+  if (showSurface) {{
+    var surfOpts = {{ opacity: 0.35 }};
+    if (colorMode === "bfactor") {{
+      surfOpts.colorfunc = function(atom) {{
+        var b = atom.b;
+        if (b >= 90) return 0x3333e6;
+        if (b >= 70) return 0x33cccc;
+        if (b >= 50) return 0xe6cc33;
+        return 0xe63333;
+      }};
+    }} else if (colorMode === "element") {{
+      surfOpts.colorscheme = "Jmol";
+    }} else {{
+      surfOpts.colorscheme = "chain";
+    }}
+    viewer.addSurface($3Dmol.SurfaceType.VDW, surfOpts);
+  }}
 
-        # C-alpha trace
-        fig.add_trace(go.Scatter3d(
-            x=ca_df["x"], y=ca_df["y"], z=ca_df["z"],
-            mode="lines+markers",
-            line=dict(color="gray", width=3),
-            marker=dict(
-                size=ca_df["bfactor"].apply(lambda v: 5 if v >= 70 else 3),
-                color=ca_df["color"],
-            ),
-            text=ca_df.apply(lambda r: f"{r['res_name']} {r['res_seq']}", axis=1),
-            hoverinfo="text",
-        ))
+  // --- Highlight mutations (red spheres + labels) ---
+  if (mutations.length > 0) {{
+    for (var i = 0; i < mutations.length; i++) {{
+      var resi = mutations[i];
+      viewer.addStyle({{ resi: resi }}, {{
+        sphere: {{ radius: 0.8, color: "red", opacity: 0.7 }}
+      }});
+      viewer.addResLabels({{ resi: resi }}, {{
+        font: "Arial", fontSize: 12, fontColor: "white",
+        backgroundColor: "rgba(200,0,0,0.7)", backgroundOpacity: 0.7,
+        showBackground: true,
+      }});
+    }}
+  }}
 
-        # Highlight mutations
-        mut_df = ca_df[ca_df["is_mutation"]]
-        if len(mut_df) > 0:
-            fig.add_trace(go.Scatter3d(
-                x=mut_df["x"], y=mut_df["y"], z=mut_df["z"],
-                mode="markers",
-                marker=dict(size=10, color="red", symbol="diamond"),
-                text=mut_df.apply(
-                    lambda r: f"MUTATION: {r['res_name']} {r['res_seq']}", axis=1
-                ),
-                hoverinfo="text",
-                name="Mutations",
-            ))
+  viewer.zoomTo();
+  viewer.spin("y", 0.5);  // Slow auto-rotation
+  viewer.render();
+}})();
+</script>
+</body>
+</html>"""
 
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(visible=False),
-                yaxis=dict(visible=False),
-                zaxis=dict(visible=False),
-                bgcolor="rgb(10,10,30)",
-            ),
-            paper_bgcolor="rgb(10,10,30)",
-            margin=dict(l=0, r=0, t=0, b=0),
-            height=550,
-            showlegend=False,
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-    except ImportError:
-        st.warning("Install plotly for 2D fallback visualization")
-    except Exception as e:
-        st.error(f"2D rendering failed: {e}")
+    components.html(html, height=600)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -267,15 +284,14 @@ with st.sidebar:
     kit_status = get_kit_status()
     if kit_status and kit_status.get("status") == "ok":
         renderer = kit_status.get("renderer", "unknown")
-        st.success(f"Kit connected ({renderer})")
+        st.success(f"Kit RTX connected ({renderer})")
         mol_loaded = kit_status.get("molecular_loaded", False)
         mol_built = kit_status.get("molecular_scene_built", False)
         if mol_loaded:
             st.info(f"Scene: {'Built' if mol_built else 'Building...'} "
                     f"| Mode: {kit_status.get('molecular_mode', '?')}")
     else:
-        st.warning("Kit server not connected")
-        st.caption(f"Expected at {KIT_BASE_URL}")
+        st.caption("Kit RTX: offline (3Dmol.js active)")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -424,14 +440,25 @@ if pdb_text:
     # ── Visualization Area ──
     view_col, info_col = st.columns([3, 1])
 
+    kit_available = kit_status and kit_status.get("status") == "ok"
+
     with view_col:
         st.subheader("3D Structure")
 
-        # Send to Kit button
-        kit_available = kit_status and kit_status.get("status") == "ok"
-
+        # Viewer mode toggle: 3Dmol.js (always available) vs Kit RTX (when available)
+        viewer_options = ["3Dmol.js (WebGL)"]
         if kit_available:
-            if st.button("Render in Kit RTX", type="primary"):
+            viewer_options.append("Kit RTX (MJPEG)")
+        active_viewer = st.radio(
+            "Renderer",
+            viewer_options,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+
+        if active_viewer == "Kit RTX (MJPEG)" and kit_available:
+            # ── Kit RTX mode ──
+            if st.button("Send to Kit RTX", type="primary"):
                 result = send_to_kit("load", {
                     "pdb_text": pdb_text,
                     "mode": viz_mode,
@@ -457,16 +484,17 @@ if pdb_text:
             cam_col1, cam_col2, cam_col3 = st.columns(3)
             with cam_col1:
                 if st.button("Reset Camera"):
-                    import requests
+                    import requests as _req
                     try:
-                        requests.post(f"{KIT_BASE_URL}/cognisom/camera/reset", timeout=5)
+                        _req.post(f"{KIT_BASE_URL}/cognisom/camera/reset",
+                                  timeout=5)
                     except Exception:
                         pass
             with cam_col2:
                 if st.button("Orbit Left"):
-                    import requests
+                    import requests as _req
                     try:
-                        requests.post(
+                        _req.post(
                             f"{KIT_BASE_URL}/cognisom/camera/orbit",
                             json={"yaw": -15, "pitch": 0}, timeout=5,
                         )
@@ -474,26 +502,32 @@ if pdb_text:
                         pass
             with cam_col3:
                 if st.button("Orbit Right"):
-                    import requests
+                    import requests as _req
                     try:
-                        requests.post(
+                        _req.post(
                             f"{KIT_BASE_URL}/cognisom/camera/orbit",
                             json={"yaw": 15, "pitch": 0}, timeout=5,
                         )
                     except Exception:
                         pass
         else:
-            st.warning(
-                "Kit RTX server not available. Showing local 2D preview."
+            # ── 3Dmol.js WebGL mode (default, always works) ──
+            _render_3d_viewer(
+                pdb_text,
+                mutations if highlight_mutations else [],
+                mode=viz_mode,
+                color_mode=color_mode,
             )
-            # Fallback: simple 2D projection using matplotlib
-            _render_2d_fallback(pdb_text, mutations)
 
     with info_col:
         st.subheader("Structure Info")
         st.write(f"**Title:** {title}")
         st.write(f"**Mode:** {viz_mode.replace('_', ' ').title()}")
         st.write(f"**Color:** {color_mode}")
+
+        if kit_available:
+            renderer = kit_status.get("renderer", "unknown")
+            st.caption(f"Kit RTX available ({renderer})")
 
         if mutations:
             st.write("**Highlighted residues:**")

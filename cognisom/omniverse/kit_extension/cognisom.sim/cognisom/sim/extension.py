@@ -79,11 +79,12 @@ class CognisomSimExtension(omni.ext.IExt):
         self._diapedesis_manager = DiapedesisManager()
         self._molecular_manager = MolecularManager()
 
-        # Start HTTP server for simulation control + MJPEG fallback (port 8211)
+        # Start HTTP server for simulation control + MJPEG streaming.
+        # Port 8600 — Isaac Sim's streaming server already uses 8211.
         self._streaming_server = StreamingServer(
             self._diapedesis_manager,
             molecular_manager=self._molecular_manager,
-            port=8211)
+            port=8600)
         self._streaming_server.start()
 
         if self._headless:
@@ -441,7 +442,7 @@ class CognisomSimExtension(omni.ext.IExt):
         await self._setup_rtx_capture(camera_path)
 
         carb.log_warn("[cognisom.sim] Headless scene setup complete — "
-                      "HTTP API on port 8211")
+                      "HTTP API on port 8600")
 
     async def _ensure_viewport(self, camera_path: str):
         """Ensure a render target exists for our camera.
