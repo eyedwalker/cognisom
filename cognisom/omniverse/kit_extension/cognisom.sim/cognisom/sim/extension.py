@@ -490,8 +490,8 @@ class CognisomSimExtension(omni.ext.IExt):
 
             self._hydra_texture = create_hydra_texture(
                 name="CognisomCapture",
-                width=1280,
-                height=720,
+                width=1920,
+                height=1080,
                 usd_context_name="",
                 usd_camera_path=camera_path,
                 hydra_engine_name="rtx",
@@ -583,7 +583,7 @@ class CognisomSimExtension(omni.ext.IExt):
             import omni.replicator.core as rep
             carb.log_warn(f"[cognisom.sim] Creating render product for "
                           f"camera: {camera_path}")
-            rp = rep.create.render_product(camera_path, (1280, 720))
+            rp = rep.create.render_product(camera_path, (1920, 1080))
             self._render_product = rp
 
             # Wait for render product to initialize
@@ -736,10 +736,10 @@ class CognisomSimExtension(omni.ext.IExt):
 
                 # Set render resolution
                 try:
-                    viewport_api.set_texture_resolution((1280, 720))
+                    viewport_api.set_texture_resolution((1920, 1080))
                 except (AttributeError, Exception):
                     try:
-                        viewport_api.resolution = (1280, 720)
+                        viewport_api.resolution = (1920, 1080)
                     except Exception:
                         pass
 
@@ -805,21 +805,13 @@ class CognisomSimExtension(omni.ext.IExt):
         # Anti-aliasing
         settings.set_bool("/rtx/post/aa/enabled", True)
 
-        # Low sample count for real-time streaming (DLSS handles denoising)
-        settings.set_int("/rtx/pathtracing/totalSpp", 1)
-        settings.set_int("/rtx/pathtracing/spp", 1)
-        settings.set_int("/rtx/directLighting/sampledLighting/autoNumberOfLights", 4)
+        # Higher sample count for quality
+        settings.set_int("/rtx/pathtracing/totalSpp", 64)
+        settings.set_int("/rtx/directLighting/sampledLighting/autoNumberOfLights", 8)
 
-        # Use RTX Real-Time renderer instead of path tracing for streaming
-        settings.set_string("/rtx/rendermode", "RaytracedLighting")
-
-        # Enable DLSS for fast upscaling (Performance mode = 2)
-        settings.set_bool("/rtx/post/dlss/enabled", True)
-        settings.set_int("/rtx/post/dlss/execMode", 2)  # 1=Quality, 2=Perf, 3=Ultra
-
-        # Reduce internal render resolution (DLSS upscales to output)
-        settings.set_int("/app/renderer/resolution/width", 1280)
-        settings.set_int("/app/renderer/resolution/height", 720)
+        # Render resolution
+        settings.set_int("/app/renderer/resolution/width", 1920)
+        settings.set_int("/app/renderer/resolution/height", 1080)
 
         # Force rendering in headless/offscreen mode
         settings.set_bool("/app/runLoops/rendering/enabled", True)
@@ -889,7 +881,7 @@ class CognisomSimExtension(omni.ext.IExt):
             # ── Strategy 2: Create standalone render product ──
             carb.log_warn("[cognisom.sim] Strategy 2: creating standalone "
                           "render product...")
-            mjpeg_rp = rep.create.render_product(camera_path, (1280, 720))
+            mjpeg_rp = rep.create.render_product(camera_path, (1920, 1080))
             self._mjpeg_rp = mjpeg_rp
 
             for _ in range(5):
@@ -1141,7 +1133,7 @@ class CognisomSimExtension(omni.ext.IExt):
             carb.log_warn(
                 f"[cognisom.sim] Post-build: creating standalone RP "
                 f"for {camera_path}")
-            rp = rep.create.render_product(camera_path, (1280, 720))
+            rp = rep.create.render_product(camera_path, (1920, 1080))
             self._render_product = rp
             self._mjpeg_rp = rp
 
