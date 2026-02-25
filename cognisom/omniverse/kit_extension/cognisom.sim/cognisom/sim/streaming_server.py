@@ -813,6 +813,43 @@ class _StreamHandler(BaseHTTPRequestHandler):
         except Exception as e:
             diag["settings"] = {"error": str(e)}
 
+        # Stage render products
+        try:
+            import omni.usd
+            stage = omni.usd.get_context().get_stage()
+            if stage:
+                from pxr import UsdRender
+                render_prims = []
+                for prim in stage.Traverse():
+                    prim_type = prim.GetTypeName()
+                    if "Render" in prim_type or "render" in str(prim.GetPath()).lower():
+                        render_prims.append({
+                            "path": str(prim.GetPath()),
+                            "type": prim_type,
+                        })
+                diag["render_prims"] = render_prims[:20]  # Limit output
+
+                # Count total prims
+                prim_count = sum(1 for _ in stage.Traverse())
+                diag["stage"] = {
+                    "root_layer": stage.GetRootLayer().identifier,
+                    "prim_count": prim_count,
+                }
+        except Exception as e:
+            diag["stage"] = {"error": str(e)}
+
+        # Check if livestream interface is available
+        try:
+            import omni.kit.livestream.core as ls_core
+            diag["livestream_core"] = {
+                "available": True,
+                "attrs": [a for a in dir(ls_core) if not a.startswith("_")][:20],
+            }
+        except ImportError:
+            diag["livestream_core"] = {"available": False}
+        except Exception as e:
+            diag["livestream_core"] = {"error": str(e)}
+
         self._send_json(diag)
 
     def _serve_viewer_html(self):

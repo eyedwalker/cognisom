@@ -705,11 +705,9 @@ class CognisomSimExtension(omni.ext.IExt):
     async def _setup_rtx_capture(self, camera_path: str):
         """Set up RTX frame capture for MJPEG streaming.
 
-        Creates a replicator annotator and attaches it, then lets the
-        per-frame _capture_rtx_frame() handler poll it continuously.
-        The annotator may not produce frames immediately — RTX needs
-        time to compile shaders and warm up in headless mode.
-        Meanwhile, the PIL fallback serves frames.
+        Creates a replicator annotator and attaches it. In headless mode,
+        rep.orchestrator.step_async() is required to trigger rendering.
+        The per-frame _capture_rtx_frame() handler polls continuously.
         """
         app = omni.kit.app.get_app()
 
@@ -719,6 +717,7 @@ class CognisomSimExtension(omni.ext.IExt):
             carb.log_warn("[cognisom.sim] Creating render product for "
                           "MJPEG capture...")
             mjpeg_rp = rep.create.render_product(camera_path, (1920, 1080))
+            self._mjpeg_rp = mjpeg_rp
 
             for _ in range(5):
                 await app.next_update_async()
@@ -726,15 +725,32 @@ class CognisomSimExtension(omni.ext.IExt):
             rgb = rep.AnnotatorRegistry.get_annotator("rgb")
             rgb.attach([mjpeg_rp])
 
-            # Brief warmup — don't block setup waiting for frames.
-            # The per-frame _capture_rtx_frame() will keep polling
-            # and switch from PIL→RTX as soon as frames appear.
-            carb.log_warn("[cognisom.sim] Annotator attached, warming up...")
-            for _ in range(30):
+            carb.log_warn("[cognisom.sim] Annotator attached, "
+                          "triggering orchestrator step...")
+
+            # In headless mode, the replicator orchestrator must be
+            # stepped to produce annotator data. Without this, the
+            # render product exists but never renders frames.
+            try:
+                await rep.orchestrator.step_async()
+                carb.log_warn("[cognisom.sim] Orchestrator step completed")
+            except Exception as e:
+                carb.log_warn(
+                    f"[cognisom.sim] Orchestrator step failed: {e}")
+
+            # Wait for render data to be available
+            for _ in range(10):
                 await app.next_update_async()
 
-            # Always set the annotator — _capture_rtx_frame() handles
-            # empty data gracefully and will activate RTX when ready
+            # Check if data is now available
+            import numpy as np
+            data = rgb.get_data()
+            if data is not None:
+                arr = np.array(data)
+                carb.log_warn(
+                    f"[cognisom.sim] Post-step annotator: "
+                    f"shape={arr.shape} size={arr.size}")
+
             if self._streaming_server:
                 self._streaming_server.set_annotator(rgb)
             self._rgb_annotator = rgb
@@ -744,6 +760,8 @@ class CognisomSimExtension(omni.ext.IExt):
 
         except Exception as e:
             carb.log_warn(f"[cognisom.sim] Replicator capture failed: {e}")
+            import traceback
+            carb.log_warn(f"[cognisom.sim] {traceback.format_exc()}")
 
         carb.log_warn("[cognisom.sim] No RTX capture available — "
                       "MJPEG will use PIL fallback")
@@ -859,8 +877,8 @@ class CognisomSimExtension(omni.ext.IExt):
 
         The initial render product was created on an empty stage, so the
         annotator returns empty data. After scene geometry is added, we
-        need to recreate the render product so the RTX renderer picks up
-        the new content and the annotator starts returning pixels.
+        need to recreate the render product and use orchestrator.step()
+        to trigger RTX rendering with the new content.
         """
         app = omni.kit.app.get_app()
         camera_path = self._camera_path or "/World/DiapedesisCam"
@@ -872,40 +890,53 @@ class CognisomSimExtension(omni.ext.IExt):
 
         try:
             import omni.replicator.core as rep
+            import numpy as np
 
             carb.log_warn(
                 f"[cognisom.sim] Recreating render product for {camera_path}")
             rp = rep.create.render_product(camera_path, (1920, 1080))
             self._render_product = rp
+            self._mjpeg_rp = rp
 
-            # Wait for render product to initialize with scene content
-            for _ in range(20):
+            # Wait for render product to initialize
+            for _ in range(10):
                 await app.next_update_async()
 
             rgb = rep.AnnotatorRegistry.get_annotator("rgb")
             rgb.attach([rp])
 
-            # Longer warmup — RTX needs to compile shaders for new materials
             carb.log_warn("[cognisom.sim] Annotator re-attached, "
-                          "warming up with scene content...")
-            for _ in range(60):
-                await app.next_update_async()
+                          "triggering orchestrator steps...")
 
-            # Check if we're getting data now
-            import numpy as np
+            # Multiple orchestrator steps to compile shaders and render
+            for step_i in range(5):
+                try:
+                    await rep.orchestrator.step_async()
+                    await app.next_update_async()
+                    data = rgb.get_data()
+                    if data is not None:
+                        arr = np.array(data)
+                        if arr.size > 0 and arr.ndim >= 2:
+                            carb.log_warn(
+                                f"[cognisom.sim] RTX producing frames "
+                                f"after step {step_i+1}! "
+                                f"{arr.shape[1]}x{arr.shape[0]}")
+                            break
+                        carb.log_warn(
+                            f"[cognisom.sim] Step {step_i+1}: "
+                            f"shape={arr.shape} size={arr.size}")
+                except Exception as e:
+                    carb.log_warn(
+                        f"[cognisom.sim] Orchestrator step {step_i+1} "
+                        f"failed: {e}")
+
+            # Final check
             data = rgb.get_data()
             if data is not None:
                 arr = np.array(data)
                 carb.log_warn(
                     f"[cognisom.sim] Post-build annotator: "
                     f"shape={arr.shape} size={arr.size}")
-                if arr.size > 0 and arr.ndim >= 2:
-                    carb.log_warn(
-                        f"[cognisom.sim] RTX producing frames! "
-                        f"{arr.shape[1]}x{arr.shape[0]}")
-            else:
-                carb.log_warn(
-                    "[cognisom.sim] Post-build annotator: None")
 
             # Install the new annotator
             if self._streaming_server:
