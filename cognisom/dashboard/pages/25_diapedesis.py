@@ -258,8 +258,8 @@ def _render_omniverse_viewer(frames, streaming_url: str):
 
     Args:
         streaming_url: Browser-accessible URL for Kit (e.g. "/kit" for
-            nginx proxy, or "http://host:8211" for direct access).
-            Server-side Python calls always use localhost:8211 directly.
+            nginx proxy, or "http://host:8600" for direct access).
+            Server-side Python calls always use localhost:8600 directly.
     """
     import urllib.request
 
@@ -273,9 +273,9 @@ def _render_omniverse_viewer(frames, streaming_url: str):
     kit_status = None
     kit_candidates = [
         os.environ.get("KIT_SERVER_URL", ""),
-        "http://host.docker.internal:8211",
-        "http://172.17.0.1:8211",
-        "http://localhost:8211",
+        "http://host.docker.internal:8600",
+        "http://172.17.0.1:8600",
+        "http://localhost:8600",
     ]
     for candidate in kit_candidates:
         if not candidate:
@@ -302,23 +302,25 @@ def _render_omniverse_viewer(frames, streaming_url: str):
             st.markdown("""
 **To enable Omniverse RTX rendering:**
 
-1. **Launch Kit container on the GPU server** (L4/L40S):
+1. **Launch Isaac Sim container on the GPU server** (L4/L40S):
    ```bash
    docker run -d --name cognisom-kit --gpus all \\
        --restart unless-stopped \\
-       -p 8211:8211 \\
+       -p 8211:8211 -p 8600:8600 -p 8899:49100 \\
+       -e ACCEPT_EULA=Y \\
        -v /path/to/cognisom.sim:/exts/cognisom.sim:ro \\
-       nvcr.io/nvidia/omniverse/kit:105.1.2 \\
+       --entrypoint /isaac-sim/isaac-sim.streaming.sh \\
+       nvcr.io/nvidia/isaac-sim:4.5.0 \\
        --ext-folder /exts --enable cognisom.sim \\
-       --/renderer/active="rtx"
+       --/renderer/active=rtx --allow-root
    ```
 
-2. **Ensure nginx proxies** `/kit/` to `localhost:8211`
+2. **Ensure nginx proxies** `/kit/` to `localhost:8600`
 
 The extension provides:
 - PBR materials with subsurface scattering
 - RTX viewport rendered at 1920x1080
-- HTTP frame streaming (MJPEG) on port 8211
+- HTTP frame streaming (MJPEG) on port 8600
 - REST API for playback control
 """)
         st.info("Falling back to Three.js viewer.")
