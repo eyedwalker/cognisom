@@ -1064,7 +1064,22 @@ class CognisomSimExtension(omni.ext.IExt):
         3. Multiple orchestrator steps to fully initialize the renderer
         """
         app = omni.kit.app.get_app()
+
+        # If a molecular scene was built, use MolecularCam instead of default
         camera_path = self._camera_path or "/World/DiapedesisCam"
+        try:
+            stage = omni.usd.get_context().get_stage()
+            mol_cam = stage.GetPrimAtPath("/World/MolecularCam")
+            if mol_cam and mol_cam.IsValid():
+                camera_path = "/World/MolecularCam"
+                self._camera_path = camera_path
+                self._set_active_camera(camera_path)
+                carb.log_warn(
+                    f"[cognisom.sim] Switched to molecular camera: "
+                    f"{camera_path}")
+        except Exception as e:
+            carb.log_warn(
+                f"[cognisom.sim] Could not check for MolecularCam: {e}")
 
         carb.log_warn("[cognisom.sim] Waiting for scene to settle...")
         # Wait for Hydra to process the new scene
