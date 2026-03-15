@@ -149,6 +149,38 @@ TREATMENT_PROFILES = {
         "requires_dna_repair_defect": True,
         "best_for": ["any_with_hrd"],
     },
+    "neoantigen_vaccine": {
+        "name": "Personalized mRNA Neoantigen Vaccine",
+        "class": "neoantigen vaccine",
+        "target": "Tumor neoantigens",
+        "mechanism": (
+            "mRNA vaccine encoding patient-specific tumor neoantigens. "
+            "LNP-encapsulated mRNA is translated by APCs, processed, and "
+            "presented on MHC-I to prime neoantigen-specific CD8+ T-cells"
+        ),
+        "exhaustion_reversal": 0.10,  # Modest direct effect on exhaustion
+        "treg_effect": 0.0,
+        "irae_base_risk": 0.08,  # Low toxicity profile
+        "effect_onset_days": 28,  # 4 weeks for T-cell priming
+        "requires_neoantigens": True,
+        "best_for": ["hot", "suppressed", "excluded"],
+    },
+    "neoantigen_vaccine_pembro": {
+        "name": "Neoantigen Vaccine + Pembrolizumab",
+        "class": "vaccine + checkpoint",
+        "target": "Neoantigens + PD-1",
+        "mechanism": (
+            "Personalized mRNA neoantigen vaccine primes tumor-specific T-cells, "
+            "while pembrolizumab removes PD-1/PD-L1 checkpoint brake — "
+            "synergistic anti-tumor immunity (mRNA-4157/V940 paradigm)"
+        ),
+        "exhaustion_reversal": 0.60,
+        "treg_effect": 0.0,
+        "irae_base_risk": 0.20,
+        "effect_onset_days": 21,
+        "requires_neoantigens": True,
+        "best_for": ["hot", "suppressed", "excluded", "cold"],
+    },
 }
 
 
@@ -274,6 +306,13 @@ class TreatmentSimulator:
         if twin.has_ar_mutation:
             recommended.append("enzalutamide")
 
+        # Neoantigen vaccine if sufficient targets
+        if twin.neoantigen_vaccine_candidate:
+            recommended.append("neoantigen_vaccine")
+            # Vaccine + checkpoint combo is the strongest approach
+            if twin.immune_score != "cold":
+                recommended.append("neoantigen_vaccine_pembro")
+
         # Combo for cold tumors
         if twin.immune_score == "cold" and "pembro_ipi_combo" not in recommended:
             recommended.append("pembro_ipi_combo")
@@ -318,6 +357,31 @@ class TreatmentSimulator:
                 eff -= 0.1  # Resistance mutations reduce effectiveness
             else:
                 eff += 0.2  # Wild-type AR responds well
+
+        # Neoantigen vaccine effectiveness
+        if "vaccine" in treatment_class:
+            # Effectiveness scales with number of vaccine-quality neoantigens
+            if twin.vaccine_candidate_count >= 10:
+                eff += 0.30
+            elif twin.vaccine_candidate_count >= 5:
+                eff += 0.20
+            elif twin.vaccine_candidate_count >= 3:
+                eff += 0.10
+            else:
+                eff -= 0.20  # Too few targets
+
+            # Strong binders contribute more
+            if twin.strong_binder_count >= 5:
+                eff += 0.15
+
+            # Immune microenvironment matters
+            if twin.immune_score == "hot":
+                eff += 0.15
+            elif twin.immune_score == "cold":
+                eff -= 0.15  # Hard to activate cold tumors
+
+            # MHC-I downregulation reduces vaccine efficacy
+            eff -= twin.mhc1_downregulation * 0.3
 
         # MSI-H boosts checkpoint response
         if twin.microsatellite_instability == "MSI-H":
@@ -436,5 +500,12 @@ class TreatmentSimulator:
 
         if twin.has_dna_repair_defect and "PARP" in profile.get("class", ""):
             parts.append("- DNA repair deficiency — synthetic lethality with PARP inhibition")
+
+        if "vaccine" in profile.get("class", ""):
+            parts.append(f"- {twin.vaccine_candidate_count} neoantigen vaccine targets identified")
+            if twin.strong_binder_count > 0:
+                parts.append(f"- {twin.strong_binder_count} strong MHC-I binders (<50 nM)")
+            if twin.hla_alleles:
+                parts.append(f"- HLA typing: {len(twin.hla_alleles)} alleles characterized")
 
         return " ".join(parts)

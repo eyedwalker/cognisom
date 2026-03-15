@@ -48,6 +48,13 @@ class DigitalTwinConfig:
     pd_l1_expression: float = 0.5  # PD-L1 on tumor cells (0-1)
     neoantigen_count: int = 0
 
+    # Neoantigen vaccine data
+    hla_alleles: List[str] = field(default_factory=list)
+    predicted_neoantigen_count: int = 0
+    strong_binder_count: int = 0
+    vaccine_candidate_count: int = 0
+    neoantigen_vaccine_candidate: bool = False
+
     @classmethod
     def from_profile_and_classification(
         cls,
@@ -73,9 +80,21 @@ class DigitalTwinConfig:
             immune_cell_fraction=classification.composition.immune_fraction,
         )
 
-        # Estimate neoantigen count from TMB
-        # ~1 neoantigen per 1-2 mutations/Mb (rough estimate)
-        config.neoantigen_count = int(config.tumor_mutational_burden * 1.5)
+        # Neoantigen count: use actual predictions if available
+        if profile.predicted_neoantigens:
+            config.neoantigen_count = sum(
+                1 for n in profile.predicted_neoantigens if n.is_weak_binder
+            )
+            config.predicted_neoantigen_count = len(profile.predicted_neoantigens)
+            config.strong_binder_count = profile.strong_binder_count
+            config.vaccine_candidate_count = len(profile.vaccine_neoantigens)
+            config.neoantigen_vaccine_candidate = profile.neoantigen_vaccine_candidate
+        else:
+            # Fallback: estimate from TMB
+            config.neoantigen_count = int(config.tumor_mutational_burden * 1.5)
+
+        # HLA alleles
+        config.hla_alleles = profile.hla_alleles or []
 
         # MHC-I downregulation based on genomic markers
         if profile.has_pten_loss:
@@ -101,6 +120,11 @@ class DigitalTwinConfig:
     @classmethod
     def from_profile_only(cls, profile: PatientProfile) -> "DigitalTwinConfig":
         """Build config from genomic profile only (no C2S data)."""
+        neo_count = (
+            sum(1 for n in profile.predicted_neoantigens if n.is_weak_binder)
+            if profile.predicted_neoantigens
+            else int(profile.tumor_mutational_burden * 1.5)
+        )
         return cls(
             patient=profile,
             tumor_mutational_burden=profile.tumor_mutational_burden,
@@ -108,9 +132,13 @@ class DigitalTwinConfig:
             has_dna_repair_defect=profile.has_dna_repair_defect,
             has_ar_mutation=profile.has_ar_mutation,
             has_pten_loss=profile.has_pten_loss,
-            # Estimate immune score from TMB
             immune_score="hot" if profile.is_tmb_high else "cold",
-            neoantigen_count=int(profile.tumor_mutational_burden * 1.5),
+            neoantigen_count=neo_count,
+            hla_alleles=profile.hla_alleles or [],
+            predicted_neoantigen_count=len(profile.predicted_neoantigens),
+            strong_binder_count=profile.strong_binder_count,
+            vaccine_candidate_count=len(profile.vaccine_neoantigens),
+            neoantigen_vaccine_candidate=profile.neoantigen_vaccine_candidate,
         )
 
     def to_simulation_params(self) -> Dict[str, Any]:
@@ -155,4 +183,9 @@ class DigitalTwinConfig:
             "mhc1_downregulation": self.mhc1_downregulation,
             "pd_l1_expression": self.pd_l1_expression,
             "neoantigen_count": self.neoantigen_count,
+            "hla_alleles": self.hla_alleles,
+            "predicted_neoantigen_count": self.predicted_neoantigen_count,
+            "strong_binder_count": self.strong_binder_count,
+            "vaccine_candidate_count": self.vaccine_candidate_count,
+            "neoantigen_vaccine_candidate": self.neoantigen_vaccine_candidate,
         }

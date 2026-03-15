@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 from .vcf_parser import Variant, VCFParser
 from .variant_annotator import VariantAnnotator, PROSTATE_CANCER_DRIVERS
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
+from .hla_typer import HLATyper
+from .neoantigen_predictor import NeoantigenPredictor, Neoantigen
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,9 @@ class PatientProfile:
     tumor_mutational_burden: float = 0.0  # Variants per megabase
     msi_status: str = "unknown"  # MSI-H, MSS, unknown
     hla_alleles: Optional[List[str]] = None
+
+    # Neoantigen predictions
+    predicted_neoantigens: List[Neoantigen] = field(default_factory=list)
 
     # Summary
     variant_summary: Dict[str, Any] = field(default_factory=dict)
@@ -82,6 +87,26 @@ class PatientProfile:
     def immunotherapy_candidate(self) -> bool:
         """Checkpoint inhibitors indicated for TMB-high or MSI-H."""
         return self.is_tmb_high or self.msi_status == "MSI-H"
+
+    @property
+    def neoantigen_vaccine_candidate(self) -> bool:
+        """Patient has strong neoantigen targets for personalized vaccine."""
+        return len(self.vaccine_neoantigens) >= 3
+
+    @property
+    def vaccine_neoantigens(self) -> List[Neoantigen]:
+        """Neoantigens selected for vaccine inclusion."""
+        return [n for n in self.predicted_neoantigens if n.include_in_vaccine]
+
+    @property
+    def strong_binder_count(self) -> int:
+        """Number of strong MHC binders (< 50 nM)."""
+        return sum(1 for n in self.predicted_neoantigens if n.is_strong_binder)
+
+    @property
+    def weak_binder_count(self) -> int:
+        """Number of weak MHC binders (< 500 nM)."""
+        return sum(1 for n in self.predicted_neoantigens if n.is_weak_binder)
 
     def get_driver_details(self) -> List[Dict]:
         """Get detailed info about each cancer driver mutation."""
@@ -153,6 +178,21 @@ class PatientProfile:
                 "confidence": "moderate",
             })
 
+        if self.neoantigen_vaccine_candidate:
+            n_targets = len(self.vaccine_neoantigens)
+            genes = sorted(set(n.source_gene for n in self.vaccine_neoantigens))
+            recommendations.append({
+                "therapy_class": "Personalized Neoantigen Vaccine",
+                "drugs": ["mRNA neoantigen vaccine"],
+                "rationale": (
+                    f"{n_targets} predicted neoantigens from "
+                    f"{', '.join(genes)} — strong MHC-I binding "
+                    f"predicted for patient HLA alleles"
+                ),
+                "evidence_level": "Clinical trials (mRNA-4157/V940 + pembrolizumab)",
+                "confidence": "moderate",
+            })
+
         return recommendations
 
     def to_dict(self) -> Dict:
@@ -171,6 +211,12 @@ class PatientProfile:
             "dna_repair_defect": self.has_dna_repair_defect,
             "parp_candidate": self.parp_inhibitor_candidate,
             "immunotherapy_candidate": self.immunotherapy_candidate,
+            "hla_alleles": self.hla_alleles,
+            "neoantigen_vaccine_candidate": self.neoantigen_vaccine_candidate,
+            "n_predicted_neoantigens": len(self.predicted_neoantigens),
+            "n_vaccine_candidates": len(self.vaccine_neoantigens),
+            "n_strong_binders": self.strong_binder_count,
+            "predicted_neoantigens": [n.to_dict() for n in self.predicted_neoantigens[:20]],
             "driver_details": self.get_driver_details(),
             "therapy_recommendations": self.get_therapy_recommendations(),
             "variant_summary": self.variant_summary,
@@ -217,6 +263,8 @@ class PatientProfileBuilder:
         self.parser = VCFParser()
         self.annotator = VariantAnnotator(cancer_type=cancer_type)
         self.mapper = GeneProteinMapper()
+        self.hla_typer = HLATyper()
+        self.neoantigen_predictor = NeoantigenPredictor()
         self.cancer_type = cancer_type
 
     def from_vcf_file(self, vcf_path: str,
@@ -254,6 +302,23 @@ class PatientProfileBuilder:
         tmb = self.annotator.compute_tmb(variants)
         msi = self.annotator.classify_msi(variants)
 
+        # HLA typing
+        hla_alleles = self.hla_typer.type_from_variants(
+            variants, patient_id=patient_id
+        )
+
+        # Neoantigen prediction
+        neoantigens = []
+        if hla_alleles and drivers:
+            try:
+                neoantigens = self.neoantigen_predictor.predict(
+                    cancer_mutations=drivers,
+                    affected_proteins=proteins,
+                    hla_alleles=hla_alleles,
+                )
+            except Exception as e:
+                logger.warning(f"Neoantigen prediction failed: {e}")
+
         # Summary stats
         summary = self.parser.variant_summary(variants)
 
@@ -267,12 +332,17 @@ class PatientProfileBuilder:
             affected_proteins=proteins,
             tumor_mutational_burden=tmb,
             msi_status=msi,
+            hla_alleles=hla_alleles,
+            predicted_neoantigens=neoantigens,
             variant_summary=summary,
         )
 
+        n_vaccine = len(profile.vaccine_neoantigens)
         logger.info(
             f"Built profile for {patient_id}: "
             f"{len(variants)} variants, {len(coding)} coding, "
-            f"{len(drivers)} drivers, TMB={tmb:.1f}"
+            f"{len(drivers)} drivers, TMB={tmb:.1f}, "
+            f"HLA={len(hla_alleles)} alleles, "
+            f"{len(neoantigens)} neoantigens ({n_vaccine} vaccine candidates)"
         )
         return profile

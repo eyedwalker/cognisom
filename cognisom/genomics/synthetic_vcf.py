@@ -104,7 +104,10 @@ def get_synthetic_profile_description() -> str:
         "- **PIK3CA E545K**: Constitutive PI3K activation\n"
         "- **ERG R367Q**: In context of TMPRSS2-ERG fusion\n"
         "- **ATM D1853N**: DNA damage response impairment\n\n"
+        "**HLA Type**: A\\*02:01 / A\\*24:02, B\\*07:02 / B\\*44:03, "
+        "C\\*05:01 / C\\*07:02\n\n"
         "This profile represents an aggressive, heavily mutated tumor "
         "with multiple therapeutic vulnerabilities (PARP inhibitors, "
-        "checkpoint inhibitors, PI3K/AKT inhibitors)."
+        "checkpoint inhibitors, PI3K/AKT inhibitors, and personalized "
+        "neoantigen vaccine targeting predicted MHC-I binding peptides)."
     )

@@ -15,6 +15,8 @@ Modules:
 - twin_config: Merge all data into personalized digital twin config
 - treatment_simulator: Predict immunotherapy response
 - spatial_transcriptomics: Spatial gene expression mapping
+- hla_typer: Extract HLA alleles from VCF data
+- neoantigen_predictor: Predict peptide-MHC binding for vaccine design
 """
 
 from .vcf_parser import VCFParser, Variant
@@ -26,6 +28,8 @@ from .cell2sentence import Cell2SentenceModel, CellStatePrediction
 from .cell_state_classifier import CellStateClassifier, ImmuneClassification
 from .twin_config import DigitalTwinConfig
 from .treatment_simulator import TreatmentSimulator, TreatmentResult
+from .hla_typer import HLATyper
+from .neoantigen_predictor import NeoantigenPredictor, Neoantigen
 from .spatial_transcriptomics import SpatialData, SpatialSpot, SpatialStats
 
 __all__ = [
@@ -47,6 +51,10 @@ __all__ = [
     "DigitalTwinConfig",
     "TreatmentSimulator",
     "TreatmentResult",
+    # Neoantigen Vaccine
+    "HLATyper",
+    "NeoantigenPredictor",
+    "Neoantigen",
     # Phase 5: Spatial Transcriptomics
     "SpatialData",
     "SpatialSpot",

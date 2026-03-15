@@ -218,8 +218,8 @@ if user is None:
 
     /* ── Metric Cards ── */
     .metric-card {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--secondary-background-color, rgba(255,255,255,0.03));
+        border: 1px solid rgba(128,128,128,0.15);
         border-radius: 12px;
         padding: 1.2rem 1rem;
         text-align: center;
@@ -233,7 +233,7 @@ if user is None:
     .metric-card:hover {
         border-color: rgba(0,212,170,0.3);
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
     }
 
     .metric-value {
@@ -247,7 +247,8 @@ if user is None:
 
     .metric-label {
         font-size: 0.8rem;
-        color: rgba(255,255,255,0.55);
+        color: var(--text-color, rgba(255,255,255,0.55));
+        opacity: 0.6;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
@@ -256,13 +257,14 @@ if user is None:
     .section-header {
         font-size: 2rem;
         font-weight: 700;
-        color: #e2e8f0;
+        color: var(--text-color, #e2e8f0);
         margin-bottom: 0.3rem;
     }
 
     .section-sub {
         font-size: 1rem;
-        color: rgba(255,255,255,0.5);
+        color: var(--text-color, rgba(255,255,255,0.5));
+        opacity: 0.6;
         margin-bottom: 1.5rem;
     }
 
@@ -276,8 +278,8 @@ if user is None:
 
     /* ── Capability Cards ── */
     .cap-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--secondary-background-color, rgba(255,255,255,0.04));
+        border: 1px solid rgba(128,128,128,0.15);
         border-radius: 16px;
         padding: 1.8rem 1.5rem;
         height: 100%;
@@ -289,7 +291,7 @@ if user is None:
     .cap-card:hover {
         border-color: rgba(0,212,170,0.4);
         transform: translateY(-4px);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.15);
     }
 
     .cap-card::before {
@@ -317,13 +319,14 @@ if user is None:
     .cap-title {
         font-size: 1.15rem;
         font-weight: 700;
-        color: #e2e8f0;
+        color: var(--text-color, #e2e8f0);
         margin-bottom: 0.6rem;
     }
 
     .cap-text {
         font-size: 0.88rem;
-        color: rgba(255,255,255,0.6);
+        color: var(--text-color, rgba(255,255,255,0.6));
+        opacity: 0.75;
         line-height: 1.6;
     }
 
@@ -356,14 +359,13 @@ if user is None:
         margin-bottom: 1.2rem;
         padding: 1rem;
         border-radius: 12px;
-        background: rgba(255,255,255,0.02);
-        border: 1px solid rgba(255,255,255,0.05);
+        background: var(--secondary-background-color, rgba(255,255,255,0.02));
+        border: 1px solid rgba(128,128,128,0.1);
         transition: all 0.3s ease;
     }
 
     .roadmap-item:hover {
-        background: rgba(255,255,255,0.04);
-        border-color: rgba(255,255,255,0.1);
+        border-color: rgba(128,128,128,0.25);
     }
 
     .roadmap-num {
@@ -398,12 +400,13 @@ if user is None:
 
     .roadmap-name {
         font-weight: 700;
-        color: #e2e8f0;
+        color: var(--text-color, #e2e8f0);
         font-size: 0.95rem;
     }
 
     .roadmap-desc {
-        color: rgba(255,255,255,0.5);
+        color: var(--text-color, rgba(255,255,255,0.5));
+        opacity: 0.6;
         font-size: 0.8rem;
         margin-top: 2px;
     }
@@ -423,8 +426,8 @@ if user is None:
 
     /* ── Tier Cards ── */
     .tier-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
-        border: 1px solid rgba(255,255,255,0.08);
+        background: var(--secondary-background-color, rgba(255,255,255,0.04));
+        border: 1px solid rgba(128,128,128,0.15);
         border-radius: 16px;
         padding: 2rem 1.5rem;
         text-align: center;
@@ -435,12 +438,11 @@ if user is None:
 
     .tier-card:hover {
         transform: translateY(-6px);
-        box-shadow: 0 16px 50px rgba(0,0,0,0.3);
+        box-shadow: 0 16px 50px rgba(0,0,0,0.15);
     }
 
     .tier-featured {
         border-color: rgba(0,212,170,0.4);
-        background: linear-gradient(145deg, rgba(0,212,170,0.06), rgba(99,102,241,0.03));
     }
 
     .tier-featured::before {
@@ -461,7 +463,7 @@ if user is None:
     .tier-name {
         font-size: 1.2rem;
         font-weight: 700;
-        color: #e2e8f0;
+        color: var(--text-color, #e2e8f0);
         margin-bottom: 0.5rem;
     }
 
@@ -476,14 +478,16 @@ if user is None:
 
     .tier-period {
         font-size: 0.75rem;
-        color: rgba(255,255,255,0.4);
+        color: var(--text-color, rgba(255,255,255,0.4));
+        opacity: 0.5;
         margin-bottom: 1.2rem;
     }
 
     .tier-features {
         text-align: left;
         font-size: 0.85rem;
-        color: rgba(255,255,255,0.65);
+        color: var(--text-color, rgba(255,255,255,0.65));
+        opacity: 0.75;
         line-height: 1.8;
     }
 
@@ -520,8 +524,8 @@ if user is None:
 
     /* ── Stats Banner ── */
     .stats-banner {
-        background: linear-gradient(135deg, rgba(0,212,170,0.08), rgba(99,102,241,0.08));
-        border: 1px solid rgba(255,255,255,0.06);
+        background: var(--secondary-background-color, rgba(0,212,170,0.08));
+        border: 1px solid rgba(128,128,128,0.12);
         border-radius: 12px;
         padding: 1.5rem;
         text-align: center;
@@ -536,7 +540,8 @@ if user is None:
 
     .stat-label {
         font-size: 0.7rem;
-        color: rgba(255,255,255,0.5);
+        color: var(--text-color, rgba(255,255,255,0.5));
+        opacity: 0.6;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
@@ -568,19 +573,20 @@ if user is None:
     /* ── Partner logos / badges ── */
     .partner-badge {
         display: inline-block;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.1);
+        background: var(--secondary-background-color, rgba(255,255,255,0.05));
+        border: 1px solid rgba(128,128,128,0.15);
         border-radius: 8px;
         padding: 0.5rem 1rem;
         margin: 0.3rem;
         font-size: 0.8rem;
-        color: rgba(255,255,255,0.6);
+        color: var(--text-color, rgba(255,255,255,0.6));
+        opacity: 0.7;
         transition: all 0.3s ease;
     }
 
     .partner-badge:hover {
         border-color: rgba(0,212,170,0.3);
-        color: rgba(255,255,255,0.8);
+        opacity: 1;
     }
 
     /* ── Molecular Visualization Placeholder ── */
@@ -636,8 +642,9 @@ if user is None:
         text-align: center;
         padding: 1.5rem 1rem;
         margin-top: 2rem;
-        border-top: 1px solid rgba(255,255,255,0.06);
-        color: rgba(255,255,255,0.3);
+        border-top: 1px solid rgba(128,128,128,0.15);
+        color: var(--text-color, rgba(255,255,255,0.3));
+        opacity: 0.4;
         font-size: 0.7rem;
         line-height: 1.5;
     }
@@ -661,7 +668,7 @@ if user is None:
             <div class="dna-line"></div>
         </div>
         <p class="hero-title">Cognisom</p>
-        <p class="hero-sub">GPU-Accelerated Human Digital Twin Platform for Cancer Research</p>
+        <p class="hero-sub">Personalized Molecular Digital Twin Platform for Precision Oncology</p>
         <p class="hero-byline">by eyentelligence inc.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -672,6 +679,18 @@ if user is None:
         with badge_col2:
             st.image(str(_inception_png_path), width=200)
 
+    # ── Development Disclaimer ────────────────────────────────────
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.05));
+                border: 1px solid rgba(234,179,8,0.3); border-radius: 10px;
+                padding: 0.8rem 1.2rem; margin: 1rem auto; max-width: 700px; text-align: center;">
+        <span style="color: #eab308; font-weight: 600;">Under Active Development</span>
+        <span style="font-size: 0.85rem; opacity: 0.7;">
+            &mdash; This application is intended for designated testers and research collaborators only.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
     # ── Demo Video ────────────────────────────────────────────────
     st.markdown("### Platform Overview")
     vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
@@ -681,29 +700,36 @@ if user is None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Hero Metrics Row ──────────────────────────────────────────
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     with m1:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-value">9</div>
-            <div class="metric-label">Simulation Modules</div>
+            <div class="metric-value">14</div>
+            <div class="metric-label">Cancer Driver Genes</div>
         </div>
         """, unsafe_allow_html=True)
     with m2:
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value">7</div>
+            <div class="metric-label">Treatment Regimens</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m3:
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value">9</div>
+            <div class="metric-label">Physics Modules</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m4:
         st.markdown("""
         <div class="metric-card">
             <div class="metric-value">11</div>
             <div class="metric-label">NVIDIA NIM Models</div>
         </div>
         """, unsafe_allow_html=True)
-    with m3:
-        st.markdown("""
-        <div class="metric-card">
-            <div class="metric-value">10</div>
-            <div class="metric-label">Cell Archetypes</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with m4:
+    with m5:
         st.markdown("""
         <div class="metric-card">
             <div class="metric-value">22</div>
@@ -723,20 +749,21 @@ if user is None:
 
     with col_what1:
         st.markdown("""
-Cognisom is a **multi-scale cellular simulation platform** that builds
-computational models of human tissue — starting with prostate cancer.
+Cognisom is a **personalized molecular digital twin platform** that creates
+computational models of individual cancer patients — starting with prostate cancer.
 
-It combines **real single-cell RNA sequencing data**, **NVIDIA BioNeMo AI
-models**, and a **9-module physics engine** to simulate how tumors grow,
-how immune cells respond, how drugs interact with targets, and how
-treatments might work — all *in silico*.
+**From patient DNA to treatment prediction in a single workflow:**
+Upload a patient's variant call file (VCF) and Cognisom automatically identifies
+**cancer driver mutations** across 14 genes, profiles the **tumor immune landscape**
+at single-cell resolution, and simulates **personalized treatment response** across
+7 therapy regimens — including immunotherapy, PARP inhibitors, and combination therapies.
 
-The goal: build a *human digital twin* accurate enough to help
-predict treatment outcomes for individual cancer patients, reducing
-the need for trial-and-error in oncology.
+The platform combines **tumor DNA analysis**, **immune cell profiling**
+(T-cell exhaustion, macrophage polarization, spatial transcriptomics),
+**NVIDIA BioNeMo AI models**, and a **9-module physics engine** to predict
+how a specific patient's cancer will respond to treatment — all *in silico*.
 
-Built on real science — validated against published experimental data
-from TCGA, GEO, and the Human Cell Atlas.
+Validated against published data from TCGA, GEO, and the Human Cell Atlas.
         """)
 
     with col_what2:
@@ -777,7 +804,7 @@ from TCGA, GEO, and the Human Cell Atlas.
     # ── Core Capabilities ─────────────────────────────────────────
     st.markdown("""
     <div class="section-header">Core Capabilities</div>
-    <div class="section-sub">Three integrated systems powering computational oncology</div>
+    <div class="section-sub">From patient DNA to personalized treatment prediction</div>
     <div class="gradient-line"></div>
     """, unsafe_allow_html=True)
 
@@ -787,22 +814,21 @@ from TCGA, GEO, and the Human Cell Atlas.
         st.markdown("""
         <div class="cap-card">
             <span class="cap-icon">&#129516;</span>
-            <div class="cap-title">Multi-Scale Simulation Engine</div>
+            <div class="cap-title">Tumor DNA Analysis</div>
             <div class="cap-text">
-                9 integrated physics modules modeling cellular dynamics,
-                immune surveillance, vascular oxygen delivery, lymphatic
-                metastasis, epigenetic silencing, circadian gating,
-                morphogen gradients, molecular interactions, and
-                receptor signaling.
+                Upload patient VCF files to identify cancer driver mutations
+                across 14 genes (AR, TP53, PTEN, BRCA1/2, SPOP, and more).
+                Automated variant annotation with protein impact prediction,
+                tumor mutational burden (TMB), and microsatellite instability (MSI).
                 <br><br>
-                Real-time visualization of tumor growth, immune response,
-                and metabolic flux — validated against published data.
+                Mutation-informed therapy guidance: immunotherapy eligibility,
+                PARP inhibitor sensitivity, and AR-targeted therapy selection.
             </div>
             <br>
-            <span class="cap-tag">Cellular Dynamics</span>
-            <span class="cap-tag">Immune Model</span>
-            <span class="cap-tag">Vascular O2</span>
-            <span class="cap-tag">Epigenetics</span>
+            <span class="cap-tag">14 Driver Genes</span>
+            <span class="cap-tag">TMB / MSI</span>
+            <span class="cap-tag">VCF Ingestion</span>
+            <span class="cap-tag">Variant Annotation</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -810,21 +836,20 @@ from TCGA, GEO, and the Human Cell Atlas.
         st.markdown("""
         <div class="cap-card">
             <span class="cap-icon">&#129514;</span>
-            <div class="cap-title">AI-Powered Drug Discovery</div>
+            <div class="cap-title">Immune Landscape Profiling</div>
             <div class="cap-text">
-                11 NVIDIA BioNeMo NIM endpoints: molecule generation
-                (MolMIM, GenMol), protein design (RFdiffusion, ProteinMPNN),
-                molecular docking (DiffDock), protein embeddings (ESM2),
-                structure prediction (OpenFold3, Boltz-2, AlphaFold2-Multimer),
-                genomic modeling (Evo2), sequence alignment (MSA-Search).
+                Single-cell resolution immune characterization of the tumor
+                microenvironment. T-cell exhaustion scoring with PD-1/TIM-3/LAG-3
+                co-expression analysis. M1 vs M2 macrophage polarization.
                 <br><br>
-                From target identification to lead compound in a single workflow.
+                Spatial transcriptomics maps immune infiltration patterns,
+                identifies hot zones via Moran's I autocorrelation, and
+                classifies tumor core, stroma, and immune border regions.
             </div>
             <br>
-            <span class="cap-tag cap-tag-purple">MolMIM</span>
-            <span class="cap-tag cap-tag-purple">RFdiffusion</span>
-            <span class="cap-tag cap-tag-purple">DiffDock</span>
-            <span class="cap-tag cap-tag-purple">ESM2</span>
+            <span class="cap-tag cap-tag-purple">T-Cell Exhaustion</span>
+            <span class="cap-tag cap-tag-purple">Macrophage M1/M2</span>
+            <span class="cap-tag cap-tag-purple">Spatial TME</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -832,20 +857,80 @@ from TCGA, GEO, and the Human Cell Atlas.
         st.markdown("""
         <div class="cap-card">
             <span class="cap-icon">&#128300;</span>
-            <div class="cap-title">Research Intelligence</div>
+            <div class="cap-title">Personalized Digital Twin</div>
             <div class="cap-text">
-                AI Research Agent with 10 tools for gene investigation,
-                mutation analysis, and drug target exploration.
+                Combines genomic profile + immune landscape to create a
+                patient-specific computational model. Simulates 7 treatment
+                regimens: pembrolizumab, nivolumab, ipilimumab, dual checkpoint
+                blockade, olaparib, enzalutamide, and combination therapies.
                 <br><br>
-                Live feeds from PubMed, bioRxiv, arXiv, Nature, Cell,
-                and 17 more sources. 22-source subscription manager
-                covering journals, databases, forums, and preprint servers.
+                RECIST-like response classification, tumor dynamics curves,
+                immune-related adverse event (irAE) risk, and survival projections.
             </div>
             <br>
-            <span class="cap-tag cap-tag-pink">PubMed</span>
-            <span class="cap-tag cap-tag-pink">bioRxiv</span>
-            <span class="cap-tag cap-tag-pink">Gene Agent</span>
-            <span class="cap-tag cap-tag-pink">22 Sources</span>
+            <span class="cap-tag cap-tag-pink">7 Therapies</span>
+            <span class="cap-tag cap-tag-pink">RECIST Response</span>
+            <span class="cap-tag cap-tag-pink">irAE Risk</span>
+            <span class="cap-tag cap-tag-pink">Survival Curves</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Additional Capabilities Row ────────────────────────────────
+    cap4, cap5, cap6 = st.columns(3)
+
+    with cap4:
+        st.markdown("""
+        <div class="cap-card">
+            <span class="cap-icon">&#9881;</span>
+            <div class="cap-title">Multi-Scale Simulation</div>
+            <div class="cap-text">
+                9 physics modules: cellular dynamics, immune surveillance,
+                vascular O2, lymphatic metastasis, epigenetics, circadian rhythms,
+                morphogen gradients, molecular interactions, receptor signaling.
+                GPU-accelerated with NVIDIA Warp. Multi-GPU tissue-scale (100K-5M cells).
+            </div>
+            <br>
+            <span class="cap-tag">9 Modules</span>
+            <span class="cap-tag">GPU Warp</span>
+            <span class="cap-tag">Multi-GPU</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with cap5:
+        st.markdown("""
+        <div class="cap-card">
+            <span class="cap-icon">&#128172;</span>
+            <div class="cap-title">AI Drug Discovery</div>
+            <div class="cap-text">
+                11 NVIDIA BioNeMo NIM endpoints: molecule generation (MolMIM, GenMol),
+                protein design (RFdiffusion, ProteinMPNN), docking (DiffDock),
+                structure prediction (OpenFold3, Boltz-2, AlphaFold2), and
+                genomic modeling (Evo2). Target to lead compound in one workflow.
+            </div>
+            <br>
+            <span class="cap-tag cap-tag-purple">11 NIMs</span>
+            <span class="cap-tag cap-tag-purple">DiffDock</span>
+            <span class="cap-tag cap-tag-purple">Evo2</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with cap6:
+        st.markdown("""
+        <div class="cap-card">
+            <span class="cap-icon">&#127912;</span>
+            <div class="cap-title">RTX 3D Visualization</div>
+            <div class="cap-text">
+                Real-time RTX rendering via NVIDIA Isaac Sim and OpenUSD.
+                Bio-USD schema (16 prim types, 99-entity catalog).
+                3Dmol.js protein viewer, Three.js tissue visualization,
+                MJPEG streaming, and leukocyte diapedesis simulation.
+            </div>
+            <br>
+            <span class="cap-tag cap-tag-pink">Omniverse</span>
+            <span class="cap-tag cap-tag-pink">Bio-USD</span>
+            <span class="cap-tag cap-tag-pink">RTX Path Tracing</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -868,8 +953,8 @@ from TCGA, GEO, and the Human Cell Atlas.
             st.markdown("""
             <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">
                 <iframe width="100%" height="315"
-                    src="https://www.youtube.com/embed/VH-gSGHGJQk?rel=0"
-                    title="NVIDIA Digital Biology"
+                    src="https://www.youtube.com/embed/lyASA5hQS6g?rel=0"
+                    title="Cognisom Vision"
                     frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen>
@@ -881,16 +966,16 @@ from TCGA, GEO, and the Human Cell Atlas.
         st.markdown("""
 **Where We're Heading**
 
-Cognisom is building toward a future where every cancer
-patient has a personalized digital twin — a living computational
-model that simulates their unique tumor biology, predicts
-treatment response, and guides precision therapy.
+Every cancer patient deserves a personalized digital twin — a
+computational model built from their own tumor DNA and immune
+profile that predicts treatment response before therapy begins.
 
-**What this represents:**
-- Multi-scale simulation from molecules to tissue
-- Immune system modeling and drug interaction prediction
-- Real-time 3D visualization in NVIDIA Omniverse
-- Bio-USD: a new open standard for biological data
+**What Cognisom delivers today:**
+- **Genomic profiling** — 14 cancer driver genes, TMB, MSI from patient VCF
+- **Immune landscape analysis** — T-cell exhaustion, macrophage polarization, spatial TME
+- **Treatment simulation** — 7 regimens with RECIST response prediction
+- **AI drug discovery** — 11 NVIDIA BioNeMo NIMs, end-to-end
+- **RTX visualization** — Real-time 3D in NVIDIA Omniverse
 
 Powered by **NVIDIA BioNeMo** and the
 **Inception Program** for accelerated startups.
@@ -906,16 +991,16 @@ Powered by **NVIDIA BioNeMo** and the
     """, unsafe_allow_html=True)
 
     phases = [
-        ("Deploy & Stabilize", "Live platform on AWS with security, authentication, and TLS", "Done"),
-        ("Data Validation", "Validated against published tumor growth, immune, and metabolic data", "Done"),
-        ("GPU Acceleration", "GPU FBA solver, diffusion kernels, and batch cell operations", "Done"),
-        ("3D Visualization", "Interactive browser-based cell populations, fields, and networks", "Done"),
-        ("Bio-USD + Entity Library", "99-entity biological catalog, OpenUSD schema, and management UI", "Done"),
-        ("Omniverse Connector", "SBML-to-USD converter, bidirectional sync, and scene export", "In Progress"),
-        ("AI Maintenance Agents", "6 autonomous agents keeping the biological knowledge base current", "Planned"),
-        ("Real-Time Simulation", "Physics-based biological simulation in Omniverse with Isaac Sim", "Planned"),
+        ("Deploy & Stabilize", "Live platform on AWS with security, Cognito authentication, and TLS", "Done"),
+        ("Genomic Digital Twin", "VCF ingestion, 14 cancer driver genes, variant annotation, TMB/MSI", "Done"),
+        ("Immune Landscape", "Cell2Sentence integration, T-cell exhaustion, macrophage polarization, spatial TME", "Done"),
+        ("Treatment Simulation", "7 therapy regimens, RECIST response, tumor dynamics, irAE risk prediction", "Done"),
+        ("AI Drug Discovery", "11 NVIDIA BioNeMo NIMs, molecule generation to docking pipeline", "Done"),
+        ("RTX Visualization", "Isaac Sim 4.5.0, Bio-USD schema, MJPEG streaming, 3D molecular viewer", "Done"),
+        ("Omniverse Scene Editor", "Interactive RTX scene editing, camera controls, and material tuning", "In Progress"),
+        ("AI Maintenance Agents", "Autonomous agents keeping the biological knowledge base current", "Planned"),
+        ("Clinical Validation", "Multi-patient cohort analysis and clinical-scale validation", "Planned"),
         ("AOUSD Standardization", "Bio-USD ratified as industry standard by the Alliance for OpenUSD", "Planned"),
-        ("Clinical Scale", "Personalized digital twins for cancer treatment planning", "Planned"),
     ]
 
     phase_col1, phase_col2 = st.columns(2)
@@ -1025,38 +1110,39 @@ Powered by **NVIDIA BioNeMo** and the
     # ── Architecture ──────────────────────────────────────────────
     st.markdown("""
     <div class="section-header">Platform Architecture</div>
-    <div class="section-sub">End-to-end computational oncology pipeline</div>
+    <div class="section-sub">From patient DNA to personalized treatment prediction</div>
     <div class="gradient-line"></div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="arch-container">
-<span class="arch-dim">DATA LAYER</span>
-scRNA-seq Data <span class="arch-dim">───┐</span>
-                  <span class="arch-dim">├──></span> Ingestion Pipeline <span class="arch-dim">──></span> <span class="arch-highlight">Cell Archetypes</span> <span class="arch-dim">──┐</span>
-CellxGene API  <span class="arch-dim">───┘</span>                                              <span class="arch-dim">│</span>
+<span class="arch-dim">PATIENT DATA LAYER</span>
+Patient VCF (DNA) <span class="arch-dim">──></span> Variant Annotator <span class="arch-dim">──></span> <span class="arch-highlight">Cancer Driver ID (14 genes)</span> <span class="arch-dim">──┐</span>
+scRNA-seq Data <span class="arch-dim">─────></span> Cell Archetypes <span class="arch-dim">──></span> <span class="arch-highlight">Immune Profiling</span> <span class="arch-dim">──────────┤</span>
+Spatial Transcriptomics <span class="arch-dim">──></span> Tissue Map <span class="arch-dim">──></span> <span class="arch-highlight">TME Characterization</span> <span class="arch-dim">───┘</span>
+                                                                        <span class="arch-dim">│</span>
+<span class="arch-dim">DIGITAL TWIN</span>                                                           <span class="arch-dim">v</span>
+  Genomic Profile + Immune Landscape <span class="arch-dim">──></span> <span class="arch-accent">Personalized Digital Twin</span>
+    <span class="arch-dim">──></span> Treatment Simulation (7 regimens) <span class="arch-dim">──></span> <span class="arch-highlight">RECIST + Survival + irAE Risk</span>
 
-<span class="arch-dim">AI LAYER</span>                                                        <span class="arch-dim">├──></span> <span class="arch-accent">Cognisom Engine (9 Modules)</span>
-NVIDIA NIMs <span class="arch-dim">──────></span> Drug Discovery Pipeline <span class="arch-dim">──></span> <span class="arch-highlight">Drug Params</span> <span class="arch-dim">───┘</span>        <span class="arch-dim">│</span>
-  MolMIM / GenMol                                                       <span class="arch-dim">│</span>
-  RFdiffusion              <span class="arch-dim">┌───────────────────────────────────────────┘</span>
-  ProteinMPNN              <span class="arch-dim">│</span>
-  DiffDock                 <span class="arch-dim">v</span>
+<span class="arch-dim">AI LAYER (11 NVIDIA BioNeMo NIMs)</span>
+  MolMIM / GenMol <span class="arch-dim">──></span> Drug Candidates     RFdiffusion / ProteinMPNN <span class="arch-dim">──></span> Protein Design
+  DiffDock / ESM2 <span class="arch-dim">──></span> Docking + Embeddings   OpenFold3 / Boltz-2 <span class="arch-dim">──></span> Structure Prediction
+  Evo2 / MSA-Search <span class="arch-dim">──></span> Genomic Analysis
 
-<span class="arch-dim">SIMULATION LAYER</span>
-  ESM2-650M          Simulation Loop <span class="arch-dim">──></span> <span class="arch-accent">Real-time 3D Visualization</span>
-  OpenFold3             <span class="arch-dim">│</span>                         <span class="arch-dim">│</span>
-  Boltz-2               <span class="arch-dim">v</span>                         <span class="arch-dim">v</span>
-  Evo2              Data Export              <span class="arch-highlight">Dashboard (14 pages)</span>
-  AlphaFold2                                        <span class="arch-dim">│</span>
+<span class="arch-dim">SIMULATION LAYER (9 Physics Modules)</span>
+  Cellular + Immune + Vascular + Lymphatic + Molecular
+  + Receptor + Epigenetic + Circadian + Morphogen
+  GPU-Accelerated (NVIDIA Warp) <span class="arch-dim">│</span> Multi-GPU (NCCL)
 
-<span class="arch-dim">KNOWLEDGE LAYER</span>
-  Entity Library (99 entities) <span class="arch-dim">──></span> <span class="arch-highlight">Bio-USD Schema</span> <span class="arch-dim">──></span> <span class="arch-accent">NVIDIA Omniverse</span>
-  SBML-to-USD Converter         Bidirectional Sync Engine
+<span class="arch-dim">VISUALIZATION LAYER</span>
+  Browser: 3Dmol.js + Three.js + Plotly <span class="arch-dim">──></span> <span class="arch-highlight">Dashboard (30 pages)</span>
+  RTX: <span class="arch-accent">NVIDIA Isaac Sim 4.5.0</span> + OpenUSD + MJPEG Streaming
+  Bio-USD Schema (16 prim types) <span class="arch-dim">──></span> Entity Library (99 entities)
 
 <span class="arch-dim">INTELLIGENCE LAYER</span>
-  MSA-Search        Research Feed <span class="arch-dim">◀────</span> PubMed / bioRxiv / arXiv
-                    Research Agent <span class="arch-dim">───</span> Gene Investigation / Mutation Analysis
+  Research Feed <span class="arch-dim">◀────</span> PubMed / bioRxiv / arXiv / 22 sources
+  Research Agent <span class="arch-dim">───</span> Gene Investigation / Mutation Analysis / Drug Targets
     </div>
     """, unsafe_allow_html=True)
 
@@ -1069,6 +1155,10 @@ NVIDIA NIMs <span class="arch-dim">──────></span> Drug Discovery Pip
         <div class="cta-sub">
             Create an organization to start running simulations,
             or join your team with an invite code.
+        </div>
+        <div style="margin-top: 0.8rem; font-size: 0.8rem; color: rgba(255,255,255,0.4);">
+            This application is under active development and is intended for designated testers
+            and research collaborators only. Not for clinical use.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1168,7 +1258,7 @@ else:
             return False
 
     st.title("Cognisom HDT Platform")
-    st.markdown("**GPU-Accelerated Multi-Scale Cellular Simulation for Cancer Research**")
+    st.markdown("**Personalized Molecular Digital Twin Platform for Precision Oncology**")
 
     # Key metrics
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -1232,22 +1322,22 @@ else:
     # Architecture
     st.subheader("Architecture")
     st.code("""
-scRNA-seq Data ─┐
-                ├─> Ingestion Pipeline ──> Cell Archetypes ──┐
-CellxGene API ──┘                                           │
-                                                             ├──> Cognisom Engine (9 Modules)
-NVIDIA NIMs ────> Drug Discovery Pipeline ──> Drug Params ──┘        │
-  MolMIM / GenMol                                                    │
-  RFdiffusion         ┌──────────────────────────────────────────────┘
-  ProteinMPNN         │
-  DiffDock            v
-  ESM2-650M     Simulation Loop ──> Real-time Visualization
-  OpenFold3         │                    │
-  Boltz-2           v                    v
-  Evo2          Data Export         Admin Dashboard (you are here)
-  AlphaFold2                             │
-  MSA-Search    Research Feed ◀──── PubMed / bioRxiv / arXiv
-                Research Agent ─── Gene Investigation / Mutation Analysis
+PATIENT DATA
+  VCF (Tumor DNA) ──> Variant Annotator ──> Cancer Driver ID (14 genes) ──┐
+  scRNA-seq ─────────> Cell Archetypes ──> Immune Profiling ──────────────┤
+  Spatial Transcriptomics ──> Tissue Map ──> TME Characterization ────────┘
+                                                                          │
+DIGITAL TWIN                                                              v
+  Genomic Profile + Immune Landscape ──> Personalized Digital Twin
+    ──> Treatment Simulation (7 regimens) ──> RECIST + Survival + irAE
+
+AI LAYER (11 NVIDIA BioNeMo NIMs)
+  MolMIM / GenMol / RFdiffusion / ProteinMPNN / DiffDock / ESM2
+  OpenFold3 / Boltz-2 / AlphaFold2 / Evo2 / MSA-Search
+
+SIMULATION (9 Modules) ──> 3D Visualization ──> Dashboard (you are here)
+KNOWLEDGE: Bio-USD (16 types) + Entity Library (99 entities)
+RESEARCH: 22 sources + AI Agent ◀── PubMed / bioRxiv / arXiv
     """, language=None)
 
     st.divider()
