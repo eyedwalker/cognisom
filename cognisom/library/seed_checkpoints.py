@@ -496,6 +496,102 @@ def _seed_signaling_kinases(store: EntityStore) -> int:
          {"target": "NF-kappaB", "type": "activates", "note": "via PKC"}],
         [0.4, 0.6, 0.8])
 
+    c += _add(store, "MEK1 (MAP2K1)", P,
+        "Mitogen-activated protein kinase kinase 1 (393 amino acids) is a dual-specificity "
+        "kinase that phosphorylates ERK1/2 at both threonine (Thr202) and tyrosine (Tyr204) "
+        "residues in the activation loop — the only known substrates of MEK1. Activated by "
+        "RAF1/BRAF phosphorylation at Ser218/Ser222 in the MEK1 activation segment. MEK1 is "
+        "the central bottleneck of the RAS-RAF-MEK-ERK cascade, making it an ideal therapeutic "
+        "target: trametinib (highly selective MEK1/2 inhibitor, Ki ~0.7 nM) is FDA-approved "
+        "for BRAF V600E melanoma (with dabrafenib), NSCLC, and anaplastic thyroid cancer. "
+        "Cobimetinib (with vemurafenib) and binimetinib (with encorafenib) are alternative "
+        "MEK inhibitors. MEK inhibitor resistance: MAPK pathway reactivation via MEK2 "
+        "mutations, RAF amplification, or receptor tyrosine kinase bypass.",
+        ["kinase", "MAPK", "cancer"],
+        {"kinase_ki_nm": 0.7},
+        ["cytoplasm"],
+        [{"target": "ERK1", "type": "phosphorylates", "note": "Thr202/Tyr204"},
+         {"target": "ERK2", "type": "phosphorylates"},
+         {"target": "RAF1", "type": "binds_to", "note": "activated by"}],
+        [0.4, 0.6, 0.8])
+
+    c += _add(store, "ERK1/2 (MAPK3/1)", P,
+        "Extracellular signal-regulated kinases 1 and 2 (379/360 amino acids) are the "
+        "terminal kinases of the canonical RAS-RAF-MEK-ERK mitogenic signaling cascade — "
+        "the most frequently mutated pathway in human cancer (~40% of all cancers). Activated "
+        "ERK1/2 phosphorylate >200 substrates in the cytoplasm (RSK, MNK, cPLA2) and "
+        "nucleus (ELK1, c-FOS, c-MYC, ETS factors), driving proliferation, differentiation, "
+        "survival, and migration. ERK nuclear translocation is mediated by importin-7. "
+        "ERK also phosphorylates SOS1 and RAF (negative feedback), creating oscillatory "
+        "signaling dynamics. ERK pathway activity can be read as phospho-ERK by "
+        "immunohistochemistry. Ulixertinib is a first-in-class ERK1/2 inhibitor in trials "
+        "for MAPK-driven cancers resistant to upstream RAF/MEK inhibitors.",
+        ["kinase", "MAPK", "proliferation"],
+        {"substrates": 200, "kinase_kcat_per_s": 10},
+        ["cytoplasm", "nucleus"],
+        [{"target": "ELK1", "type": "phosphorylates", "note": "nuclear TF"},
+         {"target": "c-FOS", "type": "phosphorylates", "note": "AP-1 component"},
+         {"target": "RSK", "type": "phosphorylates", "note": "cytoplasmic substrate"}],
+        [0.5, 0.5, 0.8])
+
+    c += _add(store, "SRC", P,
+        "Proto-oncogene tyrosine-protein kinase SRC (536 amino acids) is the prototypic "
+        "non-receptor tyrosine kinase and the first identified oncogene (v-src from Rous "
+        "sarcoma virus, 1976 Nobel Prize). SRC contains SH3 (proline-rich binding), SH2 "
+        "(phosphotyrosine binding), and kinase domains. Autoinhibited by intramolecular "
+        "SH2 binding to C-terminal pTyr527 (phosphorylated by CSK); activated by "
+        "dephosphorylation (PTPalpha) or displacement (receptor binding). SRC localizes "
+        "to focal adhesions, integrin complexes, and receptor tyrosine kinases. "
+        "Phosphorylates: FAK (cell migration), p130CAS (invasion), VE-cadherin "
+        "(vascular permeability), STAT3 (survival). Overactive SRC drives invasion and "
+        "metastasis in colon, breast, and prostate cancers. Dasatinib (SRC/ABL inhibitor) "
+        "treats CML and Ph+ ALL.",
+        ["kinase", "oncogene", "focal_adhesion", "invasion"],
+        {"kinase_kcat_per_s": 8},
+        ["cytoplasm", "cell_membrane", "focal_adhesions"],
+        [{"target": "FAK", "type": "phosphorylates", "note": "migration"},
+         {"target": "VE-cadherin", "type": "phosphorylates", "note": "permeability"},
+         {"target": "CSK", "type": "binds_to", "note": "negative regulator"}],
+        [0.5, 0.4, 0.9])
+
+    c += _add(store, "Aurora A (AURKA)", P,
+        "Aurora kinase A (403 amino acids) is a mitotic serine/threonine kinase essential "
+        "for centrosome maturation, mitotic spindle assembly, and chromosome alignment. "
+        "Aurora A is activated at centrosomes in late G2 by TPX2 binding (allosteric "
+        "activation and protection from PP1 phosphatase). Substrates: TACC3 (centrosome "
+        "maturation), PLK1 (mitotic entry), BRCA1 (checkpoint override), p53 (MDM2-mediated "
+        "degradation). Aurora A amplification occurs in breast, ovarian, and colorectal "
+        "cancers, driving centrosome amplification, supernumerary spindles, and chromosomal "
+        "instability (CIN). Aurora A also stabilizes N-MYC in neuroblastoma (preventing "
+        "FBXW7-mediated degradation). Alisertib (MLN8237, Aurora A inhibitor) showed "
+        "activity in PTCL and neuroblastoma trials.",
+        ["kinase", "mitosis", "centrosome", "CIN"],
+        {"peak_activity": "mitosis", "kinase_kcat_per_s": 5},
+        ["centrosome", "spindle"],
+        [{"target": "TPX2", "type": "binds_to", "note": "allosteric activator"},
+         {"target": "PLK1", "type": "phosphorylates", "note": "mitotic entry"},
+         {"target": "N-MYC", "type": "activates", "note": "stabilization"}],
+        [0.3, 0.9, 0.3])
+
+    c += _add(store, "WEE1", P,
+        "WEE1 kinase (646 amino acids) is the gatekeeper of the G2/M cell cycle checkpoint "
+        "that prevents premature mitotic entry by phosphorylating CDK1 (CDC2) at inhibitory "
+        "Tyr15. This keeps the CDK1/cyclin B complex inactive until all DNA damage is repaired "
+        "and replication is complete. CDC25 phosphatases remove the Tyr15 phosphorylation to "
+        "trigger mitotic entry. TP53-mutant cancers (which lack the G1/S checkpoint) are "
+        "heavily dependent on the G2/M checkpoint for DNA repair, creating a therapeutic "
+        "vulnerability: WEE1 inhibition (adavosertib/AZD1775) forces TP53-mutant cells into "
+        "mitosis with unrepaired DNA damage, causing mitotic catastrophe and cell death. "
+        "Adavosertib has shown activity in TP53-mutant ovarian cancer, SCLC, and AML, "
+        "particularly in combination with DNA-damaging agents (carboplatin, gemcitabine).",
+        ["kinase", "cell_cycle", "G2_M_checkpoint", "synthetic_lethality"],
+        {"cdk1_km_um": 2},
+        ["nucleus"],
+        [{"target": "CDK1", "type": "phosphorylates", "note": "Tyr15 inhibitory"},
+         {"target": "CDC25", "type": "inhibits", "note": "antagonistic relationship"},
+         {"target": "TP53", "type": "activates", "note": "synthetic lethal when lost"}],
+        [0.4, 0.7, 0.7])
+
     log.info("Seeded %d signaling kinase entities", c)
     return c
 
@@ -566,6 +662,85 @@ def _seed_transcription_factors(store: EntityStore) -> int:
          {"target": "VEGF", "type": "activates", "note": "HRE in promoter"},
          {"target": "GLUT1", "type": "activates", "note": "glycolytic switch"}],
         [0.7, 0.2, 0.9])
+
+    c += _add(store, "STAT1", P,
+        "Signal transducer and activator of transcription 1 (750 amino acids) is the "
+        "principal mediator of interferon-gamma signaling and a key anti-tumor transcription "
+        "factor. IFN-gamma binding to IFNGR1/IFNGR2 activates JAK1/JAK2, which phosphorylate "
+        "STAT1 at Y701. Phosphorylated STAT1 homodimerizes (gamma-activated factor/GAF) and "
+        "translocates to the nucleus, binding gamma-activated sequences (GAS) in promoters "
+        "of immunostimulatory genes: IRF1, CIITA (MHC-II transactivator), TAP1/2 (antigen "
+        "processing), CXCL9/10/11 (T cell recruitment), and iNOS. STAT1 also forms the "
+        "ISGF3 complex with STAT2 and IRF9 for type I IFN signaling (binds ISREs). STAT1 "
+        "loss in tumors impairs MHC-I expression and antigen presentation, causing resistance "
+        "to checkpoint immunotherapy. STAT1 is functionally antagonistic to STAT3 — STAT1 "
+        "promotes anti-tumor immunity while STAT3 promotes immunosuppression.",
+        ["transcription_factor", "STAT", "IFN_gamma", "anti_tumor"],
+        {"y701_phosphorylation_time_min": 5, "target_genes": 150},
+        ["cytoplasm", "nucleus"],
+        [{"target": "JAK1", "type": "binds_to", "note": "phosphorylation at Y701"},
+         {"target": "IRF1", "type": "activates", "note": "target gene"},
+         {"target": "STAT3", "type": "inhibits", "note": "functional antagonism"}],
+        [0.3, 0.6, 0.9])
+
+    c += _add(store, "NFAT (NFATC1)", P,
+        "Nuclear factor of activated T cells (943 amino acids) is a calcium-responsive "
+        "transcription factor essential for T cell activation. In resting T cells, NFAT is "
+        "heavily phosphorylated (by CK1, GSK3, DYRK kinases) and retained in the cytoplasm. "
+        "TCR stimulation → PLCgamma1 → IP3 → ER calcium release → sustained Ca2+ entry via "
+        "CRAC/ORAI1 channels → calmodulin activation → calcineurin (serine/threonine "
+        "phosphatase) dephosphorylates NFAT → nuclear translocation → binds NFAT response "
+        "elements, cooperating with AP-1 (FOS/JUN) to activate IL-2, IL-4, TNF-alpha, and "
+        "IFN-gamma transcription. Cyclosporine A and tacrolimus (FK506) are calcineurin "
+        "inhibitors that block NFAT dephosphorylation — the basis of transplant "
+        "immunosuppression. In T cell exhaustion, NFAT activation without AP-1 partner "
+        "drives expression of exhaustion genes (PD-1, TIM-3, LAG-3, TOX).",
+        ["transcription_factor", "T_cell", "calcium", "immunosuppression"],
+        {"dephosphorylation_time_min": 2, "nuclear_translocation_min": 5},
+        ["cytoplasm", "nucleus"],
+        [{"target": "calcineurin", "type": "binds_to", "note": "dephosphorylation"},
+         {"target": "AP-1", "type": "binds_to", "note": "cooperative at IL-2 promoter"},
+         {"target": "IL-2", "type": "activates", "note": "target gene"}],
+        [0.4, 0.7, 0.6])
+
+    c += _add(store, "beta-catenin (CTNNB1)", P,
+        "Beta-catenin (781 amino acids) has dual roles as a structural component of "
+        "adherens junctions (binding E-cadherin cytoplasmic tail) and as the transcriptional "
+        "effector of canonical Wnt signaling. In the absence of Wnt ligands, cytoplasmic "
+        "beta-catenin is continuously phosphorylated by the destruction complex "
+        "(APC-Axin-GSK3beta-CK1alpha): CK1 phosphorylates Ser45, then GSK3beta "
+        "phosphorylates Thr41/Ser37/Ser33 → recognized by beta-TrCP E3 ubiquitin ligase → "
+        "proteasomal degradation. Wnt binding to Frizzled/LRP5/6 → Dishevelled recruitment → "
+        "destruction complex disruption → beta-catenin accumulates → nuclear translocation → "
+        "binds TCF/LEF transcription factors → activates MYC, cyclin D1, AXIN2, LGR5 "
+        "(stemness). APC mutations (truncating, lost beta-catenin binding) occur in ~80% of "
+        "colorectal cancers and ~5% of prostate cancers.",
+        ["transcription_factor", "Wnt", "adherens_junction", "stemness"],
+        {"half_life_without_wnt_min": 30, "half_life_with_wnt_hours": 6},
+        ["cytoplasm", "nucleus", "adherens_junction"],
+        [{"target": "TCF/LEF", "type": "binds_to", "note": "nuclear co-activator"},
+         {"target": "APC", "type": "binds_to", "note": "destruction complex"},
+         {"target": "E-cadherin", "type": "binds_to", "note": "adherens junction"}],
+        [0.5, 0.8, 0.4])
+
+    c += _add(store, "IRF3", P,
+        "Interferon regulatory factor 3 (427 amino acids) is the key transcription factor "
+        "for innate antiviral type I interferon production. IRF3 is activated by the "
+        "cGAS-STING-TBK1 pathway (cytoplasmic DNA) and RIG-I/MDA5-MAVS-TBK1 pathway "
+        "(cytoplasmic RNA). TBK1 phosphorylates IRF3 at C-terminal serine cluster "
+        "(Ser386/Ser396) → IRF3 dimerization → nuclear translocation → binds IRF-E/ISRE "
+        "elements in IFN-beta, CXCL10, and ISG15 promoters. IRF3 is the initial IFN-beta "
+        "inducer; IFN-beta then upregulates IRF7 (the IFN-alpha amplification factor) "
+        "through autocrine IFNAR signaling. In anti-tumor immunity, tumor DNA in the "
+        "cytoplasm of dendritic cells activates cGAS-STING→TBK1→IRF3, producing IFN-beta "
+        "that is essential for CD8+ T cell cross-priming against tumor antigens.",
+        ["transcription_factor", "innate_immunity", "interferon", "cGAS_STING"],
+        {"phosphorylation_time_min": 15},
+        ["cytoplasm", "nucleus"],
+        [{"target": "TBK1", "type": "binds_to", "note": "phosphorylation at Ser386"},
+         {"target": "IFN-beta", "type": "activates", "note": "primary target gene"},
+         {"target": "IRF7", "type": "activates", "note": "amplification loop"}],
+        [0.3, 0.5, 0.9])
 
     log.info("Seeded %d transcription factor entities", c)
     return c
@@ -658,6 +833,102 @@ def _seed_apoptosis_regulators(store: EntityStore) -> int:
          {"target": "Complex III", "type": "binds_to", "note": "electron shuttle"},
          {"target": "Complex IV", "type": "binds_to", "note": "electron delivery"}],
         [0.8, 0.3, 0.3])
+
+    c += _add(store, "Caspase-8", P,
+        "Initiator caspase (479 amino acids, 55 kDa pro-form) that triggers the extrinsic "
+        "(death receptor) apoptosis pathway. Death ligands (FasL, TRAIL, TNF) bind their "
+        "receptors (Fas, DR4/5, TNFR1) → FADD adaptor recruitment → procaspase-8 binds via "
+        "DED-DED interaction → DISC (death-inducing signaling complex) formation → proximity-"
+        "induced dimerization and auto-proteolysis → active caspase-8 (p18/p10 heterodimer). "
+        "Active caspase-8 directly cleaves and activates executioner caspases-3/7 (type I cells, "
+        "e.g., lymphocytes) or cleaves BID to tBID (type II cells, e.g., hepatocytes), which "
+        "amplifies the signal through mitochondrial MOMP. Caspase-8 also has non-apoptotic "
+        "roles: prevents necroptosis by cleaving RIPK1/RIPK3, regulates inflammasome "
+        "activation, and is required for lymphocyte proliferation.",
+        ["apoptosis", "initiator_caspase", "death_receptor", "DISC"],
+        {"kcat_per_s": 1.5},
+        ["cytoplasm", "DISC"],
+        [{"target": "Caspase-3", "type": "activates", "note": "direct cleavage"},
+         {"target": "BID", "type": "catalyzes", "note": "→ tBID"},
+         {"target": "RIPK1", "type": "catalyzes", "note": "prevents necroptosis"}],
+        [0.8, 0.4, 0.2])
+
+    c += _add(store, "Caspase-9", P,
+        "Initiator caspase (416 amino acids, 46 kDa pro-form) of the intrinsic "
+        "(mitochondrial) apoptosis pathway. After MOMP releases cytochrome c, cytochrome c "
+        "binds APAF-1 → dATP-dependent conformational change → APAF-1 oligomerization into "
+        "the heptameric apoptosome (wheel-shaped, ~1.4 MDa) → procaspase-9 CARD domain binds "
+        "APAF-1 CARD hub → proximity-induced dimerization activates caspase-9 (no "
+        "auto-cleavage required). Active caspase-9 cleaves and activates executioner "
+        "caspases-3 and -7. Caspase-9 activity is directly inhibited by XIAP (BIR3 domain "
+        "binds caspase-9 dimerization interface). SMAC/Diablo released during MOMP displaces "
+        "XIAP, allowing caspase-9 to function. Caspase-9 is the rate-limiting step of "
+        "apoptosome-mediated cell death.",
+        ["apoptosis", "initiator_caspase", "apoptosome", "intrinsic_pathway"],
+        {"kcat_per_s": 0.5},
+        ["cytoplasm", "apoptosome"],
+        [{"target": "APAF-1", "type": "binds_to", "note": "CARD interaction"},
+         {"target": "Caspase-3", "type": "activates", "note": "cleavage at Asp175"},
+         {"target": "XIAP", "type": "binds_to", "note": "direct inhibition"}],
+        [0.7, 0.4, 0.3])
+
+    c += _add(store, "MCL-1", P,
+        "Myeloid cell leukemia 1 (350 amino acids, 40 kDa) is an anti-apoptotic BCL-2 "
+        "family member with the unique property of extremely short half-life (~30 minutes "
+        "to 3 hours), making its levels acutely responsive to stress signals. MCL-1 is "
+        "regulated at every level: transcription (STAT3, NF-kappaB), mRNA stability "
+        "(microRNAs), translation (mTORC1/4E-BP1), and protein stability (GSK3beta "
+        "phosphorylation at Ser159 → FBXW7/beta-TrCP ubiquitination → proteasomal "
+        "degradation). MCL-1 sequesters pro-apoptotic BH3-only proteins (BIM, PUMA, NOXA) "
+        "and directly inhibits BAK on the OMM. MCL-1 is amplified in ~10% of all cancers "
+        "(most frequently in breast, lung, and AML) and is a major resistance factor to "
+        "venetoclax (BCL-2 inhibitor). MCL-1-selective inhibitors (AMG-176, S64315/MIK665) "
+        "are in clinical trials for hematologic malignancies.",
+        ["apoptosis", "anti-apoptotic", "BCL-2_family", "resistance"],
+        {"half_life_hours": 1, "degradation_rate_high": True},
+        ["mitochondrial_outer_membrane"],
+        [{"target": "BAK", "type": "inhibits"},
+         {"target": "BIM", "type": "binds_to", "note": "BH3 groove"},
+         {"target": "NOXA", "type": "binds_to", "note": "selective BH3-only"}],
+        [0.3, 0.8, 0.4])
+
+    c += _add(store, "PUMA (BBC3)", P,
+        "p53-upregulated modulator of apoptosis (193 amino acids) is a BH3-only "
+        "BCL-2 family member and the principal mediator of p53-dependent apoptosis. PUMA "
+        "is transcriptionally induced by p53 (p53 response elements in promoter) within "
+        "hours of DNA damage and by FOXO3 during growth factor withdrawal. PUMA binds "
+        "all five anti-apoptotic BCL-2 family members (BCL-2, BCL-XL, BCL-W, MCL-1, A1) "
+        "with high affinity via its BH3 domain, displacing sequestered BAX and BAK and "
+        "enabling MOMP. PUMA can also directly activate BAX through transient BH3 domain "
+        "interaction. PUMA is the dominant p53 effector for apoptosis in most cell types: "
+        "PUMA knockout mice are resistant to irradiation-induced lymphocyte death and "
+        "p53-dependent intestinal stem cell apoptosis.",
+        ["apoptosis", "BH3_only", "p53", "pro-apoptotic"],
+        {"binding_all_antiapoptotic": True},
+        ["cytoplasm", "mitochondrial_outer_membrane"],
+        [{"target": "BCL-2", "type": "binds_to", "note": "BH3 displacement"},
+         {"target": "MCL-1", "type": "binds_to", "note": "BH3 displacement"},
+         {"target": "BAX", "type": "activates", "note": "indirect + direct"}],
+        [0.9, 0.2, 0.3])
+
+    c += _add(store, "XIAP (BIRC4)", P,
+        "X-linked inhibitor of apoptosis protein (497 amino acids) is the only IAP family "
+        "member that directly inhibits caspases through physical binding. XIAP BIR2 domain "
+        "binds the active site of executioner caspases-3 and -7 (blocking substrate access), "
+        "while BIR3 domain binds caspase-9 dimerization interface (preventing apoptosome "
+        "activation). XIAP RING domain has E3 ubiquitin ligase activity, targeting caspases "
+        "for degradation. XIAP is antagonized by SMAC/Diablo and Omi/HtrA2, both released "
+        "from mitochondria during MOMP: SMAC N-terminal AVPI motif competes with caspases "
+        "for XIAP BIR groove binding. SMAC mimetics (birinapant, LCL161) are synthetic "
+        "peptidomimetics that displace XIAP from caspases and also induce degradation of "
+        "cIAP1/2 (activating non-canonical NF-kappaB and TNF-dependent apoptosis).",
+        ["apoptosis", "IAP", "caspase_inhibitor"],
+        {},
+        ["cytoplasm"],
+        [{"target": "Caspase-3", "type": "inhibits", "note": "BIR2 blocks active site"},
+         {"target": "Caspase-9", "type": "inhibits", "note": "BIR3 blocks dimerization"},
+         {"target": "SMAC", "type": "binds_to", "note": "antagonist"}],
+        [0.2, 0.9, 0.3])
 
     log.info("Seeded %d apoptosis regulator entities", c)
     return c
