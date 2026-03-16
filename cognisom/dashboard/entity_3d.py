@@ -134,6 +134,133 @@ _KNOWN_PDB_IDS = {
     "Collagen I": "1CAG",    # Collagen triple helix
     "MMP-9 (Gelatinase B)": "1L6J",  # MMP-9 catalytic domain
     "MMP-2 (Gelatinase A)": "1CK7",  # MMP-2
+    "Collagen IV": "1LI1",   # Collagen IV NC1 domain
+    "Laminin": "1NPE",       # Laminin LG domain
+    "Fibronectin": "1FNF",   # Fibronectin type III
+    "Hyaluronan": "2BPX",    # CD44/HA complex
+    "TIMP-1": "1UEA",        # TIMP-1/MMP-3 complex
+    # Pattern Recognition Receptors
+    "TLR4": "3FXI",          # TLR4/MD-2/LPS complex
+    "TLR3": "2A0Z",          # TLR3 ectodomain
+    "TLR7": "5GMH",          # TLR7 with ligand
+    "TLR9": "3WPF",          # TLR9/CpG complex
+    "TLR2/1": "2Z7X",        # TLR2/TLR1 heterodimer
+    "TLR5": "3V47",          # TLR5/flagellin complex
+    "NLRP3 inflammasome": "6NPY",  # NLRP3 NACHT domain
+    "NOD2": "5IRN",          # NOD2 structure
+    "RIG-I": "5F9H",         # RIG-I with dsRNA
+    "MDA5": "4GL2",          # MDA5 filament
+    "cGAS-STING": "4KM5",    # cGAS with dsDNA
+    "Dectin-1": "2BPD",      # Dectin-1 CTLD
+    # Complement components
+    "C1q": "1PK6",           # C1q globular domain
+    "C3": "2A73",            # C3 full structure
+    "C3b": "2I07",           # C3b
+    "C5": "3CU7",            # C5 structure
+    "C5a": "1KJS",           # C5a anaphylatoxin
+    "Factor B": "2OK5",      # Factor B
+    "MAC (C5b-9)": "6H04",  # MAC pore structure (cryo-EM)
+    "MBL": "1HUP",           # MBL collagen region
+    # MHC molecules
+    "HLA-A*02:01": "3MRE",   # HLA-A*02:01 with peptide
+    "HLA-B*27:05": "1HSA",   # HLA-B*27:05
+    "HLA-B*57:01": "3VH8",   # HLA-B*57:01 with abacavir
+    "HLA-DRB1*04:01": "1J8H", # HLA-DR4
+    "HLA-DQ2.5": "1S9V",     # HLA-DQ2 with gliadin peptide
+    "B2M (beta-2 microglobulin)": "1LDS",  # B2M
+    # Cytokines
+    "IL-1beta": "1ITB",      # IL-1beta
+    "IL-2": "1M47",          # IL-2
+    "IL-4": "1HIK",          # IL-4
+    "IL-6": "1ALU",          # IL-6
+    "IL-10": "1J7V",         # IL-10 dimer
+    "IL-12": "1F45",         # IL-12 p35/p40
+    "IL-17A": "4HSA",        # IL-17A
+    "IFN-gamma": "1HIG",     # IFN-gamma homodimer
+    "IFN-alpha": "1ITF",     # IFN-alpha2
+    "TNF-alpha": "1TNF",     # TNF-alpha trimer
+    "TGF-beta1": "3KFD",     # TGF-beta1
+    "CXCL8 (IL-8)": "1IL8",  # IL-8 dimer
+    "GM-CSF": "2GMF",        # GM-CSF
+    "VEGF-A splice variants": "1VPF",  # VEGF
+    "FGF2 (bFGF)": "1BFB",   # FGF2
+    "PDGF-BB": "1PDG",       # PDGF-BB
+    "SCF (Kit ligand)": "1SCF",  # SCF dimer
+    "BMP4": "3BMP",          # BMP homolog
+    "IL-15": "2Z3Q",         # IL-15/IL-15Ralpha
+    # Adhesion molecules
+    "E-selectin (CD62E)": "1G1T",  # E-selectin lectin domain
+    "P-selectin (CD62P)": "1G1S",  # P-selectin
+    "LFA-1 (CD11a/CD18)": "1MQ8",  # LFA-1 I-domain
+    "ICAM-1 (CD54)": "1IAM",       # ICAM-1
+    "VCAM-1 (CD106)": "1VCA",      # VCAM-1
+    "CD31/PECAM-1": "3ICV",        # PECAM-1
+    "VE-cadherin (CD144)": "3PPE", # VE-cadherin
+    # Receptors
+    "Androgen Receptor": "2AM9",   # AR LBD
+    "PSMA": "2PVW",                # PSMA/FOLH1
+    "EGFR": "1NQL",                # EGFR with EGF
+    "VEGFR2": "3VHE",              # VEGFR2 kinase
+    # Additional kinases
+    "ERK1/2 (MAPK3/1)": "2ZOQ",   # ERK2
+    "Aurora A (AURKA)": "1MQ4",    # Aurora A
+    "WEE1": "3BIZ",               # WEE1 kinase
+    # Additional TFs
+    "STAT1": "1BF5",              # STAT1 dimer
+    "NFAT (NFATC1)": "1PZL",     # NFAT/AP-1/DNA
+    "beta-catenin (CTNNB1)": "1JDH",  # beta-catenin/TCF
+    "IRF3": "1J2F",               # IRF3 dimer
+    # Remaining cancer driver genes
+    "MYC": "1NKP",               # MYC/MAX leucine zipper
+    "SPOP": "3HQI",              # SPOP MATH domain
+    "ERG": "4IRG",               # ERG ETS domain
+    "FOXA1": "3CBB",             # FOXA1 forkhead domain (FoxA homolog)
+    "TMPRSS2": "7MEQ",           # TMPRSS2 protease domain
+    "CDK12": "5ACB",             # CDK12/Cyclin K
+    "ATM": "5NP0",              # ATM kinase domain (cryo-EM)
+    "NKX3-1": "3RKQ",           # NKX3-1 homeodomain (Nkx homolog)
+    "HOXB13": "5EGO",           # HOXB13 homeodomain (Hox homolog)
+    "KMT2D": "5F6K",            # KMT2D SET domain (MLL4 homolog)
+    "CHD1": "3MWY",             # CHD1 chromodomain
+    # Remaining checkpoints/receptors
+    "4-1BB (CD137)": "6MGP",    # 4-1BB/4-1BBL complex
+    "OX40 (CD134)": "2HEV",     # OX40 structure
+    "TIGIT": "3Q0H",            # TIGIT (PVR family)
+    "VISTA (B7-H5)": "6OIL",   # VISTA structure
+    "IDO1": "5WMU",             # IDO1 with inhibitor
+    "CD73 (NT5E)": "4H2I",     # CD73/NT5E
+    # Remaining complement
+    "C3a": "4HW5",              # C3a anaphylatoxin
+    "Factor D": "1DSU",         # Factor D
+    "Properdin": "6S08",        # Properdin oligomer
+    # Remaining cytokines
+    "IFN-beta": "1AU1",         # IFN-beta
+    "IL-21": "2OQP",            # IL-21
+    "IL-23": "3D85",            # IL-23 p19/p40
+    "IL-33": "2KLL",            # IL-33
+    "M-CSF": "3EJJ",            # M-CSF/CSF1R
+    "CCL2 (MCP-1)": "1DOK",    # MCP-1 dimer
+    "CXCL10 (IP-10)": "1LV9",  # IP-10
+    # Remaining adhesion
+    "L-selectin (CD62L)": "3CFW",   # L-selectin lectin
+    "MAC-1 (CD11b/CD18)": "1IDO",   # Mac-1 I-domain
+    "VLA-4 (\u03b14\u03b21)": "3V4P",       # alpha4 I-domain
+    "PSGL-1 (CD162)": "1G1R",       # PSGL-1 with P-selectin
+    "JAM-A": "1NBQ",                 # JAM-A dimer
+    "MAdCAM-1": "1GSM",             # MAdCAM-1
+    "CD99": "2L3T",                  # CD99 (NMR)
+    "ICAM-2 (CD102)": "1ZXQ",       # ICAM-2
+    # Remaining MHC
+    "HLA-A*03:01": "3RL1",          # HLA-A*03:01
+    "HLA-C*07:02": "5VGE",          # HLA-C*07:02
+    "HLA-DRB1*15:01": "1BX2",       # HLA-DR15
+    "HLA-DQ8": "1JK8",              # HLA-DQ8
+    # Additional apoptosis
+    "Caspase-8": "1QTN",          # Caspase-8
+    "Caspase-9": "1JXQ",          # Caspase-9/APAF-1
+    "MCL-1": "4HW2",             # MCL-1 with BH3 peptide
+    "PUMA (BBC3)": "2ROC",       # PUMA BH3/MCL-1
+    "BAX": "1F16",               # (already above but duplicating for safety)
 }
 
 
