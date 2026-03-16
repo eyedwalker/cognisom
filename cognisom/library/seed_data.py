@@ -1056,40 +1056,187 @@ def _seed_cell_types(loader: EntityLoader) -> int:
 
 def _seed_pathways(loader: EntityLoader) -> int:
     pathways = [
-        ("AR Signaling", "Androgen receptor signaling pathway — master regulator of prostate biology",
+        ("AR Signaling",
+         "Androgen receptor (AR) signaling is the master regulatory axis of prostate "
+         "development, homeostasis, and cancer progression. The canonical pathway begins "
+         "with testicular testosterone (T) production, conversion to dihydrotestosterone "
+         "(DHT) by 5-alpha-reductase type 2 in prostate stroma, and DHT binding to AR "
+         "in luminal epithelial cells. Activated AR recruits pioneer factors FOXA1 and "
+         "HOXB13, p300/CBP histone acetyltransferase, and the Mediator complex to "
+         "androgen response elements (AREs), driving expression of PSA (KLK3), NKX3-1, "
+         "TMPRSS2, FKBP5, and hundreds of other prostate-specific genes. In CRPC, AR "
+         "signaling persists through AR amplification, activating mutations (T878A, "
+         "L702H), splice variants (AR-V7), intratumoral steroidogenesis, and crosstalk "
+         "with PI3K/AKT, MAPK, and glucocorticoid receptor bypass pathways.",
          "signaling", ["AR", "FOXA1", "HOXB13", "NKX3-1", "KLK3"],
          "R-HSA-9009391"),
-        ("PI3K/AKT/mTOR", "Phosphoinositide 3-kinase survival pathway — PTEN loss activates this cascade",
+
+        ("PI3K/AKT/mTOR",
+         "The PI3K/AKT/mTOR pathway is the principal survival signaling cascade in "
+         "prostate cancer, activated in >40% of cases through PTEN loss (most common), "
+         "PIK3CA activating mutations, or AKT1 overexpression. Upon growth factor "
+         "receptor activation (EGFR, IGF1R, ERBB2), PI3K phosphorylates PIP2 to "
+         "generate PIP3, which recruits AKT to the plasma membrane for activation "
+         "by PDK1 (Thr308) and mTORC2 (Ser473). Activated AKT phosphorylates TSC2 "
+         "to relieve inhibition of mTORC1, driving cap-dependent translation (via S6K "
+         "and 4E-BP1), ribosome biogenesis, lipid synthesis (via SREBP), and autophagy "
+         "suppression. PTEN antagonizes this cascade by dephosphorylating PIP3. "
+         "Reciprocal cross-inhibition exists between AR and PI3K pathways: PI3K/AKT "
+         "suppresses AR transcriptional output, and vice versa. This means inhibiting "
+         "one pathway reactivates the other, necessitating dual targeting.",
          "signaling", ["PIK3CA", "AKT1", "PTEN", "MTOR", "TSC1", "TSC2"],
          "R-HSA-1257604"),
-        ("DNA Damage Response", "Homologous recombination repair and checkpoint signaling",
+
+        ("DNA Damage Response",
+         "The DNA damage response (DDR) encompasses the sensing, signaling, and repair "
+         "of DNA lesions, particularly double-strand breaks (DSBs). DSBs are detected "
+         "by the MRN complex (MRE11-RAD50-NBS1), which recruits ATM kinase. ATM "
+         "phosphorylates H2AX (gamma-H2AX), MDC1, and effector kinases CHK1/CHK2, "
+         "establishing a signaling cascade that activates cell cycle checkpoints (G1/S "
+         "via p53/p21, intra-S via CDC25A, G2/M via CDC25C). DSBs are repaired by "
+         "two main pathways: homologous recombination (HR, high-fidelity, requires "
+         "BRCA1-PALB2-BRCA2-RAD51 and a sister chromatid template) or non-homologous "
+         "end joining (NHEJ, error-prone, 53BP1-RIF1-SHIELDIN pathway). HR deficiency "
+         "(BRCA2, ATM, CDK12, PALB2 mutations) creates the therapeutic target for "
+         "PARP inhibitors through synthetic lethality.",
          "signaling", ["BRCA2", "ATM", "CDK12", "CHEK2", "RAD51", "TP53"],
          "R-HSA-73894"),
-        ("p53 Pathway", "TP53-mediated tumor suppression — apoptosis, senescence, cell cycle arrest",
+
+        ("p53 Pathway",
+         "The p53 tumor suppression pathway integrates diverse stress signals — DNA "
+         "damage, oncogene activation, hypoxia, nucleotide depletion, ribosomal "
+         "stress — into a unified transcriptional response. Under normal conditions, "
+         "MDM2 maintains p53 at low levels through ubiquitin-mediated degradation "
+         "(half-life ~20 min). Stress signals disrupt MDM2-p53 interaction via "
+         "phosphorylation (ATM/ATR on p53 Ser15, CHK2 on Ser20) and ARF binding to "
+         "MDM2. Stabilized p53 activates cell cycle arrest (p21/CDKN1A, 14-3-3-sigma), "
+         "apoptosis (BAX, PUMA/BBC3, NOXA, death receptors DR5/TRAIL-R2), senescence "
+         "(p21 sustained expression + RB engagement), DNA repair (GADD45, XPC), "
+         "and metabolic reprogramming (TIGAR, SCO2, GLS2). p53 is the most frequently "
+         "mutated gene in mCRPC (>50%), and its loss is required for neuroendocrine "
+         "transdifferentiation alongside RB1.",
          "signaling", ["TP53", "MDM2", "CDKN1A", "BAX", "BBC3"],
          "R-HSA-6806003"),
-        ("Wnt/beta-Catenin", "Canonical Wnt signaling — drives stemness and treatment resistance",
+
+        ("Wnt/beta-Catenin",
+         "Canonical Wnt signaling drives stemness, self-renewal, and treatment resistance "
+         "in prostate cancer. In the absence of Wnt ligands, cytoplasmic beta-catenin "
+         "is phosphorylated by the destruction complex (APC, Axin, GSK3-beta, CK1-alpha) "
+         "and targeted for proteasomal degradation. Wnt ligand binding to Frizzled/LRP5/6 "
+         "co-receptors recruits Dishevelled, disrupting the destruction complex and "
+         "allowing beta-catenin to accumulate and translocate to the nucleus, where it "
+         "binds TCF/LEF transcription factors to activate MYC, cyclin D1, AXIN2, and "
+         "stemness genes. APC mutations (~5% of prostate cancers), RNF43 inactivation, "
+         "and RSPO2 fusions activate Wnt signaling. Wnt also crosstalk with AR: "
+         "beta-catenin directly binds AR and enhances its transcriptional activity.",
          "signaling", ["CTNNB1", "APC", "RNF43", "RSPO2"],
          "R-HSA-195721"),
-        ("RB/E2F Cell Cycle", "Retinoblastoma-mediated cell cycle control",
+
+        ("RB/E2F Cell Cycle",
+         "The RB1/E2F pathway is the central gatekeeper of G1-to-S cell cycle transition. "
+         "Hypophosphorylated RB1 binds E2F1-3 transcription factors and recruits HDAC/SWI-SNF "
+         "chromatin remodelers to repress S-phase genes. Mitogenic signals (via cyclin D-CDK4/6) "
+         "initiate RB1 monophosphorylation, followed by cyclin E-CDK2 hyperphosphorylation, "
+         "fully inactivating RB1 and releasing E2F to drive S-phase entry. CDK4/6 inhibitors "
+         "(palbociclib, ribociclib) maintain RB1 in the hypophosphorylated state. RB1 loss "
+         "(~15-25% mCRPC) removes this checkpoint entirely, enabling constitutive E2F-driven "
+         "proliferation and, critically, enabling lineage plasticity and neuroendocrine "
+         "transdifferentiation when combined with TP53 loss.",
          "signaling", ["RB1", "CDK4", "CDK6", "CCND1", "E2F1"],
          "R-HSA-69236"),
-        ("TMPRSS2-ERG Fusion", "Oncogenic gene fusion driving ~50% of prostate cancers",
+
+        ("TMPRSS2-ERG Fusion",
+         "The TMPRSS2-ERG gene fusion is the most common structural genomic alteration in "
+         "prostate cancer, present in ~50% of cases. It results from an interstitial "
+         "deletion of ~3 Mb on chromosome 21 (or less commonly, balanced translocation) "
+         "that juxtaposes the androgen-responsive TMPRSS2 promoter to the ERG oncogene "
+         "coding sequence. This places ERG expression under androgen control, driving "
+         "constitutive ERG transcription in luminal prostate cells. The fusion typically "
+         "joins TMPRSS2 exon 1 or 2 to ERG exon 4, producing a truncated but "
+         "transcriptionally active ERG protein. ERG reprograms the AR cistrome, activates "
+         "invasion programs (MMP3/9, PLAU), suppresses differentiation (NKX3-1), and "
+         "blocks SPOP-mediated protein degradation. TMPRSS2-ERG is an early event but "
+         "insufficient alone for malignancy — requires cooperating lesions (PTEN loss, "
+         "PI3K activation).",
          "signaling", ["TMPRSS2", "ERG", "ETV1", "ETV4"],
          ""),
-        ("Glycolysis", "Glucose catabolism — Warburg effect in cancer cells",
+
+        ("Glycolysis",
+         "Glycolysis converts glucose to pyruvate through 10 enzymatic steps, generating "
+         "2 ATP and 2 NADH per glucose molecule. In cancer cells, glycolysis is "
+         "constitutively upregulated even in the presence of oxygen (aerobic glycolysis "
+         "or Warburg effect), driven by HIF-1alpha, MYC, and PI3K/AKT signaling that "
+         "upregulate glucose transporters (GLUT1/GLUT3), hexokinase 2 (HK2, first "
+         "committed step), phosphofructokinase (PFK, rate-limiting), and pyruvate kinase "
+         "M2 (PKM2, cancer-specific splice variant). PKM2 exists as a less-active dimer "
+         "in cancer, diverting glycolytic intermediates into biosynthetic pathways "
+         "(pentose phosphate pathway for nucleotides, serine biosynthesis for one-carbon "
+         "metabolism). Lactate dehydrogenase A (LDHA) converts pyruvate to lactate, "
+         "which is exported by MCT4, acidifying the TME and suppressing anti-tumor immunity.",
          "metabolic", ["HK2", "PKM", "LDHA", "PFKL"],
          "R-HSA-70171"),
-        ("TCA Cycle", "Tricarboxylic acid cycle — central metabolic hub",
+
+        ("TCA Cycle",
+         "The tricarboxylic acid (TCA/Krebs) cycle operates in the mitochondrial matrix, "
+         "oxidizing acetyl-CoA from glycolysis, fatty acid beta-oxidation, and amino acid "
+         "catabolism to generate NADH, FADH2, and GTP. Normal prostate epithelium has a "
+         "uniquely truncated TCA cycle: high zinc accumulation (~10-fold above other "
+         "tissues) inhibits aconitase (ACO2), blocking citrate oxidation and enabling "
+         "citrate secretion into seminal fluid. Prostate cancer restores TCA function "
+         "by downregulating zinc transporters (SLC39A1/ZIP1), reactivating aconitase, "
+         "and enabling complete citrate oxidation for energy production — representing "
+         "a metabolic transformation from citrate-producing to citrate-oxidizing phenotype. "
+         "IDH1/2 mutations (rare in prostate) produce the oncometabolite 2-hydroxyglutarate "
+         "that inhibits alpha-ketoglutarate-dependent dioxygenases (TET2, KDM, PHDs).",
          "metabolic", ["CS", "IDH1", "IDH2", "SDHA", "FH"],
          "R-HSA-71403"),
-        ("Oxidative Phosphorylation", "Mitochondrial electron transport chain and ATP synthesis",
+
+        ("Oxidative Phosphorylation",
+         "Oxidative phosphorylation (OXPHOS) in the inner mitochondrial membrane couples "
+         "electron transport (Complexes I-IV) to proton gradient-driven ATP synthesis "
+         "(Complex V/ATP synthase), producing ~30-32 ATP per glucose. Complex I (NADH "
+         "dehydrogenase, 45 subunits) and Complex II (succinate dehydrogenase) feed "
+         "electrons to ubiquinone, Complex III (cytochrome bc1) transfers to cytochrome c, "
+         "and Complex IV (cytochrome c oxidase) reduces O2 to H2O. While cancer was "
+         "historically thought to be glycolysis-dependent, metastatic prostate cancer "
+         "relies heavily on OXPHOS and lipid oxidation. Circulating tumor cells show "
+         "elevated OXPHOS gene expression, and AR signaling promotes mitochondrial "
+         "biogenesis through PGC-1alpha activation. Electron leakage from Complexes I "
+         "and III generates superoxide (O2-), contributing to ROS signaling and DNA damage.",
          "metabolic", ["MT-ND1", "MT-CO1", "MT-ATP6", "NDUFS1"],
          "R-HSA-163200"),
-        ("PD-1/PD-L1 Immune Checkpoint", "Programmed death signaling — suppresses anti-tumor immunity",
+
+        ("PD-1/PD-L1 Immune Checkpoint",
+         "The PD-1/PD-L1 axis is a critical immune checkpoint that normally prevents "
+         "autoimmunity but is co-opted by tumors to evade immune destruction. PD-1 "
+         "(PDCD1) on activated T cells engages PD-L1 (CD274) on tumor cells, recruiting "
+         "SHP-2 phosphatase to the TCR signaling complex, dephosphorylating ZAP70 and "
+         "CD3-zeta, and attenuating T cell proliferation, cytokine production, and "
+         "cytotoxicity. PD-L1 is upregulated on tumor cells by IFN-gamma (adaptive "
+         "immune resistance), oncogenic signaling (PTEN loss, MYC amplification), and "
+         "hypoxia (HIF-1alpha). PD-L2 (PDCD1LG2) is a second PD-1 ligand expressed "
+         "mainly on dendritic cells. Prostate cancer is generally considered an "
+         "immunologically cold tumor with low PD-L1 expression (~5-20%), limiting "
+         "checkpoint inhibitor efficacy. Exceptions: MSI-H/dMMR tumors (~3%), TMB-high "
+         "tumors, CDK12-loss tumors (neoantigen-rich), and tumors following PARP "
+         "inhibitor treatment (which increases PD-L1 via cGAS-STING pathway activation).",
          "signaling", ["PDCD1", "CD274", "PDCD1LG2"],
          "R-HSA-389948"),
-        ("Epigenetic Regulation", "Histone modification and chromatin remodeling in prostate cancer",
+
+        ("Epigenetic Regulation",
+         "Epigenetic mechanisms — DNA methylation, histone modification, chromatin "
+         "remodeling, and non-coding RNA — control gene expression without altering DNA "
+         "sequence and are profoundly dysregulated in prostate cancer. EZH2 (H3K27me3 "
+         "writer, PRC2 catalytic subunit) is overexpressed in mCRPC and silences tumor "
+         "suppressors (DAB2IP, CDH1). KMT2D (H3K4me1 writer, enhancer activator) is "
+         "mutated in ~8%, collapsing AR-dependent enhancers. CHD1 (ATP-dependent chromatin "
+         "remodeler, reads H3K4me2/3) is deleted in ~6%, impairing transcriptional "
+         "elongation and HR repair. BRD4 (BET protein, reads H3K27ac at super-enhancers) "
+         "drives MYC transcription and is stabilized by SPOP mutations. DNA methylation "
+         "at CpG islands silences GSTP1 (~90% of prostate cancers, used as biomarker), "
+         "APC, RASSF1A, and RARbeta2. Therapeutic targets: EZH2 inhibitors (tazemetostat), "
+         "BET inhibitors (JQ1, birabresib), DNMT inhibitors (decitabine), and HDAC "
+         "inhibitors (vorinostat, panobinostat).",
          "regulatory", ["EZH2", "KMT2D", "CHD1", "KDM5A", "BRD4"],
          ""),
     ]
@@ -1104,18 +1251,147 @@ def _seed_pathways(loader: EntityLoader) -> int:
 
 def _seed_metabolites(loader: EntityLoader) -> int:
     metabolites = [
-        ("Glucose", "Primary energy source for cellular metabolism", "C6H12O6", 180.16, "CHEBI:17234"),
-        ("Oxygen", "Terminal electron acceptor in oxidative phosphorylation", "O2", 32.0, "CHEBI:15379"),
-        ("ATP", "Universal energy currency of the cell", "C10H16N5O13P3", 507.18, "CHEBI:15422"),
-        ("Lactate", "End product of anaerobic glycolysis (Warburg effect marker)", "C3H6O3", 90.08, "CHEBI:24996"),
-        ("Pyruvate", "Central metabolite linking glycolysis to TCA cycle", "C3H4O3", 88.06, "CHEBI:15361"),
-        ("Citrate", "TCA cycle intermediate; elevated in prostate secretions", "C6H8O7", 192.12, "CHEBI:16947"),
-        ("Testosterone", "Primary androgen; substrate for 5-alpha reductase", "C19H28O2", 288.42, "CHEBI:17347"),
-        ("DHT", "Dihydrotestosterone — most potent androgen; binds AR", "C19H30O2", 290.44, "CHEBI:16330"),
-        ("PSA", "Prostate-specific antigen (KLK3 product) — serum biomarker", "", 0.0, ""),
-        ("NADH", "Electron carrier from TCA cycle to ETC", "C21H29N7O14P2", 663.43, "CHEBI:16908"),
-        ("Glutamine", "Major anaplerotic fuel for cancer cells", "C5H10N2O3", 146.14, "CHEBI:28300"),
-        ("Acetyl-CoA", "Central metabolic intermediate connecting multiple pathways", "C23H38N7O17P3S", 809.57, "CHEBI:15351"),
+        ("Glucose",
+         "D-glucose (dextrose) is the primary carbon and energy source for mammalian cells, "
+         "entering via GLUT1-4 transporters and phosphorylated by hexokinase to glucose-6-phosphate "
+         "(G6P), committing it to glycolysis. Normal prostate tissue consumes relatively little "
+         "glucose due to truncated TCA cycle. Cancer cells dramatically upregulate glucose uptake "
+         "(GLUT1 overexpression driven by HIF-1alpha and MYC) for aerobic glycolysis (Warburg "
+         "effect) and biosynthetic pathways (PPP for NADPH and ribose-5-phosphate). Plasma "
+         "glucose: ~5 mM; tumor interstitial glucose: ~0.5-2 mM (depleted). FDG-PET exploits "
+         "this differential uptake for tumor imaging.",
+         "C6H12O6", 180.16, "CHEBI:17234"),
+
+        ("Oxygen",
+         "Molecular oxygen serves as the terminal electron acceptor in mitochondrial Complex IV "
+         "(cytochrome c oxidase), essential for oxidative phosphorylation. Tissue oxygenation "
+         "in normal prostate: ~40-60 mmHg (pO2). Tumor hypoxia (<10 mmHg) is common due to "
+         "chaotic vasculature and high consumption. Hypoxia stabilizes HIF-1alpha, driving "
+         "VEGF (angiogenesis), GLUT1/LDHA (glycolytic switch), BNIP3/BNIP3L (autophagy), "
+         "and LOX (collagen crosslinking, premetastatic niche). Oxygen diffusion limit from "
+         "capillary: ~100-200 um. Diffusion coefficient in tissue: ~2x10^-5 cm^2/s.",
+         "O2", 32.0, "CHEBI:15379"),
+
+        ("ATP",
+         "Adenosine 5'-triphosphate is the universal energy currency, coupling exergonic "
+         "reactions (hydrolysis: DeltaG = -30.5 kJ/mol under standard conditions, ~-54 kJ/mol "
+         "in vivo) to endergonic cellular processes including motor proteins, ion pumps, "
+         "biosynthesis, and signaling. Intracellular ATP: ~1-10 mM; cytoplasmic concentration "
+         "maintained by glycolysis (~2 ATP/glucose), OXPHOS (~30 ATP/glucose), and creatine "
+         "kinase shuttle. ATP/ADP ratio is a key metabolic sensor: AMPK activates when ratio "
+         "drops, inhibiting mTOR and activating catabolic pathways. Cancer cells maintain "
+         "ATP through a combination of glycolysis, glutaminolysis, and fatty acid oxidation.",
+         "C10H16N5O13P3", 507.18, "CHEBI:15422"),
+
+        ("Lactate",
+         "L-lactate is the end product of anaerobic glycolysis, produced from pyruvate by "
+         "lactate dehydrogenase A (LDHA). In the Warburg effect, cancer cells convert >80% "
+         "of glucose to lactate even in the presence of oxygen, exporting it via MCT4 "
+         "monocarboxylate transporter. Extracellular lactate (tumor TME: ~10-40 mM vs "
+         "normal ~1.5 mM) acidifies the microenvironment (pH 6.5-6.9), suppressing T cell "
+         "and NK cell cytotoxicity, promoting M2 macrophage polarization, inhibiting dendritic "
+         "cell antigen presentation, and stabilizing HIF-1alpha. Lactate also serves as a fuel "
+         "for oxidative cancer cells (reverse Warburg/metabolic symbiosis) and promotes "
+         "angiogenesis through VEGF upregulation.",
+         "C3H6O3", 90.08, "CHEBI:24996"),
+
+        ("Pyruvate",
+         "Pyruvate sits at the metabolic crossroads between glycolysis, TCA cycle, "
+         "gluconeogenesis, and amino acid metabolism. In the cytoplasm, pyruvate kinase "
+         "(PKM2 in cancer) converts phosphoenolpyruvate to pyruvate. Pyruvate fate: "
+         "(1) mitochondrial import via MPC1/2 transporter and oxidative decarboxylation "
+         "by pyruvate dehydrogenase (PDH) to acetyl-CoA for TCA cycle; (2) reduction to "
+         "lactate by LDHA (regenerating NAD+ for glycolysis); (3) carboxylation to "
+         "oxaloacetate by pyruvate carboxylase (anaplerosis). Cancer cells shunt pyruvate "
+         "toward lactate via LDHA upregulation and PDK1/3-mediated PDH inhibition.",
+         "C3H4O3", 88.06, "CHEBI:15361"),
+
+        ("Citrate",
+         "Citrate has a unique role in prostate biology. Normal prostate epithelial cells "
+         "accumulate extraordinarily high zinc levels (~10x other soft tissues), which "
+         "inhibits mitochondrial aconitase (m-aconitase/ACO2), blocking citrate oxidation "
+         "in the TCA cycle. This causes citrate to accumulate (intracellular: ~10 mM) and "
+         "be secreted into seminal fluid (concentration: ~100-200 mM). Prostate cancer cells "
+         "downregulate zinc transporters (ZIP1/SLC39A1), restoring aconitase activity and "
+         "enabling full TCA cycle flux — a metabolic transformation from 'citrate factory' "
+         "to 'citrate consumer.' This metabolic switch is so fundamental that some consider "
+         "it the earliest biochemical change in prostate carcinogenesis.",
+         "C6H8O7", 192.12, "CHEBI:16947"),
+
+        ("Testosterone",
+         "Testosterone (T) is the primary circulating androgen (normal male serum: ~10-35 nM), "
+         "produced by Leydig cells in the testes under LH stimulation. In prostate tissue, "
+         "T is converted to the more potent dihydrotestosterone (DHT) by 5-alpha-reductase "
+         "type 2 (SRD5A2). T itself binds AR with Kd ~0.4 nM (weaker than DHT at ~0.1 nM). "
+         "Androgen deprivation therapy (surgical or chemical castration) reduces serum T from "
+         "~15 nM to <1 nM, but intratumoral T levels remain detectable (~1-5 nM in CRPC) due "
+         "to adrenal androgens (DHEA, androstenedione) and de novo steroidogenesis within "
+         "tumor cells. Testosterone is also converted to estradiol by aromatase (CYP19A1), "
+         "which has both proliferative (ERalpha) and anti-proliferative (ERbeta) effects.",
+         "C19H28O2", 288.42, "CHEBI:17347"),
+
+        ("DHT",
+         "5-alpha-Dihydrotestosterone is the most potent natural androgen, formed from "
+         "testosterone by 5-alpha-reductase type 2 (SRD5A2) in prostate stroma and "
+         "converted back to less active metabolites by 3-alpha-HSD. DHT binds AR with "
+         "~3-fold higher affinity than testosterone (Kd ~0.1 nM) and ~5-fold slower "
+         "dissociation rate, making it the primary AR agonist in prostate tissue. "
+         "Intraprostatic DHT: ~5-10 nM in normal prostate, reduced to ~0.5-2 nM during "
+         "ADT but sufficient to activate amplified/mutant AR in CRPC. 5-alpha-reductase "
+         "inhibitors (finasteride, dutasteride) block DHT synthesis and reduce prostate "
+         "cancer risk by ~25% (PCPT trial). In CRPC, alternative DHT synthesis via AKR1C3 "
+         "(bypassing T) from adrenal precursors contributes to treatment resistance.",
+         "C19H30O2", 290.44, "CHEBI:16330"),
+
+        ("PSA",
+         "Prostate-specific antigen (PSA, also KLK3) is a 237-amino acid kallikrein-family "
+         "serine protease secreted by prostate luminal epithelial cells under AR transcriptional "
+         "control. PSA's normal function is to cleave semenogelin I/II in seminal fluid, "
+         "liquefying the seminal coagulum. Serum PSA (normal: <4 ng/mL) leaks from prostate "
+         "into blood due to disrupted glandular architecture. PSA exists as free PSA (~10-30%) "
+         "and complexed PSA (bound to alpha-1-antichymotrypsin and alpha-2-macroglobulin). "
+         "%free PSA <10% raises cancer suspicion; >25% suggests BPH. PSA velocity >0.75 "
+         "ng/mL/year and PSA density >0.15 ng/mL/cc are additional diagnostic criteria. "
+         "PSA is the most widely used cancer biomarker but lacks specificity: elevated by "
+         "BPH, prostatitis, ejaculation, and digital rectal examination.",
+         "", 0.0, ""),
+
+        ("NADH",
+         "Nicotinamide adenine dinucleotide (reduced form) is the principal electron carrier "
+         "from catabolic pathways (glycolysis: 2 NADH, pyruvate dehydrogenase: 2 NADH, TCA "
+         "cycle: 6 NADH per glucose) to Complex I of the mitochondrial electron transport "
+         "chain. Each NADH donates 2 electrons, driving proton pumping and generating ~2.5 ATP "
+         "per NADH. Cytoplasmic NADH cannot cross the inner mitochondrial membrane and is "
+         "shuttled via malate-aspartate shuttle (yields NADH in matrix) or glycerol-3-phosphate "
+         "shuttle (yields FADH2, less efficient). NAD+/NADH ratio (~700:1 in cytoplasm) is a "
+         "key metabolic regulator: sirtuins (SIRT1-7) require NAD+ for histone deacetylation, "
+         "linking metabolism to epigenetics. Cancer cells increase NAD+ salvage via NAMPT.",
+         "C21H29N7O14P2", 663.43, "CHEBI:16908"),
+
+        ("Glutamine",
+         "L-glutamine is the most abundant amino acid in plasma (~0.5-0.8 mM) and a critical "
+         "fuel for rapidly proliferating cells. Glutaminase (GLS1, upregulated by MYC) converts "
+         "glutamine to glutamate in mitochondria, which is then converted to alpha-ketoglutarate "
+         "by glutamate dehydrogenase (GLUD1) or transaminases, feeding the TCA cycle "
+         "(anaplerosis). Glutamine also provides nitrogen for purine and pyrimidine biosynthesis "
+         "(via CAD and PPAT), hexosamine pathway (UDP-GlcNAc for O-GlcNAcylation), and "
+         "glutathione synthesis (antioxidant defense). MYC-driven cancers are 'glutamine-addicted' "
+         "and sensitive to GLS inhibitors (CB-839/telaglenastat). AR signaling also upregulates "
+         "glutamine uptake in prostate cancer via SLC1A5/ASCT2 transporter.",
+         "C5H10N2O3", 146.14, "CHEBI:28300"),
+
+        ("Acetyl-CoA",
+         "Acetyl-coenzyme A is the central metabolic intermediate linking carbohydrate, fatty "
+         "acid, and amino acid metabolism. Generated in mitochondria by pyruvate dehydrogenase "
+         "(from glycolysis), fatty acid beta-oxidation, and amino acid catabolism. Mitochondrial "
+         "acetyl-CoA enters TCA cycle via citrate synthase. Cytoplasmic acetyl-CoA (generated "
+         "by ATP-citrate lyase/ACLY from exported citrate or by ACSS2 from acetate) is the "
+         "substrate for de novo lipogenesis (FASN, ACC) and histone acetylation (p300/CBP, "
+         "GCN5, PCAF). Cancer cells upregulate cytoplasmic acetyl-CoA production to fuel "
+         "membrane lipid synthesis for rapid proliferation and to maintain the acetylation "
+         "landscape. ACLY inhibitors (bempedoic acid) and FASN inhibitors (TVB-2640) are "
+         "under investigation in cancer.",
+         "C23H38N7O17P3S", 809.57, "CHEBI:15351"),
     ]
     count = 0
     for name, desc, formula, mw, chebi in metabolites:
