@@ -254,232 +254,324 @@ def _render_drug_molecule(entity, props: dict, height: int) -> bool:
 
 
 def _render_cell_3d(entity, height: int) -> bool:
-    """Render morphology-specific 3D cell using Plotly.
+    """Render anatomically accurate 3D cell with internal structures.
 
-    Each cell type gets a distinct shape based on real morphology:
-    - T/B cells: smooth small spheres with large nucleus
-    - Macrophage M1: ruffled surface with pseudopods
-    - Macrophage M2: elongated spindle shape
-    - Dendritic cell: stellate with dendrite extensions
-    - Neutrophil: multilobed nucleus
-    - NK cell: slightly irregular with granules
-    - Mast cell: round packed with granules
-    - Eosinophil: bilobed nucleus, granular
-    - Plasma cell: eccentric nucleus, expanded ER
+    Each cell type is a composite scene with:
+    - Cell membrane (semi-transparent surface with type-specific shape)
+    - Nucleus (correct shape: round, kidney, multilobed, eccentric)
+    - Organelles (mitochondria, ER, Golgi, granules as appropriate)
+    - Surface receptors (type-specific markers as small dots on membrane)
     """
-    import plotly.graph_objects as go
-    import numpy as np
-
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.8, 0.3, 0.3]
     r, g, b = [int(c * 255) for c in color[:3]]
-    cell_color = f"rgb({r},{g},{b})"
-    light_color = f"rgb({min(255,r+50)},{min(255,g+50)},{min(255,b+50)})"
-    dark_color = f"rgb({max(0,r-80)},{max(0,g-80)},{max(0,b-80)})"
-    nuc_color = f"rgb({max(0,r-60)},{max(0,g-60)},{min(255,b+40)})"
-
     rng = np.random.RandomState(hash(entity.name) % 2**31)
     name_lower = entity.name.lower()
-    fig = go.Figure()
-
-    # Determine morphology from name
     morphology = _classify_cell_morphology(name_lower)
 
-    u = np.linspace(0, 2 * np.pi, 50)
-    v = np.linspace(0, np.pi, 25)
-    cos_u, sin_u = np.cos(u), np.sin(u)
-    cos_v, sin_v = np.cos(v), np.sin(v)
+    fig = go.Figure()
 
+    # Base sphere parameters
+    u = np.linspace(0, 2 * np.pi, 40)
+    v = np.linspace(0, np.pi, 20)
+
+    def sphere(radius=1.0, cx=0, cy=0, cz=0, stretch_z=1.0, noise_level=0.0):
+        x = np.outer(np.cos(u), np.sin(v)) * radius + cx
+        y = np.outer(np.sin(u), np.sin(v)) * radius + cy
+        z = np.outer(np.ones_like(u), np.cos(v)) * radius * stretch_z + cz
+        if noise_level > 0:
+            x += rng.normal(0, noise_level, x.shape)
+            y += rng.normal(0, noise_level, y.shape)
+            z += rng.normal(0, noise_level, z.shape)
+        return x, y, z
+
+    def add_surface(x, y, z, col, opacity=0.8, lighting=None):
+        if isinstance(col, str):
+            c1, c2 = col, col
+        else:
+            c1, c2 = col
+        fig.add_trace(go.Surface(
+            x=x, y=y, z=z,
+            colorscale=[[0, c1], [1, c2]],
+            showscale=False, opacity=opacity,
+            lighting=lighting or dict(ambient=0.35, diffuse=0.65, specular=0.3, roughness=0.5),
+        ))
+
+    def add_dots(positions, color, size=3, opacity=0.8):
+        if positions:
+            px, py, pz = zip(*positions)
+            fig.add_trace(go.Scatter3d(
+                x=list(px), y=list(py), z=list(pz), mode="markers",
+                marker=dict(size=size, color=color, opacity=opacity),
+                showlegend=False))
+
+    def add_line(points, color, width=4):
+        px, py, pz = zip(*points)
+        fig.add_trace(go.Scatter3d(
+            x=list(px), y=list(py), z=list(pz), mode="lines",
+            line=dict(color=color, width=width), showlegend=False))
+
+    def random_surface_points(n, radius, min_r=0.0):
+        """Generate random points on/inside a sphere."""
+        pts = []
+        for _ in range(n * 3):
+            p = rng.normal(0, radius * 0.6, 3)
+            dist = np.sqrt(sum(p**2))
+            if min_r * radius < dist < radius * 0.95:
+                pts.append(tuple(p))
+                if len(pts) >= n:
+                    break
+        return pts
+
+    def surface_receptors(n, radius, color, size=2):
+        """Place receptor dots on the cell surface."""
+        pts = []
+        for _ in range(n):
+            th = rng.uniform(0, 2*np.pi)
+            ph = rng.uniform(0, np.pi)
+            pts.append((
+                radius * np.sin(ph) * np.cos(th),
+                radius * np.sin(ph) * np.sin(th),
+                radius * np.cos(ph),
+            ))
+        add_dots(pts, color, size=size, opacity=0.9)
+
+    # Colors
+    membrane_col = f"rgb({r},{g},{b})"
+    membrane_light = f"rgb({min(255,r+40)},{min(255,g+40)},{min(255,b+40)})"
+    nuc_dark = f"rgb({max(0,r//3)},{max(0,g//3)},{min(255,b//2+80)})"
+    nuc_light = f"rgb({max(0,r//3+30)},{max(0,g//3+30)},{min(255,b//2+100)})"
+    mito_col = "rgb(200,80,80)"
+    er_col = "rgb(80,130,200)"
+    golgi_col = "rgb(220,180,60)"
+
+    # ══════════════════════════════════════════════════════════════
     if morphology == "t_cell":
-        # Small smooth sphere (7-8 um), large nucleus ratio
-        x = np.outer(cos_u, sin_v) * 0.7
-        y = np.outer(sin_u, sin_v) * 0.7
-        z = np.outer(np.ones_like(u), cos_v) * 0.7
-        noise = rng.normal(0, 0.01, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
-        _add_nucleus(fig, x * 0.55, y * 0.55, z * 0.55, nuc_color, 0.7)
+        # CD8/CD4 T cell: small, smooth, very large nucleus, thin cytoplasm
+        # ~30,000 TCR/CD3 complexes on surface, CD8 or CD4 co-receptors
+        R = 0.7  # cell radius
+        x, y, z = sphere(R, noise_level=0.008)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Large round nucleus (N:C ratio ~0.85)
+        nx, ny, nz = sphere(R * 0.6, noise_level=0.005)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.75)
+        # Chromatin texture inside nucleus
+        add_dots(random_surface_points(8, R * 0.4), "rgb(40,40,120)", size=2, opacity=0.5)
+        # TCR/CD3 on surface (green dots)
+        surface_receptors(40, R * 1.02, "rgb(50,220,50)", size=2)
+        # A few mitochondria
+        add_dots(random_surface_points(5, R * 0.55, min_r=0.6), mito_col, size=3, opacity=0.6)
 
     elif morphology == "macrophage_m1":
-        # Large ruffled cell with pseudopods extending outward
-        x = np.outer(cos_u, sin_v)
-        y = np.outer(sin_u, sin_v)
-        z = np.outer(np.ones_like(u), cos_v)
-        # Heavy surface ruffling
-        ruffle = rng.normal(0, 0.08, x.shape)
-        x += ruffle; y += ruffle; z += ruffle
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
-        _add_nucleus(fig, x * 0.35, y * 0.35, z * 0.35, nuc_color, 0.6)
-        # Pseudopods (extending protrusions)
-        for _ in range(5):
-            theta, phi = rng.uniform(0, 2*np.pi), rng.uniform(0.3, 2.8)
-            dx, dy, dz = np.sin(phi)*np.cos(theta), np.sin(phi)*np.sin(theta), np.cos(phi)
-            length = rng.uniform(0.3, 0.6)
-            t = np.linspace(0, 1, 8)
-            px = dx * (1 + t * length) + rng.normal(0, 0.05, 8)
-            py = dy * (1 + t * length) + rng.normal(0, 0.05, 8)
-            pz = dz * (1 + t * length) + rng.normal(0, 0.05, 8)
-            fig.add_trace(go.Scatter3d(
-                x=px, y=py, z=pz, mode="lines",
-                line=dict(color=cell_color, width=6), showlegend=False))
+        # Large, irregular, ruffled membrane, pseudopods, kidney-shaped nucleus
+        # FcgammaR, TLR4, CD14, MHC-II, CD80/86 on surface
+        # Phagocytic vacuoles and phagolysosomes inside
+        R = 1.0
+        x, y, z = sphere(R, noise_level=0.06)  # Heavy ruffling
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.45)
+        # Kidney-shaped nucleus (squashed and indented)
+        nx, ny, nz = sphere(0.35, cx=0.1, noise_level=0.02, stretch_z=0.6)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.7)
+        # Pseudopods (5-7 extending lamellipodia)
+        for _ in range(6):
+            th, ph = rng.uniform(0, 2*np.pi), rng.uniform(0.3, 2.8)
+            dx = np.sin(ph) * np.cos(th)
+            dy = np.sin(ph) * np.sin(th)
+            dz = np.cos(ph)
+            length = rng.uniform(0.4, 0.8)
+            pts = [(dx*(R + t*length) + rng.normal(0, 0.04),
+                    dy*(R + t*length) + rng.normal(0, 0.04),
+                    dz*(R + t*length) + rng.normal(0, 0.04))
+                   for t in np.linspace(0, 1, 8)]
+            add_line(pts, membrane_light, width=5)
+        # Phagocytic vacuoles (larger spheres inside)
+        for _ in range(3):
+            vx, vy, vz = rng.normal(0, 0.3, 3)
+            if vx**2 + vy**2 + vz**2 < 0.6:
+                vsx, vsy, vsz = sphere(0.12, cx=vx, cy=vy, cz=vz)
+                add_surface(vsx, vsy, vsz, "rgb(180,200,180)", opacity=0.4)
+        # Surface receptors: TLR4 (yellow), MHC-II (green), FcgammaR (blue)
+        surface_receptors(20, R * 1.03, "rgb(230,200,50)", size=2)  # TLR4
+        surface_receptors(15, R * 1.04, "rgb(50,200,50)", size=2)    # MHC-II
+        surface_receptors(10, R * 1.05, "rgb(80,80,230)", size=2)    # FcgammaR
+        # Mitochondria scattered
+        add_dots(random_surface_points(8, R * 0.7, min_r=0.3), mito_col, size=3, opacity=0.5)
 
     elif morphology == "macrophage_m2":
-        # Elongated spindle shape
-        x = np.outer(cos_u, sin_v) * 0.6
-        y = np.outer(sin_u, sin_v) * 0.6
-        z = np.outer(np.ones_like(u), cos_v) * 1.4  # stretched along z
-        noise = rng.normal(0, 0.02, x.shape)
-        x += noise; y += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
-        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.3, nuc_color, 0.6)
+        # Elongated spindle, smoother, fewer pseudopods
+        R = 0.9
+        x, y, z = sphere(0.5, stretch_z=1.8, noise_level=0.02)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Elongated nucleus
+        nx, ny, nz = sphere(0.2, stretch_z=1.2, noise_level=0.01)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.7)
+        # CD163 (scavenger receptor, pink), CD206 (mannose receptor, green)
+        surface_receptors(15, 0.52, "rgb(220,120,150)", size=2)  # CD163
+        surface_receptors(12, 0.53, "rgb(100,200,100)", size=2)  # CD206
 
     elif morphology == "dendritic":
-        # Stellate shape with long dendrite extensions
-        x = np.outer(cos_u, sin_v) * 0.6
-        y = np.outer(sin_u, sin_v) * 0.6
-        z = np.outer(np.ones_like(u), cos_v) * 0.6
-        noise = rng.normal(0, 0.04, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.75)
-        _add_nucleus(fig, x * 0.45, y * 0.45, z * 0.45, nuc_color, 0.6)
-        # Long thin dendrites (8-12 extending branches)
-        for _ in range(10):
-            theta = rng.uniform(0, 2*np.pi)
-            phi = rng.uniform(0.2, 2.9)
-            dx, dy, dz = np.sin(phi)*np.cos(theta), np.sin(phi)*np.sin(theta), np.cos(phi)
-            length = rng.uniform(0.6, 1.2)
-            n_pts = 12
-            t = np.linspace(0, 1, n_pts)
-            # Branching wiggle
-            px = dx * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
-            py = dy * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
-            pz = dz * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
-            fig.add_trace(go.Scatter3d(
-                x=px, y=py, z=pz, mode="lines",
-                line=dict(color=light_color, width=3), showlegend=False))
-            # Tip bulge
-            fig.add_trace(go.Scatter3d(
-                x=[px[-1]], y=[py[-1]], z=[pz[-1]], mode="markers",
-                marker=dict(size=3, color=light_color), showlegend=False))
+        # Stellate with 8-12 long thin dendrite projections
+        # Large MIIC compartments (MHC-II loading vesicles)
+        R = 0.5
+        x, y, z = sphere(R, noise_level=0.03)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.45)
+        # Round nucleus
+        nx, ny, nz = sphere(R * 0.5, noise_level=0.01)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.7)
+        # Long dendrite projections (10-12 branching arms)
+        for _ in range(11):
+            th = rng.uniform(0, 2*np.pi)
+            ph = rng.uniform(0.2, 2.9)
+            dx = np.sin(ph) * np.cos(th)
+            dy = np.sin(ph) * np.sin(th)
+            dz = np.cos(ph)
+            length = rng.uniform(0.8, 1.4)
+            n_pts = 15
+            pts = []
+            for t in np.linspace(0, 1, n_pts):
+                pts.append((
+                    dx * (R + t * length) + rng.normal(0, 0.06),
+                    dy * (R + t * length) + rng.normal(0, 0.06),
+                    dz * (R + t * length) + rng.normal(0, 0.06),
+                ))
+            add_line(pts, membrane_light, width=3)
+            # Veil-like flattening at tips
+            add_dots([pts[-1]], membrane_light, size=4, opacity=0.7)
+            # Branch point
+            if length > 1.0:
+                bp = pts[n_pts // 2]
+                branch_dir = (rng.normal(0, 0.3), rng.normal(0, 0.3), rng.normal(0, 0.3))
+                branch_pts = [(bp[0] + branch_dir[0]*t, bp[1] + branch_dir[1]*t,
+                               bp[2] + branch_dir[2]*t) for t in np.linspace(0, 0.4, 5)]
+                add_line(branch_pts, membrane_light, width=2)
+        # MIIC vesicles (MHC-II loading compartments)
+        add_dots(random_surface_points(6, R * 0.4, min_r=0.1), "rgb(50,180,50)", size=4, opacity=0.6)
+        # MHC-II on surface
+        surface_receptors(25, R * 1.03, "rgb(50,220,50)", size=2)
 
     elif morphology == "neutrophil":
-        # Medium cell with multilobed nucleus (3-5 lobes)
-        x = np.outer(cos_u, sin_v) * 0.85
-        y = np.outer(sin_u, sin_v) * 0.85
-        z = np.outer(np.ones_like(u), cos_v) * 0.85
-        noise = rng.normal(0, 0.02, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
-        # Multilobed nucleus — 4 connected small spheres
-        nuc_scale = 0.2
-        offsets = [(-0.15, 0, 0.1), (0.05, 0.1, 0), (0.15, -0.05, -0.1), (-0.05, -0.1, 0.05)]
-        for ox, oy, oz in offsets:
-            nx = x * nuc_scale + ox
-            ny = y * nuc_scale + oy
-            nz = z * nuc_scale + oz
-            fig.add_trace(go.Surface(
-                x=nx, y=ny, z=nz,
-                colorscale=[[0, nuc_color], [1, dark_color]],
-                showscale=False, opacity=0.7))
-        # Granules (small dots in cytoplasm)
-        for _ in range(20):
-            gx, gy, gz = rng.normal(0, 0.3, 3)
-            if gx**2 + gy**2 + gz**2 < 0.5:
-                fig.add_trace(go.Scatter3d(
-                    x=[gx], y=[gy], z=[gz], mode="markers",
-                    marker=dict(size=2, color="rgb(200,180,220)", opacity=0.6),
-                    showlegend=False))
+        # Round cell, MULTILOBED NUCLEUS (3-5 connected lobes, THE defining feature)
+        # Three granule types visible
+        R = 0.85
+        x, y, z = sphere(R, noise_level=0.015)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Multilobed nucleus — 4 lobes connected by thin chromatin bridges
+        lobe_positions = [(-0.2, 0.15, 0.1), (0.05, 0.15, -0.05),
+                          (0.2, -0.1, 0.1), (-0.05, -0.15, -0.1)]
+        for lx, ly, lz in lobe_positions:
+            lsx, lsy, lsz = sphere(0.17, cx=lx, cy=ly, cz=lz, noise_level=0.01)
+            add_surface(lsx, lsy, lsz, (nuc_dark, nuc_light), opacity=0.75)
+        # Chromatin bridges between lobes
+        for i in range(len(lobe_positions) - 1):
+            add_line([lobe_positions[i], lobe_positions[i+1]], nuc_dark, width=3)
+        # Primary (azurophilic) granules — large, dark purple
+        add_dots(random_surface_points(12, R * 0.65, min_r=0.25),
+                 "rgb(120,60,140)", size=4, opacity=0.7)
+        # Secondary (specific) granules — smaller, lighter
+        add_dots(random_surface_points(20, R * 0.7, min_r=0.2),
+                 "rgb(180,160,200)", size=2, opacity=0.5)
+        # Tertiary (gelatinase) granules — smallest
+        add_dots(random_surface_points(15, R * 0.7, min_r=0.2),
+                 "rgb(200,190,210)", size=1.5, opacity=0.4)
+        # Surface: PSGL-1, LFA-1, Mac-1
+        surface_receptors(20, R * 1.02, "rgb(200,200,50)", size=1.5)
 
     elif morphology == "nk_cell":
-        # Medium, slightly irregular with visible granules
-        x = np.outer(cos_u, sin_v) * 0.8
-        y = np.outer(sin_u, sin_v) * 0.8
-        z = np.outer(np.ones_like(u), cos_v) * 0.8
-        noise = rng.normal(0, 0.03, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
-        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.4, nuc_color, 0.65)
-        # Azurophilic granules
-        for _ in range(15):
-            gx, gy, gz = rng.normal(0, 0.35, 3)
-            if 0.1 < gx**2 + gy**2 + gz**2 < 0.5:
-                fig.add_trace(go.Scatter3d(
-                    x=[gx], y=[gy], z=[gz], mode="markers",
-                    marker=dict(size=3, color="rgb(180,50,50)", opacity=0.7),
-                    showlegend=False))
+        # Larger than T cell, "large granular lymphocyte"
+        # Distinctive perforin/granzyme granules (azurophilic)
+        R = 0.8
+        x, y, z = sphere(R, noise_level=0.02)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Round nucleus (less dominant than T cell, more cytoplasm)
+        nx, ny, nz = sphere(R * 0.45, noise_level=0.008)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.7)
+        # Large perforin/granzyme granules — THE distinguishing feature
+        granule_pts = random_surface_points(18, R * 0.65, min_r=0.3)
+        add_dots(granule_pts, "rgb(200,50,50)", size=5, opacity=0.8)
+        # KIR receptors (inhibitory, orange), NKG2D (activating, green)
+        surface_receptors(15, R * 1.02, "rgb(220,160,40)", size=2)  # KIR
+        surface_receptors(12, R * 1.03, "rgb(50,200,100)", size=2)  # NKG2D
+        # Mitochondria
+        add_dots(random_surface_points(6, R * 0.55, min_r=0.3), mito_col, size=3, opacity=0.5)
 
     elif morphology == "mast_cell":
-        # Round, densely packed with large metachromatic granules
-        x = np.outer(cos_u, sin_v) * 0.85
-        y = np.outer(sin_u, sin_v) * 0.85
-        z = np.outer(np.ones_like(u), cos_v) * 0.85
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.7)
-        _add_nucleus(fig, x * 0.3, y * 0.3, z * 0.3, nuc_color, 0.5)
-        # Dense granules filling cytoplasm
-        for _ in range(40):
-            gx, gy, gz = rng.normal(0, 0.4, 3)
-            if 0.05 < gx**2 + gy**2 + gz**2 < 0.6:
-                fig.add_trace(go.Scatter3d(
-                    x=[gx], y=[gy], z=[gz], mode="markers",
-                    marker=dict(size=4, color="rgb(160,50,160)", opacity=0.8),
-                    showlegend=False))
+        # Round, PACKED with metachromatic granules (100-200 per cell)
+        # FcepsilonRI on surface
+        R = 0.85
+        x, y, z = sphere(R, noise_level=0.01)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.4)  # More transparent to show granules
+        # Small central nucleus (hard to see through granules)
+        nx, ny, nz = sphere(R * 0.25, noise_level=0.005)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.5)
+        # DENSE metachromatic granules (purple/violet) — fill the cytoplasm
+        granule_pts = random_surface_points(60, R * 0.75, min_r=0.15)
+        add_dots(granule_pts, "rgb(140,40,160)", size=5, opacity=0.85)
+        # Smaller granules
+        add_dots(random_surface_points(30, R * 0.7, min_r=0.1),
+                 "rgb(160,60,180)", size=3, opacity=0.7)
+        # FcepsilonRI (IgE receptor, yellow)
+        surface_receptors(25, R * 1.02, "rgb(230,200,50)", size=2)
 
     elif morphology == "plasma_cell":
-        # Eccentric nucleus, expanded rough ER visible
-        x = np.outer(cos_u, sin_v) * 0.8
-        y = np.outer(sin_u, sin_v) * 0.8
-        z = np.outer(np.ones_like(u), cos_v) * 0.8
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
-        # Eccentric nucleus (offset to one side)
-        _add_nucleus(fig, x * 0.35 + 0.25, y * 0.35, z * 0.35, nuc_color, 0.7)
-        # ER ribbons (concentric arcs on opposite side of nucleus)
-        for i in range(4):
-            er_t = np.linspace(-1.5, 1.5, 20)
-            er_x = np.cos(er_t) * (0.15 + i * 0.08) - 0.2
-            er_y = np.sin(er_t) * (0.15 + i * 0.08)
-            er_z = np.zeros_like(er_t) + rng.normal(0, 0.02, 20)
-            fig.add_trace(go.Scatter3d(
-                x=er_x, y=er_y, z=er_z, mode="lines",
-                line=dict(color="rgb(100,150,200)", width=2), showlegend=False))
+        # Oval, ECCENTRIC nucleus with clock-face chromatin
+        # Massive expanded rough ER filling cytoplasm
+        # Clear perinuclear halo (Golgi)
+        R = 0.8
+        x, y, z = sphere(R, stretch_z=1.15, noise_level=0.01)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Eccentric nucleus (pushed to one side)
+        nx, ny, nz = sphere(0.28, cx=0.3, cy=0, cz=0.1, noise_level=0.008)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.75)
+        # Clock-face chromatin pattern (radial dark spots in nucleus)
+        for angle in np.linspace(0, 2*np.pi, 6, endpoint=False):
+            add_dots([(0.3 + 0.15*np.cos(angle), 0.15*np.sin(angle), 0.1)],
+                     "rgb(20,20,80)", size=3, opacity=0.6)
+        # Perinuclear Golgi halo (gold arc near nucleus)
+        golgi_t = np.linspace(-1, 1, 15)
+        golgi_pts = [(0.3 + 0.35*np.cos(t), 0.35*np.sin(t), 0.1) for t in golgi_t]
+        add_line(golgi_pts, golgi_col, width=4)
+        # Massive rough ER — parallel lamellae filling opposite side from nucleus
+        for layer in range(6):
+            er_t = np.linspace(-1.2, 1.2, 20)
+            er_x = np.full_like(er_t, -0.15 - layer * 0.08)
+            er_y = 0.4 * np.sin(er_t + layer * 0.3) + rng.normal(0, 0.02, 20)
+            er_z = er_t * 0.5
+            er_pts = list(zip(er_x, er_y, er_z))
+            add_line(er_pts, er_col, width=2)
+            # Ribosomes on ER (tiny dots along ER)
+            for j in range(0, 20, 3):
+                add_dots([(er_x[j], er_y[j] + 0.03, er_z[j])],
+                         "rgb(60,60,60)", size=1, opacity=0.4)
 
     elif morphology == "eosinophil":
-        # Bilobed nucleus, large pink-red granules
-        x = np.outer(cos_u, sin_v) * 0.85
-        y = np.outer(sin_u, sin_v) * 0.85
-        z = np.outer(np.ones_like(u), cos_v) * 0.85
-        noise = rng.normal(0, 0.015, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
-        # Bilobed nucleus (two connected lobes)
-        for offset in [-0.15, 0.15]:
-            nx = x * 0.22 + offset
-            ny = y * 0.22
-            nz = z * 0.22
-            fig.add_trace(go.Surface(
-                x=nx, y=ny, z=nz,
-                colorscale=[[0, nuc_color], [1, dark_color]],
-                showscale=False, opacity=0.7))
-        # Large eosinophilic (pink-red) granules
-        for _ in range(25):
-            gx, gy, gz = rng.normal(0, 0.35, 3)
-            if 0.08 < gx**2 + gy**2 + gz**2 < 0.55:
-                fig.add_trace(go.Scatter3d(
-                    x=[gx], y=[gy], z=[gz], mode="markers",
-                    marker=dict(size=4, color="rgb(230,120,100)", opacity=0.8),
-                    showlegend=False))
+        # BILOBED nucleus (always exactly 2 lobes, connected)
+        # Large eosinophilic (bright pink/red) granules with crystalline core
+        R = 0.85
+        x, y, z = sphere(R, noise_level=0.012)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        # Bilobed nucleus — TWO distinct lobes with thin bridge
+        for offset in [-0.18, 0.18]:
+            lx, ly, lz = sphere(0.2, cx=offset, noise_level=0.008)
+            add_surface(lx, ly, lz, (nuc_dark, nuc_light), opacity=0.75)
+        add_line([(-0.18, 0, 0), (0.18, 0, 0)], nuc_dark, width=3)  # Bridge
+        # Large eosinophilic granules (bright salmon-red with crystalloid core)
+        granule_pts = random_surface_points(30, R * 0.65, min_r=0.2)
+        add_dots(granule_pts, "rgb(230,100,80)", size=5, opacity=0.85)
+        # Crystalline cores inside larger granules (darker centers)
+        add_dots(granule_pts[:15], "rgb(180,60,40)", size=2, opacity=0.9)
 
     else:
-        # Default: generic cell with slight noise
-        x = np.outer(cos_u, sin_v) * 0.8
-        y = np.outer(sin_u, sin_v) * 0.8
-        z = np.outer(np.ones_like(u), cos_v) * 0.8
-        noise = rng.normal(0, 0.02, x.shape)
-        x += noise; y += noise; z += noise
-        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
-        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.4, nuc_color, 0.6)
+        # Default cell
+        R = 0.8
+        x, y, z = sphere(R, noise_level=0.02)
+        add_surface(x, y, z, (membrane_col, membrane_light), opacity=0.5)
+        nx, ny, nz = sphere(R * 0.4, noise_level=0.01)
+        add_surface(nx, ny, nz, (nuc_dark, nuc_light), opacity=0.65)
+        add_dots(random_surface_points(5, R * 0.55, min_r=0.3), mito_col, size=3, opacity=0.5)
 
-    # Add caption with morphology info
+    # Caption
     scale = entity.scale_um if hasattr(entity, "scale_um") and entity.scale_um else ""
-    caption = f"{morphology.replace('_', ' ').title()}"
+    mesh = entity.mesh_type if hasattr(entity, "mesh_type") and entity.mesh_type else morphology
+    caption = mesh.replace("_", " ").title()
     if scale:
         caption += f" | ~{scale} um"
 
@@ -487,7 +579,7 @@ def _render_cell_3d(entity, height: int) -> bool:
         scene=dict(
             xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
             bgcolor="#0a0a1a",
-            camera=dict(eye=dict(x=1.8, y=1.8, z=1.2)),
+            camera=dict(eye=dict(x=2.0, y=2.0, z=1.2)),
             aspectmode="data",
         ),
         margin=dict(l=0, r=0, t=0, b=25),
@@ -523,7 +615,7 @@ def _classify_cell_morphology(name_lower: str) -> str:
     if "eosinophil" in name_lower:
         return "eosinophil"
     if "basophil" in name_lower:
-        return "mast_cell"  # similar morphology
+        return "mast_cell"
     if "plasma cell" in name_lower or "plasma_cell" in name_lower:
         return "plasma_cell"
     if "t cell" in name_lower or "th1" in name_lower or "th2" in name_lower or \
@@ -531,42 +623,20 @@ def _classify_cell_morphology(name_lower: str) -> str:
        "cd8" in name_lower or "cd4" in name_lower or "gamma-delta" in name_lower:
         return "t_cell"
     if "b cell" in name_lower or "naive b" in name_lower or "memory b" in name_lower:
-        return "t_cell"  # similar morphology (small round lymphocyte)
+        return "t_cell"
     if "ilc" in name_lower:
-        return "t_cell"  # ILCs look like lymphocytes
+        return "t_cell"
     if "cancer" in name_lower or "stem cell" in name_lower:
-        return "macrophage_m1"  # irregular
+        return "macrophage_m1"
     if "fibroblast" in name_lower:
-        return "macrophage_m2"  # spindle shaped
+        return "macrophage_m2"
     if "endothelial" in name_lower:
-        return "macrophage_m2"  # flat/elongated
+        return "macrophage_m2"
     if "epithelial" in name_lower or "luminal" in name_lower or "basal" in name_lower:
-        return "plasma_cell"  # polarized with ER
+        return "plasma_cell"
     if "neuroendocrine" in name_lower:
-        return "mast_cell"  # granular
+        return "mast_cell"
     return "default"
-
-
-def _add_cell_body(fig, x, y, z, color, light_color, opacity):
-    """Add a cell body surface trace."""
-    fig.add_trace(go.Surface(
-        x=x, y=y, z=z,
-        colorscale=[[0, color], [1, light_color]],
-        showscale=False, opacity=opacity,
-        lighting=dict(ambient=0.35, diffuse=0.65, specular=0.3, roughness=0.5),
-    ))
-
-
-def _add_nucleus(fig, x, y, z, color, opacity):
-    """Add a nucleus surface trace."""
-    import plotly.graph_objects as go
-    dark = color.replace("rgb(", "").replace(")", "")
-    r, g, b = [int(c) for c in dark.split(",")]
-    fig.add_trace(go.Surface(
-        x=x, y=y, z=z,
-        colorscale=[[0, color], [1, f"rgb({max(0,r-30)},{max(0,g-30)},{max(0,b-30)})"]],
-        showscale=False, opacity=opacity,
-    ))
 
 
 def _render_virus_3d(entity, height: int) -> bool:
