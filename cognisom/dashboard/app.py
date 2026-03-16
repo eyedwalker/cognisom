@@ -38,7 +38,7 @@ if user is not None and getattr(user, 'must_change_password', False):
 
 
 # ── Navigation setup (MUST be called before any other st.* calls) ──
-_pages_dir = Path(__file__).resolve().parent / "pages"
+_pages_dir = Path(__file__).resolve().parent / "_pages"
 
 if user is not None:
     # Authenticated: grouped navigation
