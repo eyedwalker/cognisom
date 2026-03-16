@@ -386,6 +386,82 @@ def _seed_growth_factors(store: EntityStore) -> int:
          {"target": "STAT5", "type": "activates"}],
         [1.0, 0.7, 0.2])
 
+    c += _add(store, "FGF2 (bFGF)", C,
+        "Basic fibroblast growth factor (18 kDa, 155 amino acids) is a potent mitogen for "
+        "endothelial cells, fibroblasts, and smooth muscle cells. Lacks a signal peptide and "
+        "is released non-classically (cell damage, exosome secretion, or membrane translocation). "
+        "FGF2 binds FGFR1-4 receptor tyrosine kinases with heparan sulfate proteoglycan (HSPG) "
+        "as an obligate co-receptor — the ternary FGF2-FGFR-HSPG complex is required for "
+        "signaling. Activates RAS-MAPK (proliferation), PLCgamma-PKC, and PI3K-AKT pathways. "
+        "In cancer: pro-angiogenic (synergizes with VEGF), promotes chemoresistance, and drives "
+        "fibroblast activation in the TME. FGF2 is also essential for embryonic stem cell "
+        "self-renewal (maintaining pluripotency). FGFR inhibitors (erdafitinib, futibatinib) "
+        "treat FGFR-altered urothelial and cholangiocarcinoma.",
+        ["growth_factor", "angiogenesis", "FGFR"],
+        {"fgfr1_kd_nm": 5, "molecular_weight_kda": 18},
+        ["extracellular", "cytoplasm", "nucleus"],
+        [{"target": "FGFR1", "type": "binds_to", "kd_nm": 5},
+         {"target": "HSPG", "type": "binds_to", "note": "obligate co-receptor"},
+         {"target": "VEGF-A", "type": "activates", "note": "synergistic angiogenesis"}],
+        [0.8, 0.5, 0.2])
+
+    c += _add(store, "PDGF-BB", C,
+        "Platelet-derived growth factor BB (30 kDa homodimer of two B chains) signals through "
+        "PDGFRalpha (binds all PDGF dimers) and PDGFRbeta (binds BB and AB). PDGF-BB is the "
+        "most potent activator of PDGFRbeta, which is critical for pericyte and smooth muscle "
+        "cell recruitment during blood vessel maturation (stabilizing nascent VEGF-induced "
+        "vessels). PDGFRbeta activation signals through RAS-MAPK, PI3K-AKT, and PLCgamma-PKC. "
+        "In fibrosis: PDGF-BB drives hepatic stellate cell and myofibroblast proliferation, "
+        "contributing to liver/lung/kidney fibrosis. In cancer: autocrine PDGF loops drive "
+        "glioblastoma and dermatofibrosarcoma protuberans (DFSP, harboring COL1A1-PDGFB fusion). "
+        "Imatinib inhibits PDGFRalpha/beta (along with ABL and KIT) and treats DFSP and "
+        "hypereosinophilic syndrome with PDGFR fusions.",
+        ["growth_factor", "PDGFR", "pericyte", "fibrosis"],
+        {"pdgfrb_kd_nm": 0.5, "molecular_weight_kda": 30},
+        ["extracellular"],
+        [{"target": "PDGFRbeta", "type": "binds_to", "kd_nm": 0.5},
+         {"target": "pericyte", "type": "activates", "note": "vessel maturation"},
+         {"target": "RAS", "type": "activates", "note": "via GRB2-SOS"}],
+        [0.7, 0.4, 0.8])
+
+    c += _add(store, "SCF (Kit ligand)", C,
+        "Stem cell factor (36 kDa, exists as soluble and membrane-bound forms) is the ligand "
+        "for the c-KIT (CD117) receptor tyrosine kinase. SCF-KIT signaling is essential for "
+        "hematopoietic stem cell maintenance, mast cell development and survival, melanocyte "
+        "migration and survival, spermatogenesis, and interstitial cells of Cajal (gut pacemaker "
+        "cells). KIT activation triggers PI3K-AKT, RAS-MAPK, JAK-STAT, and PLCgamma pathways. "
+        "Gain-of-function KIT mutations (D816V in mastocytosis, exon 11 in GIST) cause "
+        "constitutive activation. Imatinib treats KIT-mutant GIST (except D816V, which requires "
+        "avapritinib). KIT is a diagnostic marker for GIST (>95% KIT+), mast cell neoplasms, "
+        "and seminoma. CD117 on hematopoietic stem cells is a target for antibody-drug "
+        "conjugates in conditioning for bone marrow transplant.",
+        ["growth_factor", "KIT", "stem_cell", "GIST"],
+        {"kit_kd_nm": 0.1, "molecular_weight_kda": 36},
+        ["extracellular", "cell_membrane"],
+        [{"target": "c-KIT", "type": "binds_to", "kd_nm": 0.1},
+         {"target": "PI3K", "type": "activates"},
+         {"target": "mast_cell", "type": "activates", "note": "development/survival"}],
+        [0.6, 0.8, 0.3])
+
+    c += _add(store, "BMP4", C,
+        "Bone morphogenetic protein 4 (47 kDa homodimer) is a TGF-beta superfamily member "
+        "that plays critical roles in embryonic development (ventral mesoderm specification, "
+        "neural crest formation) and adult tissue homeostasis. BMP4 binds type I receptors "
+        "(BMPR1A/ALK3, BMPR1B/ALK6) and type II receptors (BMPR2, ActRIIA/B), forming a "
+        "heterotetrameric complex. Type I receptor phosphorylates SMAD1/5/8, which complex "
+        "with SMAD4 and translocate to the nucleus to regulate target genes (ID1-4, RUNX2). "
+        "BMP4 is antagonized by noggin, chordin, and follistatin (extracellular sequestration). "
+        "In cancer, BMP4 has context-dependent roles: promotes differentiation (tumor-suppressive "
+        "in some cancers) but also drives epithelial-mesenchymal transition and cancer stem cell "
+        "maintenance in others. In prostate cancer, BMP4 promotes osteoblastic bone metastasis.",
+        ["growth_factor", "TGF_beta_superfamily", "SMAD", "bone"],
+        {"bmpr1a_kd_nm": 5, "molecular_weight_kda": 47},
+        ["extracellular"],
+        [{"target": "BMPR1A", "type": "binds_to", "kd_nm": 5},
+         {"target": "SMAD1", "type": "activates", "note": "via BMPR1"},
+         {"target": "noggin", "type": "binds_to", "note": "antagonist"}],
+        [0.5, 0.7, 0.6])
+
     log.info("Seeded %d growth factor entities", c)
     return c
 
@@ -1002,6 +1078,104 @@ def _seed_ecm_components(store: EntityStore) -> int:
          {"target": "RHAMM", "type": "binds_to", "note": "migration"},
          {"target": "hyaluronidase", "type": "binds_to", "note": "degradation"}],
         [0.5, 0.8, 0.9])
+
+    c += _add(store, "Collagen IV", P,
+        "Type IV collagen is the primary structural component of all basement membranes — "
+        "thin, specialized ECM sheets underlying epithelia, endothelia, and surrounding muscle "
+        "and fat cells. Unlike fibrillar collagens (I, II, III), collagen IV forms a "
+        "non-fibrillar, sheet-like network through end-to-end and lateral associations of its "
+        "triple-helical protomers (alpha1-alpha6 chains). The network provides mechanical "
+        "support, cell attachment (via integrin alpha1beta1, alpha2beta1), and serves as a "
+        "size-selective filtration barrier (e.g., glomerular basement membrane in kidney). "
+        "Basement membrane degradation by MMP-2 and MMP-9 (type IV collagenases) is the "
+        "critical step in tumor invasion and metastasis — cancer cells must breach the "
+        "basement membrane to invade stroma and enter blood/lymphatic vessels. Goodpasture "
+        "syndrome: autoantibodies against the alpha3(IV) NC1 domain cause glomerulonephritis.",
+        ["ECM", "collagen", "basement_membrane", "invasion"],
+        {},
+        ["extracellular", "basement_membrane"],
+        [{"target": "integrin_a1b1", "type": "binds_to"},
+         {"target": "MMP-2", "type": "binds_to", "note": "type IV collagenase"},
+         {"target": "MMP-9", "type": "binds_to", "note": "gelatinase B cleavage"}],
+        [0.7, 0.7, 0.5])
+
+    c += _add(store, "Laminin", P,
+        "Large (400-900 kDa) heterotrimeric glycoprotein (alpha/beta/gamma chains) that is the "
+        "first ECM component deposited during embryonic development and the organizing foundation "
+        "of all basement membranes. Laminin self-polymerizes through LN domain interactions to "
+        "form a network that is subsequently reinforced by collagen IV crosslinking. Cell binding "
+        "occurs through integrin receptors: alpha6beta1 (primary laminin receptor on epithelial "
+        "cells), alpha6beta4 (hemidesmosomes in skin, strong adhesion), alpha3beta1 (kidney, "
+        "lung), and alpha7beta1 (muscle). Laminin-332 (formerly laminin-5) is the critical "
+        "adhesion substrate for epidermal keratinocytes; its loss causes junctional epidermolysis "
+        "bullosa (lethal skin blistering). In cancer, laminin fragments generated by MMP cleavage "
+        "can promote migration and angiogenesis.",
+        ["ECM", "basement_membrane", "laminin", "cell_adhesion"],
+        {"molecular_weight_kda": 800},
+        ["extracellular", "basement_membrane"],
+        [{"target": "integrin_a6b1", "type": "binds_to", "note": "epithelial adhesion"},
+         {"target": "integrin_a6b4", "type": "binds_to", "note": "hemidesmosomes"},
+         {"target": "collagen_IV", "type": "binds_to", "note": "BM network"}],
+        [0.6, 0.5, 0.7])
+
+    c += _add(store, "Fibronectin", P,
+        "Large (440 kDa homodimer) multidomain glycoprotein that connects cells to the "
+        "extracellular matrix and plays essential roles in wound healing, embryonic development, "
+        "and blood clotting. Fibronectin contains the RGD (Arg-Gly-Asp) tripeptide motif in its "
+        "type III10 repeat — the prototypic integrin-binding sequence recognized by alpha5beta1 "
+        "(primary FN receptor), alphavbeta3, and alphavbeta1 integrins. Exists in two forms: "
+        "plasma fibronectin (soluble dimer produced by hepatocytes, circulates at ~300 ug/mL) "
+        "and cellular fibronectin (insoluble fibrils assembled by fibroblasts into the ECM "
+        "via integrin-mediated tension). Fibronectin fibrillogenesis requires cell-generated "
+        "mechanical force to expose cryptic self-assembly sites. In wound healing, fibronectin "
+        "provides the provisional matrix for cell migration. In cancer, fibronectin in the "
+        "pre-metastatic niche attracts bone marrow-derived cells that prepare distant sites "
+        "for metastatic colonization.",
+        ["ECM", "fibronectin", "RGD", "wound_healing", "integrin"],
+        {"molecular_weight_kda": 440, "serum_concentration_ug_ml": 300},
+        ["extracellular", "ECM", "blood"],
+        [{"target": "integrin_a5b1", "type": "binds_to", "note": "RGD recognition"},
+         {"target": "integrin_avb3", "type": "binds_to", "note": "RGD"},
+         {"target": "fibrin", "type": "binds_to", "note": "wound clot matrix"}],
+        [0.7, 0.5, 0.4])
+
+    c += _add(store, "MMP-2 (Gelatinase A)", P,
+        "Matrix metalloproteinase 2 (72 kDa, 660 amino acids) is a zinc-dependent gelatinase "
+        "that degrades type IV collagen — the principal structural component of basement "
+        "membranes. MMP-2 is constitutively expressed by fibroblasts, endothelial cells, and "
+        "many tumor cells. Pro-MMP-2 (72 kDa) is activated at the cell surface by a unique "
+        "mechanism: MT1-MMP (MMP-14, membrane-type MMP) cleaves pro-MMP-2 in complex with "
+        "TIMP-2, generating the 62 kDa active form. This cell-surface activation focuses "
+        "MMP-2 activity at the leading edge of migrating cells. MMP-2 also cleaves laminin, "
+        "fibronectin, elastin, and growth factors (TGF-beta activation, VEGF liberation from "
+        "ECM). In invasion: MMP-2 at invadopodia (actin-rich membrane protrusions) degrades "
+        "basement membrane, the rate-limiting step of metastatic dissemination.",
+        ["ECM", "MMP", "invasion", "basement_membrane"],
+        {"kcat_per_s": 8, "km_collagen_iv_um": 3},
+        ["extracellular", "invadopodia"],
+        [{"target": "collagen_IV", "type": "catalyzes", "note": "BM degradation"},
+         {"target": "MT1-MMP", "type": "binds_to", "note": "cell-surface activation"},
+         {"target": "TIMP-2", "type": "binds_to", "note": "inhibitor + activator"}],
+        [0.6, 0.5, 0.4])
+
+    c += _add(store, "TIMP-1", P,
+        "Tissue inhibitor of metalloproteinases 1 (28 kDa, 207 amino acids) is the primary "
+        "endogenous inhibitor of MMP-9 (gelatinase B) and most other MMPs. TIMP-1 inhibits "
+        "MMPs by binding the active site zinc in a 1:1 stoichiometric complex with Ki values "
+        "in the sub-nanomolar range (Ki ~0.1-1 nM for most MMPs). TIMP-1 also has "
+        "MMP-independent functions: it binds CD63 on the cell surface, activating FAK/PI3K "
+        "survival signaling, and serves as a growth factor for erythroid progenitors. Elevated "
+        "serum TIMP-1 is a poor prognostic marker in colorectal, breast, and gastric cancers — "
+        "paradoxically, because TIMP-1 promotes tumor cell survival through MMP-independent "
+        "anti-apoptotic signaling rather than inhibiting invasion. TIMP-2 has a unique dual "
+        "role: inhibits most MMPs but is required for MT1-MMP-mediated pro-MMP-2 activation.",
+        ["ECM", "TIMP", "MMP_inhibitor"],
+        {"mmp9_ki_nm": 0.5},
+        ["extracellular"],
+        [{"target": "MMP-9", "type": "inhibits", "kd_nm": 0.5},
+         {"target": "CD63", "type": "binds_to", "note": "survival signaling"},
+         {"target": "FAK", "type": "activates", "note": "MMP-independent"}],
+        [0.5, 0.6, 0.5])
 
     log.info("Seeded %d ECM component entities", c)
     return c
