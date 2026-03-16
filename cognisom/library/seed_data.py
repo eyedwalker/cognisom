@@ -711,30 +711,157 @@ def _seed_manual_genes(loader: EntityLoader) -> int:
 # ── Drugs ────────────────────────────────────────────────────────────
 
 def _seed_drugs(loader: EntityLoader) -> int:
+    # Each entry: (name, drug_class, mechanism, targets, status, smiles)
+    # Descriptions are research-grade with PK/PD parameters
     drugs = [
-        ("Enzalutamide", "anti-androgen", "Competitive AR inhibitor; blocks nuclear translocation and DNA binding of the androgen receptor",
-         ["AR"], "approved", "CC1(C2CCC3(C(=O)NC(=C3C2CC(C1)(F)F)C#N)C)C4=CC(=C(C=C4)F)C(=O)NC5=CC=C(C=N5)C(F)(F)F"),
-        ("Abiraterone", "anti-androgen", "CYP17A1 inhibitor; blocks androgen biosynthesis in testes, adrenals, and tumor",
+        ("Enzalutamide", "anti-androgen",
+         "Second-generation androgen receptor (AR) antagonist that inhibits AR signaling "
+         "at three levels: competitively blocks androgen binding to the ligand-binding domain "
+         "(IC50 ~21 nM for AR binding), inhibits AR nuclear translocation by disrupting the "
+         "importin-alpha interaction, and prevents AR binding to DNA by blocking the "
+         "N/C-terminal interaction required for transcriptional activation. Enzalutamide "
+         "binds AR with 5-8 fold greater affinity than first-generation antiandrogens "
+         "(bicalutamide). Oral bioavailability >80%, steady-state Cmax ~16.6 mcg/mL, "
+         "terminal half-life ~5.8 days. Metabolized by CYP2C8 and CYP3A4 to active "
+         "metabolite N-desmethyl enzalutamide. Crosses blood-brain barrier (causes ~1% "
+         "seizure risk). Resistance mechanisms include AR-F877L mutation (converts "
+         "enzalutamide to agonist), AR-V7 splice variant (lacks LBD), AR amplification, "
+         "glucocorticoid receptor bypass, and lineage plasticity to AR-null NEPC.",
+         ["AR"], "approved",
+         "CC1(C2CCC3(C(=O)NC(=C3C2CC(C1)(F)F)C#N)C)C4=CC(=C(C=C4)F)C(=O)NC5=CC=C(C=N5)C(F)(F)F"),
+
+        ("Abiraterone", "anti-androgen",
+         "Irreversible inhibitor of cytochrome P450 17A1 (CYP17A1), the enzyme catalyzing "
+         "both 17-alpha-hydroxylase and 17,20-lyase reactions in androgen biosynthesis. "
+         "Blocks conversion of pregnenolone to DHEA and progesterone to androstenedione "
+         "in the testes, adrenal glands, and intratumoral steroidogenic pathway. "
+         "Administered as abiraterone acetate prodrug, rapidly deacetylated to active "
+         "abiraterone. IC50 for CYP17A1 ~2.5 nM, >10-fold selectivity over CYP17A1 "
+         "hydroxylase. Requires co-administration with prednisone (5 mg BID) to prevent "
+         "mineralocorticoid excess from upstream steroid accumulation. Terminal half-life "
+         "~12 hours. Resistance via CYP17A1 point mutations (T208A), AR mutations "
+         "enabling activation by progesterone metabolites, and intratumoral AKR1C3 "
+         "upregulation (alternative DHT synthesis).",
          ["CYP17A1"], "approved", ""),
-        ("Docetaxel", "chemotherapy", "Taxane microtubule stabilizer; inhibits mitotic cell division",
+
+        ("Docetaxel", "chemotherapy",
+         "Semi-synthetic taxane that binds beta-tubulin subunit at a site distinct from "
+         "vinca alkaloids, stabilizing microtubule polymers and preventing depolymerization. "
+         "This arrests cells in mitosis by blocking spindle dynamics required for chromosome "
+         "segregation, activating the spindle assembly checkpoint and triggering mitotic "
+         "catastrophe and apoptosis via the intrinsic (mitochondrial) pathway. Docetaxel "
+         "also inhibits BCL-2 phosphorylation and induces BCL-2 degradation. In prostate "
+         "cancer, docetaxel disrupts AR nuclear trafficking via microtubule-dependent "
+         "transport, providing an additional mechanism against AR signaling. Standard "
+         "dosing: 75 mg/m2 IV q3w. Terminal half-life ~11 hours. >95% protein-bound. "
+         "CYP3A4 metabolized. Dose-limiting toxicities: neutropenia, peripheral neuropathy.",
          ["TUBB"], "approved", ""),
-        ("Cabazitaxel", "chemotherapy", "Semi-synthetic taxane; overcomes docetaxel resistance",
+
+        ("Cabazitaxel", "chemotherapy",
+         "Semi-synthetic taxane derivative with dimethyl substitutions at C7 and C10 that "
+         "reduce affinity for P-glycoprotein (MDR1/ABCB1) efflux pump, overcoming the "
+         "primary mechanism of docetaxel resistance. Cabazitaxel stabilizes microtubules "
+         "with similar potency to docetaxel but maintains activity in docetaxel-resistant "
+         "cell lines. Greater CNS penetration than docetaxel. Approved for mCRPC post-docetaxel. "
+         "Standard dosing: 25 mg/m2 IV q3w with prednisone. Terminal half-life ~95 hours. "
+         "CYP3A4/5 metabolized. Higher febrile neutropenia risk than docetaxel; G-CSF "
+         "prophylaxis recommended.",
          ["TUBB"], "approved", ""),
-        ("Olaparib", "PARP_inhibitor", "PARP1/2 inhibitor; synthetic lethality with BRCA1/2 and HRR deficiency",
+
+        ("Olaparib", "PARP_inhibitor",
+         "Potent inhibitor of poly(ADP-ribose) polymerase 1 and 2 (PARP1/2) that exploits "
+         "synthetic lethality in tumors with homologous recombination repair deficiency "
+         "(HRD). Olaparib inhibits PARP catalytic activity (IC50 ~5 nM for PARP1) and, "
+         "critically, traps PARP-DNA complexes at single-strand break sites, converting "
+         "them into cytotoxic double-strand breaks during replication. HR-deficient cells "
+         "(BRCA1/2, ATM, PALB2, CDK12 mutations) cannot repair these DSBs by high-fidelity "
+         "HR and rely on error-prone NHEJ, leading to chromosomal instability and cell "
+         "death. FDA approved for mCRPC with BRCA1/2 mutations (PROfound trial: 7.4 mo "
+         "rPFS improvement). Also active in ATM-mutant and CDK12-loss tumors, though "
+         "with lower response rates. Oral, 300 mg BID. Half-life ~11 hours. "
+         "Resistance: secondary BRCA2 reversion mutations restoring reading frame, "
+         "53BP1/RIF1/SHIELDIN loss (restoring end resection), PARP1 mutations.",
          ["PARP1", "PARP2", "BRCA2"], "approved", ""),
-        ("Rucaparib", "PARP_inhibitor", "PARP inhibitor for BRCA-mutated mCRPC",
+
+        ("Rucaparib", "PARP_inhibitor",
+         "PARP1/2/3 inhibitor with broader PARP family coverage than olaparib. "
+         "Inhibits PARP1 (IC50 ~1.4 nM) and effectively traps PARP-DNA complexes. "
+         "Approved for BRCA-mutated mCRPC (TRITON2/3 trials). Also inhibits tankyrase "
+         "1/2 (TNKS1/2), which may contribute to WNT pathway modulation. Oral, 600 mg "
+         "BID. Half-life ~17 hours. Notable for robust activity in genomic LOH-high "
+         "tumors beyond BRCA1/2 mutations, suggesting utility in a broader HRD population.",
          ["PARP1", "BRCA2"], "approved", ""),
-        ("Pembrolizumab", "immunotherapy", "Anti-PD-1 checkpoint inhibitor; activates T cell anti-tumor immunity",
+
+        ("Pembrolizumab", "immunotherapy",
+         "Humanized IgG4-kappa monoclonal antibody that blocks the interaction between "
+         "programmed death receptor 1 (PD-1) on T cells and its ligands PD-L1 (CD274) "
+         "and PD-L2 (PDCD1LG2) on tumor cells and antigen-presenting cells. PD-1 is an "
+         "inhibitory co-receptor that, upon ligand engagement, recruits SHP-2 phosphatase "
+         "to dephosphorylate TCR signaling molecules (ZAP70, CD3-zeta), attenuating T cell "
+         "activation, proliferation, and cytokine production. Pembrolizumab blockade "
+         "restores anti-tumor T cell effector function. FDA approved for MSI-H/dMMR or "
+         "TMB-H (>=10 mut/Mb) solid tumors including prostate cancer (KEYNOTE-158). "
+         "In combination with enzalutamide (KEYNOTE-641) and olaparib (KEYNOTE-365) for "
+         "broader mCRPC populations. IV 200 mg q3w or 400 mg q6w. Half-life ~26 days. "
+         "Immune-related adverse events (irAEs) in ~15-20%: colitis, hepatitis, "
+         "thyroiditis, pneumonitis, dermatitis.",
          ["PDCD1"], "approved", ""),
-        ("Ipatasertib", "PI3K_pathway", "AKT inhibitor; blocks PI3K/AKT/mTOR survival signaling",
+
+        ("Ipatasertib", "PI3K_pathway",
+         "Highly selective ATP-competitive inhibitor of all three AKT isoforms (AKT1/2/3) "
+         "with Ki ~0.3-4.6 nM. Blocks AKT-mediated phosphorylation of downstream substrates "
+         "including TSC2 (mTORC1 activation), GSK3-beta (glycogen metabolism), FOXO3 "
+         "(transcription), and BAD (anti-apoptotic). In PTEN-loss prostate cancer, "
+         "ipatasertib + abiraterone showed improved rPFS (18.5 vs 16.5 months) in the "
+         "IPATential150 trial, particularly in the PTEN-loss biomarker subgroup. Oral, "
+         "400 mg QD. Half-life ~26 hours. Main toxicities: diarrhea, hyperglycemia, rash.",
          ["AKT1", "AKT2"], "clinical_trial", ""),
-        ("Darolutamide", "anti-androgen", "Structurally distinct AR inhibitor with low CNS penetration",
+
+        ("Darolutamide", "anti-androgen",
+         "Structurally distinct AR antagonist with a unique pyrazole core that differs "
+         "from the thiohydantoin scaffold of enzalutamide and apalutamide. Binds AR LBD "
+         "with high affinity (IC50 ~26 nM) but exhibits low blood-brain barrier penetration "
+         "(P-gp substrate), resulting in significantly lower rates of CNS side effects "
+         "(seizures, fatigue, falls) compared to other AR inhibitors. Darolutamide also "
+         "inhibits mutant AR forms including F877L, W742C, and T878A that confer "
+         "resistance to enzalutamide. ARAMIS trial demonstrated 40% reduction in risk of "
+         "metastasis or death in non-metastatic CRPC. Active metabolite keto-darolutamide "
+         "has similar AR affinity. Oral, 600 mg BID with food. Half-life ~20 hours.",
          ["AR"], "approved", ""),
-        ("Lutetium-177 PSMA", "radiotherapy", "Radioligand targeting PSMA; delivers beta radiation to PSMA-expressing cells",
+
+        ("Lutetium-177 PSMA", "radiotherapy",
+         "Radioligand therapy consisting of Lutetium-177 (beta-emitting radionuclide, "
+         "half-life 6.7 days, max beta energy 0.5 MeV, tissue penetration ~2 mm) "
+         "conjugated to PSMA-617, a small-molecule ligand targeting prostate-specific "
+         "membrane antigen (PSMA/FOLH1). PSMA is a type II transmembrane glycoprotein "
+         "overexpressed on >90% of prostate cancer cells (10-1000x higher than normal "
+         "prostate). Upon binding, Lu-177 PSMA-617 is internalized and delivers "
+         "cytotoxic beta radiation to tumor cells and neighboring cells (crossfire effect). "
+         "VISION trial: improved OS by 4 months and rPFS by 5.3 months in mCRPC. "
+         "Requires PSMA-PET confirmation of target expression. 7.4 GBq IV q6w x 6 cycles. "
+         "Main toxicities: xerostomia, bone marrow suppression.",
          ["FOLH1"], "approved", ""),
-        ("Talazoparib", "PARP_inhibitor", "Potent PARP trapping agent for HRR-deficient prostate cancer",
+
+        ("Talazoparib", "PARP_inhibitor",
+         "Potent PARP1/2 inhibitor and the strongest PARP trapper in the clinical class "
+         "(PARP trapping potency ~100x greater than olaparib). IC50 for PARP1 ~0.57 nM. "
+         "The enhanced trapping ability generates more cytotoxic PARP-DNA complexes at "
+         "lower concentrations, but also increases myelosuppression risk. TALAPRO-2 trial: "
+         "talazoparib + enzalutamide improved rPFS in mCRPC regardless of HRR status "
+         "(though HRR-deficient patients benefited most). Oral, 0.5 mg QD (when combined "
+         "with enzalutamide). Half-life ~90 hours. Dose-limiting: thrombocytopenia, anemia.",
          ["PARP1", "BRCA2"], "approved", ""),
-        ("Apalutamide", "anti-androgen", "AR inhibitor for non-metastatic castration-resistant prostate cancer",
+
+        ("Apalutamide", "anti-androgen",
+         "Second-generation AR antagonist structurally related to enzalutamide (shared "
+         "thiohydantoin core). Binds AR LBD with similar affinity to enzalutamide, "
+         "inhibits nuclear translocation, DNA binding, and coactivator recruitment. "
+         "SPARTAN trial: 24.3-month improvement in metastasis-free survival in "
+         "non-metastatic CRPC. TITAN trial: 35% reduction in risk of death in metastatic "
+         "castration-sensitive prostate cancer. Oral, 240 mg QD. Half-life ~72 hours "
+         "(active metabolite N-desmethyl apalutamide has similar half-life and activity). "
+         "CYP2C8/3A4 metabolized. Notable side effects: rash (24%), hypothyroidism (8%), "
+         "seizure risk (~0.2%).",
          ["AR"], "approved", ""),
     ]
     count = 0
@@ -748,30 +875,175 @@ def _seed_drugs(loader: EntityLoader) -> int:
 
 def _seed_cell_types(loader: EntityLoader) -> int:
     cell_types = [
-        ("Luminal epithelial cell", "Main secretory cell of the prostate. Expresses AR, PSA, CK8, CK18.",
-         "prostate", ["AR+", "PSA+", "CK8+", "CK18+"], "epithelial", "CL:0002327"),
-        ("Basal epithelial cell", "Progenitor cell layer of the prostate. AR-low, p63+, CK5+.",
-         "prostate", ["p63+", "CK5+", "CK14+", "AR-low"], "epithelial", "CL:0000646"),
-        ("Neuroendocrine cell", "Rare endocrine cell in prostate. Synaptophysin+, chromogranin A+.",
-         "prostate", ["SYP+", "CHGA+", "NSE+"], "neuroendocrine", "CL:0000165"),
-        ("Stromal fibroblast", "Mesenchymal cell in prostate stroma. Vimentin+, alpha-SMA+.",
-         "prostate", ["VIM+", "ACTA2+", "FAP+"], "mesenchymal", "CL:0000057"),
-        ("Cancer-associated fibroblast", "Activated fibroblast in tumor microenvironment. Promotes tumor growth.",
-         "prostate", ["FAP+", "PDPN+", "alpha-SMA+"], "mesenchymal", ""),
-        ("Endothelial cell", "Lines blood vessels in prostate tissue. CD31+, CD34+.",
-         "prostate", ["CD31+", "CD34+", "VEGFR2+"], "endothelial", "CL:0000115"),
-        ("CD8+ T cell", "Cytotoxic T lymphocyte. Key effector of anti-tumor immunity.",
-         "blood", ["CD8+", "CD3+", "TCR+"], "lymphoid", "CL:0000625"),
-        ("CD4+ T cell", "Helper T cell. Coordinates immune responses.",
-         "blood", ["CD4+", "CD3+", "TCR+"], "lymphoid", "CL:0000624"),
-        ("NK cell", "Natural killer cell. Innate cytotoxic lymphocyte.",
-         "blood", ["CD56+", "CD16+", "NKp46+"], "lymphoid", "CL:0000623"),
-        ("Macrophage", "Phagocytic myeloid cell in tumor microenvironment. M1 (anti-tumor) vs M2 (pro-tumor).",
-         "blood", ["CD68+", "CD163+", "CD14+"], "myeloid", "CL:0000235"),
-        ("Prostate cancer stem cell", "Self-renewing cancer cell with high tumorigenicity. CD44+, ALDH+.",
-         "prostate", ["CD44+", "ALDH+", "CD133+", "integrin-a2b1+"], "epithelial", ""),
-        ("Regulatory T cell", "Immunosuppressive CD4+ T cell subset. Suppresses anti-tumor immunity in TME.",
-         "blood", ["CD4+", "CD25+", "FOXP3+"], "lymphoid", "CL:0000815"),
+        ("Luminal epithelial cell",
+         "The predominant secretory cell of the prostate gland, comprising ~60% of the "
+         "epithelial compartment. Luminal cells express high levels of androgen receptor "
+         "(AR) and are the primary source of prostate-specific antigen (PSA/KLK3), "
+         "prostatic acid phosphatase (PAP), and other secretory proteins in the seminal "
+         "fluid. Characterized by cytokeratin 8/18 (CK8/CK18) expression and apical "
+         "E-cadherin. AR-dependent transcription drives luminal cell survival and "
+         "proliferation; androgen deprivation therapy induces apoptosis preferentially "
+         "in this compartment. Most prostate adenocarcinomas originate from luminal cells, "
+         "maintaining AR expression and luminal markers throughout disease progression. "
+         "Division time ~24-48 hours in cancer; quiescent in normal tissue.",
+         "prostate", ["AR+", "PSA+", "CK8+", "CK18+", "NKX3-1+", "FOXA1+"],
+         "epithelial", "CL:0002327"),
+
+        ("Basal epithelial cell",
+         "Multipotent progenitor cells forming the outer layer of prostate acini, resting "
+         "on the basement membrane. Basal cells express p63 (TP63), CK5, CK14, and low "
+         "levels of AR. They serve as the stem/progenitor compartment, giving rise to "
+         "luminal, neuroendocrine, and intermediate transit-amplifying cells. Basal cells "
+         "are resistant to androgen deprivation and may serve as cells of origin for "
+         "certain prostate cancers, particularly basal-type tumors. They secrete hedgehog "
+         "ligands that maintain stromal homeostasis and produce components of the basement "
+         "membrane (laminin, collagen IV). Loss of the basal cell layer is the histological "
+         "hallmark of invasive adenocarcinoma (vs. benign HGPIN which retains patchy basal cells).",
+         "prostate", ["p63+", "CK5+", "CK14+", "AR-low", "BCL2+"],
+         "epithelial", "CL:0000646"),
+
+        ("Neuroendocrine cell",
+         "Rare (<1%) post-mitotic endocrine cells scattered within prostate acini that "
+         "secrete neuropeptides including chromogranin A (CHGA), synaptophysin (SYP), "
+         "neuron-specific enolase (NSE), serotonin, and bombesin/GRP. These paracrine "
+         "signals promote proliferation and survival of neighboring luminal cells. "
+         "Neuroendocrine cells are AR-negative and androgen-independent, providing a "
+         "survival niche during ADT. Treatment-emergent neuroendocrine prostate cancer "
+         "(NEPC) arises when luminal adenocarcinoma cells undergo transdifferentiation "
+         "(driven by RB1/TP53 loss + EZH2/SOX2 upregulation) to acquire neuroendocrine "
+         "features: AR-negative, high proliferation, visceral metastases, poor prognosis "
+         "(median OS ~7 months). NEPC represents ~15-20% of treatment-resistant mCRPC.",
+         "prostate", ["SYP+", "CHGA+", "NSE+", "AR-", "CD56+"],
+         "neuroendocrine", "CL:0000165"),
+
+        ("Stromal fibroblast",
+         "Mesenchymal cells embedded in the extracellular matrix (ECM) of the prostate "
+         "stroma, producing collagen I/III, fibronectin, and proteoglycans. Normal stromal "
+         "fibroblasts maintain epithelial homeostasis through paracrine signaling: "
+         "AR-dependent production of growth factors (FGF7/10, IGF1, HGF) acts on epithelial "
+         "cells. In the tumor microenvironment, fibroblasts become activated (alpha-SMA+, "
+         "vimentin+) and remodel ECM through MMP2/9 secretion, creating invasion-permissive "
+         "tracks. Stromal AR signaling is essential for prostate development; stromal-epithelial "
+         "crosstalk through DHT-dependent andromedins drives normal glandular growth.",
+         "prostate", ["VIM+", "ACTA2+", "FAP-", "COL1A1+"],
+         "mesenchymal", "CL:0000057"),
+
+        ("Cancer-associated fibroblast",
+         "Activated fibroblasts in the tumor microenvironment (TME) that promote cancer "
+         "progression through ECM remodeling, pro-angiogenic signaling, immune suppression, "
+         "and metabolic support. CAFs express FAP (fibroblast activation protein), PDPN "
+         "(podoplanin), alpha-SMA, and S100A4. They secrete CXCL12 (attracts immune cells), "
+         "TGF-beta (immunosuppressive), IL-6 (activates STAT3 in cancer cells), and VEGF "
+         "(promotes angiogenesis). CAFs also provide metabolic fuel to cancer cells via "
+         "reverse Warburg effect: CAFs undergo aerobic glycolysis, secreting lactate and "
+         "pyruvate that feed cancer cell oxidative phosphorylation. CAF-derived exosomes "
+         "transfer miRNAs that promote treatment resistance. CAFs represent 20-80% of "
+         "tumor stromal cells and are associated with poor prognosis.",
+         "prostate", ["FAP+", "PDPN+", "alpha-SMA+", "S100A4+", "IL6+"],
+         "mesenchymal", ""),
+
+        ("Endothelial cell",
+         "Specialized squamous cells lining blood vessels (CD31+/PECAM1, CD34+, VEGFR2+) "
+         "that form a selective barrier between blood and tissue. In the prostate, "
+         "endothelial cells regulate oxygen and nutrient delivery, leukocyte trafficking, "
+         "and angiogenesis. Tumor-associated endothelial cells are phenotypically distinct: "
+         "they express elevated VEGFR2, DLL4 (Notch ligand), and angiopoietin-2, and form "
+         "irregular, leaky vessels with poor pericyte coverage. This chaotic vasculature "
+         "creates hypoxic zones that promote tumor aggression and treatment resistance. "
+         "Endothelial cells also express PD-L1 in the TME and present antigens to T cells, "
+         "serving as non-professional APCs that can either activate or tolerize immune cells.",
+         "prostate", ["CD31+", "CD34+", "VEGFR2+", "VE-cadherin+", "vWF+"],
+         "endothelial", "CL:0000115"),
+
+        ("CD8+ T cell",
+         "Cytotoxic T lymphocyte (CTL) and the primary effector of adaptive anti-tumor "
+         "immunity. CD8+ T cells recognize tumor neoantigens presented on MHC class I "
+         "molecules through their T cell receptor (TCR). Upon activation (TCR signal + "
+         "CD28 co-stimulation + IL-2), CTLs clonally expand and kill target cells through "
+         "two mechanisms: perforin/granzyme pathway (perforin pores allow granzyme B entry, "
+         "activating caspase-3/7 apoptosis) and Fas/FasL interaction. In the prostate TME, "
+         "CD8+ T cells become progressively exhausted (PD-1hi, TIM-3+, LAG-3+, TOX+) "
+         "through chronic antigen stimulation, losing effector function in a hierarchical "
+         "manner: IL-2 production lost first, then TNF-alpha, then IFN-gamma, and finally "
+         "cytotoxic capacity. Checkpoint inhibitors (anti-PD-1) can reinvigorate a "
+         "progenitor-exhausted (TCF1+, PD-1int) subset but not terminally exhausted "
+         "(TCF1-, PD-1hi) cells. Migration speed ~10-15 um/min in tissue.",
+         "blood", ["CD8+", "CD3+", "TCR+", "perforin+", "granzyme B+"],
+         "lymphoid", "CL:0000625"),
+
+        ("CD4+ T cell",
+         "Helper T lymphocyte that orchestrates adaptive immune responses through cytokine "
+         "production and cell-cell contact. CD4+ T cells recognize antigens on MHC class II "
+         "molecules and differentiate into functional subsets: Th1 (IFN-gamma, anti-tumor), "
+         "Th2 (IL-4/IL-13, anti-helminth), Th17 (IL-17, mucosal immunity), Tfh (IL-21, "
+         "B cell help), and Treg (IL-10/TGF-beta, immunosuppression). In the prostate TME, "
+         "the Th1/Treg balance is critical: high Th1 infiltration correlates with favorable "
+         "prognosis, while Treg accumulation suppresses anti-tumor immunity. CD4+ T cells "
+         "also provide 'help' to CD8+ CTLs through CD40L-CD40 interactions with dendritic "
+         "cells, licensing them for optimal CTL priming. CD4+ T cells can also directly "
+         "kill MHC-II+ tumor cells through granzyme B, though this is less common.",
+         "blood", ["CD4+", "CD3+", "TCR+", "CD40L+"],
+         "lymphoid", "CL:0000624"),
+
+        ("NK cell",
+         "Innate lymphoid cell that provides rapid cytotoxicity against tumor cells without "
+         "requiring prior antigen sensitization or MHC restriction. NK cells integrate "
+         "activating signals (NKG2D binding MICA/B on stressed cells, DNAM-1, natural "
+         "cytotoxicity receptors NKp46/NKp30/NKp44) and inhibitory signals (KIR receptors "
+         "binding self-MHC-I). When activating signals exceed inhibitory, NK cells degranulate "
+         "(perforin/granzyme) and produce IFN-gamma and TNF-alpha. NK cells are particularly "
+         "effective against MHC-I-low tumor cells (the 'missing self' hypothesis), which "
+         "escape CD8+ T cell recognition. CD56bright NK cells (blood) produce cytokines; "
+         "CD56dim NK cells (tissue) are primarily cytotoxic. In prostate cancer, NK cell "
+         "infiltration is associated with better outcomes but is often limited by TGF-beta "
+         "and IL-10 in the immunosuppressive TME.",
+         "blood", ["CD56+", "CD16+", "NKp46+", "NKG2D+", "perforin+"],
+         "lymphoid", "CL:0000623"),
+
+        ("Macrophage",
+         "Phagocytic myeloid cell with remarkable plasticity, existing on a spectrum between "
+         "classically activated M1 (anti-tumor) and alternatively activated M2 (pro-tumor) "
+         "states. M1 macrophages are induced by IFN-gamma + LPS/TNF-alpha, express iNOS "
+         "(produces anti-microbial NO), IL-12, TNF-alpha, and MHC-II, and perform "
+         "phagocytosis and antigen presentation. M2 macrophages are induced by IL-4/IL-13 "
+         "(M2a), immune complexes (M2b), or IL-10/TGF-beta/glucocorticoids (M2c), express "
+         "CD163, CD206 (mannose receptor), arginase-1, and secrete IL-10, TGF-beta, VEGF, "
+         "and MMPs. Tumor-associated macrophages (TAMs) in prostate cancer are predominantly "
+         "M2-polarized, promoting tumor growth through angiogenesis (VEGF), ECM remodeling "
+         "(MMP2/9), immunosuppression (IL-10, PD-L1), and direct growth factor production "
+         "(EGF, FGF). High CD163+ TAM density correlates with biochemical recurrence and "
+         "metastasis. TAMs represent the most abundant immune cell in the prostate TME.",
+         "blood", ["CD68+", "CD163+", "CD14+", "CSF1R+", "CD206+"],
+         "myeloid", "CL:0000235"),
+
+        ("Prostate cancer stem cell",
+         "Self-renewing subpopulation (~0.1-5% of tumor cells) with enhanced tumorigenicity, "
+         "chemoresistance, and metastatic potential. Prostate CSCs are enriched by CD44+/"
+         "CD24-/ALDH+ phenotype, express pluripotency factors (OCT4, SOX2, NANOG), and "
+         "demonstrate asymmetric division generating both CSC daughters and differentiated "
+         "bulk tumor cells. CSCs resist standard therapies through quiescence (slow cycling, "
+         "evading anti-mitotic drugs), ABC transporter efflux (ABCG2), enhanced DNA repair, "
+         "anti-apoptotic programs (BCL2, MCL1), and immune evasion (low MHC-I). They express "
+         "integrin alpha2-beta1 for basement membrane adhesion and CD133 for stem identity. "
+         "CSCs are enriched after ADT, chemotherapy, and radiation, driving treatment "
+         "resistance and tumor recurrence.",
+         "prostate", ["CD44+", "ALDH+", "CD133+", "integrin-a2b1+", "SOX2+", "NANOG+"],
+         "epithelial", ""),
+
+        ("Regulatory T cell",
+         "Immunosuppressive CD4+ T cell subset defined by the master transcription factor "
+         "FOXP3 and surface markers CD25 (IL-2 receptor alpha chain) and CTLA-4. Tregs "
+         "suppress anti-tumor immunity through multiple mechanisms: IL-10 and TGF-beta "
+         "secretion (inhibit effector T cells and NK cells), CTLA-4-mediated trans-endocytosis "
+         "of CD80/CD86 from dendritic cells (removing co-stimulatory signals), IL-2 "
+         "consumption (metabolic disruption of effector T cells), and granzyme B-mediated "
+         "killing of effector cells. In the prostate TME, Tregs are recruited by CCL22 "
+         "and CXCL12 secreted by tumor cells and are expanded by TGF-beta and IDO-producing "
+         "myeloid-derived suppressor cells. High Treg infiltration correlates with poor "
+         "outcomes. Anti-CTLA-4 antibodies (ipilimumab) deplete Tregs in the TME through "
+         "Fc-mediated ADCC while simultaneously blocking CTLA-4 checkpoint on effector T cells.",
+         "blood", ["CD4+", "CD25hi", "FOXP3+", "CTLA-4+", "GITR+", "CD127lo"],
+         "lymphoid", "CL:0000815"),
     ]
     count = 0
     for name, desc, origin, markers, lineage, cl_id in cell_types:
