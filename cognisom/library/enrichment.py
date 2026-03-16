@@ -872,6 +872,68 @@ class EntityEnricher:
         "complement": ["extracellular", "blood"],
     }
 
+    # Name-specific overrides for morphologically distinct entities
+    # These override the type-level defaults with realistic per-entity specs
+    _NAME_OVERRIDES = {
+        # T cells — small smooth lymphocytes
+        "CD8+ Naive T cell": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.3, 0.7, 0.9]},
+        "CD8+ Effector T cell": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.2, 0.5, 0.9]},
+        "CD8+ Memory T cell": {"mesh_type": "smooth_sphere", "scale_um": 7.5, "color_rgb": [0.3, 0.6, 0.85]},
+        "CD4+ Th1 cell": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.4, 0.8, 0.4]},
+        "CD4+ Th2 cell": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.5, 0.9, 0.3]},
+        "CD4+ Th17 cell": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.6, 0.7, 0.2]},
+        "Regulatory T cell (Treg)": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.3, 0.6, 0.3]},
+        "T follicular helper (Tfh)": {"mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.4, 0.7, 0.5]},
+        "Gamma-delta T cell": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.5, 0.6, 0.7]},
+        # NK cells — medium, granular
+        "NK cell": {"mesh_type": "granular_sphere", "scale_um": 12.0, "color_rgb": [0.9, 0.3, 0.3]},
+        "NKT cell": {"mesh_type": "granular_sphere", "scale_um": 10.0, "color_rgb": [0.8, 0.35, 0.4]},
+        # Macrophages — large, morphology-distinct
+        "Macrophage M1": {"mesh_type": "ruffled_pseudopod", "scale_um": 20.0, "color_rgb": [0.9, 0.5, 0.2]},
+        "Macrophage M2": {"mesh_type": "elongated_spindle", "scale_um": 18.0, "color_rgb": [0.7, 0.6, 0.3]},
+        # Dendritic cells — stellate
+        "Conventional dendritic cell (cDC)": {"mesh_type": "stellate_branching", "scale_um": 15.0, "color_rgb": [0.8, 0.6, 0.2]},
+        "Plasmacytoid dendritic cell (pDC)": {"mesh_type": "smooth_sphere", "scale_um": 10.0, "color_rgb": [0.7, 0.5, 0.8]},
+        # B cells — small lymphocytes
+        "Naive B cell": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.3, 0.4, 0.9]},
+        "Memory B cell": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.4, 0.5, 0.85]},
+        "Plasma cell": {"mesh_type": "eccentric_nucleus_er", "scale_um": 14.0, "color_rgb": [0.5, 0.3, 0.9]},
+        # Granulocytes
+        "Neutrophil": {"mesh_type": "multilobed_granular", "scale_um": 13.0, "color_rgb": [0.7, 0.7, 0.8]},
+        "Mast cell": {"mesh_type": "dense_granular", "scale_um": 12.0, "color_rgb": [0.6, 0.2, 0.6]},
+        "Basophil": {"mesh_type": "dense_granular", "scale_um": 10.0, "color_rgb": [0.5, 0.2, 0.7]},
+        "Eosinophil": {"mesh_type": "bilobed_granular", "scale_um": 13.0, "color_rgb": [0.9, 0.5, 0.4]},
+        # ILCs
+        "ILC1": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.4, 0.8, 0.5]},
+        "ILC2": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.5, 0.9, 0.4]},
+        "ILC3": {"mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.6, 0.7, 0.3]},
+        # Cell types from seed_data
+        "Luminal epithelial cell": {"usd_prim_type": "BioCell", "mesh_type": "polarized_columnar", "scale_um": 15.0, "color_rgb": [0.9, 0.7, 0.5]},
+        "Basal epithelial cell": {"usd_prim_type": "BioCell", "mesh_type": "cuboidal", "scale_um": 10.0, "color_rgb": [0.7, 0.6, 0.4]},
+        "Neuroendocrine cell": {"usd_prim_type": "BioCell", "mesh_type": "dense_granular", "scale_um": 12.0, "color_rgb": [0.6, 0.4, 0.8]},
+        "Stromal fibroblast": {"usd_prim_type": "BioCell", "mesh_type": "elongated_spindle", "scale_um": 25.0, "color_rgb": [0.6, 0.5, 0.4]},
+        "Cancer-associated fibroblast": {"usd_prim_type": "BioCell", "mesh_type": "elongated_spindle", "scale_um": 30.0, "color_rgb": [0.8, 0.4, 0.3]},
+        "Endothelial cell": {"usd_prim_type": "BioEndothelialCell", "mesh_type": "flat_squamous", "scale_um": 20.0, "color_rgb": [0.5, 0.7, 0.9]},
+        "CD8+ T cell": {"usd_prim_type": "BioImmuneCell", "mesh_type": "smooth_sphere", "scale_um": 8.0, "color_rgb": [0.2, 0.5, 0.9]},
+        "CD4+ T cell": {"usd_prim_type": "BioImmuneCell", "mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.4, 0.8, 0.4]},
+        "Macrophage": {"usd_prim_type": "BioImmuneCell", "mesh_type": "ruffled_pseudopod", "scale_um": 20.0, "color_rgb": [0.9, 0.5, 0.2]},
+        "Prostate cancer stem cell": {"usd_prim_type": "BioCell", "mesh_type": "irregular_ruffled", "scale_um": 12.0, "color_rgb": [0.9, 0.2, 0.2]},
+        "Regulatory T cell": {"usd_prim_type": "BioImmuneCell", "mesh_type": "smooth_sphere", "scale_um": 7.0, "color_rgb": [0.3, 0.6, 0.3]},
+        # Viruses
+        "SARS-CoV-2": {"mesh_type": "enveloped_corona_spikes", "scale_um": 0.12, "color_rgb": [0.9, 0.3, 0.3]},
+        "Influenza A": {"mesh_type": "enveloped_ha_na_spikes", "scale_um": 0.1, "color_rgb": [0.3, 0.6, 0.9]},
+        "HIV-1": {"mesh_type": "enveloped_sparse_spikes", "scale_um": 0.12, "color_rgb": [0.8, 0.2, 0.5]},
+        "Epstein-Barr virus (EBV)": {"mesh_type": "enveloped_smooth", "scale_um": 0.17, "color_rgb": [0.5, 0.3, 0.8]},
+        "Hepatitis B virus (HBV)": {"mesh_type": "enveloped_small", "scale_um": 0.042, "color_rgb": [0.7, 0.5, 0.2]},
+        "Measles virus": {"mesh_type": "enveloped_pleomorphic", "scale_um": 0.15, "color_rgb": [0.9, 0.6, 0.2]},
+        "Rabies virus": {"mesh_type": "bullet_shape", "scale_um": 0.18, "color_rgb": [0.4, 0.4, 0.4]},
+        # Bacteria
+        "Staphylococcus aureus": {"mesh_type": "coccus_cluster", "scale_um": 1.0, "color_rgb": [0.9, 0.8, 0.2]},
+        "Escherichia coli (UPEC)": {"mesh_type": "rod_flagellated", "scale_um": 2.0, "color_rgb": [0.5, 0.8, 0.3]},
+        "Mycobacterium tuberculosis": {"mesh_type": "rod_acid_fast", "scale_um": 3.0, "color_rgb": [0.8, 0.3, 0.3]},
+        "Pseudomonas aeruginosa": {"mesh_type": "rod_flagellated", "scale_um": 2.5, "color_rgb": [0.2, 0.7, 0.5]},
+    }
+
     def enrich_with_defaults(
         self, progress_callback: Optional[Callable] = None,
     ) -> EnrichmentReport:
@@ -911,6 +973,14 @@ class EntityEnricher:
             if compartments and not entity.compartments:
                 entity.compartments = list(compartments)
                 changed = True
+
+            # Name-specific overrides (always apply — these are morphology-correct)
+            name_override = self._NAME_OVERRIDES.get(entity.name, {})
+            if name_override:
+                for field in ("usd_prim_type", "mesh_type", "scale_um", "color_rgb"):
+                    if field in name_override:
+                        setattr(entity, field, name_override[field])
+                        changed = True
 
             if changed:
                 try:
