@@ -1208,6 +1208,121 @@ def _seed_antibody_types(store: EntityStore) -> int:
 # ── Complement Components ──────────────────────────────────────────
 
 def _seed_complement_components(store: EntityStore) -> int:
+    _comp_descriptions = {
+        "C1q": (
+            "Pattern recognition molecule of the classical complement pathway (460 kDa hexamer of "
+            "trimers, resembling a bouquet of tulips). C1q binds the CH2 domain of IgG1/IgG3 Fc "
+            "regions and the CH3 domain of IgM Fc when antibodies are complexed with antigen (single "
+            "IgM pentamer or >=2 IgG molecules). Also recognizes apoptotic cells (phosphatidylserine, "
+            "DNA), CRP, pentraxins, and some microbial surfaces directly. C1q binding activates C1r "
+            "and C1s serine proteases within the C1 complex, initiating the classical cascade. C1q "
+            "deficiency is the strongest single genetic risk factor for SLE (~90% penetrance), because "
+            "impaired clearance of apoptotic debris drives autoantigen exposure."
+        ),
+        "C3": (
+            "Central component of all three complement pathways (185 kDa, most abundant complement "
+            "protein at 1.0-1.3 mg/mL in serum). C3 convertases (C4b2a classical/lectin; C3bBb "
+            "alternative) cleave C3 into C3a (9 kDa anaphylatoxin) and C3b (176 kDa opsonin). C3b "
+            "covalently attaches to pathogen surfaces via a reactive thioester bond, tagging them "
+            "for phagocytosis through CR1 (CD35) on macrophages/neutrophils. C3b also forms the "
+            "C5 convertase (C4b2a3b or C3bBb3b) and feeds the amplification loop: each C3b can "
+            "recruit Factor B to generate more C3 convertase, producing ~2 million C3b molecules "
+            "within 5 minutes. C3 deficiency causes severe recurrent pyogenic infections."
+        ),
+        "C3a": (
+            "Anaphylatoxin (9 kDa peptide) released during C3 cleavage by any complement pathway. "
+            "Binds C3aR (GPCR) on mast cells triggering histamine release, on smooth muscle cells "
+            "causing contraction, and on endothelial cells increasing vascular permeability. C3a is "
+            "also a neutrophil and monocyte chemoattractant. In the CNS, C3a/C3aR signaling mediates "
+            "synaptic pruning during development and in neurodegeneration (Alzheimer's complement "
+            "hypothesis). C3a is rapidly inactivated by carboxypeptidase N (removing C-terminal Arg "
+            "to form C3a-desArg, which has no anaphylatoxin activity)."
+        ),
+        "C3b": (
+            "Major opsonin of the complement system (176 kDa). When C3 is cleaved, C3b undergoes "
+            "conformational change exposing a reactive thioester that covalently bonds to hydroxyl "
+            "or amino groups on target surfaces (pathogen cell walls, immune complexes). Surface-bound "
+            "C3b is recognized by complement receptor 1 (CR1/CD35) on phagocytes, triggering "
+            "phagocytosis. C3b also amplifies complement activation by binding Factor B → cleaved by "
+            "Factor D → forming C3bBb alternative pathway convertase. C3b is regulated by Factor H "
+            "(blocks Factor B binding) and Factor I (cleaves C3b to iC3b → C3dg → C3d). iC3b binds "
+            "CR3 (Mac-1/CD11b-CD18) for enhanced phagocytosis."
+        ),
+        "C5": (
+            "Complement C5 (190 kDa) is cleaved by C5 convertases into C5a (11 kDa, most potent "
+            "anaphylatoxin) and C5b (initiates terminal/lytic pathway). C5a binds C5aR1 (CD88, GPCR) "
+            "on neutrophils, macrophages, and endothelial cells — it is the most potent complement "
+            "chemoattractant and activator: 100x more potent than C3a. C5a induces neutrophil "
+            "degranulation, oxidative burst, and expression of adhesion molecules. C5b associates "
+            "with C6, C7, C8, and multiple C9 molecules to form the membrane attack complex (MAC). "
+            "Eculizumab (anti-C5 mAb) blocks MAC formation and treats paroxysmal nocturnal "
+            "hemoglobinuria (PNH) and atypical hemolytic uremic syndrome (aHUS). C5 deficiency causes "
+            "susceptibility to Neisseria infections."
+        ),
+        "C5a": (
+            "Most potent anaphylatoxin and chemotactic factor in the complement system (11 kDa "
+            "glycopeptide). C5a signals through C5aR1 (CD88), a Gi-coupled GPCR, activating PI3K, "
+            "PLC, and MAPK pathways. Effects: neutrophil chemotaxis (effective at picomolar "
+            "concentrations), degranulation, superoxide generation, upregulation of CR1/CR3 "
+            "adhesion molecules, and delayed apoptosis. On endothelium: P-selectin mobilization, "
+            "IL-8 production, increased vascular permeability. On mast cells: degranulation "
+            "independent of IgE. In sepsis, excessive C5a causes neutrophil paralysis (impaired "
+            "chemotaxis, reduced oxidative burst) contributing to immune dysfunction. Avacopan "
+            "(C5aR1 antagonist) treats ANCA-associated vasculitis."
+        ),
+        "Factor B": (
+            "Serine protease zymogen (93 kDa) of the alternative complement pathway. Factor B binds "
+            "C3b on pathogen surfaces, forming the pro-convertase C3bB. Factor D then cleaves Factor B "
+            "into Ba (33 kDa, released) and Bb (60 kDa, remains bound to C3b as the catalytic subunit "
+            "of the alternative pathway C3 convertase C3bBb). C3bBb has a half-life of only ~90 seconds "
+            "unless stabilized by properdin. The alternative pathway amplification loop continuously "
+            "generates C3b, providing constant low-level surveillance (tick-over mechanism). Factor B "
+            "gain-of-function mutations cause C3 glomerulopathy (dense deposit disease, C3 "
+            "glomerulonephritis). Factor B inhibitors are in development for complement-mediated diseases."
+        ),
+        "Factor D": (
+            "Rate-limiting serine protease (24 kDa) of the alternative complement pathway and the "
+            "least abundant complement protein in serum (~2 ug/mL). Factor D exists in an active "
+            "conformation (unusual for serine proteases, which are typically zymogens) and specifically "
+            "cleaves Factor B when Factor B is complexed with C3b. This single enzymatic step generates "
+            "the Bb catalytic subunit of the alternative pathway C3 convertase. Factor D's low "
+            "concentration makes it a therapeutic bottleneck: Factor D inhibitors (danicopan/ACH-4471) "
+            "effectively shut down the alternative pathway and are approved for PNH."
+        ),
+        "Properdin": (
+            "The only known positive regulator of complement activation (53 kDa monomer, functions "
+            "as dimers/trimers/tetramers). Properdin stabilizes the alternative pathway C3 convertase "
+            "(C3bBb) by binding to C3b, extending its half-life from ~90 seconds to ~30 minutes. "
+            "Properdin can also directly recognize pathogen surfaces (Neisseria, zymosan, apoptotic "
+            "cells) and recruit C3b, serving as a pattern recognition molecule for the alternative "
+            "pathway. Properdin deficiency (X-linked) causes susceptibility to fulminant "
+            "meningococcal disease."
+        ),
+        "MBL": (
+            "Mannose-binding lectin (32 kDa monomers forming oligomers of 2-6 trimers) is the "
+            "pattern recognition molecule of the lectin complement pathway. MBL recognizes terminal "
+            "mannose, fucose, and N-acetylglucosamine residues on microbial surfaces (bacteria, "
+            "fungi, viruses) but not on mammalian cells (which present terminal sialic acid and "
+            "galactose). MBL-associated serine proteases (MASP-1 and MASP-2) are activated upon "
+            "MBL binding, cleaving C4 and C2 to generate the lectin pathway C3 convertase (C4b2a, "
+            "identical to classical pathway). MBL deficiency (common, ~5% of Caucasians have very "
+            "low levels) increases infection susceptibility primarily in early childhood before the "
+            "adaptive immune repertoire matures."
+        ),
+        "MAC (C5b-9)": (
+            "Membrane attack complex — a transmembrane pore formed by sequential assembly of C5b, "
+            "C6, C7 (inserts into lipid bilayer), C8 (initiates pore), and 12-18 C9 molecules "
+            "(polymerize into a ring, forming the ~100 Angstrom diameter pore). The MAC disrupts "
+            "membrane integrity, causing ion flux (Ca2+ influx, K+ efflux), osmotic swelling, and "
+            "cell lysis. Particularly effective against Gram-negative bacteria (thin peptidoglycan + "
+            "outer membrane). Gram-positive bacteria and nucleated cells resist MAC through thick "
+            "peptidoglycan or CD59 (protectin, blocks C9 polymerization). Sublytic MAC on nucleated "
+            "cells activates NF-kappaB and MAPK signaling. MAC formation on self-cells is prevented "
+            "by CD59; deficiency (PNH, due to GPI anchor loss) causes complement-mediated "
+            "intravascular hemolysis."
+        ),
+    }
+
     components = [
         # (name, pathway, step, products, function, deficiency, gene, conc_ug_ml)
         ("C1q", "classical", 1, ["C1q-Ab complex"],
@@ -1249,7 +1364,7 @@ def _seed_complement_components(store: EntityStore) -> int:
         entity = ComplementComponent(
             name=name,
             display_name=name,
-            description=function,
+            description=_comp_descriptions.get(name, function),
             pathway=pathway,
             activation_step=step,
             cleavage_products=products,
