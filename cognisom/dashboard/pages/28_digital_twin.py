@@ -163,7 +163,12 @@ for i, (name, present, therapy) in enumerate(vulnerabilities):
 
 st.header("Treatment Simulation")
 
-simulator = TreatmentSimulator()
+try:
+    from cognisom.library.store import EntityStore
+    _entity_store = EntityStore()
+    simulator = TreatmentSimulator(store=_entity_store)
+except Exception:
+    simulator = TreatmentSimulator()  # Fallback to hardcoded
 
 # Auto-recommend if none selected
 if not selected_treatments:
