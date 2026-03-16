@@ -16,11 +16,12 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="Researcher | Cognisom", page_icon="🔬", layout="wide")
+safe_set_page_config(page_title="Researcher | Cognisom", page_icon="🔬", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("22_researcher")

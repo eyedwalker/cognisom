@@ -12,11 +12,12 @@ Features:
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(
+safe_set_page_config(
     page_title="Physics Engine | Cognisom",
     page_icon="⚛️",
     layout="wide",

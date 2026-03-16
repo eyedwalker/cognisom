@@ -1163,10 +1163,7 @@ Spatial Transcriptomics <span class="arch-dim">──></span> Tissue Map <span c
     </div>
     """, unsafe_allow_html=True)
 
-    from cognisom.auth.middleware import streamlit_login_gate
-    streamlit_login_gate()
-
-    # ── Footer ────────────────────────────────────────────────────
+    # ── Footer (rendered before login gate since st.stop() halts execution) ──
     from cognisom.dashboard.footer import render_footer, VERSION, BUILD_DATE
     if _has_inception_badge:
         footer_b1, footer_b2, footer_b3 = st.columns([3, 1, 3])
@@ -1182,9 +1179,20 @@ Spatial Transcriptomics <span class="arch-dim">──></span> Tissue Map <span c
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Sign In / Register ─────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="section-header">Sign In</div>
+    <div class="section-sub">Log in to access the platform, or create an account to get started</div>
+    <div class="gradient-line"></div>
+    """, unsafe_allow_html=True)
+
+    from cognisom.auth.middleware import streamlit_login_gate
+    streamlit_login_gate()
+
 
 # ════════════════════════════════════════════════════════════════════
-# AUTHENTICATED DASHBOARD (logged in)
+# AUTHENTICATED DASHBOARD (logged in) — Grouped Navigation
 # ════════════════════════════════════════════════════════════════════
 
 else:
@@ -1219,160 +1227,86 @@ else:
             InactivityMonitor.get_or_start()
             st.markdown(inject_activity_tracker(), unsafe_allow_html=True)
     except Exception:
-        pass  # Not on GPU instance or infrastructure module unavailable
+        pass
 
-    # Sidebar
+    # Sidebar user info
     st.sidebar.markdown(f"**Logged in as:** {st.session_state.get('username', 'unknown')}")
     if user.org_id:
-        org_mgr = _get_org_manager()
-        org = org_mgr.get_org(user.org_id)
-        if org:
-            st.sidebar.caption(f"Org: {org.name} ({org.plan.value.title()})")
+        try:
+            org_mgr = _get_org_manager()
+            org = org_mgr.get_org(user.org_id)
+            if org:
+                st.sidebar.caption(f"Org: {org.name} ({org.plan.value.title()})")
+        except Exception:
+            pass
     if st.sidebar.button("Log out"):
         auth = _get_auth_manager()
         session_id = st.session_state.get("session_id")
         if session_id:
             auth.logout(session_id)
-        # Clear all auth-related session state (local + Cognito)
         for key in ["session_id", "username", "cognito_access_token",
                     "cognito_refresh_token", "cognito_token_expires"]:
             st.session_state.pop(key, None)
         st.rerun()
     st.sidebar.divider()
 
-    # ── Dashboard content ────────────────────────────────────────
+    # ── Beta disclaimer in sidebar ──
+    st.sidebar.markdown(
+        '<span style="color: #f97316; font-weight: 600; font-size: 0.75rem;">BETA</span>'
+        ' <span style="font-size: 0.7rem; opacity: 0.6;">Research only. Not for clinical use.</span>',
+        unsafe_allow_html=True,
+    )
 
-    def _check_api_key(name, env_var):
-        val = os.environ.get(env_var, "")
-        if not val:
-            env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-            if env_path.exists():
-                for line in env_path.read_text().splitlines():
-                    if line.startswith(f"{env_var}="):
-                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
-        return bool(val) and not val.startswith("your-")
+    # ── Grouped Navigation ─────────────────────────────────────────
+    _pages_dir = Path(__file__).resolve().parent / "pages"
 
-    def _check_module(name, import_path):
-        try:
-            __import__(import_path)
-            return True
-        except ImportError:
-            return False
+    pages = {
+        "Digital Twin": [
+            st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
+            st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
+            st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
+            st.Page(str(_pages_dir / "31_neoantigen_vaccine.py"), title="Neoantigen Vaccine", icon=":material/vaccines:"),
+        ],
+        "Visualization": [
+            st.Page(str(_pages_dir / "29_molecular_viewer.py"), title="Molecular Viewer", icon=":material/view_in_ar:"),
+            st.Page(str(_pages_dir / "30_spatial_tissue.py"), title="Spatial Tissue", icon=":material/map:"),
+            st.Page(str(_pages_dir / "25_diapedesis.py"), title="Diapedesis", icon=":material/bloodtype:"),
+            st.Page(str(_pages_dir / "12_3d_visualization.py"), title="3D Cells & Fields", icon=":material/scatter_plot:"),
+        ],
+        "Drug Discovery": [
+            st.Page(str(_pages_dir / "2_discovery.py"), title="NIM Discovery", icon=":material/science:"),
+            st.Page(str(_pages_dir / "5_molecular_lab.py"), title="Molecular Lab", icon=":material/labs:"),
+        ],
+        "Simulation": [
+            st.Page(str(_pages_dir / "3_simulation.py"), title="9-Module Engine", icon=":material/settings:"),
+            st.Page(str(_pages_dir / "15_physics_engine.py"), title="Physics Engine", icon=":material/bolt:"),
+            st.Page(str(_pages_dir / "19_prostate_metastasis.py"), title="Cancer Progression", icon=":material/target:"),
+            st.Page(str(_pages_dir / "20_vcell_solvers.py"), title="VCell Solvers", icon=":material/calculate:"),
+            st.Page(str(_pages_dir / "21_tissue_scale.py"), title="Tissue Scale", icon=":material/memory:"),
+        ],
+        "Research": [
+            st.Page(str(_pages_dir / "7_research_agent.py"), title="Research Agent", icon=":material/smart_toy:"),
+            st.Page(str(_pages_dir / "6_research_feed.py"), title="Research Feed", icon=":material/newspaper:"),
+            st.Page(str(_pages_dir / "8_subscriptions.py"), title="Subscriptions", icon=":material/mail:"),
+            st.Page(str(_pages_dir / "18_external_databases.py"), title="Databases", icon=":material/database:"),
+            st.Page(str(_pages_dir / "1_ingestion.py"), title="Data Ingestion", icon=":material/download:"),
+            st.Page(str(_pages_dir / "24_data_pipeline.py"), title="Data Pipeline", icon=":material/sync:"),
+        ],
+        "Publish": [
+            st.Page(str(_pages_dir / "22_researcher.py"), title="Researcher", icon=":material/edit_note:"),
+            st.Page(str(_pages_dir / "23_paper_studio.py"), title="Paper Studio", icon=":material/article:"),
+            st.Page(str(_pages_dir / "11_validation.py"), title="Validation", icon=":material/verified:"),
+            st.Page(str(_pages_dir / "14_entity_library.py"), title="Entity Library", icon=":material/library_books:"),
+            st.Page(str(_pages_dir / "16_usd_omniverse.py"), title="USD & Omniverse", icon=":material/public:"),
+            st.Page(str(_pages_dir / "17_flywheel_monitor.py"), title="Flywheel Monitor", icon=":material/autorenew:"),
+        ],
+        "Admin": [
+            st.Page(str(_pages_dir / "9_account.py"), title="Account", icon=":material/person:"),
+            st.Page(str(_pages_dir / "13_organization.py"), title="Organization", icon=":material/business:"),
+            st.Page(str(_pages_dir / "10_security.py"), title="Security", icon=":material/lock:"),
+            st.Page(str(_pages_dir / "4_admin.py"), title="Platform Admin", icon=":material/admin_panel_settings:"),
+        ],
+    }
 
-    # ── Beta Disclaimer (post-login) ──────────────────────────────
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, rgba(234,88,12,0.15), rgba(234,88,12,0.05));
-                border: 1px solid rgba(234,88,12,0.35); border-radius: 8px;
-                padding: 0.6rem 1rem; margin-bottom: 1rem;">
-        <span style="color: #f97316; font-weight: 600; font-size: 0.85rem;">BETA</span>
-        <span style="font-size: 0.8rem; opacity: 0.7;">
-            &mdash; This platform is in beta testing. Results are for research purposes only
-            and must not be used for clinical decision-making. Features may change without notice.
-            By continuing, you acknowledge this is pre-release software.
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.title("Cognisom HDT Platform")
-    st.markdown("**Personalized Molecular Digital Twin Platform for Precision Oncology**")
-
-    # Key metrics
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Simulation Modules", "9",
-                help="Cellular, Immune, Vascular, Lymphatic, Epigenetic, Circadian, Morphogen, Molecular, Receptor")
-    col2.metric("NIM Endpoints", "11",
-                help="MolMIM, GenMol, RFdiffusion, ProteinMPNN, DiffDock, ESM2, OpenFold3, Boltz-2, Evo2, AlphaFold2-Multimer, MSA-Search")
-    col3.metric("Bio-USD Types", "16",
-                help="9 IsA prim schemas + 5 applied API schemas + BioScene + BioExosome")
-
-    # Entity library stats
-    try:
-        from cognisom.library.store import EntityStore
-        _lib_store = EntityStore()
-        _lib_stats = _lib_store.stats()
-        col4.metric("Entity Library", _lib_stats["total_entities"],
-                    help="Genes, proteins, drugs, pathways, cell types, metabolites, mutations, receptors, tissues, organs")
-        col5.metric("Relationships", _lib_stats["total_relationships"],
-                    help="Typed edges: binds_to, activates, inhibits, encodes, regulates, etc.")
-    except Exception:
-        col4.metric("Entity Library", "0", help="Seed the entity library from the Entity Library page")
-        col5.metric("Relationships", "0")
-
-    st.divider()
-
-    # Platform components
-    st.subheader("Platform Components")
-    comp1, comp2 = st.columns(2)
-
-    with comp1:
-        st.markdown("##### Core Engine")
-        for name, pkg in [("NumPy", "numpy"), ("SciPy", "scipy"), ("Scanpy", "scanpy"),
-                          ("AnnData", "anndata"), ("Flask", "flask"), ("Plotly", "plotly")]:
-            ok = _check_module(name, pkg)
-            st.markdown(f"- {'`OK`' if ok else '`MISSING`'} {name}")
-
-        st.markdown("##### GPU Acceleration")
-        for name, pkg in [("RAPIDS-singlecell", "rapids_singlecell"),
-                          ("CuPy", "cupy"), ("PyTorch", "torch")]:
-            ok = _check_module(name, pkg)
-            st.markdown(f"- {'`OK`' if ok else '`N/A`'} {name}")
-
-    with comp2:
-        st.markdown("##### API Keys")
-        for name, env in [("NVIDIA NIM API", "NVIDIA_API_KEY"),
-                          ("NGC Container Registry", "NGC_API_KEY")]:
-            ok = _check_api_key(name, env)
-            st.markdown(f"- {'`CONFIGURED`' if ok else '`NOT SET`'} {name}")
-
-        st.markdown("##### NIM Microservices")
-        for n in ["MolMIM (Molecule Generation)", "GenMol (Fragment-Based Generation)",
-                  "RFdiffusion (Protein Design)", "ProteinMPNN (Sequence Design)",
-                  "DiffDock (Molecular Docking)", "ESM2-650M (Protein Embeddings)",
-                  "OpenFold3 (Structure Prediction)", "Boltz-2 (Complex Prediction)",
-                  "Evo2 (Genomic Foundation Model)", "AlphaFold2-Multimer (Multi-chain)",
-                  "MSA-Search (Sequence Alignment)"]:
-            st.markdown(f"- `READY` {n}")
-
-    st.divider()
-
-    # Architecture
-    st.subheader("Architecture")
-    st.code("""
-PATIENT DATA
-  VCF (Tumor DNA) ──> Variant Annotator ──> Cancer Driver ID (14 genes) ──┐
-  scRNA-seq ─────────> Cell Archetypes ──> Immune Profiling ──────────────┤
-  Spatial Transcriptomics ──> Tissue Map ──> TME Characterization ────────┘
-                                                                          │
-DIGITAL TWIN                                                              v
-  Genomic Profile + Immune Landscape ──> Personalized Digital Twin
-    ──> Treatment Simulation (7 regimens) ──> RECIST + Survival + irAE
-
-AI LAYER (11 NVIDIA BioNeMo NIMs)
-  MolMIM / GenMol / RFdiffusion / ProteinMPNN / DiffDock / ESM2
-  OpenFold3 / Boltz-2 / AlphaFold2 / Evo2 / MSA-Search
-
-SIMULATION (9 Modules) ──> 3D Visualization ──> Dashboard (you are here)
-KNOWLEDGE: Bio-USD (16 types) + Entity Library (99 entities)
-RESEARCH: 22 sources + AI Agent ◀── PubMed / bioRxiv / arXiv
-    """, language=None)
-
-    st.divider()
-
-    # Data directory
-    st.subheader("Data Directory")
-    data_dir = Path(__file__).resolve().parent.parent.parent / "data" / "scrna"
-    if data_dir.exists():
-        h5ad_files = list(data_dir.glob("*.h5ad"))
-        if h5ad_files:
-            for f in h5ad_files:
-                st.markdown(f"- `{f.name}` ({f.stat().st_size / 1e6:.1f} MB)")
-        else:
-            st.info("No .h5ad datasets yet. Use the **Ingestion** page to run the pipeline.")
-    else:
-        st.info("No data directory yet. Use the **Ingestion** page to generate synthetic data.")
-
-    st.sidebar.markdown("---")
-    from cognisom.dashboard.footer import VERSION, BUILD_DATE
-    st.sidebar.caption("eyentelligence inc.")
-    st.sidebar.caption(f"v{VERSION} | Built {BUILD_DATE}")
-    st.sidebar.caption("NVIDIA Inception Member")
+    nav = st.navigation(pages)
+    nav.run()

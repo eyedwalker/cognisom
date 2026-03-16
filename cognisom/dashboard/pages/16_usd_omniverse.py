@@ -15,13 +15,14 @@ Tabs:
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import json
 import math
 import os
 from dataclasses import asdict, fields, is_dataclass
 from typing import get_type_hints
 
-st.set_page_config(
+safe_set_page_config(
     page_title="USD & Omniverse | Cognisom",
     page_icon="🎬",
     layout="wide",

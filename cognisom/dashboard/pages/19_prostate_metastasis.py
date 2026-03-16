@@ -12,11 +12,12 @@ For Harvard immunology demo: Educational visualization of cancer progression.
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import streamlit.components.v1 as components
 import numpy as np
 import json
 
-st.set_page_config(page_title="Prostate Metastasis", page_icon="🔬", layout="wide")
+safe_set_page_config(page_title="Prostate Metastasis", page_icon="🔬", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("19_prostate_metastasis")

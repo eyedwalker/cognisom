@@ -11,12 +11,13 @@ Pipeline: VCF -> HLA Typing -> Neoantigen Prediction -> Vaccine Design
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import logging
 
-st.set_page_config(
+safe_set_page_config(
     page_title="Neoantigen Vaccine",
     page_icon="\U0001f489",
     layout="wide",

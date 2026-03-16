@@ -28,8 +28,9 @@ import os
 import time
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 
-st.set_page_config(
+safe_set_page_config(
     page_title="Diapedesis Simulator | Cognisom",
     page_icon="🩸",
     layout="wide",

@@ -10,11 +10,12 @@ Browse and import data from external biological databases:
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import plotly.graph_objects as go
 import networkx as nx
 from typing import List
 
-st.set_page_config(
+safe_set_page_config(
     page_title="External Databases | Cognisom",
     page_icon="🌐",
     layout="wide",

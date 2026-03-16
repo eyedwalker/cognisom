@@ -13,12 +13,13 @@ Features:
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 
-st.set_page_config(
+safe_set_page_config(
     page_title="Flywheel Monitor | Cognisom",
     page_icon="🔄",
     layout="wide",

@@ -16,10 +16,11 @@ Sections:
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import time
 import numpy as np
 
-st.set_page_config(
+safe_set_page_config(
     page_title="Tissue-Scale Simulation | Cognisom",
     page_icon="🧬",
     layout="wide",

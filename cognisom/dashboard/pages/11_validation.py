@@ -7,12 +7,13 @@ benchmarks, calibrating parameters, and profiling performance.
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import json
 import time
 
 import numpy as np
 
-st.set_page_config(page_title="Validation", page_icon="V", layout="wide")
+safe_set_page_config(page_title="Validation", page_icon="V", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("11_validation")

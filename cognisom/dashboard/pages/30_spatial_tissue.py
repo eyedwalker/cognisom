@@ -10,10 +10,11 @@ Phase 5 of the Molecular Digital Twin pipeline.
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import numpy as np
 import logging
 
-st.set_page_config(page_title="Spatial Tissue", page_icon="🔬", layout="wide")
+safe_set_page_config(page_title="Spatial Tissue", page_icon="🔬", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("30_spatial_tissue")

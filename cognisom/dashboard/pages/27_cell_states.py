@@ -12,13 +12,14 @@ Phase 2 of the Molecular Digital Twin pipeline.
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import logging
 
-st.set_page_config(page_title="Cell States", page_icon="🔬", layout="wide")
+safe_set_page_config(page_title="Cell States", page_icon="🔬", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("27_cell_states")

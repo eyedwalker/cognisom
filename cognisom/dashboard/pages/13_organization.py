@@ -8,9 +8,10 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 from datetime import datetime
 
-st.set_page_config(page_title="Organization | Cognisom", page_icon="🏢", layout="wide")
+safe_set_page_config(page_title="Organization | Cognisom", page_icon="🏢", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate, _get_auth_manager, _get_org_manager
 user = streamlit_page_gate("13_organization")

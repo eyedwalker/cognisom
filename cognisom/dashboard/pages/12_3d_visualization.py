@@ -9,13 +9,14 @@ to PDB, glTF, VTK, and CSV.
 """
 
 import streamlit as st
+from cognisom.dashboard.page_config import safe_set_page_config
 import streamlit.components.v1 as components
 import numpy as np
 import tempfile
 import json
 from pathlib import Path
 
-st.set_page_config(page_title="3D Visualization", page_icon="3", layout="wide")
+safe_set_page_config(page_title="3D Visualization", page_icon="3", layout="wide")
 
 from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("12_3d_visualization")
