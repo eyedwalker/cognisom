@@ -705,6 +705,46 @@ def _seed_manual_genes(loader: EntityLoader) -> int:
         )
         if loader.store.add_entity(gene):
             count += 1
+
+    # Add simulation-specific immune effects to gene entities
+    # These values are used by twin_config.py via parameter_resolver
+    _gene_immune_effects = {
+        "PTEN": {"mhc1_downregulation_effect": 0.3, "tumor_growth_multiplier": 1.3,
+                 "pi3k_pathway_activation": 0.8},
+        "TP53": {"mhc1_downregulation_effect": 0.2, "tumor_growth_multiplier": 1.2,
+                 "apoptosis_evasion": 0.5},
+        "AR": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.1,
+               "ar_signaling_boost": 1.5},
+        "RB1": {"mhc1_downregulation_effect": 0.1, "tumor_growth_multiplier": 1.15,
+                "neuroendocrine_risk": 0.3},
+        "MYC": {"mhc1_downregulation_effect": 0.1, "tumor_growth_multiplier": 1.4,
+                "metabolic_reprogramming": 0.6},
+        "BRCA2": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.0,
+                  "hrd_score": 0.9, "parp_sensitivity": 0.85},
+        "ATM": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.05,
+                "hrd_score": 0.5, "parp_sensitivity": 0.5},
+        "CDK12": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.1,
+                  "neoantigen_generation": 0.7, "immunotherapy_sensitivity": 0.6},
+        "SPOP": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.1,
+                 "ar_stability_increase": 0.4},
+        "ERG": {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.1,
+                "invasion_boost": 0.5},
+        "PIK3CA": {"mhc1_downregulation_effect": 0.1, "tumor_growth_multiplier": 1.2,
+                   "pi3k_pathway_activation": 0.7},
+        "EZH2": {"mhc1_downregulation_effect": 0.15, "tumor_growth_multiplier": 1.15,
+                 "epigenetic_silencing": 0.6, "neuroendocrine_risk": 0.2},
+    }
+    for gene_name, effects in _gene_immune_effects.items():
+        entity = loader.store.find_entity_by_name(gene_name, "gene")
+        if entity:
+            pp = entity.physics_params if hasattr(entity, "physics_params") else {}
+            pp.update(effects)
+            entity.physics_params = pp
+            try:
+                loader.store.update_entity(entity, changed_by="seed_immune_effects")
+            except Exception:
+                pass
+
     return count
 
 
@@ -868,6 +908,83 @@ def _seed_drugs(loader: EntityLoader) -> int:
     for name, dclass, mech, targets, status, smiles in drugs:
         loader.add_drug(name, dclass, mech, targets, status, smiles)
         count += 1
+
+    # Add simulation-specific physics_params to drug entities
+    # These values transfer the TREATMENT_PROFILES data into the entity library
+    _drug_sim_params = {
+        "Enzalutamide": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.05,
+            "effect_onset_days": 30, "effect_ramp_days": 21,
+            "requires_ar_sensitivity": True, "best_for": ["any"],
+        },
+        "Abiraterone": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.05,
+            "effect_onset_days": 28, "effect_ramp_days": 21,
+            "requires_ar_sensitivity": True, "best_for": ["any"],
+        },
+        "Olaparib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.05,
+            "effect_onset_days": 28, "effect_ramp_days": 28,
+            "requires_dna_repair_defect": True, "best_for": ["any"],
+        },
+        "Rucaparib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.05,
+            "effect_onset_days": 28, "effect_ramp_days": 28,
+            "requires_dna_repair_defect": True, "best_for": ["any"],
+        },
+        "Talazoparib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.08,
+            "effect_onset_days": 21, "effect_ramp_days": 21,
+            "requires_dna_repair_defect": True, "best_for": ["any"],
+        },
+        "Pembrolizumab": {
+            "exhaustion_reversal": 0.55, "treg_effect": 0.0, "irae_base_risk": 0.15,
+            "effect_onset_days": 14, "effect_ramp_days": 21,
+            "best_for": ["hot", "suppressed"],
+        },
+        "Docetaxel": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.20,
+            "effect_onset_days": 7, "effect_ramp_days": 14,
+            "best_for": ["any"],
+        },
+        "Cabazitaxel": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.25,
+            "effect_onset_days": 7, "effect_ramp_days": 14,
+            "best_for": ["any"],
+        },
+        "Darolutamide": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.03,
+            "effect_onset_days": 30, "effect_ramp_days": 21,
+            "requires_ar_sensitivity": True, "best_for": ["any"],
+        },
+        "Apalutamide": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.05,
+            "effect_onset_days": 28, "effect_ramp_days": 21,
+            "requires_ar_sensitivity": True, "best_for": ["any"],
+        },
+        "Lutetium-177 PSMA": {
+            "exhaustion_reversal": 0.05, "treg_effect": 0.0, "irae_base_risk": 0.10,
+            "effect_onset_days": 14, "effect_ramp_days": 28,
+            "best_for": ["any"],
+        },
+        "Ipatasertib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.10,
+            "effect_onset_days": 21, "effect_ramp_days": 21,
+            "best_for": ["any"],
+        },
+    }
+
+    for drug_name, sim_params in _drug_sim_params.items():
+        entity = loader.store.find_entity_by_name(drug_name, "drug")
+        if entity:
+            existing_pp = entity.physics_params if hasattr(entity, "physics_params") else {}
+            existing_pp.update(sim_params)
+            entity.physics_params = existing_pp
+            try:
+                loader.store.update_entity(entity, changed_by="seed_simulation_params")
+            except Exception:
+                pass
+
     return count
 
 

@@ -1759,6 +1759,56 @@ def _seed_immune_drugs(store: EntityStore) -> int:
         )
         store.add_entity(entity)
         count += 1
+
+    # Add simulation physics_params to immunotherapy drugs
+    _immuno_sim_params = {
+        "Nivolumab": {
+            "exhaustion_reversal": 0.50, "treg_effect": 0.0, "irae_base_risk": 0.12,
+            "effect_onset_days": 14, "effect_ramp_days": 21,
+            "best_for": ["hot", "suppressed"],
+        },
+        "Ipilimumab": {
+            "exhaustion_reversal": 0.20, "treg_effect": -0.40, "irae_base_risk": 0.35,
+            "effect_onset_days": 21, "effect_ramp_days": 28,
+            "best_for": ["suppressed", "cold"],
+        },
+        "Atezolizumab": {
+            "exhaustion_reversal": 0.50, "treg_effect": 0.0, "irae_base_risk": 0.12,
+            "effect_onset_days": 14, "effect_ramp_days": 21,
+            "best_for": ["hot", "suppressed"],
+        },
+        "Relatlimab": {
+            "exhaustion_reversal": 0.35, "treg_effect": 0.0, "irae_base_risk": 0.10,
+            "effect_onset_days": 14, "effect_ramp_days": 21,
+            "best_for": ["suppressed"],
+        },
+        "Rituximab": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.10,
+            "effect_onset_days": 7, "effect_ramp_days": 14,
+            "best_for": ["any"],
+        },
+        "Tofacitinib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.08,
+            "effect_onset_days": 14, "effect_ramp_days": 28,
+            "best_for": ["any"],
+        },
+        "Ruxolitinib": {
+            "exhaustion_reversal": 0.0, "treg_effect": 0.0, "irae_base_risk": 0.08,
+            "effect_onset_days": 14, "effect_ramp_days": 21,
+            "best_for": ["any"],
+        },
+    }
+    for drug_name, sim_params in _immuno_sim_params.items():
+        entity = store.find_entity_by_name(drug_name, "drug")
+        if entity:
+            pp = entity.physics_params if hasattr(entity, "physics_params") else {}
+            pp.update(sim_params)
+            entity.physics_params = pp
+            try:
+                store.update_entity(entity, changed_by="seed_simulation_params")
+            except Exception:
+                pass
+
     return count
 
 
