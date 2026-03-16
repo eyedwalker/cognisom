@@ -1069,6 +1069,94 @@ def _seed_pathogens_bacteria(store: EntityStore) -> int:
 # ── Antibody Isotypes ──────────────────────────────────────────────
 
 def _seed_antibody_types(store: EntityStore) -> int:
+    _ab_descriptions = {
+        "IgG1": (
+            "Most abundant serum immunoglobulin subclass (~60-70% of total IgG, 5-12 mg/mL). IgG1 "
+            "is a 150 kDa heterotetramer (2 gamma1 heavy + 2 kappa/lambda light chains) with the "
+            "broadest Fc effector functions: high-affinity binding to FcgammaRI (CD64, Kd ~1 nM) on "
+            "macrophages/monocytes for phagocytosis, FcgammaRIII (CD16) on NK cells for ADCC, and "
+            "C1q for complement-dependent cytotoxicity (CDC) via classical pathway. Crosses the "
+            "placenta via neonatal FcRn (providing passive immunity to the fetus). Half-life ~21 days "
+            "(FcRn-mediated recycling prevents lysosomal degradation). Most therapeutic monoclonal "
+            "antibodies (rituximab, trastuzumab, pembrolizumab) are engineered on the IgG1 backbone "
+            "to exploit ADCC and CDC. IgG1 is the dominant isotype in protein antigen responses."
+        ),
+        "IgG2": (
+            "Second most abundant IgG subclass (~20-25% of serum IgG). IgG2 has a rigid, short "
+            "hinge region with 4 inter-heavy chain disulfide bonds, making it structurally compact "
+            "and less flexible than IgG1. Weak FcgammaR binding (poor ADCC) and minimal complement "
+            "fixation. IgG2 is the dominant response to T-independent antigens — polysaccharide "
+            "capsules of encapsulated bacteria (S. pneumoniae, H. influenzae, N. meningitidis). "
+            "IgG2 deficiency predisposes to recurrent sinopulmonary infections with encapsulated "
+            "organisms. Half-life ~21 days."
+        ),
+        "IgG3": (
+            "Most potent IgG subclass for effector functions despite being only ~5-8% of serum IgG. "
+            "IgG3 has an exceptionally long, flexible hinge region (62 amino acids, vs. 15 for IgG1) "
+            "with 11 inter-chain disulfide bonds, enabling superior complement fixation and high-"
+            "affinity FcgammaR binding. Strongest activator of classical complement pathway among IgG "
+            "subclasses. However, the extended hinge makes IgG3 susceptible to proteolysis, resulting "
+            "in a shorter half-life (~7 days vs. 21 for IgG1/2/4). IgG3 is the first IgG isotype "
+            "produced in primary immune responses and is particularly effective against viral pathogens."
+        ),
+        "IgG4": (
+            "Least abundant IgG subclass (~4% of serum IgG) with unique non-inflammatory properties. "
+            "IgG4 undergoes Fab-arm exchange in vivo: inter-heavy chain disulfide bonds in the hinge "
+            "are labile, allowing half-molecules to recombine with other IgG4 half-molecules, producing "
+            "functionally monovalent, bispecific antibodies that cannot crosslink antigens or form "
+            "immune complexes. Minimal FcgammaR binding (no ADCC) and no complement fixation. IgG4 "
+            "is the 'blocking antibody' isotype: produced after chronic antigen exposure (allergen "
+            "immunotherapy switches IgE to IgG4) and in IgG4-related disease (autoimmune fibrosis). "
+            "Therapeutic IgG4 antibodies (nivolumab, pembrolizumab) are chosen specifically for their "
+            "lack of effector function — they block the target without killing the target cell."
+        ),
+        "IgA1 (secretory)": (
+            "Dominant antibody at mucosal surfaces (gut, respiratory, urogenital tracts), providing "
+            "immune exclusion — preventing pathogen and toxin adherence to epithelial cells. Secretory "
+            "IgA (SIgA) is a dimeric 390 kDa complex: two IgA monomers joined by J-chain, transported "
+            "across epithelium by polymeric immunoglobulin receptor (pIgR), and released with secretory "
+            "component (SC, protects against proteolysis in mucosal lumen). IgA1 has an extended hinge "
+            "susceptible to IgA1 proteases (virulence factors of N. meningitidis, S. pneumoniae, H. "
+            "influenzae). ~3-5 g IgA produced daily (more than all other isotypes combined). No "
+            "complement activation via classical pathway. Serum IgA is monomeric; deficiency (1:500 "
+            "prevalence) is the most common primary immunodeficiency, usually asymptomatic."
+        ),
+        "IgE": (
+            "Least abundant serum immunoglobulin (~0.05 ug/mL) but the most potent activator of "
+            "immediate hypersensitivity. IgE (190 kDa) binds with extraordinarily high affinity to "
+            "FcepsilonRI (Kd ~10^-10 M) on mast cells and basophils, occupying receptors even at "
+            "resting serum concentrations. Crosslinking of surface-bound IgE by multivalent antigen "
+            "triggers explosive mast cell degranulation within seconds: histamine release (vasodilation, "
+            "bronchoconstriction), leukotriene/prostaglandin synthesis, and cytokine production. This "
+            "is the mechanism of type I hypersensitivity (anaphylaxis, asthma, allergic rhinitis, food "
+            "allergy). Biological role: anti-helminth defense via ADCC — eosinophils bearing FcepsilonRII "
+            "(CD23) degranulate MBP onto IgE-coated worm surfaces. Omalizumab (anti-IgE) treats severe "
+            "allergic asthma. Short half-life (~2.5 days) in serum but months when mast cell-bound."
+        ),
+        "IgM (pentameric)": (
+            "First antibody produced in primary immune responses and the first isotype expressed during "
+            "B cell development (surface IgM as BCR). Serum IgM is a 900 kDa pentamer (5 monomers "
+            "joined by J-chain) with 10 antigen-binding sites, providing high avidity despite "
+            "individually low-affinity binding (compensating for lack of somatic hypermutation in early "
+            "responses). Pentameric IgM is the most potent complement activator: a single pentameric "
+            "IgM bound to antigen is sufficient to activate C1q and initiate the classical pathway "
+            "(vs. ~1000 IgG molecules needed). Natural IgM antibodies are produced by B-1 cells "
+            "without prior infection and recognize conserved microbial patterns (phosphorylcholine, "
+            "LPS) and altered self-antigens (oxidized LDL on apoptotic cells). Half-life ~5 days. "
+            "Cannot cross placenta (too large)."
+        ),
+        "IgD": (
+            "Co-expressed with IgM on the surface of mature naive B cells (via alternative mRNA "
+            "splicing of the heavy chain locus) where it functions as an antigen receptor (BCR). "
+            "Surface IgD is slightly more responsive to antigen than surface IgM due to a more "
+            "flexible hinge region. Serum IgD is present at very low concentrations (~30 ug/mL) and "
+            "its secreted function remained mysterious for decades. Recent evidence shows IgD activates "
+            "basophils and mast cells via an unknown receptor, promoting antimicrobial and inflammatory "
+            "responses at mucosal surfaces. IgD is also found on the surface of innate-like B cells "
+            "in the upper respiratory tract. Half-life ~3 days."
+        ),
+    }
+
     antibodies = [
         # (name, isotype, heavy, light, fc_functions, half_life, valency, complement)
         ("IgG1", "IgG1", "gamma1", "kappa/lambda",
@@ -1101,7 +1189,7 @@ def _seed_antibody_types(store: EntityStore) -> int:
         entity = Antibody(
             name=name,
             display_name=name,
-            description=f"{isotype} antibody. Functions: {', '.join(fc[:3])}. Half-life: {half_life} days.",
+            description=_ab_descriptions.get(name, f"{isotype} antibody. Functions: {', '.join(fc[:3])}. Half-life: {half_life} days."),
             isotype=isotype,
             heavy_chain=heavy,
             light_chain=light,
