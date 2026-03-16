@@ -45,6 +45,7 @@ if user is not None:
     pages = {
         "": [
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
+            st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
         ],
         "Digital Twin": [
             st.Page(str(_pages_dir / "32_parabricks.py"), title="GPU Genomics", icon=":material/dna:"),
