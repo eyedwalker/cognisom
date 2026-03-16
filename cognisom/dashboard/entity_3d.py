@@ -16,6 +16,8 @@ All rendering is on-the-fly in the browser — no stored assets.
 
 import hashlib
 import logging
+import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 from typing import Optional
 
