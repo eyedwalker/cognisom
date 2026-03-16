@@ -279,6 +279,26 @@ class BioEntity:
     # Tags for categorization
     tags: List[str] = field(default_factory=list)
 
+    # ── Visualization (Bio-USD mapping) ──
+    usd_prim_type: str = ""          # Bio-USD schema class (e.g. "BioCell", "BioProtein")
+    color_rgb: List[float] = field(default_factory=list)  # Default viz color [R, G, B] 0-1
+    mesh_type: str = ""              # Default 3D shape ("sphere", "cylinder", "mesh")
+    scale_um: float = 0.0            # Physical size in micrometers
+
+    # ── Physics / Simulation parameters ──
+    physics_params: Dict = field(default_factory=dict)
+    # e.g. {"diffusion_coefficient": 1e-10, "half_life_hours": 24.0,
+    #        "production_rate": 0.1, "degradation_rate": 0.05}
+
+    # ── Localization ──
+    compartments: List[str] = field(default_factory=list)  # ["cytoplasm", "nucleus", "membrane"]
+    tissues: List[str] = field(default_factory=list)        # ["prostate_epithelium", "lymph_node"]
+
+    # ── Interaction summary ──
+    interacts_with: List[Dict] = field(default_factory=list)
+    # e.g. [{"target": "IL-2R", "type": "binds_to", "kd_nm": 150},
+    #        {"target": "JAK1", "type": "activates", "ec50_nm": 50}]
+
     def __post_init__(self):
         if not self.entity_id:
             self.entity_id = str(uuid.uuid4())[:12]
@@ -290,7 +310,7 @@ class BioEntity:
             self.display_name = self.name
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "entity_id": self.entity_id,
             "entity_type": self.entity_type.value,
             "name": self.name,
@@ -309,6 +329,24 @@ class BioEntity:
             "tags": self.tags,
             "properties": self._extra_properties(),
         }
+        # Include visualization/physics/interaction fields if set
+        if self.usd_prim_type:
+            d["usd_prim_type"] = self.usd_prim_type
+        if self.color_rgb:
+            d["color_rgb"] = self.color_rgb
+        if self.mesh_type:
+            d["mesh_type"] = self.mesh_type
+        if self.scale_um:
+            d["scale_um"] = self.scale_um
+        if self.physics_params:
+            d["physics_params"] = self.physics_params
+        if self.compartments:
+            d["compartments"] = self.compartments
+        if self.tissues:
+            d["tissues"] = self.tissues
+        if self.interacts_with:
+            d["interacts_with"] = self.interacts_with
+        return d
 
     def _extra_properties(self) -> dict:
         """Override in subclasses to add type-specific properties."""
@@ -351,6 +389,16 @@ class BioEntity:
         entity.updated_at = data.get("updated_at", 0.0)
         entity.created_by = data.get("created_by", "system")
         entity.tags = data.get("tags", [])
+
+        # Visualization / physics / interaction fields
+        entity.usd_prim_type = data.get("usd_prim_type", "") or props.get("usd_prim_type", "")
+        entity.color_rgb = data.get("color_rgb", []) or props.get("color_rgb", [])
+        entity.mesh_type = data.get("mesh_type", "") or props.get("mesh_type", "")
+        entity.scale_um = data.get("scale_um", 0.0) or props.get("scale_um", 0.0)
+        entity.physics_params = data.get("physics_params", {}) or props.get("physics_params", {})
+        entity.compartments = data.get("compartments", []) or props.get("compartments", [])
+        entity.tissues = data.get("tissues", []) or props.get("tissues", [])
+        entity.interacts_with = data.get("interacts_with", []) or props.get("interacts_with", [])
 
         # Apply type-specific properties
         entity._apply_properties(props)

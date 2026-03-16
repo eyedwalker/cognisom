@@ -826,6 +826,105 @@ class EntityEnricher:
         report.duration_seconds = time.time() - t0
         return report
 
+    # ── Default Viz/Physics Enrichment ────────────────────────────────
+
+    # Default visualization properties by entity type
+    _VIZ_DEFAULTS = {
+        "gene": {"usd_prim_type": "BioGene", "color_rgb": [0.2, 0.6, 1.0], "mesh_type": "helix", "scale_um": 0.01},
+        "protein": {"usd_prim_type": "BioProtein", "color_rgb": [0.4, 0.8, 0.4], "mesh_type": "mesh", "scale_um": 0.005},
+        "drug": {"usd_prim_type": "BioMolecule", "color_rgb": [1.0, 0.5, 0.0], "mesh_type": "sphere", "scale_um": 0.001},
+        "cell_type": {"usd_prim_type": "BioCell", "color_rgb": [0.9, 0.3, 0.3], "mesh_type": "sphere", "scale_um": 10.0},
+        "immune_cell": {"usd_prim_type": "BioImmuneCell", "color_rgb": [0.3, 0.9, 0.6], "mesh_type": "sphere", "scale_um": 8.0},
+        "cytokine": {"usd_prim_type": "BioMolecule", "color_rgb": [1.0, 0.8, 0.2], "mesh_type": "sphere", "scale_um": 0.003},
+        "receptor": {"usd_prim_type": "BioProtein", "color_rgb": [0.7, 0.3, 0.9], "mesh_type": "cylinder", "scale_um": 0.008},
+        "metabolite": {"usd_prim_type": "BioMolecule", "color_rgb": [0.5, 0.9, 1.0], "mesh_type": "sphere", "scale_um": 0.0005},
+        "mutation": {"usd_prim_type": "BioGene", "color_rgb": [1.0, 0.2, 0.2], "mesh_type": "sphere", "scale_um": 0.01},
+        "tissue_type": {"usd_prim_type": "BioTissue", "color_rgb": [0.8, 0.6, 0.5], "mesh_type": "mesh", "scale_um": 1000.0},
+        "organ": {"usd_prim_type": "BioTissue", "color_rgb": [0.7, 0.4, 0.4], "mesh_type": "mesh", "scale_um": 50000.0},
+        "virus": {"usd_prim_type": "BioVirusParticle", "color_rgb": [0.8, 0.1, 0.8], "mesh_type": "icosphere", "scale_um": 0.1},
+        "bacterium": {"usd_prim_type": "BioCell", "color_rgb": [0.6, 0.8, 0.2], "mesh_type": "capsule", "scale_um": 2.0},
+        "antibody": {"usd_prim_type": "BioAntibody", "color_rgb": [0.2, 0.4, 0.9], "mesh_type": "y_shape", "scale_um": 0.01},
+        "mhc": {"usd_prim_type": "BioProtein", "color_rgb": [0.9, 0.5, 0.7], "mesh_type": "groove", "scale_um": 0.007},
+        "adhesion_molecule": {"usd_prim_type": "BioProtein", "color_rgb": [0.4, 0.7, 0.3], "mesh_type": "cylinder", "scale_um": 0.01},
+        "complement": {"usd_prim_type": "BioProtein", "color_rgb": [0.9, 0.7, 0.3], "mesh_type": "sphere", "scale_um": 0.008},
+        "prr": {"usd_prim_type": "BioProtein", "color_rgb": [0.6, 0.3, 0.1], "mesh_type": "cylinder", "scale_um": 0.01},
+        "pathway": {"usd_prim_type": "", "color_rgb": [0.6, 0.6, 0.6], "mesh_type": "", "scale_um": 0.0},
+    }
+
+    # Default physics parameters by entity type
+    _PHYSICS_DEFAULTS = {
+        "cell_type": {"division_time_hours": 24.0, "apoptosis_rate_per_hour": 0.001, "migration_speed_um_per_min": 0.5, "oxygen_consumption_rate": 0.05},
+        "immune_cell": {"division_time_hours": 48.0, "migration_speed_um_per_min": 5.0, "detection_radius_um": 30.0, "kill_probability": 0.3, "exhaustion_rate": 0.01},
+        "cytokine": {"diffusion_coefficient_m2_per_s": 1e-10, "half_life_hours": 4.0, "production_rate_pg_per_cell_per_hour": 10.0},
+        "drug": {"half_life_hours": 12.0, "bioavailability": 0.8, "volume_of_distribution_L": 50.0},
+        "metabolite": {"diffusion_coefficient_m2_per_s": 1e-9, "normal_concentration_mM": 5.0},
+        "virus": {"replication_cycle_hours": 8.0, "burst_size": 100},
+        "bacterium": {"division_time_hours": 0.5, "migration_speed_um_per_min": 20.0},
+        "receptor": {"ligand_kd_nm": 100.0, "endocytosis_rate_per_min": 0.05, "surface_density_per_cell": 10000},
+        "adhesion_molecule": {"bond_lifetime_seconds": 2.0, "binding_force_pN": 50.0},
+    }
+
+    _COMPARTMENT_DEFAULTS = {
+        "gene": ["nucleus"], "protein": ["cytoplasm"], "receptor": ["cell_membrane"],
+        "metabolite": ["cytoplasm", "extracellular"], "drug": ["extracellular", "cytoplasm"],
+        "cytokine": ["extracellular"], "mhc": ["cell_membrane"],
+        "adhesion_molecule": ["cell_membrane"], "antibody": ["extracellular"],
+        "complement": ["extracellular", "blood"],
+    }
+
+    def enrich_with_defaults(
+        self, progress_callback: Optional[Callable] = None,
+    ) -> EnrichmentReport:
+        """Add visualization, physics, and compartment defaults to all entities.
+
+        Only sets fields that are currently empty (doesn't overwrite user edits).
+        """
+        report = EnrichmentReport()
+        t0 = time.time()
+
+        entities, total = self.store.search(limit=5000)
+        for entity in entities:
+            changed = False
+            etype = entity.entity_type.value
+
+            viz = self._VIZ_DEFAULTS.get(etype, {})
+            if viz:
+                if not entity.usd_prim_type and viz.get("usd_prim_type"):
+                    entity.usd_prim_type = viz["usd_prim_type"]
+                    changed = True
+                if not entity.color_rgb and viz.get("color_rgb"):
+                    entity.color_rgb = viz["color_rgb"]
+                    changed = True
+                if not entity.mesh_type and viz.get("mesh_type"):
+                    entity.mesh_type = viz["mesh_type"]
+                    changed = True
+                if not entity.scale_um and viz.get("scale_um"):
+                    entity.scale_um = viz["scale_um"]
+                    changed = True
+
+            physics = self._PHYSICS_DEFAULTS.get(etype, {})
+            if physics and not entity.physics_params:
+                entity.physics_params = dict(physics)
+                changed = True
+
+            compartments = self._COMPARTMENT_DEFAULTS.get(etype, [])
+            if compartments and not entity.compartments:
+                entity.compartments = list(compartments)
+                changed = True
+
+            if changed:
+                try:
+                    self.store.update_entity(entity, changed_by="enrichment")
+                    report.entities_updated += 1
+                except Exception as e:
+                    log.debug("Failed to enrich %s: %s", entity.name, e)
+
+        report.duration_seconds = time.time() - t0
+        if progress_callback:
+            progress_callback(f"Enriched {report.entities_updated}/{total} entities")
+        log.info("Enriched %d / %d entities with defaults", report.entities_updated, total)
+        return report
+
     def enrich_all_drugs(
         self, progress_callback: Optional[Callable] = None
     ) -> EnrichmentReport:

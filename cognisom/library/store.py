@@ -102,6 +102,15 @@ class EntityStore:
                 from .seed_immunology import seed_immunology_catalog
                 seed_prostate_cancer_catalog(self)
                 seed_immunology_catalog(self)
+
+                # Enrich with visualization/physics defaults
+                try:
+                    from .enrichment import EntityEnricher
+                    enricher = EntityEnricher(self)
+                    enricher.enrich_with_defaults()
+                except Exception as e:
+                    log.warning("Default enrichment failed (non-fatal): %s", e)
+
                 final = self.stats()
                 log.info(
                     "Auto-seeded entity library: %d entities, %d relationships",
