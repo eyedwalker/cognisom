@@ -904,6 +904,102 @@ def _seed_pathogens_viruses(store: EntityStore) -> int:
 # ── Pathogens: Bacteria ────────────────────────────────────────────
 
 def _seed_pathogens_bacteria(store: EntityStore) -> int:
+    _bacteria_descriptions = {
+        "Staphylococcus aureus": (
+            "Gram-positive coccus (0.5-1.5 um diameter, grape-like clusters) that is the leading "
+            "cause of skin/soft tissue infections, bacteremia, endocarditis, and osteomyelitis. "
+            "Virulence arsenal: protein A binds IgG Fc (blocking opsonization), coagulase forms "
+            "fibrin cloak (anti-phagocytic), Panton-Valentine leukocidin (PVL) forms pores in "
+            "neutrophils, toxic shock syndrome toxin-1 (TSST-1) is a superantigen activating "
+            "~20% of all T cells (causing massive cytokine storm). Alpha-hemolysin forms "
+            "heptameric beta-barrel pores in host cell membranes. Biofilm formation on medical "
+            "devices. MRSA (methicillin-resistant) carries mecA gene encoding PBP2a with low "
+            "beta-lactam affinity. VRSA (vancomycin-resistant) via vanA gene cluster. ~30% of "
+            "humans are asymptomatic nasal carriers."
+        ),
+        "Escherichia coli (UPEC)": (
+            "Gram-negative rod (2 x 0.5 um) and uropathogenic strain responsible for ~80% of "
+            "uncomplicated UTIs. UPEC virulence: type 1 fimbriae (FimH adhesin binds mannose on "
+            "uroepithelial cells, critical for bladder colonization), P fimbriae (PapG binds "
+            "Gal-alpha-1,4-Gal on kidney epithelium, enables pyelonephritis), alpha-hemolysin "
+            "(HlyA, pore-forming toxin), and K1 capsule (anti-phagocytic sialic acid polymer). "
+            "LPS (lipid A/endotoxin) activates TLR4-MD2 on macrophages, triggering TNF-alpha, "
+            "IL-1beta, IL-6 release. UPEC invades bladder epithelial cells and forms intracellular "
+            "bacterial communities (IBCs), evading antibiotics and causing recurrent UTIs. Extended-"
+            "spectrum beta-lactamase (ESBL) resistance is a growing global health threat."
+        ),
+        "Mycobacterium tuberculosis": (
+            "Acid-fast rod (2-4 x 0.2-0.5 um) with an exceptionally thick, lipid-rich cell wall "
+            "containing mycolic acids (60-90 carbon fatty acids), making it resistant to Gram staining, "
+            "desiccation, and many antibiotics. Obligate intracellular pathogen of alveolar macrophages. "
+            "After phagocytosis, Mtb arrests phagosome maturation by blocking phagolysosome fusion "
+            "(via TACO/coronin-1, SapM phosphatase, PtpA) and survives within the phagosome. Cord "
+            "factor (trehalose 6,6'-dimycolate) induces granuloma formation — organized structures "
+            "of macrophages, giant cells, and T cells that contain but don't eliminate infection. "
+            "ESAT-6 and CFP-10 (secreted by ESX-1/type VII secretion system) damage phagosomal "
+            "membrane, enabling cytoplasmic access and cGAS-STING activation. ~2 billion people "
+            "harbor latent TB. Standard treatment: RIPE (rifampicin, isoniazid, pyrazinamide, "
+            "ethambutol) for 6 months."
+        ),
+        "Streptococcus pyogenes": (
+            "Gram-positive coccus (Group A Streptococcus/GAS) in chains, responsible for pharyngitis, "
+            "impetigo, cellulitis, necrotizing fasciitis, and post-infectious sequelae (rheumatic "
+            "fever, glomerulonephritis). M protein — the principal virulence factor — extends from "
+            "cell surface as a coiled-coil dimer that inhibits complement deposition by binding "
+            "Factor H and C4BP, and resists phagocytosis. >200 M-protein serotypes drive antigenic "
+            "variation. Streptolysin O (SLO) is a cholesterol-dependent cytolysin forming large "
+            "pores in host cell membranes. Streptolysin S (SLS) is a small peptide cytotoxin. "
+            "Superantigens (SpeA, SpeC) cause streptococcal toxic shock syndrome. Molecular mimicry "
+            "between M protein and cardiac myosin/laminin drives rheumatic heart disease."
+        ),
+        "Salmonella enterica": (
+            "Gram-negative rod with >2,500 serovars (Typhi causes typhoid fever; Typhimurium causes "
+            "gastroenteritis). Uses type III secretion system (T3SS) encoded by Salmonella pathogenicity "
+            "islands SPI-1 (invasion) and SPI-2 (intracellular survival). SPI-1 T3SS injects effectors "
+            "(SipA, SopE, SopB) into intestinal epithelial cells, triggering Rho GTPase-mediated "
+            "actin rearrangement, membrane ruffling, and bacterial internalization (macropinocytosis). "
+            "Inside macrophages, SPI-2 T3SS creates a modified phagosome (Salmonella-containing "
+            "vacuole/SCV) that avoids lysosomal fusion. Vi capsule (S. Typhi) prevents complement "
+            "activation and TLR4 recognition of LPS. Flagellin activates TLR5 and NLRC4 "
+            "inflammasome. Typhoid toxin causes DNA damage in host cells."
+        ),
+        "Neisseria meningitidis": (
+            "Gram-negative diplococcus that colonizes the nasopharynx (~10% carriage rate) and can "
+            "cause devastating meningitis and septicemia (meningococcemia) with purpura fulminans. "
+            "Polysaccharide capsule (serogroups A, B, C, W, Y) is the dominant virulence factor, "
+            "preventing complement deposition and phagocytosis. Serogroup B capsule (polysialic acid) "
+            "mimics human neural cell adhesion molecule (NCAM), explaining poor immunogenicity and "
+            "the need for protein-based vaccines (4CMenB/Bexsero). Type IV pili mediate initial "
+            "nasopharyngeal attachment. LOS (lipooligosaccharide, not LPS) activates TLR4 and "
+            "triggers intense inflammatory response. IgA1 protease cleaves mucosal IgA. Factor H "
+            "binding protein (fHbp) recruits complement regulator Factor H to bacterial surface."
+        ),
+        "Clostridioides difficile": (
+            "Gram-positive, spore-forming, obligate anaerobic rod responsible for antibiotic-associated "
+            "diarrhea and pseudomembranous colitis. Spores survive gastric acid, alcohol-based hand "
+            "sanitizers, and environmental cleaning, germinating in the bile acid-rich colon. "
+            "Pathogenicity driven by two large clostridial toxins: Toxin A (TcdA, 308 kDa) and "
+            "Toxin B (TcdB, 270 kDa) are glucosyltransferases that inactivate Rho GTPases (RhoA, "
+            "Rac1, Cdc42), disrupting the actin cytoskeleton, opening tight junctions, and causing "
+            "cell death → pseudomembrane formation (fibrin + inflammatory cells + necrotic epithelium). "
+            "Hypervirulent strain BI/NAP1/027 produces binary toxin (CDT) and has tcdC regulator "
+            "deletion (increased toxin production). Treatment: oral vancomycin or fidaxomicin. "
+            "Fecal microbiota transplantation (FMT) >90% effective for recurrent CDI."
+        ),
+        "Pseudomonas aeruginosa": (
+            "Gram-negative rod (1.5-3 x 0.5-0.8 um) and the paradigm of opportunistic hospital-"
+            "acquired infection, particularly in cystic fibrosis lungs, burn wounds, and ventilated "
+            "patients. Intrinsic antibiotic resistance: low outer membrane permeability, constitutive "
+            "AmpC beta-lactamase, and multiple efflux pumps (MexAB-OprM). Type III secretion system "
+            "injects ExoS (GTPase-activating protein, disrupts cytoskeleton), ExoT (anti-phagocytic), "
+            "ExoU (phospholipase, rapid cell lysis), and ExoY (adenylate cyclase). Quorum sensing "
+            "(las/rhl systems using AHL autoinducers) coordinates biofilm formation, virulence factor "
+            "production, and swarming motility. Biofilms on medical devices and CF airways are 100-"
+            "1000x more antibiotic-resistant than planktonic cells. Pyocyanin (blue-green pigment) "
+            "generates ROS, damages host tissue, and impairs ciliary function."
+        ),
+    }
+
     bacteria = [
         # (name, gram, shape, oxygen, pathogenicity, resistance, growth, toxins, niche, genome_mb)
         ("Staphylococcus aureus", "positive", "coccus", "facultative",
@@ -952,7 +1048,7 @@ def _seed_pathogens_bacteria(store: EntityStore) -> int:
         entity = Bacterium(
             name=name,
             display_name=name,
-            description=f"Gram-{gram} {shape}. Niche: {niche}. Key factors: {', '.join(pathogenicity[:3])}.",
+            description=_bacteria_descriptions.get(name, f"Gram-{gram} {shape}. Niche: {niche}. Key factors: {', '.join(pathogenicity[:3])}."),
             gram_stain=gram,
             shape=shape,
             oxygen_requirement=oxygen,
