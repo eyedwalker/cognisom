@@ -1383,6 +1383,135 @@ def _seed_complement_components(store: EntityStore) -> int:
 # ── Pattern Recognition Receptors ──────────────────────────────────
 
 def _seed_prrs(store: EntityStore) -> int:
+    _prr_descriptions = {
+        "TLR4": (
+            "Toll-like receptor 4 — the receptor for bacterial lipopolysaccharide (LPS/endotoxin), "
+            "the most potent microbial activator of innate immunity. TLR4 signals as a homodimer "
+            "requiring MD-2 co-receptor (which directly binds lipid A moiety of LPS) and CD14 "
+            "(GPI-anchored, concentrates LPS). Unique among TLRs in activating BOTH MyD88-dependent "
+            "pathway (from cell surface: TIRAP→MyD88→IRAK1/4→TRAF6→NF-kappaB, producing TNF-alpha, "
+            "IL-1beta, IL-6) AND TRIF-dependent pathway (from endosome after internalization: "
+            "TRAM→TRIF→TBK1→IRF3, producing IFN-beta). DAMP recognition: HMGB1, heat shock proteins, "
+            "hyaluronan fragments. LPS hypersensitivity causes septic shock (TNF storm); TLR4 "
+            "polymorphisms (D299G) affect sepsis susceptibility. Eritoran (lipid A analog TLR4 "
+            "antagonist) was developed for sepsis but failed phase III trials."
+        ),
+        "TLR3": (
+            "Endosomal TLR that detects double-stranded RNA (dsRNA) — a replication intermediate "
+            "of most viruses. TLR3 is unique among TLRs in signaling exclusively through TRIF (not "
+            "MyD88), activating TBK1→IRF3 for type I IFN production and RIP1→NF-kappaB for "
+            "pro-inflammatory cytokines. Expressed in endosomes of dendritic cells and epithelial "
+            "cells where viral dsRNA accumulates during endosomal processing. TLR3 also recognizes "
+            "the dsRNA analog poly(I:C), used experimentally as an adjuvant. TLR3 deficiency causes "
+            "susceptibility to herpes simplex encephalitis (HSE), revealing its critical role in "
+            "CNS antiviral defense."
+        ),
+        "TLR7": (
+            "Endosomal TLR in plasmacytoid dendritic cells and B cells that detects single-stranded "
+            "RNA (ssRNA) from viruses (influenza, HIV, SARS-CoV-2). TLR7 signals through "
+            "MyD88→IRAK1/4→IRF7, driving massive IFN-alpha production in pDCs (the basis of the "
+            "antiviral type I IFN response). TLR7 also activates NF-kappaB for pro-inflammatory "
+            "cytokine production. Imiquimod (topical TLR7 agonist) treats genital warts, actinic "
+            "keratosis, and basal cell carcinoma. TLR7 duplication on the X chromosome may explain "
+            "the female predominance of SLE (increased IFN-alpha from self-RNA recognition). "
+            "TLR7/8 agonists are being explored as vaccine adjuvants and cancer immunotherapy."
+        ),
+        "TLR9": (
+            "Endosomal TLR that detects unmethylated CpG dinucleotides in bacterial and viral DNA. "
+            "Mammalian DNA is heavily methylated at CpG sites, allowing TLR9 to discriminate "
+            "microbial from self DNA. Signals through MyD88→IRF7 in pDCs (IFN-alpha production) "
+            "and MyD88→NF-kappaB in B cells (proliferation, antibody production). CpG "
+            "oligodeoxynucleotides (CpG-ODN) are potent immunostimulatory adjuvants used in the "
+            "HBV vaccine (Heplisav-B, CpG 1018 adjuvant). TLR9 agonists are being developed as "
+            "cancer immunotherapy (SD-101, intratumoral injection to activate anti-tumor immunity)."
+        ),
+        "TLR2/1": (
+            "Heterodimeric TLR that recognizes triacylated lipopeptides from gram-negative bacteria "
+            "and mycoplasma. TLR2 forms heterodimers with TLR1 (triacyl lipopeptides) or TLR6 "
+            "(diacyl lipopeptides), providing discriminative recognition of bacterial lipoproteins. "
+            "Signals through TIRAP→MyD88→NF-kappaB. Also recognizes peptidoglycan, lipoteichoic acid "
+            "(gram-positive), zymosan (fungi), and lipoarabinomannan (mycobacteria). TLR2 is the "
+            "most promiscuous TLR, sensing the broadest range of PAMPs. Expressed on macrophages, "
+            "dendritic cells, and neutrophils."
+        ),
+        "TLR5": (
+            "Surface TLR that detects bacterial flagellin — the structural protein of flagella. "
+            "TLR5 recognizes a highly conserved region of flagellin (domain D1) that is essential "
+            "for flagellar motility, preventing immune evasion through mutation. Signals through "
+            "MyD88→NF-kappaB, producing IL-8, TNF-alpha, and IL-6. Highly expressed on intestinal "
+            "epithelial cells (basolateral surface only, preventing activation by commensal "
+            "flagellin in the lumen). CBLB502 (entolimod, flagellin derivative) is a TLR5 agonist "
+            "developed as a radiation countermeasure (stimulates NF-kappaB survival signaling)."
+        ),
+        "NLRP3 inflammasome": (
+            "Cytoplasmic multiprotein complex (NLRP3 + ASC adaptor + pro-caspase-1) that serves "
+            "as the most versatile innate immune sensor. NLRP3 is activated by an extraordinarily "
+            "diverse array of danger signals: ATP (via P2X7 receptor K+ efflux), uric acid crystals "
+            "(gout), cholesterol crystals (atherosclerosis), silica/asbestos (silicosis), amyloid-beta "
+            "(Alzheimer's), SARS-CoV-2 viroporin. A unifying mechanism: K+ efflux, mitochondrial ROS, "
+            "and/or lysosomal rupture converge on NLRP3 activation. Priming signal (NF-kappaB) "
+            "upregulates NLRP3 and pro-IL-1beta; activation signal triggers ASC oligomerization into "
+            "specks, recruiting and activating caspase-1. Active caspase-1 cleaves pro-IL-1beta and "
+            "pro-IL-18 to active forms and cleaves gasdermin D (GSDMD) to form plasma membrane pores "
+            "(pyroptosis). Canakinumab (anti-IL-1beta) treats NLRP3-driven diseases."
+        ),
+        "NOD2": (
+            "Cytoplasmic innate immune receptor (NOD-like receptor family) that detects muramyl "
+            "dipeptide (MDP) — a minimal bioactive fragment of peptidoglycan found in virtually all "
+            "bacteria. NOD2 contains leucine-rich repeats (ligand sensing), a NACHT domain "
+            "(oligomerization/activation), and two CARD domains (signal transduction). Upon MDP "
+            "binding, NOD2 oligomerizes and recruits RIP2 kinase via CARD-CARD interaction, "
+            "activating NF-kappaB and MAPK. NOD2 also activates autophagy for bacterial clearance. "
+            "NOD2 loss-of-function mutations (R702W, G908R, 1007fs) are the strongest genetic risk "
+            "factors for Crohn's disease — impaired bacterial sensing in intestinal Paneth cells leads "
+            "to dysbiosis and chronic inflammation."
+        ),
+        "RIG-I": (
+            "Cytoplasmic RNA helicase (retinoic acid-inducible gene I) that detects viral RNA bearing "
+            "5'-triphosphate or 5'-diphosphate groups — a molecular signature absent from self-RNA "
+            "(which has a 5'-cap or 5'-monophosphate). RIG-I also recognizes short double-stranded "
+            "RNA (<1 kb). Contains two N-terminal CARDs (signal transduction), a central helicase "
+            "domain (RNA binding/unwinding), and a C-terminal domain (5'ppp recognition). Upon RNA "
+            "binding, RIG-I undergoes K63-linked ubiquitination by TRIM25, exposing CARDs for "
+            "interaction with MAVS on mitochondrial outer membrane. MAVS forms prion-like aggregates "
+            "that activate TBK1→IRF3 (type I IFN) and IKK→NF-kappaB (pro-inflammatory). Detects "
+            "influenza, Sendai virus, HCV, and Ebola."
+        ),
+        "MDA5": (
+            "Cytoplasmic RNA helicase (melanoma differentiation-associated gene 5) that detects long "
+            "double-stranded RNA (>1 kb) and RNA web-like structures from viral replication. MDA5 "
+            "forms filaments along dsRNA (unlike RIG-I which binds RNA ends) and signals through "
+            "the same MAVS-TBK1-IRF3 pathway. MDA5 is the primary sensor for picornaviruses "
+            "(including SARS-CoV-2 replication intermediates), while RIG-I detects influenza and "
+            "paramyxoviruses — providing complementary coverage. MDA5 gain-of-function mutations "
+            "cause Aicardi-Goutieres syndrome and Singleton-Merten syndrome (constitutive IFN "
+            "activation). IFIH1 (MDA5 gene) polymorphisms are associated with type 1 diabetes risk."
+        ),
+        "cGAS-STING": (
+            "Cytoplasmic DNA sensing pathway: cyclic GMP-AMP synthase (cGAS) detects double-stranded "
+            "DNA in the cytoplasm — normally a danger signal indicating viral infection, mitochondrial "
+            "stress, or DNA damage. cGAS binds dsDNA in a sequence-independent manner and catalyzes "
+            "synthesis of 2'3'-cyclic GMP-AMP (cGAMP), a second messenger that binds STING "
+            "(stimulator of interferon genes) on the endoplasmic reticulum. STING dimerizes, "
+            "translocates to Golgi, and recruits TBK1, which phosphorylates IRF3 for type I IFN "
+            "production. Also activates NF-kappaB and autophagy. Critical for anti-tumor immunity: "
+            "tumor cell DNA in the cytoplasm of dendritic cells (after phagocytosis) activates "
+            "cGAS-STING, driving IFN-beta-dependent CD8+ T cell cross-priming. STING agonists "
+            "(ADU-S100, MSA-2) are in cancer immunotherapy trials. Paradoxically, chronic cGAS-STING "
+            "activation promotes senescence-associated secretory phenotype (SASP) and inflammaging."
+        ),
+        "Dectin-1": (
+            "C-type lectin receptor (CLR) on macrophages and dendritic cells that recognizes "
+            "beta-1,3-glucan — the major structural polysaccharide of fungal cell walls. Dectin-1 "
+            "(CLEC7A) contains an extracellular C-type lectin domain and a cytoplasmic hemITAM "
+            "motif that recruits Syk kinase upon ligand binding, activating CARD9-BCL10-MALT1 → "
+            "NF-kappaB pathway. Dectin-1 also activates the NLRP3 inflammasome and induces Th17 "
+            "differentiation (via IL-6 and IL-23), which is critical for mucosal anti-fungal defense. "
+            "Dectin-1 deficiency causes susceptibility to mucocutaneous fungal infections. Dectin-1 "
+            "also cooperates with TLR2 to synergistically activate inflammatory responses to fungi."
+        ),
+    }
+
     prrs = [
         # (name, type, ligands, pamp/damp, pathway, cells, effectors, location, gene)
         ("TLR4", "TLR", ["LPS", "HMGB1"], "both",
@@ -1427,7 +1556,7 @@ def _seed_prrs(store: EntityStore) -> int:
         entity = PatternRecognitionReceptor(
             name=name,
             display_name=name,
-            description=f"{ptype} sensing {', '.join(ligands[:2])}. Pathway: {pathway}.",
+            description=_prr_descriptions.get(name, f"{ptype} sensing {', '.join(ligands[:2])}. Pathway: {pathway}."),
             prr_type=ptype,
             ligands=ligands,
             pamp_or_damp=pamp_damp,
