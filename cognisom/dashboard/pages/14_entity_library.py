@@ -129,11 +129,21 @@ if entities:
                 unsafe_allow_html=True,
             )
 
-            # Description (the research-grade content)
-            if entity.description:
-                st.markdown(entity.description)
-            else:
-                st.caption("No description available.")
+            # 3D Preview + Description side by side
+            viz_col, desc_col = st.columns([1, 2])
+
+            with viz_col:
+                try:
+                    from cognisom.dashboard.entity_3d import render_entity_3d
+                    render_entity_3d(entity, height=220)
+                except Exception as e:
+                    st.caption(f"3D preview unavailable")
+
+            with desc_col:
+                if entity.description:
+                    st.markdown(entity.description)
+                else:
+                    st.caption("No description available.")
 
             # Details in columns
             col_left, col_right = st.columns(2)
