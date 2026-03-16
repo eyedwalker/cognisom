@@ -100,8 +100,10 @@ class EntityStore:
                 log.info("Entity library is empty — running auto-seed...")
                 from .seed_data import seed_prostate_cancer_catalog
                 from .seed_immunology import seed_immunology_catalog
+                from .seed_checkpoints import seed_expanded_catalog
                 seed_prostate_cancer_catalog(self)
                 seed_immunology_catalog(self)
+                seed_expanded_catalog(self)
 
                 # Enrich with visualization/physics defaults
                 try:
