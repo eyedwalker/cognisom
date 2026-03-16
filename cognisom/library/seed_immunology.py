@@ -754,8 +754,104 @@ def _seed_cytokines(store: EntityStore) -> int:
 # ── Pathogens: Viruses ─────────────────────────────────────────────
 
 def _seed_pathogens_viruses(store: EntityStore) -> int:
+    # Virus descriptions are stored separately for readability
+    _virus_descriptions = {
+        "SARS-CoV-2": (
+            "Betacoronavirus (Coronaviridae) responsible for COVID-19 pandemic. 29.9 kb positive-sense "
+            "single-stranded RNA genome — the largest known RNA virus genome — encoding 29 proteins including "
+            "spike (S), envelope (E), membrane (M), and nucleocapsid (N) structural proteins plus 16 "
+            "non-structural proteins (nsp1-16) forming the replicase-transcriptase complex. Entry mechanism: "
+            "S protein receptor-binding domain (RBD) engages ACE2 on respiratory epithelial cells (Kd ~15 nM), "
+            "followed by TMPRSS2 serine protease cleavage at the S2' site to trigger membrane fusion. "
+            "Alternative entry via cathepsin L in endosomes. Immune evasion: nsp1 blocks host mRNA translation "
+            "and degrades host mRNA; nsp3 (papain-like protease) removes ISG15 conjugates; ORF6 blocks STAT1 "
+            "nuclear import; ORF8 downregulates MHC-I. Variants of concern arise through spike RBD mutations "
+            "(N501Y, E484K, L452R) increasing ACE2 affinity and/or escaping neutralizing antibodies."
+        ),
+        "Influenza A": (
+            "Orthomyxovirus with 8-segment negative-sense ssRNA genome (~13.5 kb total) encoding 12+ "
+            "proteins. Hemagglutinin (HA) binds sialic acid receptors on respiratory epithelium (alpha-2,6 "
+            "linkage in humans, alpha-2,3 in birds), enabling receptor-mediated endocytosis. Neuraminidase "
+            "(NA) cleaves sialic acid for virion release. M2 ion channel acidifies virion interior for "
+            "uncoating. Segmented genome enables antigenic shift (reassortment between human/avian/swine "
+            "strains, generating pandemic strains) and antigenic drift (point mutations in HA/NA under "
+            "immune selection). NS1 protein antagonizes innate immunity by sequestering dsRNA from RIG-I, "
+            "blocking CPSF30-mediated host mRNA processing, and inhibiting PKR. 18 HA and 11 NA subtypes. "
+            "Oseltamivir (Tamiflu, NA inhibitor), baloxavir (cap-dependent endonuclease inhibitor)."
+        ),
+        "HIV-1": (
+            "Lentivirus (Retroviridae) that infects CD4+ T cells and macrophages, causing progressive immune "
+            "destruction (AIDS). 9.7 kb diploid RNA genome reverse-transcribed to dsDNA by reverse "
+            "transcriptase (RT, error rate ~3x10^-5/base/cycle, generating enormous diversity). gp120 binds "
+            "CD4 (Kd ~4 nM), triggering conformational change that exposes co-receptor binding site "
+            "(CCR5 for R5-tropic, CXCR4 for X4-tropic strains). gp41 mediates membrane fusion. Proviral "
+            "DNA integrates into host genome (integrase), establishing lifelong latent reservoir in resting "
+            "memory CD4+ T cells (~10^6 cells), the primary barrier to cure. Immune evasion: Nef "
+            "downregulates MHC-I (but not HLA-C/E, protecting from NK cells), Vpu degrades CD4 and "
+            "tetherin, Vif degrades APOBEC3G (host restriction factor). cART (combined antiretroviral "
+            "therapy) suppresses viral load to <50 copies/mL but does not eliminate latent reservoir."
+        ),
+        "Epstein-Barr virus (EBV)": (
+            "Gammaherpesvirus (HHV-4) that infects >90% of adults worldwide, establishing lifelong latency "
+            "in memory B cells. 172 kb dsDNA genome encoding ~85 proteins. Entry into B cells via gp350 "
+            "binding CD21 (complement receptor 2) and gp42 binding HLA-DQ (MHC-II). Lytic infection "
+            "produces infectious virions; latent infection expresses limited genes (EBNA1-6, LMP1/2, "
+            "EBERs, BARTs). LMP1 mimics constitutively active CD40, activating NF-kappaB, JNK, and p38 "
+            "survival signaling. EBNA1 maintains episomal genome during cell division. Associated "
+            "malignancies: Burkitt lymphoma (endemic, MYC translocation), Hodgkin lymphoma (LMP1+), "
+            "nasopharyngeal carcinoma, post-transplant lymphoproliferative disorder (PTLD), and ~10% "
+            "of gastric carcinomas. Immune evasion: viral IL-10 homolog (BCRF1), EBNA1 GAr repeat "
+            "blocks proteasomal processing, LMP2A mimics BCR survival signal."
+        ),
+        "Hepatitis B virus (HBV)": (
+            "Hepadnavirus with a 3.2 kb partially double-stranded relaxed circular DNA (rcDNA) genome — "
+            "the smallest human DNA virus. Entry via NTCP (sodium taurocholate co-transporting polypeptide) "
+            "on hepatocytes. rcDNA is converted to covalently closed circular DNA (cccDNA) in the nucleus, "
+            "serving as a transcriptional template for pregenomic RNA, which is reverse-transcribed in "
+            "cytoplasmic nucleocapsids. cccDNA persists as a stable minichromosome, resisting antiviral "
+            "clearance and enabling relapse after therapy discontinuation — the primary barrier to cure. "
+            "HBx protein transactivates viral and cellular promoters and degrades Smc5/6 restriction "
+            "factor. Chronicity (~5% adults, ~90% neonates) leads to cirrhosis and hepatocellular "
+            "carcinoma via chronic inflammation, insertional mutagenesis, and HBx-mediated p53 "
+            "inactivation. Decoy subviral particles (HBsAg, 1000:1 ratio to virions) overwhelm "
+            "neutralizing antibodies. Tenofovir/entecavir suppress replication; functional cure requires "
+            "HBsAg loss."
+        ),
+        "Zika virus": (
+            "Flavivirus with 10.8 kb positive-sense ssRNA genome encoding a single polyprotein cleaved "
+            "into 3 structural (C, prM/M, E) and 7 non-structural (NS1-NS5) proteins. Entry via AXL "
+            "(TAM receptor tyrosine kinase) and DC-SIGN on dendritic cells and neural progenitor cells. "
+            "NS5 degrades STAT2 (blocking IFN signaling). Unique among flaviviruses for neurotropism: "
+            "crosses placenta and infects neural progenitor cells, causing microcephaly and congenital "
+            "Zika syndrome through apoptosis of cortical progenitors, disrupted neurogenesis, and "
+            "centrosome perturbation. Also causes Guillain-Barre syndrome through molecular mimicry "
+            "with gangliosides. Sexual and vector-borne (Aedes aegypti) transmission."
+        ),
+        "Measles virus": (
+            "Paramyxovirus with 15.9 kb negative-sense ssRNA genome encoding 8 proteins. "
+            "Hemagglutinin (H) binds CD150/SLAM on immune cells (initial infection) and nectin-4 on "
+            "respiratory epithelium (airborne transmission). Most contagious human virus (R0 ~12-18). "
+            "Causes transient but profound immunosuppression ('immune amnesia'): depletes 20-70% of "
+            "pre-existing memory B and T cells, erasing years of immunological memory. This immune "
+            "amnesia increases susceptibility to secondary infections for 2-3 years post-measles and "
+            "is responsible for most measles mortality. V protein blocks STAT1/STAT2 signaling; "
+            "C protein inhibits IFN-beta induction. Live attenuated vaccine (MMR) is one of the most "
+            "effective vaccines ever developed."
+        ),
+        "Rabies virus": (
+            "Rhabdovirus with 12 kb negative-sense ssRNA genome encoding 5 proteins (N, P, M, G, L). "
+            "Glycoprotein (G) binds nicotinic acetylcholine receptor (nAChR), NCAM, and p75NTR at "
+            "neuromuscular junction. Virus travels retrogradely along peripheral nerves to CNS at ~12-100 "
+            "mm/day via dynein motor transport along microtubules. Once in brain, causes fatal "
+            "encephalitis (>99.9% case fatality without post-exposure prophylaxis). Immune evasion: "
+            "neurotropism (CNS is immune-privileged), P protein blocks IRF3/STAT1 signaling, minimal "
+            "cytopathic effect preserves neuronal function (enabling continued transmission via biting "
+            "behavior). Post-exposure prophylaxis (wound washing + rabies immunoglobulin + vaccine) is "
+            "effective if given before virus reaches CNS."
+        ),
+    }
+
     viruses = [
-        # (name, family, genome, capsid, envelope, size_kb, replication, tropism, receptors, evasion, incubation)
         ("SARS-CoV-2", "Coronaviridae", "ssRNA+", "helical", True, 29.9, 100.0,
          ["respiratory_epithelial"], ["ACE2", "TMPRSS2"],
          ["antigenic_drift", "interferon_antagonism", "ORF_immune_evasion"], 120.0),
@@ -786,7 +882,7 @@ def _seed_pathogens_viruses(store: EntityStore) -> int:
         entity = Virus(
             name=name,
             display_name=name,
-            description=f"{family} virus. Genome: {genome}, {size} kb. Targets: {', '.join(receptors)}.",
+            description=_virus_descriptions.get(name, f"{family} virus. Genome: {genome}, {size} kb."),
             virus_family=family,
             genome_type=genome,
             capsid_type=capsid,
