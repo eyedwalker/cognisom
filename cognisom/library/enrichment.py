@@ -932,6 +932,15 @@ class EntityEnricher:
         "Escherichia coli (UPEC)": {"mesh_type": "rod_flagellated", "scale_um": 2.0, "color_rgb": [0.5, 0.8, 0.3]},
         "Mycobacterium tuberculosis": {"mesh_type": "rod_acid_fast", "scale_um": 3.0, "color_rgb": [0.8, 0.3, 0.3]},
         "Pseudomonas aeruginosa": {"mesh_type": "rod_flagellated", "scale_um": 2.5, "color_rgb": [0.2, 0.7, 0.5]},
+        "Streptococcus pyogenes": {"mesh_type": "coccus_chain", "scale_um": 0.8, "color_rgb": [0.9, 0.7, 0.3]},
+        "Salmonella enterica": {"mesh_type": "rod_flagellated", "scale_um": 2.5, "color_rgb": [0.8, 0.5, 0.2]},
+        "Neisseria meningitidis": {"mesh_type": "diplococcus", "scale_um": 0.8, "color_rgb": [0.7, 0.3, 0.5]},
+        "Clostridioides difficile": {"mesh_type": "rod_spore_forming", "scale_um": 4.0, "color_rgb": [0.5, 0.5, 0.3]},
+        "Zika virus": {"mesh_type": "enveloped_smooth_small", "scale_um": 0.05, "color_rgb": [0.3, 0.8, 0.6]},
+        # Endothelial cells (diapedesis)
+        "Postcapillary venule endothelial cell": {"usd_prim_type": "BioEndothelialCell", "mesh_type": "flat_squamous", "scale_um": 20.0, "color_rgb": [0.5, 0.7, 0.9]},
+        "High endothelial venule (HEV) cell": {"usd_prim_type": "BioEndothelialCell", "mesh_type": "cuboidal_tall", "scale_um": 15.0, "color_rgb": [0.6, 0.8, 0.9]},
+        "Inflamed endothelial cell": {"usd_prim_type": "BioEndothelialCell", "mesh_type": "flat_activated_adhesion", "scale_um": 22.0, "color_rgb": [0.9, 0.5, 0.5]},
     }
 
     def enrich_with_defaults(
