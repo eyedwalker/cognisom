@@ -252,116 +252,402 @@ def _render_drug_molecule(entity, props: dict, height: int) -> bool:
 
 
 def _render_cell_3d(entity, height: int) -> bool:
-    """Render a procedural 3D cell using Plotly."""
+    """Render morphology-specific 3D cell using Plotly.
+
+    Each cell type gets a distinct shape based on real morphology:
+    - T/B cells: smooth small spheres with large nucleus
+    - Macrophage M1: ruffled surface with pseudopods
+    - Macrophage M2: elongated spindle shape
+    - Dendritic cell: stellate with dendrite extensions
+    - Neutrophil: multilobed nucleus
+    - NK cell: slightly irregular with granules
+    - Mast cell: round packed with granules
+    - Eosinophil: bilobed nucleus, granular
+    - Plasma cell: eccentric nucleus, expanded ER
+    """
     import plotly.graph_objects as go
     import numpy as np
 
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.8, 0.3, 0.3]
     r, g, b = [int(c * 255) for c in color[:3]]
     cell_color = f"rgb({r},{g},{b})"
+    light_color = f"rgb({min(255,r+50)},{min(255,g+50)},{min(255,b+50)})"
+    dark_color = f"rgb({max(0,r-80)},{max(0,g-80)},{max(0,b-80)})"
+    nuc_color = f"rgb({max(0,r-60)},{max(0,g-60)},{min(255,b+40)})"
 
-    # Generate sphere
-    u = np.linspace(0, 2 * np.pi, 40)
-    v = np.linspace(0, np.pi, 20)
-    x = np.outer(np.cos(u), np.sin(v))
-    y = np.outer(np.sin(u), np.sin(v))
-    z = np.outer(np.ones(np.size(u)), np.cos(v))
-
-    # Add surface noise for realism (microvilli-like bumps)
-    noise = np.random.RandomState(hash(entity.name) % 2**31).normal(0, 0.03, x.shape)
-    x += noise
-    y += noise
-    z += noise
-
+    rng = np.random.RandomState(hash(entity.name) % 2**31)
+    name_lower = entity.name.lower()
     fig = go.Figure()
 
-    # Cell body
-    fig.add_trace(go.Surface(
-        x=x, y=y, z=z,
-        colorscale=[[0, cell_color], [1, f"rgb({min(255,r+40)},{min(255,g+40)},{min(255,b+40)})"]],
-        showscale=False,
-        opacity=0.85,
-        lighting=dict(ambient=0.4, diffuse=0.6, specular=0.3, roughness=0.5),
-    ))
+    # Determine morphology from name
+    morphology = _classify_cell_morphology(name_lower)
 
-    # Nucleus (smaller, darker sphere inside)
-    scale = 0.4
-    fig.add_trace(go.Surface(
-        x=x * scale, y=y * scale, z=z * scale,
-        colorscale=[[0, f"rgb({max(0,r-80)},{max(0,g-80)},{max(0,b-80)})"],
-                     [1, f"rgb({max(0,r-40)},{max(0,g-40)},{max(0,b-40)})"]],
-        showscale=False,
-        opacity=0.6,
-    ))
+    u = np.linspace(0, 2 * np.pi, 50)
+    v = np.linspace(0, np.pi, 25)
+    cos_u, sin_u = np.cos(u), np.sin(u)
+    cos_v, sin_v = np.cos(v), np.sin(v)
+
+    if morphology == "t_cell":
+        # Small smooth sphere (7-8 um), large nucleus ratio
+        x = np.outer(cos_u, sin_v) * 0.7
+        y = np.outer(sin_u, sin_v) * 0.7
+        z = np.outer(np.ones_like(u), cos_v) * 0.7
+        noise = rng.normal(0, 0.01, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
+        _add_nucleus(fig, x * 0.55, y * 0.55, z * 0.55, nuc_color, 0.7)
+
+    elif morphology == "macrophage_m1":
+        # Large ruffled cell with pseudopods extending outward
+        x = np.outer(cos_u, sin_v)
+        y = np.outer(sin_u, sin_v)
+        z = np.outer(np.ones_like(u), cos_v)
+        # Heavy surface ruffling
+        ruffle = rng.normal(0, 0.08, x.shape)
+        x += ruffle; y += ruffle; z += ruffle
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
+        _add_nucleus(fig, x * 0.35, y * 0.35, z * 0.35, nuc_color, 0.6)
+        # Pseudopods (extending protrusions)
+        for _ in range(5):
+            theta, phi = rng.uniform(0, 2*np.pi), rng.uniform(0.3, 2.8)
+            dx, dy, dz = np.sin(phi)*np.cos(theta), np.sin(phi)*np.sin(theta), np.cos(phi)
+            length = rng.uniform(0.3, 0.6)
+            t = np.linspace(0, 1, 8)
+            px = dx * (1 + t * length) + rng.normal(0, 0.05, 8)
+            py = dy * (1 + t * length) + rng.normal(0, 0.05, 8)
+            pz = dz * (1 + t * length) + rng.normal(0, 0.05, 8)
+            fig.add_trace(go.Scatter3d(
+                x=px, y=py, z=pz, mode="lines",
+                line=dict(color=cell_color, width=6), showlegend=False))
+
+    elif morphology == "macrophage_m2":
+        # Elongated spindle shape
+        x = np.outer(cos_u, sin_v) * 0.6
+        y = np.outer(sin_u, sin_v) * 0.6
+        z = np.outer(np.ones_like(u), cos_v) * 1.4  # stretched along z
+        noise = rng.normal(0, 0.02, x.shape)
+        x += noise; y += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
+        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.3, nuc_color, 0.6)
+
+    elif morphology == "dendritic":
+        # Stellate shape with long dendrite extensions
+        x = np.outer(cos_u, sin_v) * 0.6
+        y = np.outer(sin_u, sin_v) * 0.6
+        z = np.outer(np.ones_like(u), cos_v) * 0.6
+        noise = rng.normal(0, 0.04, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.75)
+        _add_nucleus(fig, x * 0.45, y * 0.45, z * 0.45, nuc_color, 0.6)
+        # Long thin dendrites (8-12 extending branches)
+        for _ in range(10):
+            theta = rng.uniform(0, 2*np.pi)
+            phi = rng.uniform(0.2, 2.9)
+            dx, dy, dz = np.sin(phi)*np.cos(theta), np.sin(phi)*np.sin(theta), np.cos(phi)
+            length = rng.uniform(0.6, 1.2)
+            n_pts = 12
+            t = np.linspace(0, 1, n_pts)
+            # Branching wiggle
+            px = dx * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
+            py = dy * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
+            pz = dz * (0.6 + t * length) + rng.normal(0, 0.08, n_pts)
+            fig.add_trace(go.Scatter3d(
+                x=px, y=py, z=pz, mode="lines",
+                line=dict(color=light_color, width=3), showlegend=False))
+            # Tip bulge
+            fig.add_trace(go.Scatter3d(
+                x=[px[-1]], y=[py[-1]], z=[pz[-1]], mode="markers",
+                marker=dict(size=3, color=light_color), showlegend=False))
+
+    elif morphology == "neutrophil":
+        # Medium cell with multilobed nucleus (3-5 lobes)
+        x = np.outer(cos_u, sin_v) * 0.85
+        y = np.outer(sin_u, sin_v) * 0.85
+        z = np.outer(np.ones_like(u), cos_v) * 0.85
+        noise = rng.normal(0, 0.02, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
+        # Multilobed nucleus — 4 connected small spheres
+        nuc_scale = 0.2
+        offsets = [(-0.15, 0, 0.1), (0.05, 0.1, 0), (0.15, -0.05, -0.1), (-0.05, -0.1, 0.05)]
+        for ox, oy, oz in offsets:
+            nx = x * nuc_scale + ox
+            ny = y * nuc_scale + oy
+            nz = z * nuc_scale + oz
+            fig.add_trace(go.Surface(
+                x=nx, y=ny, z=nz,
+                colorscale=[[0, nuc_color], [1, dark_color]],
+                showscale=False, opacity=0.7))
+        # Granules (small dots in cytoplasm)
+        for _ in range(20):
+            gx, gy, gz = rng.normal(0, 0.3, 3)
+            if gx**2 + gy**2 + gz**2 < 0.5:
+                fig.add_trace(go.Scatter3d(
+                    x=[gx], y=[gy], z=[gz], mode="markers",
+                    marker=dict(size=2, color="rgb(200,180,220)", opacity=0.6),
+                    showlegend=False))
+
+    elif morphology == "nk_cell":
+        # Medium, slightly irregular with visible granules
+        x = np.outer(cos_u, sin_v) * 0.8
+        y = np.outer(sin_u, sin_v) * 0.8
+        z = np.outer(np.ones_like(u), cos_v) * 0.8
+        noise = rng.normal(0, 0.03, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
+        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.4, nuc_color, 0.65)
+        # Azurophilic granules
+        for _ in range(15):
+            gx, gy, gz = rng.normal(0, 0.35, 3)
+            if 0.1 < gx**2 + gy**2 + gz**2 < 0.5:
+                fig.add_trace(go.Scatter3d(
+                    x=[gx], y=[gy], z=[gz], mode="markers",
+                    marker=dict(size=3, color="rgb(180,50,50)", opacity=0.7),
+                    showlegend=False))
+
+    elif morphology == "mast_cell":
+        # Round, densely packed with large metachromatic granules
+        x = np.outer(cos_u, sin_v) * 0.85
+        y = np.outer(sin_u, sin_v) * 0.85
+        z = np.outer(np.ones_like(u), cos_v) * 0.85
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.7)
+        _add_nucleus(fig, x * 0.3, y * 0.3, z * 0.3, nuc_color, 0.5)
+        # Dense granules filling cytoplasm
+        for _ in range(40):
+            gx, gy, gz = rng.normal(0, 0.4, 3)
+            if 0.05 < gx**2 + gy**2 + gz**2 < 0.6:
+                fig.add_trace(go.Scatter3d(
+                    x=[gx], y=[gy], z=[gz], mode="markers",
+                    marker=dict(size=4, color="rgb(160,50,160)", opacity=0.8),
+                    showlegend=False))
+
+    elif morphology == "plasma_cell":
+        # Eccentric nucleus, expanded rough ER visible
+        x = np.outer(cos_u, sin_v) * 0.8
+        y = np.outer(sin_u, sin_v) * 0.8
+        z = np.outer(np.ones_like(u), cos_v) * 0.8
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
+        # Eccentric nucleus (offset to one side)
+        _add_nucleus(fig, x * 0.35 + 0.25, y * 0.35, z * 0.35, nuc_color, 0.7)
+        # ER ribbons (concentric arcs on opposite side of nucleus)
+        for i in range(4):
+            er_t = np.linspace(-1.5, 1.5, 20)
+            er_x = np.cos(er_t) * (0.15 + i * 0.08) - 0.2
+            er_y = np.sin(er_t) * (0.15 + i * 0.08)
+            er_z = np.zeros_like(er_t) + rng.normal(0, 0.02, 20)
+            fig.add_trace(go.Scatter3d(
+                x=er_x, y=er_y, z=er_z, mode="lines",
+                line=dict(color="rgb(100,150,200)", width=2), showlegend=False))
+
+    elif morphology == "eosinophil":
+        # Bilobed nucleus, large pink-red granules
+        x = np.outer(cos_u, sin_v) * 0.85
+        y = np.outer(sin_u, sin_v) * 0.85
+        z = np.outer(np.ones_like(u), cos_v) * 0.85
+        noise = rng.normal(0, 0.015, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.8)
+        # Bilobed nucleus (two connected lobes)
+        for offset in [-0.15, 0.15]:
+            nx = x * 0.22 + offset
+            ny = y * 0.22
+            nz = z * 0.22
+            fig.add_trace(go.Surface(
+                x=nx, y=ny, z=nz,
+                colorscale=[[0, nuc_color], [1, dark_color]],
+                showscale=False, opacity=0.7))
+        # Large eosinophilic (pink-red) granules
+        for _ in range(25):
+            gx, gy, gz = rng.normal(0, 0.35, 3)
+            if 0.08 < gx**2 + gy**2 + gz**2 < 0.55:
+                fig.add_trace(go.Scatter3d(
+                    x=[gx], y=[gy], z=[gz], mode="markers",
+                    marker=dict(size=4, color="rgb(230,120,100)", opacity=0.8),
+                    showlegend=False))
+
+    else:
+        # Default: generic cell with slight noise
+        x = np.outer(cos_u, sin_v) * 0.8
+        y = np.outer(sin_u, sin_v) * 0.8
+        z = np.outer(np.ones_like(u), cos_v) * 0.8
+        noise = rng.normal(0, 0.02, x.shape)
+        x += noise; y += noise; z += noise
+        _add_cell_body(fig, x, y, z, cell_color, light_color, 0.85)
+        _add_nucleus(fig, x * 0.4, y * 0.4, z * 0.4, nuc_color, 0.6)
+
+    # Add caption with morphology info
+    scale = entity.scale_um if hasattr(entity, "scale_um") and entity.scale_um else ""
+    caption = f"{morphology.replace('_', ' ').title()}"
+    if scale:
+        caption += f" | ~{scale} um"
 
     fig.update_layout(
         scene=dict(
-            xaxis=dict(visible=False),
-            yaxis=dict(visible=False),
-            zaxis=dict(visible=False),
+            xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
             bgcolor="#0a0a1a",
-            camera=dict(eye=dict(x=1.5, y=1.5, z=1.0)),
+            camera=dict(eye=dict(x=1.8, y=1.8, z=1.2)),
+            aspectmode="data",
         ),
-        margin=dict(l=0, r=0, t=0, b=0),
+        margin=dict(l=0, r=0, t=0, b=25),
         height=height,
         paper_bgcolor="#0a0a1a",
+        annotations=[dict(
+            text=caption, x=0.5, y=0, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=10, color="rgba(255,255,255,0.4)"),
+        )],
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     return True
 
 
+def _classify_cell_morphology(name_lower: str) -> str:
+    """Classify cell morphology from entity name."""
+    if "macrophage m1" in name_lower or "macrophage_m1" in name_lower:
+        return "macrophage_m1"
+    if "macrophage m2" in name_lower or "macrophage_m2" in name_lower:
+        return "macrophage_m2"
+    if "macrophage" in name_lower:
+        return "macrophage_m1"
+    if "dendritic" in name_lower or "cdc" in name_lower or "pdc" in name_lower:
+        return "dendritic"
+    if "neutrophil" in name_lower:
+        return "neutrophil"
+    if "nk cell" in name_lower or "natural killer" in name_lower:
+        return "nk_cell"
+    if "nkt" in name_lower:
+        return "nk_cell"
+    if "mast cell" in name_lower:
+        return "mast_cell"
+    if "eosinophil" in name_lower:
+        return "eosinophil"
+    if "basophil" in name_lower:
+        return "mast_cell"  # similar morphology
+    if "plasma cell" in name_lower or "plasma_cell" in name_lower:
+        return "plasma_cell"
+    if "t cell" in name_lower or "th1" in name_lower or "th2" in name_lower or \
+       "th17" in name_lower or "treg" in name_lower or "tfh" in name_lower or \
+       "cd8" in name_lower or "cd4" in name_lower or "gamma-delta" in name_lower:
+        return "t_cell"
+    if "b cell" in name_lower or "naive b" in name_lower or "memory b" in name_lower:
+        return "t_cell"  # similar morphology (small round lymphocyte)
+    if "ilc" in name_lower:
+        return "t_cell"  # ILCs look like lymphocytes
+    if "cancer" in name_lower or "stem cell" in name_lower:
+        return "macrophage_m1"  # irregular
+    if "fibroblast" in name_lower:
+        return "macrophage_m2"  # spindle shaped
+    if "endothelial" in name_lower:
+        return "macrophage_m2"  # flat/elongated
+    if "epithelial" in name_lower or "luminal" in name_lower or "basal" in name_lower:
+        return "plasma_cell"  # polarized with ER
+    if "neuroendocrine" in name_lower:
+        return "mast_cell"  # granular
+    return "default"
+
+
+def _add_cell_body(fig, x, y, z, color, light_color, opacity):
+    """Add a cell body surface trace."""
+    fig.add_trace(go.Surface(
+        x=x, y=y, z=z,
+        colorscale=[[0, color], [1, light_color]],
+        showscale=False, opacity=opacity,
+        lighting=dict(ambient=0.35, diffuse=0.65, specular=0.3, roughness=0.5),
+    ))
+
+
+def _add_nucleus(fig, x, y, z, color, opacity):
+    """Add a nucleus surface trace."""
+    import plotly.graph_objects as go
+    dark = color.replace("rgb(", "").replace(")", "")
+    r, g, b = [int(c) for c in dark.split(",")]
+    fig.add_trace(go.Surface(
+        x=x, y=y, z=z,
+        colorscale=[[0, color], [1, f"rgb({max(0,r-30)},{max(0,g-30)},{max(0,b-30)})"]],
+        showscale=False, opacity=opacity,
+    ))
+
+
 def _render_virus_3d(entity, height: int) -> bool:
-    """Render virus as icosahedral particle."""
+    """Render virus with morphology-specific features."""
     import plotly.graph_objects as go
     import numpy as np
 
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.8, 0.1, 0.8]
     r, g, b = [int(c * 255) for c in color[:3]]
+    rng = np.random.RandomState(hash(entity.name) % 2**31)
+    name_lower = entity.name.lower()
 
-    # Generate icosphere-like surface
-    phi = (1 + np.sqrt(5)) / 2  # golden ratio
     u = np.linspace(0, 2 * np.pi, 50)
     v = np.linspace(0, np.pi, 25)
     x = np.outer(np.cos(u), np.sin(v))
     y = np.outer(np.sin(u), np.sin(v))
-    z = np.outer(np.ones(np.size(u)), np.cos(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
 
-    # Add icosahedral facet pattern
-    rng = np.random.RandomState(hash(entity.name) % 2**31)
-    facets = rng.normal(0, 0.05, x.shape)
-    x += facets
-
-    # Spike proteins (small protrusions)
     fig = go.Figure()
-    fig.add_trace(go.Surface(
-        x=x, y=y, z=z,
-        colorscale=[[0, f"rgb({r},{g},{b})"],
-                     [1, f"rgb({min(255,r+60)},{min(255,g+60)},{min(255,b+60)})"]],
-        showscale=False,
-        opacity=0.9,
-        lighting=dict(ambient=0.3, diffuse=0.7, specular=0.5),
-    ))
 
-    # Add spike-like protrusions
-    n_spikes = 30
-    for i in range(n_spikes):
-        theta = rng.uniform(0, 2 * np.pi)
-        phi_s = rng.uniform(0, np.pi)
-        sx = np.sin(phi_s) * np.cos(theta)
-        sy = np.sin(phi_s) * np.sin(theta)
-        sz = np.cos(phi_s)
-        fig.add_trace(go.Scatter3d(
-            x=[sx, sx * 1.25], y=[sy, sy * 1.25], z=[sz, sz * 1.25],
-            mode="lines",
-            line=dict(color=f"rgb({min(255,r+80)},{min(255,g+80)},{min(255,b+80)})", width=3),
-            showlegend=False,
+    # Determine if enveloped (corona-like spikes) or non-enveloped (faceted)
+    is_enveloped = any(k in name_lower for k in
+                       ["corona", "sars", "influenza", "hiv", "ebv", "herpes",
+                        "hepatitis b", "zika", "measles", "rabies"])
+
+    if is_enveloped:
+        # Lipid bilayer envelope (smooth, slightly noisy)
+        env_noise = rng.normal(0, 0.02, x.shape)
+        ex, ey, ez = x + env_noise, y + env_noise, z + env_noise
+        fig.add_trace(go.Surface(
+            x=ex, y=ey, z=ez,
+            colorscale=[[0, f"rgb({r},{g},{b})"],
+                         [1, f"rgb({min(255,r+40)},{min(255,g+40)},{min(255,b+40)})"]],
+            showscale=False, opacity=0.6,
+            lighting=dict(ambient=0.3, diffuse=0.7, specular=0.4),
+        ))
+        # Inner capsid
+        fig.add_trace(go.Surface(
+            x=x * 0.7, y=y * 0.7, z=z * 0.7,
+            colorscale=[[0, f"rgb({max(0,r-40)},{max(0,g-40)},{max(0,b-40)})"],
+                         [1, f"rgb({r},{g},{b})"]],
+            showscale=False, opacity=0.4,
+        ))
+        # Spike glycoproteins
+        n_spikes = 40 if "corona" in name_lower or "sars" in name_lower else 20
+        spike_len = 0.35 if "corona" in name_lower else 0.2
+        for _ in range(n_spikes):
+            theta = rng.uniform(0, 2 * np.pi)
+            phi_s = rng.uniform(0, np.pi)
+            sx = np.sin(phi_s) * np.cos(theta)
+            sy = np.sin(phi_s) * np.sin(theta)
+            sz = np.cos(phi_s)
+            # Spike stalk
+            fig.add_trace(go.Scatter3d(
+                x=[sx, sx * (1 + spike_len)],
+                y=[sy, sy * (1 + spike_len)],
+                z=[sz, sz * (1 + spike_len)],
+                mode="lines",
+                line=dict(color=f"rgb({min(255,r+80)},{min(255,g+80)},{min(255,b+80)})", width=3),
+                showlegend=False))
+            # Spike tip (bulb for corona)
+            if "corona" in name_lower or "sars" in name_lower:
+                fig.add_trace(go.Scatter3d(
+                    x=[sx * (1 + spike_len)], y=[sy * (1 + spike_len)], z=[sz * (1 + spike_len)],
+                    mode="markers",
+                    marker=dict(size=3, color=f"rgb({min(255,r+100)},{min(255,g+100)},{min(255,b+100)})"),
+                    showlegend=False))
+    else:
+        # Non-enveloped: faceted icosahedral capsid
+        facets = rng.normal(0, 0.06, x.shape)
+        fig.add_trace(go.Surface(
+            x=x + facets, y=y + facets, z=z + facets,
+            colorscale=[[0, f"rgb({r},{g},{b})"],
+                         [1, f"rgb({min(255,r+60)},{min(255,g+60)},{min(255,b+60)})"]],
+            showscale=False, opacity=0.9,
+            lighting=dict(ambient=0.3, diffuse=0.7, specular=0.5),
         ))
 
     fig.update_layout(
         scene=dict(
             xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
             bgcolor="#0a0a1a",
-            camera=dict(eye=dict(x=2, y=2, z=1.5)),
+            camera=dict(eye=dict(x=2.2, y=2.2, z=1.5)),
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         height=height,
