@@ -730,132 +730,322 @@ def _render_virus_3d(entity, height: int) -> bool:
 
 
 def _render_bacterium_3d(entity, height: int) -> bool:
-    """Render bacterium as rod or coccus shape."""
-    import plotly.graph_objects as go
-    import numpy as np
-
+    """Render species-specific bacterium with anatomical features."""
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.6, 0.8, 0.2]
     r, g, b = [int(c * 255) for c in color[:3]]
-
+    col = f"rgb({r},{g},{b})"
+    light = f"rgb({min(255,r+40)},{min(255,g+40)},{min(255,b+40)})"
+    rng = np.random.RandomState(hash(entity.name) % 2**31)
+    name_lower = entity.name.lower()
     props = entity.to_dict().get("properties", {})
     shape = props.get("shape", "rod")
 
-    u = np.linspace(0, 2 * np.pi, 40)
-    v = np.linspace(0, np.pi, 20)
-
-    if shape == "rod":
-        # Capsule shape (elongated sphere)
-        x = np.outer(np.cos(u), np.sin(v)) * 0.4
-        y = np.outer(np.sin(u), np.sin(v)) * 0.4
-        z = np.outer(np.ones(np.size(u)), np.cos(v)) * 1.2
-    else:
-        # Coccus (sphere)
-        x = np.outer(np.cos(u), np.sin(v))
-        y = np.outer(np.sin(u), np.sin(v))
-        z = np.outer(np.ones(np.size(u)), np.cos(v))
-
     fig = go.Figure()
-    fig.add_trace(go.Surface(
-        x=x, y=y, z=z,
-        colorscale=[[0, f"rgb({r},{g},{b})"],
-                     [1, f"rgb({min(255,r+30)},{min(255,g+30)},{min(255,b+30)})"]],
-        showscale=False, opacity=0.9,
-        lighting=dict(ambient=0.4, diffuse=0.6, specular=0.3),
-    ))
+    u = np.linspace(0, 2 * np.pi, 35)
+    v = np.linspace(0, np.pi, 18)
+
+    def capsule(rx=0.4, rz=1.2, cx=0, cy=0, cz=0):
+        x = np.outer(np.cos(u), np.sin(v)) * rx + cx
+        y = np.outer(np.sin(u), np.sin(v)) * rx + cy
+        z = np.outer(np.ones_like(u), np.cos(v)) * rz + cz
+        return x, y, z
+
+    def coccus(radius=0.5, cx=0, cy=0, cz=0):
+        x = np.outer(np.cos(u), np.sin(v)) * radius + cx
+        y = np.outer(np.sin(u), np.sin(v)) * radius + cy
+        z = np.outer(np.ones_like(u), np.cos(v)) * radius + cz
+        return x, y, z
+
+    def add_surf(x, y, z, opacity=0.85):
+        fig.add_trace(go.Surface(
+            x=x, y=y, z=z, colorscale=[[0, col], [1, light]],
+            showscale=False, opacity=opacity,
+            lighting=dict(ambient=0.4, diffuse=0.6, specular=0.3)))
+
+    def add_flagella(base_x, base_y, base_z, n=1):
+        for _ in range(n):
+            t = np.linspace(0, 4*np.pi, 40)
+            fx = base_x + t * 0.02 + rng.normal(0, 0.01, 40)
+            fy = base_y + np.sin(t) * 0.15
+            fz = base_z - t * 0.08
+            fig.add_trace(go.Scatter3d(
+                x=fx, y=fy, z=fz, mode="lines",
+                line=dict(color="rgb(180,180,120)", width=2), showlegend=False))
+
+    if "staphylococcus" in name_lower or "aureus" in name_lower:
+        # Grape-like CLUSTERS of cocci (staphylo = grape)
+        positions = [(0, 0, 0), (0.55, 0.3, 0), (-0.3, 0.5, 0.2),
+                     (0.2, -0.4, 0.3), (-0.4, -0.2, -0.1), (0.1, 0.2, 0.5),
+                     (-0.2, 0.1, -0.4), (0.4, -0.1, -0.3)]
+        for px, py, pz in positions:
+            x, y, z = coccus(0.28, px, py, pz)
+            noise = rng.normal(0, 0.008, x.shape)
+            add_surf(x + noise, y + noise, z + noise, 0.9)
+
+    elif "streptococcus" in name_lower or "pyogenes" in name_lower:
+        # CHAINS of cocci (strepto = chain)
+        for i in range(7):
+            x, y, z = coccus(0.22, cx=0, cy=0, cz=i * 0.48 - 1.4)
+            add_surf(x, y, z, 0.9)
+        # M-protein fibrils extending from surface
+        for i in range(7):
+            for _ in range(4):
+                th = rng.uniform(0, 2*np.pi)
+                bx, by, bz = 0.22*np.cos(th), 0.22*np.sin(th), i*0.48 - 1.4
+                fig.add_trace(go.Scatter3d(
+                    x=[bx, bx + 0.15*np.cos(th)], y=[by, by + 0.15*np.sin(th)], z=[bz, bz],
+                    mode="lines", line=dict(color="rgb(255,200,100)", width=1.5), showlegend=False))
+
+    elif "neisseria" in name_lower or "meningitidis" in name_lower:
+        # DIPLOCOCCI (paired kidney-bean shaped cocci)
+        for offset in [-0.25, 0.25]:
+            x, y, z = coccus(0.35, cx=offset)
+            # Slightly flatten adjacent sides
+            mask = (x - offset) * np.sign(offset) < 0
+            x[mask] *= 0.85
+            add_surf(x, y, z, 0.9)
+        # Polysaccharide capsule (transparent outer shell)
+        cx, cy, cz = coccus(0.7)
+        fig.add_trace(go.Surface(
+            x=cx, y=cy, z=cz, colorscale=[[0, "rgb(200,200,255)"], [1, "rgb(220,220,255)"]],
+            showscale=False, opacity=0.15))
+
+    elif "clostridioides" in name_lower or "difficile" in name_lower:
+        # Rod with TERMINAL SPORE (bulging end)
+        x, y, z = capsule(0.35, 1.0)
+        add_surf(x, y, z, 0.85)
+        # Terminal endospore (bright, refractive)
+        sx, sy, sz = coccus(0.3, cz=1.2)
+        fig.add_trace(go.Surface(
+            x=sx, y=sy, z=sz,
+            colorscale=[[0, "rgb(240,240,200)"], [1, "rgb(255,255,220)"]],
+            showscale=False, opacity=0.95,
+            lighting=dict(ambient=0.5, specular=0.8)))
+
+    elif "mycobacterium" in name_lower or "tuberculosis" in name_lower:
+        # Slightly curved rod, WAXY CELL WALL (thick, lipid-rich)
+        x, y, z = capsule(0.3, 1.0)
+        # Slight curvature
+        x += np.outer(np.ones_like(u), np.cos(v)) * 0.1
+        add_surf(x, y, z, 0.9)
+        # Thick waxy cell wall layer (outer translucent)
+        wx, wy, wz = capsule(0.38, 1.08)
+        wx += np.outer(np.ones_like(u), np.cos(v)) * 0.1
+        fig.add_trace(go.Surface(
+            x=wx, y=wy, z=wz,
+            colorscale=[[0, "rgb(180,130,100)"], [1, "rgb(200,160,120)"]],
+            showscale=False, opacity=0.2))
+
+    elif "pseudomonas" in name_lower:
+        # Rod with SINGLE POLAR FLAGELLUM + pili
+        x, y, z = capsule(0.35, 1.0)
+        add_surf(x, y, z, 0.85)
+        add_flagella(0, 0, -1.0, n=1)
+        # Type IV pili (thin, short, all around)
+        for _ in range(8):
+            th = rng.uniform(0, 2*np.pi)
+            pz = rng.uniform(-0.8, 0.8)
+            bx, by = 0.35*np.cos(th), 0.35*np.sin(th)
+            fig.add_trace(go.Scatter3d(
+                x=[bx, bx + 0.2*np.cos(th)], y=[by, by + 0.2*np.sin(th)], z=[pz, pz],
+                mode="lines", line=dict(color="rgb(150,200,150)", width=1), showlegend=False))
+
+    elif "escherichia" in name_lower or "salmonella" in name_lower:
+        # Rod with PERITRICHOUS FLAGELLA (multiple, all around)
+        x, y, z = capsule(0.35, 1.0)
+        noise = rng.normal(0, 0.008, x.shape)
+        add_surf(x + noise, y + noise, z + noise, 0.85)
+        # Multiple flagella from all over
+        for _ in range(6):
+            th = rng.uniform(0, 2*np.pi)
+            fz = rng.uniform(-0.5, 0.5)
+            bx, by = 0.35*np.cos(th), 0.35*np.sin(th)
+            add_flagella(bx, by, fz)
+        # Fimbriae (short, hair-like)
+        for _ in range(15):
+            th = rng.uniform(0, 2*np.pi)
+            fz = rng.uniform(-0.8, 0.8)
+            bx, by = 0.35*np.cos(th), 0.35*np.sin(th)
+            fig.add_trace(go.Scatter3d(
+                x=[bx, bx + 0.12*np.cos(th)], y=[by, by + 0.12*np.sin(th)], z=[fz, fz],
+                mode="lines", line=dict(color=light, width=1), showlegend=False))
+
+    else:
+        # Generic rod
+        x, y, z = capsule(0.35, 1.0)
+        add_surf(x, y, z, 0.85)
 
     fig.update_layout(
         scene=dict(
             xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
-            bgcolor="#0a0a1a",
-            camera=dict(eye=dict(x=2, y=2, z=1.5)),
-        ),
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=height,
-        paper_bgcolor="#0a0a1a",
-    )
+            bgcolor="#0a0a1a", camera=dict(eye=dict(x=2.5, y=2.5, z=1.5)),
+            aspectmode="data"),
+        margin=dict(l=0, r=0, t=0, b=0), height=height, paper_bgcolor="#0a0a1a")
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     return True
 
 
 def _render_antibody_3d(entity, height: int) -> bool:
-    """Render antibody Y-shape."""
-    import plotly.graph_objects as go
-    import numpy as np
-
+    """Render isotype-specific antibody structure."""
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.2, 0.4, 0.9]
     r, g, b = [int(c * 255) for c in color[:3]]
     col = f"rgb({r},{g},{b})"
+    light = f"rgb({min(255,r+60)},{min(255,g+60)},{min(255,b+60)})"
+    name_lower = entity.name.lower()
 
-    # Y-shape from line segments (simplified)
     fig = go.Figure()
 
-    # Fc stem
-    fig.add_trace(go.Scatter3d(
-        x=[0, 0], y=[0, 0], z=[-1, 0],
-        mode="lines", line=dict(color=col, width=12), showlegend=False,
-    ))
-    # Left Fab arm
-    fig.add_trace(go.Scatter3d(
-        x=[0, -0.8], y=[0, 0], z=[0, 0.8],
-        mode="lines", line=dict(color=col, width=10), showlegend=False,
-    ))
-    # Right Fab arm
-    fig.add_trace(go.Scatter3d(
-        x=[0, 0.8], y=[0, 0], z=[0, 0.8],
-        mode="lines", line=dict(color=col, width=10), showlegend=False,
-    ))
-    # Antigen-binding tips
-    for xp in [-0.8, 0.8]:
+    def add_ig_monomer(cx=0, cz=0, hinge_flex=0.3):
+        """Draw one IgG-like monomer: 2 Fab arms + Fc stem + hinge."""
+        # Fc stem (2 CH2-CH3 domains)
+        for dx in [-0.12, 0.12]:
+            fig.add_trace(go.Scatter3d(
+                x=[cx+dx, cx+dx], y=[0, 0], z=[cz-0.8, cz],
+                mode="lines", line=dict(color=col, width=8), showlegend=False))
+        # Hinge region
         fig.add_trace(go.Scatter3d(
-            x=[xp], y=[0], z=[0.8],
-            mode="markers",
-            marker=dict(size=8, color=f"rgb({min(255,r+60)},{min(255,g+60)},{min(255,b+60)})"),
-            showlegend=False,
-        ))
-    # Fc base
-    fig.add_trace(go.Scatter3d(
-        x=[0], y=[0], z=[-1],
-        mode="markers",
-        marker=dict(size=10, color=col),
-        showlegend=False,
-    ))
-    # Hinge
-    fig.add_trace(go.Scatter3d(
-        x=[0], y=[0], z=[0],
-        mode="markers",
-        marker=dict(size=6, color="gold"),
-        showlegend=False,
-    ))
+            x=[cx], y=[0], z=[cz],
+            mode="markers", marker=dict(size=4, color="gold"), showlegend=False))
+        # Left Fab (VL-CL + VH-CH1)
+        fig.add_trace(go.Scatter3d(
+            x=[cx, cx-0.5], y=[0, 0], z=[cz, cz+0.6],
+            mode="lines", line=dict(color=col, width=7), showlegend=False))
+        fig.add_trace(go.Scatter3d(
+            x=[cx-0.5], y=[0], z=[cz+0.6],
+            mode="markers", marker=dict(size=6, color=light), showlegend=False))
+        # Right Fab
+        fig.add_trace(go.Scatter3d(
+            x=[cx, cx+0.5], y=[0, 0], z=[cz, cz+0.6],
+            mode="lines", line=dict(color=col, width=7), showlegend=False))
+        fig.add_trace(go.Scatter3d(
+            x=[cx+0.5], y=[0], z=[cz+0.6],
+            mode="markers", marker=dict(size=6, color=light), showlegend=False))
+        # Fc glycosylation (small orange dots at CH2)
+        fig.add_trace(go.Scatter3d(
+            x=[cx-0.08, cx+0.08], y=[0, 0], z=[cz-0.3, cz-0.3],
+            mode="markers", marker=dict(size=3, color="orange"), showlegend=False))
+
+    if "igm" in name_lower:
+        # PENTAMERIC IgM — 5 monomers arranged in a star around J-chain
+        for angle in np.linspace(0, 2*np.pi, 5, endpoint=False):
+            cx = 1.2 * np.cos(angle)
+            cy = 1.2 * np.sin(angle)
+            # Simplified: Fc points inward, Fab outward
+            fig.add_trace(go.Scatter3d(
+                x=[0, cx*0.5], y=[0, cy*0.5], z=[0, 0],
+                mode="lines", line=dict(color=col, width=6), showlegend=False))
+            fig.add_trace(go.Scatter3d(
+                x=[cx*0.5, cx*0.8, cx], y=[cy*0.5, cy*0.8-0.15, cy-0.15],
+                z=[0, 0.3, 0.3],
+                mode="lines", line=dict(color=col, width=5), showlegend=False))
+            fig.add_trace(go.Scatter3d(
+                x=[cx*0.5, cx*0.8, cx], y=[cy*0.5, cy*0.8+0.15, cy+0.15],
+                z=[0, 0.3, 0.3],
+                mode="lines", line=dict(color=col, width=5), showlegend=False))
+            # Antigen-binding tips
+            fig.add_trace(go.Scatter3d(
+                x=[cx, cx], y=[cy-0.15, cy+0.15], z=[0.3, 0.3],
+                mode="markers", marker=dict(size=4, color=light), showlegend=False))
+        # J-chain at center
+        fig.add_trace(go.Scatter3d(
+            x=[0], y=[0], z=[0],
+            mode="markers", marker=dict(size=6, color="gold"), showlegend=False))
+
+    elif "ige" in name_lower:
+        # IgE: no hinge, extra CH domain, bound to FcepsilonRI
+        add_ig_monomer()
+        # Extra CH4 domain (IgE has 4 CH domains, no hinge)
+        fig.add_trace(go.Scatter3d(
+            x=[-0.12, 0.12], y=[0, 0], z=[-1.0, -1.0],
+            mode="markers", marker=dict(size=5, color=col), showlegend=False))
+        # FcepsilonRI receptor (orange Y below Fc)
+        fig.add_trace(go.Scatter3d(
+            x=[0, -0.3, 0, 0.3], y=[0, 0, 0, 0], z=[-1.0, -1.4, -1.0, -1.4],
+            mode="lines+markers",
+            line=dict(color="rgb(220,140,40)", width=5),
+            marker=dict(size=4, color="rgb(220,140,40)"),
+            showlegend=False))
+
+    elif "igg3" in name_lower:
+        # IgG3: VERY LONG HINGE (62 amino acids, 11 disulfide bonds)
+        # Fc
+        for dx in [-0.12, 0.12]:
+            fig.add_trace(go.Scatter3d(
+                x=[dx, dx], y=[0, 0], z=[-0.8, -0.2],
+                mode="lines", line=dict(color=col, width=8), showlegend=False))
+        # Extended hinge (the distinguishing feature)
+        fig.add_trace(go.Scatter3d(
+            x=[0, 0], y=[0, 0], z=[-0.2, 0.5],
+            mode="lines", line=dict(color="gold", width=3), showlegend=False))
+        # Multiple disulfide bonds along hinge
+        for hz in np.linspace(-0.1, 0.4, 6):
+            fig.add_trace(go.Scatter3d(
+                x=[0], y=[0], z=[hz],
+                mode="markers", marker=dict(size=2, color="gold"), showlegend=False))
+        # Fab arms (more spread due to long hinge)
+        for dx, sign in [(-0.7, -1), (0.7, 1)]:
+            fig.add_trace(go.Scatter3d(
+                x=[0, dx], y=[0, 0], z=[0.5, 1.0],
+                mode="lines", line=dict(color=col, width=7), showlegend=False))
+            fig.add_trace(go.Scatter3d(
+                x=[dx], y=[0], z=[1.0],
+                mode="markers", marker=dict(size=6, color=light), showlegend=False))
+
+    elif "iga" in name_lower:
+        # Secretory IgA: DIMER with J-chain + secretory component
+        add_ig_monomer(cx=-0.6)
+        add_ig_monomer(cx=0.6)
+        # J-chain connecting Fc regions
+        fig.add_trace(go.Scatter3d(
+            x=[-0.6, 0.6], y=[0, 0], z=[-0.8, -0.8],
+            mode="lines", line=dict(color="gold", width=4), showlegend=False))
+        # Secretory component (wrapping around)
+        sc_t = np.linspace(-0.8, 0.8, 20)
+        sc_x = sc_t
+        sc_y = np.sin(sc_t * 3) * 0.15
+        sc_z = np.full_like(sc_t, -0.9)
+        fig.add_trace(go.Scatter3d(
+            x=sc_x, y=sc_y, z=sc_z, mode="lines",
+            line=dict(color="rgb(180,220,180)", width=3), showlegend=False))
+
+    else:
+        # Standard IgG1/IgG2/IgG4/IgD monomer
+        add_ig_monomer()
 
     fig.update_layout(
         scene=dict(
             xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False),
-            bgcolor="#0a0a1a",
-            camera=dict(eye=dict(x=0, y=3, z=0.5)),
-        ),
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=height,
-        paper_bgcolor="#0a0a1a",
-    )
+            bgcolor="#0a0a1a", camera=dict(eye=dict(x=0, y=3, z=0.5)),
+            aspectmode="data"),
+        margin=dict(l=0, r=0, t=0, b=0), height=height, paper_bgcolor="#0a0a1a")
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     return True
 
 
 def _render_type_icon(entity, height: int) -> bool:
-    """Render a simple colored indicator for entity types without 3D."""
+    """Render a colored indicator for entity types without specific 3D renderer."""
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.5, 0.5, 0.5]
     r, g, b = [int(c * 255) for c in color[:3]]
     scale = entity.scale_um if hasattr(entity, "scale_um") and entity.scale_um else 0
+    etype = entity.entity_type.value
+
+    # Type-specific icons
+    icons = {
+        "pathway": "\U0001f310", "mutation": "\U0001f9ec", "organ": "\U0001fac0",
+        "tissue_type": "\U0001f9eb", "mhc": "\U0001f3af", "complement": "\u2b50",
+    }
+    icon = icons.get(etype, "\U0001f52c")
 
     st.markdown(
-        f'<div style="background: rgba({r},{g},{b},0.15); border: 1px solid rgba({r},{g},{b},0.3); '
-        f'border-radius: 12px; padding: 1.5rem; text-align: center; height: {height}px; '
+        f'<div style="background: rgba({r},{g},{b},0.1); border: 1px solid rgba({r},{g},{b},0.25); '
+        f'border-radius: 12px; padding: 1.2rem; text-align: center; height: {height}px; '
         f'display: flex; flex-direction: column; align-items: center; justify-content: center;">'
-        f'<div style="width: 60px; height: 60px; border-radius: 50%; '
+        f'<div style="font-size: 3rem; margin-bottom: 0.3rem;">{icon}</div>'
+        f'<div style="width: 40px; height: 40px; border-radius: 50%; '
         f'background: linear-gradient(135deg, rgb({r},{g},{b}), rgb({min(255,r+60)},{min(255,g+60)},{min(255,b+60)})); '
-        f'margin-bottom: 0.5rem; box-shadow: 0 0 20px rgba({r},{g},{b},0.3);"></div>'
-        f'<div style="font-size: 0.75rem; opacity: 0.6;">{entity.entity_type.value}</div>'
-        + (f'<div style="font-size: 0.65rem; opacity: 0.4;">Scale: {scale} um</div>' if scale else '')
+        f'margin-bottom: 0.3rem; box-shadow: 0 0 15px rgba({r},{g},{b},0.3);"></div>'
+        f'<div style="font-size: 0.75rem; opacity: 0.6;">{etype.replace("_", " ").title()}</div>'
+        + (f'<div style="font-size: 0.65rem; opacity: 0.4;">~{scale} um</div>' if scale else '')
         + '</div>',
         unsafe_allow_html=True,
     )
