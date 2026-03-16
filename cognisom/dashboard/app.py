@@ -1208,14 +1208,16 @@ else:
             st.rerun()
         st.stop()
 
-    # ── GPU inactivity monitor (on-demand instance auto-shutdown) ──
+    # ── GPU inactivity monitor (only runs on the GPU instance itself) ──
     try:
-        from cognisom.infrastructure.inactivity import (
-            InactivityMonitor, update_heartbeat, inject_activity_tracker,
-        )
-        update_heartbeat()
-        InactivityMonitor.get_or_start()
-        st.markdown(inject_activity_tracker(), unsafe_allow_html=True)
+        from cognisom.infrastructure.gpu_connector import IS_GPU_INSTANCE
+        if IS_GPU_INSTANCE:
+            from cognisom.infrastructure.inactivity import (
+                InactivityMonitor, update_heartbeat, inject_activity_tracker,
+            )
+            update_heartbeat()
+            InactivityMonitor.get_or_start()
+            st.markdown(inject_activity_tracker(), unsafe_allow_html=True)
     except Exception:
         pass  # Not on GPU instance or infrastructure module unavailable
 

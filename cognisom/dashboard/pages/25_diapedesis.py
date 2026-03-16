@@ -207,22 +207,8 @@ with st.sidebar:
 
             if st.button("Apply Scene Changes", key="apply_scene"):
                 import urllib.request
-                kit_candidates = [
-                    os.environ.get("KIT_SERVER_URL", ""),
-                    "http://host.docker.internal:8600",
-                    "http://172.17.0.1:8600",
-                    "http://localhost:8600",
-                ]
-                kit_url = None
-                for c in kit_candidates:
-                    if not c:
-                        continue
-                    try:
-                        urllib.request.urlopen(f"{c}/status", timeout=2)
-                        kit_url = c
-                        break
-                    except Exception:
-                        continue
+                from cognisom.infrastructure.gpu_connector import get_kit_server_url, is_kit_available
+                kit_url = get_kit_server_url() if is_kit_available() else None
                 if kit_url:
                     payload = json.dumps({
                         "camera": {"x": cam_x, "y": cam_y, "z": cam_z},
@@ -312,42 +298,46 @@ def _render_omniverse_viewer(frames, streaming_url: str):
             Server-side Python calls always use localhost:8600 directly.
     """
     import urllib.request
+    from cognisom.infrastructure.gpu_connector import (
+        get_kit_server_url, get_kit_browser_url, is_kit_available,
+        get_gpu_instance_state, start_gpu_instance,
+    )
 
     st.markdown("### Omniverse RTX Viewer")
 
-    # Server-side URL (Python → Kit)
-    # Try multiple addresses: env var, host.docker.internal, Docker bridge gateway.
-    # host.docker.internal requires --add-host flag; 172.17.0.1 is the default
-    # Docker bridge gateway that works without special flags on Linux.
+    # Use centralized GPU connector for Kit URLs
     kit_server = None
     kit_status = None
-    kit_candidates = [
-        os.environ.get("KIT_SERVER_URL", ""),
-        "http://host.docker.internal:8600",
-        "http://172.17.0.1:8600",
-        "http://localhost:8600",
-    ]
-    for candidate in kit_candidates:
-        if not candidate:
-            continue
+    if is_kit_available():
+        kit_server = get_kit_server_url()
         try:
-            req = urllib.request.Request(f"{candidate}/status", method="GET")
+            req = urllib.request.Request(f"{kit_server}/status", method="GET")
             req.add_header("Accept", "application/json")
-            with urllib.request.urlopen(req, timeout=2) as resp:
+            with urllib.request.urlopen(req, timeout=3) as resp:
                 kit_status = json.loads(resp.read())
-                kit_server = candidate
-                break
         except Exception:
-            continue
+            kit_server = None
 
-    # Browser-side URL (JS/HTML → Kit, through nginx HTTPS proxy)
-    kit_browser = streaming_url.rstrip("/")
+    kit_browser = get_kit_browser_url().rstrip("/")
 
     if not kit_status:
-        st.warning(
-            "Omniverse Kit not detected. "
-            "Make sure the Kit container is running with the cognisom.sim extension."
-        )
+        gpu_state = get_gpu_instance_state()
+        if gpu_state == "stopped":
+            st.warning("GPU renderer is offline.")
+            if st.button("Start GPU Renderer", key="start_gpu_diap"):
+                ok, msg = start_gpu_instance()
+                if ok:
+                    st.success(msg)
+                    st.info("Kit will be available in ~2-3 minutes. Refresh to check.")
+                else:
+                    st.error(msg)
+        elif gpu_state in ("pending", "running"):
+            st.info(
+                "GPU instance is running but Kit is still initializing. "
+                "Refresh in 1-2 minutes."
+            )
+        else:
+            st.warning("Omniverse Kit not detected.")
         with st.expander("Setup Instructions"):
             st.markdown("""
 **To enable Omniverse RTX rendering:**

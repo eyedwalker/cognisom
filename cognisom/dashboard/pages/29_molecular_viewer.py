@@ -38,8 +38,13 @@ st.caption(
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────────
 
-KIT_BASE_URL = "http://host.docker.internal:8600"  # Server-side (container→container)
-KIT_PUBLIC_URL = "/kit"  # Client-side (browser→nginx→Kit, HTTPS)
+from cognisom.infrastructure.gpu_connector import (
+    get_kit_server_url, get_kit_browser_url, is_kit_available,
+    get_gpu_instance_state, start_gpu_instance,
+)
+
+KIT_BASE_URL = get_kit_server_url()
+KIT_PUBLIC_URL = get_kit_browser_url()
 
 # Sample PDB for demo (small beta-hairpin)
 DEMO_PDB = """HEADER    DEMO PROTEIN
@@ -444,6 +449,23 @@ if pdb_text:
 
     with view_col:
         st.subheader("3D Structure")
+
+        # GPU start button when Kit is not available
+        if not kit_available:
+            gpu_state = get_gpu_instance_state()
+            if gpu_state == "stopped":
+                st.info("GPU renderer is offline. Start it for RTX ray-traced visualization.")
+                if st.button("Start GPU Renderer", type="secondary"):
+                    ok, msg = start_gpu_instance()
+                    if ok:
+                        st.success(msg)
+                        st.info("Kit will be available in ~2-3 minutes. Refresh this page to check.")
+                    else:
+                        st.error(msg)
+            elif gpu_state == "pending":
+                st.info("GPU instance is starting up. Kit will be available in ~2 minutes.")
+            elif gpu_state == "running":
+                st.info("GPU is running but Kit is not responding yet. It may still be initializing.")
 
         # Viewer mode toggle: 3Dmol.js (always available) vs Kit RTX (when available)
         viewer_options = ["3Dmol.js (WebGL)"]
