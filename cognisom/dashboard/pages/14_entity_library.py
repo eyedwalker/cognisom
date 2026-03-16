@@ -92,11 +92,7 @@ if not search_query and stats["by_type"]:
     type_cols = st.columns(min(len(sorted_types), 9))
     for i, (etype, count) in enumerate(sorted_types[:9]):
         with type_cols[i]:
-            if st.button(f"{etype}\n({count})", key=f"type_btn_{etype}",
-                         use_container_width=True):
-                st.session_state["entity_search"] = ""
-                st.query_params["type"] = etype
-                st.rerun()
+            st.caption(f"**{etype}**\n{count}")
 
 st.divider()
 

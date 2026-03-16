@@ -20,22 +20,12 @@ if _project_root not in sys.path:
 import streamlit as st
 import os
 
-st.set_page_config(
-    page_title="Cognisom | Human Digital Twin Platform",
-    page_icon="🧬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# ── Check auth state (without blocking) ─────────────────────────────
+# ── Check auth state FIRST (before navigation) ──────────────────────
 
 try:
     from cognisom.auth.middleware import get_current_user, _get_auth_manager
     user = get_current_user()
-except Exception as e:
-    st.error(f"Authentication system error: {e}")
-    st.info("The authentication system could not be loaded. This may be a configuration issue.")
-    st.code(str(e))
+except Exception:
     user = None
 
 # Force password change if needed
@@ -43,14 +33,99 @@ if user is not None and getattr(user, 'must_change_password', False):
     try:
         from cognisom.auth.middleware import _streamlit_force_password_change
         _streamlit_force_password_change(user)
-    except Exception as e:
-        st.error(f"Password change error: {e}")
+    except Exception:
         user = None
 
 
+# ── Navigation setup (MUST be called before any other st.* calls) ──
+_pages_dir = Path(__file__).resolve().parent / "pages"
+
+if user is not None:
+    # Authenticated: grouped navigation
+    pages = {
+        "": [
+            st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
+        ],
+        "Digital Twin": [
+            st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
+            st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
+            st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
+            st.Page(str(_pages_dir / "31_neoantigen_vaccine.py"), title="Neoantigen Vaccine", icon=":material/vaccines:"),
+        ],
+        "Visualization": [
+            st.Page(str(_pages_dir / "29_molecular_viewer.py"), title="Molecular Viewer", icon=":material/view_in_ar:"),
+            st.Page(str(_pages_dir / "30_spatial_tissue.py"), title="Spatial Tissue", icon=":material/map:"),
+            st.Page(str(_pages_dir / "25_diapedesis.py"), title="Diapedesis", icon=":material/bloodtype:"),
+            st.Page(str(_pages_dir / "12_3d_visualization.py"), title="3D Cells & Fields", icon=":material/scatter_plot:"),
+        ],
+        "Drug Discovery": [
+            st.Page(str(_pages_dir / "2_discovery.py"), title="NIM Discovery", icon=":material/science:"),
+            st.Page(str(_pages_dir / "5_molecular_lab.py"), title="Molecular Lab", icon=":material/labs:"),
+        ],
+        "Simulation": [
+            st.Page(str(_pages_dir / "3_simulation.py"), title="9-Module Engine", icon=":material/settings:"),
+            st.Page(str(_pages_dir / "15_physics_engine.py"), title="Physics Engine", icon=":material/bolt:"),
+            st.Page(str(_pages_dir / "19_prostate_metastasis.py"), title="Cancer Progression", icon=":material/target:"),
+            st.Page(str(_pages_dir / "20_vcell_solvers.py"), title="VCell Solvers", icon=":material/calculate:"),
+            st.Page(str(_pages_dir / "21_tissue_scale.py"), title="Tissue Scale", icon=":material/memory:"),
+        ],
+        "Research": [
+            st.Page(str(_pages_dir / "7_research_agent.py"), title="Research Agent", icon=":material/smart_toy:"),
+            st.Page(str(_pages_dir / "6_research_feed.py"), title="Research Feed", icon=":material/newspaper:"),
+            st.Page(str(_pages_dir / "8_subscriptions.py"), title="Subscriptions", icon=":material/mail:"),
+            st.Page(str(_pages_dir / "18_external_databases.py"), title="Databases", icon=":material/database:"),
+            st.Page(str(_pages_dir / "1_ingestion.py"), title="Data Ingestion", icon=":material/download:"),
+            st.Page(str(_pages_dir / "24_data_pipeline.py"), title="Data Pipeline", icon=":material/sync:"),
+        ],
+        "Publish": [
+            st.Page(str(_pages_dir / "22_researcher.py"), title="Researcher", icon=":material/edit_note:"),
+            st.Page(str(_pages_dir / "23_paper_studio.py"), title="Paper Studio", icon=":material/article:"),
+            st.Page(str(_pages_dir / "11_validation.py"), title="Validation", icon=":material/verified:"),
+            st.Page(str(_pages_dir / "14_entity_library.py"), title="Entity Library", icon=":material/library_books:"),
+            st.Page(str(_pages_dir / "16_usd_omniverse.py"), title="USD & Omniverse", icon=":material/public:"),
+            st.Page(str(_pages_dir / "17_flywheel_monitor.py"), title="Flywheel Monitor", icon=":material/autorenew:"),
+        ],
+        "Admin": [
+            st.Page(str(_pages_dir / "9_account.py"), title="Account", icon=":material/person:"),
+            st.Page(str(_pages_dir / "13_organization.py"), title="Organization", icon=":material/business:"),
+            st.Page(str(_pages_dir / "10_security.py"), title="Security", icon=":material/lock:"),
+            st.Page(str(_pages_dir / "4_admin.py"), title="Platform Admin", icon=":material/admin_panel_settings:"),
+        ],
+    }
+    nav = st.navigation(pages)
+
+    # Sidebar user info (visible on all authenticated pages)
+    st.sidebar.markdown(f"**{st.session_state.get('username', 'user')}**")
+    st.sidebar.markdown(
+        '<span style="color: #f97316; font-weight: 600; font-size: 0.7rem;">BETA</span>'
+        ' <span style="font-size: 0.65rem; opacity: 0.5;">Research only</span>',
+        unsafe_allow_html=True,
+    )
+    if st.sidebar.button("Log out", key="main_logout"):
+        auth = _get_auth_manager()
+        session_id = st.session_state.get("session_id")
+        if session_id:
+            auth.logout(session_id)
+        for key in ["session_id", "username", "cognito_access_token",
+                    "cognito_refresh_token", "cognito_token_expires"]:
+            st.session_state.pop(key, None)
+        st.rerun()
+    st.sidebar.divider()
+
+    nav.run()
+    st.stop()  # Navigation handles everything for authenticated users
+
+
 # ════════════════════════════════════════════════════════════════════
-# PUBLIC LANDING PAGE (not logged in)
+# PUBLIC LANDING PAGE (not logged in — st.navigation not used)
 # ════════════════════════════════════════════════════════════════════
+
+st.set_page_config(
+    page_title="Cognisom | Human Digital Twin Platform",
+    page_icon="\U0001f9ec",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 if user is None:
 
@@ -1194,124 +1269,5 @@ Spatial Transcriptomics <span class="arch-dim">──></span> Tissue Map <span c
 
 
 # ════════════════════════════════════════════════════════════════════
-# AUTHENTICATED DASHBOARD (logged in) — Grouped Navigation
+# (Authenticated users are handled above by st.navigation + st.stop)
 # ════════════════════════════════════════════════════════════════════
-
-else:
-    try:
-        # Check tier access
-        from cognisom.auth.middleware import _get_org_manager
-        from cognisom.auth.models import UserRole
-
-        if user.role != UserRole.ADMIN:
-            org_mgr = _get_org_manager()
-            org = org_mgr.get_org(user.org_id) if user.org_id else None
-            if org is None:
-                st.error("Your account is not associated with an organization. Contact an admin.")
-                st.stop()
-    except Exception as e:
-        st.error(f"Authentication error: {e}")
-        st.info("Try logging out and logging back in, or contact support.")
-        if st.button("Log out and try again"):
-            for key in ["session_id", "username"]:
-                st.session_state.pop(key, None)
-            st.rerun()
-        st.stop()
-
-    # ── GPU inactivity monitor (only runs on the GPU instance itself) ──
-    try:
-        from cognisom.infrastructure.gpu_connector import IS_GPU_INSTANCE
-        if IS_GPU_INSTANCE:
-            from cognisom.infrastructure.inactivity import (
-                InactivityMonitor, update_heartbeat, inject_activity_tracker,
-            )
-            update_heartbeat()
-            InactivityMonitor.get_or_start()
-            st.markdown(inject_activity_tracker(), unsafe_allow_html=True)
-    except Exception:
-        pass
-
-    # Sidebar user info
-    st.sidebar.markdown(f"**Logged in as:** {st.session_state.get('username', 'unknown')}")
-    if user.org_id:
-        try:
-            org_mgr = _get_org_manager()
-            org = org_mgr.get_org(user.org_id)
-            if org:
-                st.sidebar.caption(f"Org: {org.name} ({org.plan.value.title()})")
-        except Exception:
-            pass
-    if st.sidebar.button("Log out"):
-        auth = _get_auth_manager()
-        session_id = st.session_state.get("session_id")
-        if session_id:
-            auth.logout(session_id)
-        for key in ["session_id", "username", "cognito_access_token",
-                    "cognito_refresh_token", "cognito_token_expires"]:
-            st.session_state.pop(key, None)
-        st.rerun()
-    st.sidebar.divider()
-
-    # ── Beta disclaimer in sidebar ──
-    st.sidebar.markdown(
-        '<span style="color: #f97316; font-weight: 600; font-size: 0.75rem;">BETA</span>'
-        ' <span style="font-size: 0.7rem; opacity: 0.6;">Research only. Not for clinical use.</span>',
-        unsafe_allow_html=True,
-    )
-
-    # ── Grouped Navigation ─────────────────────────────────────────
-    _pages_dir = Path(__file__).resolve().parent / "pages"
-
-    pages = {
-        "": [
-            st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
-        ],
-        "Digital Twin": [
-            st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
-            st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
-            st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
-            st.Page(str(_pages_dir / "31_neoantigen_vaccine.py"), title="Neoantigen Vaccine", icon=":material/vaccines:"),
-        ],
-        "Visualization": [
-            st.Page(str(_pages_dir / "29_molecular_viewer.py"), title="Molecular Viewer", icon=":material/view_in_ar:"),
-            st.Page(str(_pages_dir / "30_spatial_tissue.py"), title="Spatial Tissue", icon=":material/map:"),
-            st.Page(str(_pages_dir / "25_diapedesis.py"), title="Diapedesis", icon=":material/bloodtype:"),
-            st.Page(str(_pages_dir / "12_3d_visualization.py"), title="3D Cells & Fields", icon=":material/scatter_plot:"),
-        ],
-        "Drug Discovery": [
-            st.Page(str(_pages_dir / "2_discovery.py"), title="NIM Discovery", icon=":material/science:"),
-            st.Page(str(_pages_dir / "5_molecular_lab.py"), title="Molecular Lab", icon=":material/labs:"),
-        ],
-        "Simulation": [
-            st.Page(str(_pages_dir / "3_simulation.py"), title="9-Module Engine", icon=":material/settings:"),
-            st.Page(str(_pages_dir / "15_physics_engine.py"), title="Physics Engine", icon=":material/bolt:"),
-            st.Page(str(_pages_dir / "19_prostate_metastasis.py"), title="Cancer Progression", icon=":material/target:"),
-            st.Page(str(_pages_dir / "20_vcell_solvers.py"), title="VCell Solvers", icon=":material/calculate:"),
-            st.Page(str(_pages_dir / "21_tissue_scale.py"), title="Tissue Scale", icon=":material/memory:"),
-        ],
-        "Research": [
-            st.Page(str(_pages_dir / "7_research_agent.py"), title="Research Agent", icon=":material/smart_toy:"),
-            st.Page(str(_pages_dir / "6_research_feed.py"), title="Research Feed", icon=":material/newspaper:"),
-            st.Page(str(_pages_dir / "8_subscriptions.py"), title="Subscriptions", icon=":material/mail:"),
-            st.Page(str(_pages_dir / "18_external_databases.py"), title="Databases", icon=":material/database:"),
-            st.Page(str(_pages_dir / "1_ingestion.py"), title="Data Ingestion", icon=":material/download:"),
-            st.Page(str(_pages_dir / "24_data_pipeline.py"), title="Data Pipeline", icon=":material/sync:"),
-        ],
-        "Publish": [
-            st.Page(str(_pages_dir / "22_researcher.py"), title="Researcher", icon=":material/edit_note:"),
-            st.Page(str(_pages_dir / "23_paper_studio.py"), title="Paper Studio", icon=":material/article:"),
-            st.Page(str(_pages_dir / "11_validation.py"), title="Validation", icon=":material/verified:"),
-            st.Page(str(_pages_dir / "14_entity_library.py"), title="Entity Library", icon=":material/library_books:"),
-            st.Page(str(_pages_dir / "16_usd_omniverse.py"), title="USD & Omniverse", icon=":material/public:"),
-            st.Page(str(_pages_dir / "17_flywheel_monitor.py"), title="Flywheel Monitor", icon=":material/autorenew:"),
-        ],
-        "Admin": [
-            st.Page(str(_pages_dir / "9_account.py"), title="Account", icon=":material/person:"),
-            st.Page(str(_pages_dir / "13_organization.py"), title="Organization", icon=":material/business:"),
-            st.Page(str(_pages_dir / "10_security.py"), title="Security", icon=":material/lock:"),
-            st.Page(str(_pages_dir / "4_admin.py"), title="Platform Admin", icon=":material/admin_panel_settings:"),
-        ],
-    }
-
-    nav = st.navigation(pages)
-    nav.run()
