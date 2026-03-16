@@ -52,6 +52,8 @@ if user is not None:
             st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
             st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
             st.Page(str(_pages_dir / "31_neoantigen_vaccine.py"), title="Neoantigen Vaccine", icon=":material/vaccines:"),
+            st.Page(str(_pages_dir / "33_clinical_report.py"), title="Clinical Report", icon=":material/description:"),
+            st.Page(str(_pages_dir / "34_pathway_editor.py"), title="Pathway Editor", icon=":material/hub:"),
         ],
         "Visualization": [
             st.Page(str(_pages_dir / "29_molecular_viewer.py"), title="Molecular Viewer", icon=":material/view_in_ar:"),
