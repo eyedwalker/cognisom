@@ -691,23 +691,17 @@ if user is None:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Demo Video ────────────────────────────────────────────────
-    st.markdown("### Platform Overview")
-    vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
-    with vid_col2:
-        st.markdown("""
-        <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(128,128,128,0.15);">
-            <iframe width="100%" height="400"
-                src="https://www.youtube.com/embed/gaLwSzDk2zE?rel=0"
-                title="Cognisom Platform Overview"
-                frameborder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen>
-            </iframe>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    # ── Demo Video (uncomment when YouTube account is active) ────
+    # vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
+    # with vid_col2:
+    #     st.markdown("""
+    #     <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(128,128,128,0.15);">
+    #         <iframe width="100%" height="400"
+    #             src="https://www.youtube.com/embed/YOUR_VIDEO_ID?rel=0"
+    #             title="Cognisom Platform Overview"
+    #             frameborder="0" allowfullscreen></iframe>
+    #     </div>
+    #     """, unsafe_allow_html=True)
 
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4, m5 = st.columns(5)
@@ -946,33 +940,16 @@ Validated against published data from TCGA, GEO, and the Human Cell Atlas.
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Video Section ─────────────────────────────────────────────
+    # ── Vision Section ─────────────────────────────────────────────
     st.markdown("""
     <div class="section-header">The Vision</div>
-    <div class="section-sub">A stylized look at the future of computational oncology</div>
+    <div class="section-sub">Building the future of computational oncology</div>
     <div class="gradient-line"></div>
     """, unsafe_allow_html=True)
 
-    vid_col1, vid_col2 = st.columns([3, 2])
+    vis_col1, vis_col2 = st.columns(2)
 
-    with vid_col1:
-        if _demo_video_path.exists():
-            st.video(str(_demo_video_path))
-        else:
-            # Fallback to NVIDIA digital biology video
-            st.markdown("""
-            <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08);">
-                <iframe width="100%" height="315"
-                    src="https://www.youtube.com/embed/lyASA5hQS6g?rel=0"
-                    title="Cognisom Vision"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
-            </div>
-            """, unsafe_allow_html=True)
-
-    with vid_col2:
+    with vis_col1:
         st.markdown("""
 **Where We're Heading**
 
@@ -983,9 +960,24 @@ profile that predicts treatment response before therapy begins.
 **What Cognisom delivers today:**
 - **Genomic profiling** — 14 cancer driver genes, TMB, MSI from patient VCF
 - **Immune landscape analysis** — T-cell exhaustion, macrophage polarization, spatial TME
-- **Treatment simulation** — 7 regimens with RECIST response prediction
+- **Treatment simulation** — 9 regimens with RECIST response prediction
+- **Neoantigen vaccine design** — HLA typing + MHC-I binding prediction
 - **AI drug discovery** — 11 NVIDIA BioNeMo NIMs, end-to-end
 - **RTX visualization** — Real-time 3D in NVIDIA Omniverse
+        """)
+
+    with vis_col2:
+        st.markdown("""
+**Personalized mRNA Cancer Vaccine Pipeline**
+
+From patient DNA to vaccine design in a single workflow:
+
+1. Upload tumor VCF → identify cancer driver mutations
+2. HLA type the patient → 6 MHC-I alleles
+3. Predict neoantigens → peptide-MHC binding affinity
+4. Select vaccine targets → top binders with high agretopicity
+5. Design mRNA sequence → LinearDesign optimization
+6. Simulate response → digital twin treatment prediction
 
 Powered by **NVIDIA BioNeMo** and the
 **Inception Program** for accelerated startups.
