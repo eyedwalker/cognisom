@@ -96,103 +96,355 @@ def _seed_immune_cell_types(store: EntityStore) -> int:
         ("CD8+ Naive T cell", "T_cell", "naive",
          ["CD8", "CD45RA", "CCR7", "CD62L"],
          [],
-         "Naive cytotoxic T cell. Not yet encountered antigen. Circulates between blood and lymph nodes."),
+         "Quiescent CD8+ T lymphocyte that has completed thymic selection (positive selection for "
+         "MHC-I recognition, negative selection against self-peptides) but has not yet encountered "
+         "its cognate antigen in the periphery. Naive CD8+ T cells continuously recirculate between "
+         "blood and secondary lymphoid organs (lymph nodes, spleen) guided by CCR7 and CD62L "
+         "(L-selectin), surveying dendritic cell-presented peptide-MHC-I complexes. Each naive "
+         "T cell carries a unique alpha-beta TCR with precursor frequency of ~1 in 10^5-10^6 "
+         "total T cells for any given epitope. Upon antigen recognition plus co-stimulation "
+         "(CD28-B7) and IL-12/type I IFN signaling, naive CD8+ T cells undergo massive clonal "
+         "expansion (~10,000-fold in 7 days), differentiate into effector CTLs, and migrate to "
+         "peripheral tissues. Homeostatic proliferation is maintained by IL-7 (CD127/IL-7R) and "
+         "IL-15 signaling. Naive T cell numbers decline with age (thymic involution), contributing "
+         "to immunosenescence."),
         ("CD8+ Effector T cell", "T_cell", "effector",
          ["CD8", "CD45RO", "KLRG1", "granzyme_B", "perforin"],
          ["IFNg", "TNFa", "granzyme_B"],
-         "Activated cytotoxic T lymphocyte. Kills virus-infected and tumor cells via perforin/granzyme."),
+         "Fully activated cytotoxic T lymphocyte (CTL) that kills target cells through two primary "
+         "mechanisms: (1) Directed exocytosis of cytolytic granules containing perforin (forms "
+         "transmembrane pores) and granzyme B (serine protease that cleaves caspase-3/7/8, "
+         "BID, and ICAD, triggering apoptosis) at the immunological synapse; (2) Fas ligand "
+         "(FasL/CD95L) engagement of Fas (CD95) on target cells, activating extrinsic apoptosis "
+         "via FADD and caspase-8. Effector CTLs also produce IFN-gamma (activates macrophages, "
+         "upregulates MHC-I on tumor cells) and TNF-alpha (direct cytotoxicity, NF-kappaB "
+         "activation in bystander cells). CTLs kill targets in serial fashion, reforming granules "
+         "between kills (~30 minutes per target). KLRG1+ effector CTLs are short-lived effector "
+         "cells (SLECs) that undergo apoptosis after pathogen clearance, while KLRG1- memory "
+         "precursor effector cells (MPECs) survive to form long-lived memory."),
         ("CD8+ Memory T cell", "T_cell", "memory",
          ["CD8", "CD45RO", "CD127", "CCR7"],
          ["IFNg"],
-         "Long-lived memory CTL. Rapid recall response upon re-encounter with antigen."),
+         "Long-lived antigen-experienced CD8+ T cell that persists for decades via IL-7 and IL-15 "
+         "homeostatic signaling. Memory T cells exist in three subsets: central memory (Tcm, "
+         "CCR7+CD62L+, lymph node-homing, highest proliferative potential upon re-stimulation), "
+         "effector memory (Tem, CCR7-CD62L-, circulates in blood and tissues, rapid cytotoxicity "
+         "but lower proliferative capacity), and tissue-resident memory (Trm, CD69+CD103+, "
+         "permanently lodged in barrier tissues, provides immediate local defense). Memory CD8+ "
+         "T cells have a 100-1000x higher precursor frequency than naive cells for the same "
+         "epitope, respond to antigen within hours instead of days, have a lower activation "
+         "threshold (reduced co-stimulation requirement), and generate effector progeny more "
+         "rapidly. Stem cell-like memory T cells (Tscm, CD45RA+CD95+CCR7+) represent the "
+         "least-differentiated memory subset with the greatest self-renewal capacity."),
         ("CD4+ Th1 cell", "T_cell", "Th1",
          ["CD4", "CXCR3", "CCR5", "T-bet"],
          ["IFNg", "TNFa", "IL2"],
-         "Type 1 helper T cell. Drives cell-mediated immunity against intracellular pathogens. Master TF: T-bet."),
+         "Type 1 helper T cell specialized for defense against intracellular pathogens (viruses, "
+         "intracellular bacteria, protozoa) and anti-tumor immunity. Th1 differentiation from "
+         "naive CD4+ T cells requires IL-12 (from dendritic cells) and IFN-gamma, activating "
+         "STAT4 and STAT1 respectively, which induce the master transcription factor T-bet (TBX21). "
+         "T-bet drives IFN-gamma expression and suppresses Th2/Th17 programs by inhibiting GATA3 "
+         "and RORgamma-t. Th1 cells produce IFN-gamma (classically activates macrophages, enhances "
+         "MHC-I/II expression, promotes antibody class switching to IgG1/IgG3 opsonizing isotypes), "
+         "TNF-alpha (pro-inflammatory, activates endothelium), and IL-2 (autocrine T cell "
+         "proliferation). In anti-tumor immunity, Th1 cells license dendritic cells via CD40L-CD40 "
+         "interaction, enabling optimal CD8+ CTL priming, and recruit inflammatory monocytes via "
+         "CCL2/CXCL10. Th1/Th2 balance is a key determinant of immune response quality."),
         ("CD4+ Th2 cell", "T_cell", "Th2",
          ["CD4", "CCR4", "CCR8", "GATA3"],
          ["IL4", "IL5", "IL13"],
-         "Type 2 helper T cell. Drives humoral immunity and anti-helminth responses. Master TF: GATA3."),
+         "Type 2 helper T cell that orchestrates humoral immunity and defense against helminth "
+         "parasites. Th2 differentiation requires IL-4 (initially from basophils, mast cells, or "
+         "NKT cells) acting through STAT6 to induce master transcription factor GATA3, which "
+         "drives IL-4, IL-5, and IL-13 production while repressing IFN-gamma. IL-4 promotes B "
+         "cell class switching to IgE (helminth defense, allergy) and IgG4. IL-5 recruits and "
+         "activates eosinophils. IL-13 induces goblet cell hyperplasia, mucus production, smooth "
+         "muscle contraction, and alternative macrophage activation (M2). In cancer, Th2-dominant "
+         "immune responses are generally pro-tumorigenic: IL-4/IL-13 promote M2 macrophage "
+         "polarization and suppress Th1 anti-tumor immunity. Allergic diseases (asthma, atopic "
+         "dermatitis, allergic rhinitis) reflect inappropriate Th2 activation against harmless "
+         "environmental antigens."),
         ("CD4+ Th17 cell", "T_cell", "Th17",
          ["CD4", "CCR6", "IL23R", "RORgt"],
          ["IL17A", "IL17F", "IL22"],
-         "IL-17-producing helper T cell. Mucosal defense against extracellular bacteria/fungi. Master TF: RORgt."),
+         "IL-17-producing helper T cell critical for mucosal barrier defense against extracellular "
+         "bacteria and fungi (Candida, Staphylococcus, Klebsiella). Th17 differentiation requires "
+         "TGF-beta + IL-6 (or IL-21) to induce master transcription factor RORgamma-t via STAT3. "
+         "IL-23 (not a differentiation signal but a survival/expansion factor) stabilizes the Th17 "
+         "phenotype and promotes pathogenicity. Th17 cells produce IL-17A/F (induces G-CSF, "
+         "CXCL1/CXCL8 from epithelial and stromal cells, recruiting neutrophils; upregulates "
+         "antimicrobial peptides beta-defensins and S100A8/A9) and IL-22 (promotes epithelial "
+         "barrier integrity, tight junction proteins, REG3gamma antimicrobial lectin). "
+         "Dysregulated Th17 responses drive autoimmune diseases (psoriasis, rheumatoid arthritis, "
+         "MS, IBD). In cancer, Th17 cells have context-dependent roles: pro-tumorigenic (IL-17 "
+         "promotes angiogenesis, recruits MDSCs) or anti-tumorigenic (recruit effector cells)."),
         ("Regulatory T cell (Treg)", "T_cell", "Treg",
          ["CD4", "CD25", "FOXP3", "CTLA4", "CD127lo"],
          ["IL10", "TGFb", "IL35"],
-         "Immunosuppressive T cell. Maintains self-tolerance and prevents autoimmunity. Master TF: FOXP3."),
+         "Immunosuppressive CD4+ T cell lineage essential for peripheral self-tolerance and "
+         "prevention of autoimmunity. Tregs are defined by the master transcription factor FOXP3 "
+         "and constitutive expression of high-affinity IL-2R alpha chain (CD25) and CTLA-4. "
+         "Two origins: thymic Tregs (tTregs, develop in thymus from self-reactive T cells) and "
+         "peripheral Tregs (pTregs, induced from naive CD4+ T cells by TGF-beta + retinoic acid "
+         "in the gut and TME). Suppressive mechanisms: (1) IL-10 and TGF-beta secretion; (2) "
+         "CTLA-4-mediated trans-endocytosis of CD80/CD86 from APCs, stripping co-stimulatory "
+         "ligands; (3) IL-2 consumption (depriving effector T cells of proliferative signal); "
+         "(4) Granzyme B/perforin-mediated killing of effector cells; (5) Adenosine production "
+         "via CD39/CD73 ectonucleotidases. In cancer, Tregs are recruited by CCL22 and CXCL12 "
+         "and expanded by IDO+ myeloid cells, creating a major barrier to anti-tumor immunity. "
+         "Anti-CTLA-4 (ipilimumab) depletes intratumoral Tregs via Fc-mediated ADCC."),
         ("T follicular helper (Tfh)", "T_cell", "Tfh",
          ["CD4", "CXCR5", "PD-1", "ICOS", "BCL6"],
          ["IL21", "IL4"],
-         "Germinal center helper T cell. Provides help to B cells for affinity maturation and class switching."),
+         "Specialized CD4+ T cell subset that resides in B cell follicles and germinal centers "
+         "(GCs) of secondary lymphoid organs, providing essential help for high-affinity antibody "
+         "responses. Tfh differentiation requires ICOS co-stimulation, IL-6, and IL-21 to induce "
+         "master transcription factor BCL6 (which represses T-bet, GATA3, and RORgamma-t, "
+         "preventing other Th fates). CXCR5 expression enables migration toward CXCL13-producing "
+         "follicular dendritic cells. In GCs, Tfh cells provide survival signals to GC B cells "
+         "undergoing somatic hypermutation: CD40L-CD40 interaction prevents B cell apoptosis, "
+         "while IL-21 and IL-4 drive class-switch recombination (IgG, IgA, IgE) and plasma cell "
+         "differentiation. Only B cells presenting the highest-affinity antigen receive Tfh help, "
+         "driving affinity maturation. PD-1 on Tfh cells limits excessive GC responses."),
         ("Gamma-delta T cell", "T_cell", "gamma_delta",
          ["TCRgd", "CD3", "NKG2D"],
          ["IFNg", "IL17A"],
-         "Unconventional T cell with gamma-delta TCR. Bridges innate and adaptive immunity. Tissue-resident sentinel."),
+         "Unconventional T lymphocyte bearing a gamma-delta TCR (vs. alpha-beta TCR on conventional "
+         "T cells) that bridges innate and adaptive immunity. Gamma-delta T cells recognize "
+         "non-peptide antigens without MHC restriction, including phosphoantigens (isopentenyl "
+         "pyrophosphate/IPP from the mevalonate pathway, accumulated in stressed/transformed cells), "
+         "lipid antigens presented by CD1d, and stress-induced ligands (MICA/MICB recognized by "
+         "NKG2D). Vgamma9Vdelta2 T cells (predominant in blood) sense phosphoantigens via "
+         "butyrophilin BTN3A1 and provide rapid anti-tumor surveillance. Vdelta1 T cells "
+         "(predominant in tissues/epithelia) serve as tissue-resident sentinels. Gamma-delta T "
+         "cells produce IFN-gamma (anti-tumor) or IL-17 (context-dependent; IL-17-producing "
+         "gamma-delta T cells can promote tumor growth via neutrophil recruitment and angiogenesis)."),
         ("NK cell", "NK_cell", "NK",
          ["CD56", "CD16", "NKG2D", "NKp46", "KIR"],
          ["IFNg", "TNFa", "perforin", "granzyme_B"],
-         "Natural killer cell. Innate cytotoxic lymphocyte. Kills via missing-self (low MHC-I) and ADCC."),
+         "Innate lymphoid cell (~5-15% of blood lymphocytes) that provides MHC-unrestricted "
+         "cytotoxicity against virus-infected and transformed cells. NK cell activation is "
+         "governed by the integration of activating receptors (NKG2D recognizes MICA/MICB/ULBP "
+         "on stressed cells; NKp46/NKp30/NKp44 natural cytotoxicity receptors; CD16/FcgammaRIII "
+         "for antibody-dependent cellular cytotoxicity/ADCC) and inhibitory receptors (KIR family "
+         "and NKG2A/CD94 recognize self-MHC-I). When activating signals exceed inhibitory ('missing "
+         "self' or 'induced self'), NK cells form a lytic synapse and release perforin/granzyme "
+         "granules. CD56bright NK cells (blood, ~10%) are primarily cytokine producers (IFN-gamma, "
+         "TNF-alpha); CD56dim CD16+ NK cells (~90%) are potent cytotoxic effectors. NK cells also "
+         "perform antibody-dependent cellular cytotoxicity (ADCC) by binding IgG-opsonized targets "
+         "via CD16, the primary mechanism of action for therapeutic antibodies like rituximab and "
+         "trastuzumab. NK cell education/licensing through self-MHC recognition tunes responsiveness."),
         ("NKT cell", "NK_cell", "NKT",
          ["CD3", "Va24Ja18TCR", "CD1d-reactive", "CD56"],
          ["IFNg", "IL4"],
-         "Natural killer T cell. Recognizes lipid antigens on CD1d. Bridges innate and adaptive immunity."),
+         "Innate-like T lymphocyte that expresses both a semi-invariant TCR (Valpha24-Jalpha18 "
+         "in humans) and NK cell markers (CD56, NKG2D). Invariant NKT (iNKT) cells recognize "
+         "glycolipid antigens (alpha-galactosylceramide/alpha-GalCer, microbial glycolipids) "
+         "presented by the non-polymorphic MHC-I-like molecule CD1d on APCs. Upon activation, "
+         "iNKT cells produce massive amounts of both IFN-gamma and IL-4 within hours, enabling "
+         "rapid amplification of both Th1 and Th2 responses. This dual cytokine burst "
+         "transactivates NK cells, dendritic cells, and conventional T cells. NKT cells are "
+         "enriched in the liver (~30% of lymphocytes) and provide frontline defense against "
+         "blood-borne pathogens. Alpha-GalCer has been explored as a cancer immunotherapy adjuvant "
+         "to activate NKT-mediated anti-tumor immunity."),
         ("Macrophage M1", "macrophage", "M1",
          ["CD68", "CD80", "CD86", "iNOS", "HLA-DR"],
          ["TNFa", "IL1b", "IL6", "IL12", "NO"],
-         "Classically activated macrophage. Pro-inflammatory, microbicidal. Activated by IFNg + LPS."),
+         "Classically activated macrophage polarized by IFN-gamma (from Th1/NK cells) and TLR "
+         "ligands (LPS, bacterial lipoproteins). M1 macrophages upregulate inducible nitric oxide "
+         "synthase (iNOS/NOS2), producing nitric oxide (NO) from L-arginine — a potent antimicrobial "
+         "that also generates peroxynitrite (ONOO-) by reacting with superoxide. M1 macrophages "
+         "are professional antigen presenters (high MHC-II, CD80, CD86), phagocytes (FcgammaR, "
+         "complement receptors, scavenger receptors), and pro-inflammatory cytokine producers "
+         "(TNF-alpha drives local inflammation and fever; IL-1beta activates endothelium; IL-6 "
+         "induces acute phase proteins; IL-12 drives Th1 differentiation and NK activation). "
+         "M1 macrophages also produce reactive oxygen species (ROS) via NADPH oxidase (respiratory "
+         "burst). In tumors, M1 macrophages are anti-tumorigenic but are typically overwhelmed by "
+         "M2-polarizing signals (IL-10, TGF-beta, CSF-1) in the immunosuppressive TME."),
         ("Macrophage M2", "macrophage", "M2",
          ["CD68", "CD163", "CD206", "arginase-1"],
          ["IL10", "TGFb"],
-         "Alternatively activated macrophage. Anti-inflammatory, tissue repair. Activated by IL-4/IL-13."),
+         "Alternatively activated macrophage polarized along an anti-inflammatory, tissue-repair "
+         "spectrum. M2a (induced by IL-4/IL-13 via STAT6) express mannose receptor (CD206), "
+         "arginase-1 (converts L-arginine to ornithine/polyamines for collagen synthesis rather "
+         "than NO), and secrete CCL17/CCL22 (recruit Th2/Tregs). M2b (induced by immune complexes "
+         "+ TLR ligands) produce both pro- and anti-inflammatory cytokines (IL-10high, IL-12low). "
+         "M2c (induced by IL-10, TGF-beta, glucocorticoids) are strongly immunosuppressive, "
+         "expressing CD163 (hemoglobin-haptoglobin scavenger), and secrete TGF-beta (fibrosis, "
+         "EMT), VEGF (angiogenesis), and MMP9 (ECM remodeling). Tumor-associated macrophages "
+         "(TAMs) in prostate cancer are predominantly M2-like, representing 50-80% of immune "
+         "infiltrate. TAMs promote tumor progression through immunosuppression (PD-L1, IL-10, "
+         "IDO), angiogenesis (VEGF, ANG2), invasion (MMP2/9, cathepsins), and metabolic support "
+         "(provide iron, lipids). High CD163+ TAM density predicts biochemical recurrence."),
         ("Conventional dendritic cell (cDC)", "dendritic", "cDC",
          ["CD11c", "HLA-DR", "CD1c", "CD141"],
          ["IL12", "IL6", "TNFa"],
-         "Professional antigen-presenting cell. Cross-presents antigen on MHC-I/II. Activates naive T cells."),
+         "Professional antigen-presenting cell that bridges innate and adaptive immunity by "
+         "capturing, processing, and presenting antigens to naive T cells. cDCs exist as two "
+         "functional subsets: cDC1 (CD141/BDCA3+, CLEC9A+, XCR1+) specialize in cross-presentation "
+         "of exogenous antigens on MHC-I to activate CD8+ T cells — critical for anti-tumor and "
+         "antiviral immunity; cDC2 (CD1c/BDCA1+, CD11b+) present antigen on MHC-II to CD4+ T "
+         "cells and drive Th1, Th2, and Th17 responses. Immature DCs in tissues capture antigen "
+         "via macropinocytosis, receptor-mediated endocytosis (DEC-205, DC-SIGN), and phagocytosis. "
+         "Danger signals (PAMPs, DAMPs) trigger maturation: upregulation of MHC-II, CD80/CD86 "
+         "co-stimulatory molecules, and CCR7 (directing migration to T cell zones of lymph nodes "
+         "via CCL19/CCL21). IL-12 production by cDC1 drives Th1/CTL responses. cDC1s are rare "
+         "but essential for anti-tumor immunity; their absence correlates with immunotherapy failure."),
         ("Plasmacytoid dendritic cell (pDC)", "dendritic", "pDC",
          ["CD123", "CD303", "CD304"],
          ["IFNa", "IFNb"],
-         "Type I interferon-producing dendritic cell. Key antiviral sentinel via TLR7/9 sensing."),
+         "Specialized dendritic cell subset that produces massive amounts of type I interferons "
+         "(IFN-alpha/beta) in response to viral nucleic acids. pDCs constitutively express TLR7 "
+         "(detects single-stranded RNA) and TLR9 (detects unmethylated CpG DNA) in endosomes. "
+         "Upon TLR activation, pDCs produce 100-1000x more type I IFN than any other cell type "
+         "(up to 10 pg IFN-alpha per cell), creating a potent antiviral state in neighboring cells "
+         "by upregulating ISGs (MxA, OAS, PKR, IFITM). IFN-alpha also activates NK cells, promotes "
+         "cDC maturation, and enhances CD8+ T cell cross-priming. pDCs are morphologically "
+         "plasma cell-like (extensive ER for IFN production). In tumors, pDCs can be co-opted: "
+         "tumor-infiltrating pDCs often produce less IFN and instead express IDO, promoting immune "
+         "tolerance. pDC-derived IFN-alpha is the basis of IFN therapy in melanoma and hairy cell "
+         "leukemia, and pDC agonists (TLR7/9 agonists like imiquimod) are used topically."),
         ("Naive B cell", "B_cell", "naive",
          ["CD19", "CD20", "IgM", "IgD", "CD23"],
          [],
-         "Mature naive B cell expressing surface IgM/IgD. Not yet encountered antigen."),
+         "Mature B lymphocyte that has completed bone marrow development (pro-B → pre-B → immature "
+         "B → transitional B → mature naive B) and expresses surface IgM and IgD via alternative "
+         "mRNA splicing. Naive B cells circulate through blood and secondary lymphoid organs, "
+         "residing in B cell follicles (guided by CXCR5/CXCL13). Each B cell expresses a unique "
+         "B cell receptor (BCR) generated through V(D)J recombination of immunoglobulin heavy and "
+         "light chain gene segments. BCR signaling upon antigen binding (via Igalpha/Igbeta, Syk, "
+         "BLNK, PLCgamma2, NF-kappaB cascade) drives activation, with full activation requiring "
+         "T cell help (CD40L from Tfh cells) for most protein antigens (T-dependent response). "
+         "Activated B cells either differentiate into short-lived plasmablasts (rapid, low-affinity "
+         "antibody) or enter germinal centers for somatic hypermutation and affinity maturation. "
+         "B cell depletion by anti-CD20 (rituximab) treats B cell lymphomas and autoimmune diseases."),
         ("Memory B cell", "B_cell", "memory",
          ["CD19", "CD20", "CD27", "class-switched_Ig"],
          [],
-         "Long-lived memory B cell. Rapid recall response with high-affinity class-switched antibodies."),
+         "Long-lived antigen-experienced B cell that persists in lymphoid tissues and circulation "
+         "for decades, providing rapid recall humoral immunity. Memory B cells have undergone "
+         "somatic hypermutation in germinal centers, expressing high-affinity BCRs typically "
+         "class-switched from IgM to IgG, IgA, or IgE. CD27 expression distinguishes memory from "
+         "naive B cells. Upon re-exposure to antigen, memory B cells activate within hours "
+         "(vs. days for naive B cells), rapidly differentiate into antibody-secreting plasmablasts, "
+         "and produce high-affinity class-switched antibodies. Memory B cells can also re-enter "
+         "germinal centers for additional rounds of affinity maturation, further refining antibody "
+         "responses. They are the cellular basis of vaccine-induced long-term protection, "
+         "complementing long-lived plasma cells that provide constitutive antibody production."),
         ("Plasma cell", "B_cell", "plasma_cell",
          ["CD138", "CD38", "BLIMP-1", "XBP1"],
          [],
-         "Antibody-secreting cell. Terminally differentiated B cell producing ~10,000 antibodies/second."),
+         "Terminally differentiated antibody-secreting cell derived from activated B cells. Plasma "
+         "cells are antibody factories, producing and secreting ~2,000-10,000 immunoglobulin "
+         "molecules per second via a massively expanded endoplasmic reticulum. BLIMP-1 (PRDM1) is "
+         "the master transcription factor that silences the B cell program (PAX5, BCL6) and "
+         "activates the secretory program. XBP1 drives ER expansion (unfolded protein response) "
+         "to accommodate the enormous protein synthesis load. Short-lived plasmablasts (~3-5 days) "
+         "form rapidly in extrafollicular sites and produce low-affinity antibodies. Long-lived "
+         "plasma cells migrate to bone marrow survival niches (CXCL12/APRIL/BAFF signals from "
+         "stromal cells) and persist for decades, constitutively secreting antibodies that maintain "
+         "serum immunoglobulin levels without ongoing antigen stimulation. Multiple myeloma is a "
+         "malignancy of plasma cells; CD138/CD38 are therapeutic targets (daratumumab anti-CD38)."),
         ("Neutrophil", "neutrophil", "neutrophil",
          ["CD15", "CD16", "CD66b", "MPO"],
          ["IL8", "TNFa"],
-         "Most abundant granulocyte. First responder to bacterial infection. Phagocytosis, NETs, degranulation."),
+         "Most abundant leukocyte in human blood (~60-70% of WBCs, 2-7.5 x 10^9/L) and the "
+         "first innate immune cell recruited to sites of infection and tissue damage. Neutrophils "
+         "arrive within minutes via selectin-mediated rolling (P/E-selectin on activated endothelium), "
+         "chemokine-induced integrin activation (LFA-1, Mac-1), firm adhesion (ICAM-1), and "
+         "transendothelial migration (diapedesis via PECAM-1/CD31, JAMs). Three antimicrobial "
+         "mechanisms: (1) Phagocytosis — ingest opsonized bacteria into phagosomes, kill via "
+         "NADPH oxidase-generated superoxide/H2O2 and myeloperoxidase (MPO)-generated HOCl; "
+         "(2) Degranulation — release primary granules (MPO, elastase, defensins), secondary "
+         "granules (lactoferrin, collagenase), and tertiary granules (MMP-9, gelatinase); "
+         "(3) NETosis — extrude chromatin + granule proteins as neutrophil extracellular traps "
+         "(NETs) that trap and kill microbes but can also promote thrombosis and autoimmunity. "
+         "Neutrophils are short-lived (~5-90 hours in circulation) and undergo constitutive "
+         "apoptosis, which is essential for resolution of inflammation."),
         ("Mast cell", "mast_cell", "mast_cell",
          ["FceRI", "CD117", "tryptase", "chymase"],
          ["histamine", "TNFa", "IL4", "IL13"],
-         "Tissue-resident granulocyte. IgE-mediated degranulation. Allergic responses and anti-parasite defense."),
+         "Tissue-resident granulocyte derived from bone marrow progenitors that complete maturation "
+         "in peripheral tissues under stem cell factor (SCF)/c-Kit (CD117) signaling. Mast cells "
+         "are concentrated at host-environment interfaces (skin, airways, gut) and contain "
+         "metachromatic granules loaded with preformed mediators: histamine (vasodilation, "
+         "bronchoconstriction, pruritus), heparin (anticoagulant), tryptase and chymase (serine "
+         "proteases that remodel ECM and activate pro-MMPs), and TNF-alpha (pre-stored, earliest "
+         "source during infection). FcepsilonRI (high-affinity IgE receptor) crosslinking by "
+         "multivalent antigen triggers explosive degranulation within seconds, releasing granule "
+         "contents. Mast cells also synthesize lipid mediators (PGD2, LTC4/LTD4/LTE4) and "
+         "cytokines (IL-4, IL-13, IL-5, IL-33) over hours. Type I hypersensitivity (anaphylaxis, "
+         "asthma, food allergy) results from IgE-mediated mast cell degranulation. Mast cells also "
+         "defend against parasites and venoms and regulate innate immunity through TNF-alpha release."),
         ("Basophil", "basophil", "basophil",
          ["FceRI", "CD123", "CD203c"],
          ["IL4", "IL13", "histamine"],
-         "Rare blood granulocyte. Type 2 immunity, anti-parasite. Th2 differentiation via early IL-4."),
+         "Rarest blood granulocyte (<1% of leukocytes) that plays a non-redundant role in type 2 "
+         "immunity and anti-parasitic defense. Like mast cells, basophils express high-affinity "
+         "FcepsilonRI and degranulate upon IgE crosslinking, releasing histamine and generating "
+         "LTC4. Critically, basophils are the earliest and most important source of IL-4 during "
+         "primary immune responses, providing the initial IL-4 signal that drives naive CD4+ T cell "
+         "differentiation toward the Th2 lineage before Th2 cells themselves produce IL-4. Basophils "
+         "are recruited to tissues during helminth infection by IL-3, eotaxin, and thymic stromal "
+         "lymphopoietin (TSLP). Basophil-derived IL-4 and IL-13 also promote alternative macrophage "
+         "activation (M2) and IgE class switching. In allergic disease, basophils contribute to "
+         "late-phase reactions. Basophil activation test (BAT, measuring CD63/CD203c upregulation) "
+         "is a diagnostic tool for drug and food allergies."),
         ("Eosinophil", "eosinophil", "eosinophil",
          ["CD193", "Siglec-8", "MBP", "EPO"],
          ["IL5", "IL13", "MBP"],
-         "Granulocyte for anti-helminth defense. Eosinophilic granule proteins damage large parasites."),
+         "Granulocyte containing bilobed nucleus and distinctive eosin-staining cytoplasmic granules "
+         "that constitute the primary defense against multicellular parasites (helminths) too large "
+         "for phagocytosis. Eosinophil granules contain four major cationic proteins: major basic "
+         "protein (MBP, toxic to helminth tegument, also damages respiratory epithelium in asthma), "
+         "eosinophil peroxidase (EPO, generates hypohalous acids), eosinophil cationic protein "
+         "(ECP, RNase activity, neurotoxic), and eosinophil-derived neurotoxin (EDN, antiviral "
+         "RNase). IL-5 (from Th2 cells, ILC2s, and mast cells) is the principal eosinophil growth "
+         "factor, survival signal, and activator. Eosinophils also produce lipid mediators "
+         "(LTC4, PGD2, 15-HETE), cytokines (IL-4, IL-13, TGF-beta), and extracellular DNA traps "
+         "(EETs). Tissue eosinophilia drives pathology in asthma (airway remodeling), eosinophilic "
+         "esophagitis, and hypereosinophilic syndrome. Anti-IL-5 (mepolizumab, reslizumab) and "
+         "anti-IL-5R (benralizumab) treat severe eosinophilic asthma."),
         ("ILC1", "ILC", "ILC1",
          ["T-bet", "NK1.1", "NKp46", "CD127"],
          ["IFNg", "TNFa"],
-         "Group 1 innate lymphoid cell. IFNg-producing, mirrors Th1 function. Anti-intracellular pathogens."),
+         "Group 1 innate lymphoid cell that mirrors the Th1 program without adaptive antigen "
+         "receptors. ILC1s reside in tissues (liver, intestinal epithelium, salivary glands) and "
+         "produce IFN-gamma and TNF-alpha in response to IL-12, IL-15, and IL-18 from myeloid "
+         "cells. ILC1 development requires the transcription factor T-bet but, unlike NK cells, "
+         "ILC1s are non-cytotoxic (lack perforin expression) and do not recirculate. ILC1s "
+         "provide rapid IFN-gamma for macrophage activation during intracellular bacterial "
+         "(Toxoplasma, Salmonella, Clostridium) and viral infections, acting before adaptive "
+         "Th1 responses develop. ILC1s are expanded in inflammatory bowel disease (Crohn's) "
+         "where they contribute to tissue damage through excessive IFN-gamma."),
         ("ILC2", "ILC", "ILC2",
          ["GATA3", "CD127", "CRTH2", "ST2"],
          ["IL5", "IL13", "IL4"],
-         "Group 2 innate lymphoid cell. Type 2 cytokines, mirrors Th2. Anti-helminth and allergic inflammation."),
+         "Group 2 innate lymphoid cell that is the innate counterpart of Th2 cells, producing "
+         "type 2 cytokines (IL-5, IL-13, IL-4, amphiregulin) in response to epithelial alarmins: "
+         "IL-33 (binding ST2/IL1RL1), IL-25 (binding IL-17RB), and TSLP. ILC2 development requires "
+         "GATA3 and RORalpha. ILC2s reside in barrier tissues (lung, gut, skin, adipose) and "
+         "are activated within hours of tissue damage or helminth invasion — before Th2 cells "
+         "respond. IL-5 production recruits eosinophils; IL-13 drives goblet cell hyperplasia "
+         "and mucus production (weep-and-sweep response to expel helminths) and promotes smooth "
+         "muscle contraction. Amphiregulin (AREG) promotes epithelial repair. ILC2s are central "
+         "to allergic inflammation: constitutively active in asthmatic airways, driving "
+         "eosinophilia and mucus hypersecretion. Anti-TSLP (tezepelumab) blocks ILC2 activation "
+         "and treats severe asthma across phenotypes."),
         ("ILC3", "ILC", "ILC3",
          ["RORgt", "CD127", "NKp44"],
          ["IL22", "IL17A"],
-         "Group 3 innate lymphoid cell. IL-22/IL-17 producing, mirrors Th17. Mucosal barrier defense."),
+         "Group 3 innate lymphoid cell that is the innate counterpart of Th17 cells, crucial for "
+         "mucosal barrier defense and lymphoid organogenesis. ILC3 development requires RORgamma-t. "
+         "Two main subsets: NKp44+ ILC3s produce IL-22, which acts on intestinal epithelial cells "
+         "to induce antimicrobial peptides (REG3gamma, REG3beta, defensins), mucin production, and "
+         "tight junction proteins (claudins), maintaining the epithelial barrier against commensal "
+         "bacteria. NKp44- ILC3s produce IL-17A, recruiting neutrophils for defense against "
+         "extracellular bacteria and fungi. Lymphoid tissue inducer (LTi) cells — a subset of ILC3s "
+         "— are essential for embryonic development of lymph nodes, Peyer's patches, and cryptopatches "
+         "through lymphotoxin-alpha/beta signaling. ILC3s sense microbial signals via aryl "
+         "hydrocarbon receptor (AhR), which is activated by dietary indoles and tryptophan "
+         "metabolites, linking diet to mucosal immunity. ILC3 dysfunction contributes to IBD."),
     ]
     count = 0
     for name, itype, subtype, markers, cytokines, desc in cells:
