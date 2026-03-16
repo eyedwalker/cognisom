@@ -255,6 +255,82 @@ _KNOWN_PDB_IDS = {
     "HLA-C*07:02": "5VGE",          # HLA-C*07:02
     "HLA-DRB1*15:01": "1BX2",       # HLA-DR15
     "HLA-DQ8": "1JK8",              # HLA-DQ8
+    # ── Drugs (target complex or Fab structures) ──
+    "Enzalutamide": "2AM9",          # AR LBD (target)
+    "Abiraterone": "3RUK",           # CYP17A1 with abiraterone
+    "Docetaxel": "1JFF",             # Tubulin/taxane complex
+    "Cabazitaxel": "1JFF",           # Tubulin (same binding site)
+    "Olaparib": "5DS3",              # PARP1 with olaparib
+    "Rucaparib": "4RJY",             # PARP1 with rucaparib
+    "Talazoparib": "4PJT",           # PARP1 with talazoparib
+    "Apalutamide": "2AM9",           # AR LBD
+    "Darolutamide": "2AM9",          # AR LBD
+    "Nivolumab": "5WT9",             # Nivolumab Fab/PD-1
+    "Ipilimumab": "5TRU",            # CTLA-4/antibody complex
+    "Atezolizumab": "5X8L",          # Atezolizumab/PD-L1
+    "Relatlimab": "7TZG",            # LAG-3 (target)
+    "Rituximab": "2OSL",             # CD20/rituximab Fab
+    "Infliximab": "4G3Y",            # TNF/infliximab complex
+    "Adalimumab": "3WD5",            # Adalimumab Fab/TNF
+    "Ruxolitinib": "6BBU",           # JAK1 (target)
+    "Tofacitinib": "3FUP",           # JAK3 with tofacitinib
+    "Eculizumab": "3CU7",            # C5 (target)
+    "Aldesleukin (IL-2)": "1M47",    # IL-2 structure
+    "Interferon alfa-2b": "1ITF",    # IFN-alpha
+    "Imiquimod": "5GMH",             # TLR7 (target)
+    "Lutetium-177 PSMA": "2PVW",     # PSMA (target)
+    # ── Metabolites ──
+    "Glucose": "1GCO",               # Glucokinase with glucose
+    "ATP": "4C9H",                   # ATP in kinase active site
+    "Lactate": "1I10",               # LDH with lactate
+    "Pyruvate": "1ZY6",              # Pyruvate dehydrogenase
+    "Citrate": "1CTS",               # Citrate synthase with citrate
+    "Testosterone": "2AM9",          # AR LBD with testosterone
+    "DHT": "1T7T",                   # AR LBD with DHT
+    "NADH": "1LDN",                  # LDH with NADH
+    "Glutamine": "1U60",             # Glutaminase with glutamine
+    "Acetyl-CoA": "1NZ4",            # Acetyltransferase with AcCoA
+    "PSA": "2ZCK",                   # PSA/KLK3 crystal structure
+    "Oxygen": "1A3N",                # Hemoglobin with O2
+    # ── Mutations (map to parent gene structure) ──
+    "TP53_R175H": "1TUP",            # p53 (show mutation site)
+    "TP53_R248W": "1TUP",
+    "TP53_R273H": "1TUP",
+    "PTEN_del exon 5-6": "1D5R",     # PTEN
+    "PTEN_R130*": "1D5R",
+    "BRCA2_del exon 13": "1MIU",     # BRCA2
+    "SPOP_F133V": "3HQI",            # SPOP MATH domain
+    "SPOP_W131G": "3HQI",
+    "FOXA1_R219S": "3CBB",           # FOXA1
+    "PIK3CA_H1047R": "4OVV",         # PIK3CA kinase domain
+    "AR_T878A": "2AM9",              # AR LBD
+    "AR_amplification": "2AM9",
+    "RB1_del": "1N4M",               # RB1
+    "MYC_amplification": "1NKP",     # MYC/MAX
+    "ATM_truncation": "5NP0",        # ATM
+    "CDK12_biallelic loss": "5ACB",   # CDK12
+    "HOXB13_G84E": "5EGO",           # HOXB13
+    # ── Pathways (map to key pathway protein) ──
+    "AR Signaling": "2AM9",          # AR (central node)
+    "PI3K/AKT/mTOR": "4OVV",         # PI3K (entry kinase)
+    "DNA Damage Response": "5NP0",    # ATM (apical kinase)
+    "p53 Pathway": "1TUP",           # p53 (central TF)
+    "Wnt/beta-Catenin": "1JDH",      # beta-catenin/TCF
+    "RB/E2F Cell Cycle": "1N4M",     # RB1 (gatekeeper)
+    "TMPRSS2-ERG Fusion": "4IRG",    # ERG ETS domain
+    "Glycolysis": "1GCO",            # Glucokinase (first step)
+    "TCA Cycle": "1CTS",             # Citrate synthase (first step)
+    "Oxidative Phosphorylation": "1OCC",  # Cytochrome c oxidase
+    "PD-1/PD-L1 Immune Checkpoint": "4ZQK",  # PD-1/PD-L1
+    "PD-1/PD-L1 Checkpoint": "4ZQK",
+    "Epigenetic Regulation": "4MI5",  # EZH2 SET domain
+    "JAK-STAT Signaling": "6BBU",    # JAK1 kinase
+    "NF-kB Signaling": "1VKX",       # NF-kappaB p65/p50
+    "TLR Signaling": "3FXI",         # TLR4/MD2/LPS
+    "TCR Signaling": "3QDM",         # TCR/pMHC complex
+    "BCR Signaling": "3GEN",         # BTK kinase
+    "Complement Cascade": "2A73",    # C3 (central hub)
+    "Inflammasome Pathway": "6NPY",  # NLRP3
     # Additional apoptosis
     "Caspase-8": "1QTN",          # Caspase-8
     "Caspase-9": "1JXQ",          # Caspase-9/APAF-1
