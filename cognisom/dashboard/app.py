@@ -47,6 +47,7 @@ if user is not None:
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
         ],
         "Digital Twin": [
+            st.Page(str(_pages_dir / "32_parabricks.py"), title="GPU Genomics", icon=":material/dna:"),
             st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
             st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
             st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
