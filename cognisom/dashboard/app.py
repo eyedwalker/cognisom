@@ -1257,6 +1257,20 @@ else:
         except ImportError:
             return False
 
+    # ── Beta Disclaimer (post-login) ──────────────────────────────
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, rgba(234,88,12,0.15), rgba(234,88,12,0.05));
+                border: 1px solid rgba(234,88,12,0.35); border-radius: 8px;
+                padding: 0.6rem 1rem; margin-bottom: 1rem;">
+        <span style="color: #f97316; font-weight: 600; font-size: 0.85rem;">BETA</span>
+        <span style="font-size: 0.8rem; opacity: 0.7;">
+            &mdash; This platform is in beta testing. Results are for research purposes only
+            and must not be used for clinical decision-making. Features may change without notice.
+            By continuing, you acknowledge this is pre-release software.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.title("Cognisom HDT Platform")
     st.markdown("**Personalized Molecular Digital Twin Platform for Precision Oncology**")
 
