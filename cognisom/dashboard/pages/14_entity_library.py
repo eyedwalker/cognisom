@@ -80,7 +80,7 @@ entities, total = store.search(
     query=search_query,
     entity_type=etype_filter,
     status=status_filter,
-    limit=100,
+    limit=25,
 )
 
 st.caption(f"Showing {len(entities)} of {total} entities")
@@ -129,21 +129,20 @@ if entities:
                 unsafe_allow_html=True,
             )
 
-            # 3D Preview + Description side by side
-            viz_col, desc_col = st.columns([1, 2])
+            # Description
+            if entity.description:
+                st.markdown(entity.description)
+            else:
+                st.caption("No description available.")
 
-            with viz_col:
+            # 3D Preview — on-demand button (avoids loading 100 viewers)
+            if st.button("Show 3D Structure", key=f"3d_{entity.entity_id}",
+                         type="secondary"):
                 try:
                     from cognisom.dashboard.entity_3d import render_entity_3d
-                    render_entity_3d(entity, height=220)
+                    render_entity_3d(entity, height=280)
                 except Exception as e:
-                    st.caption(f"3D preview unavailable")
-
-            with desc_col:
-                if entity.description:
-                    st.markdown(entity.description)
-                else:
-                    st.caption("No description available.")
+                    st.caption("3D preview unavailable")
 
             # Details in columns
             col_left, col_right = st.columns(2)
