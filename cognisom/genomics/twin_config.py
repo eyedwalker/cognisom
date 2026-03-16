@@ -96,12 +96,22 @@ class DigitalTwinConfig:
         # HLA alleles
         config.hla_alleles = profile.hla_alleles or []
 
-        # MHC-I downregulation based on genomic markers
-        if profile.has_pten_loss:
-            config.mhc1_downregulation += 0.3
-        if profile.has_tp53_mutation:
-            config.mhc1_downregulation += 0.2
-        config.mhc1_downregulation = min(1.0, config.mhc1_downregulation)
+        # MHC-I downregulation based on genomic markers (entity-driven)
+        try:
+            from .parameter_resolver import SimulationParameterResolver
+            from cognisom.library.store import EntityStore
+            _resolver = SimulationParameterResolver(EntityStore())
+            gene_effects = _resolver.get_gene_effects_for_mutations(
+                profile.affected_genes
+            )
+            config.mhc1_downregulation = gene_effects.get("mhc1_downregulation", 0.0)
+        except Exception:
+            # Fallback to hardcoded values
+            if profile.has_pten_loss:
+                config.mhc1_downregulation += 0.3
+            if profile.has_tp53_mutation:
+                config.mhc1_downregulation += 0.2
+            config.mhc1_downregulation = min(1.0, config.mhc1_downregulation)
 
         # PD-L1 expression correlates with immune infiltration
         if classification.immune_score == "hot":
@@ -125,6 +135,23 @@ class DigitalTwinConfig:
             if profile.predicted_neoantigens
             else int(profile.tumor_mutational_burden * 1.5)
         )
+        # Calculate MHC-I downregulation from entity library
+        mhc1_down = 0.0
+        try:
+            from .parameter_resolver import SimulationParameterResolver
+            from cognisom.library.store import EntityStore
+            _resolver = SimulationParameterResolver(EntityStore())
+            gene_effects = _resolver.get_gene_effects_for_mutations(
+                profile.affected_genes
+            )
+            mhc1_down = gene_effects.get("mhc1_downregulation", 0.0)
+        except Exception:
+            if profile.has_pten_loss:
+                mhc1_down += 0.3
+            if profile.has_tp53_mutation:
+                mhc1_down += 0.2
+            mhc1_down = min(1.0, mhc1_down)
+
         return cls(
             patient=profile,
             tumor_mutational_burden=profile.tumor_mutational_burden,
@@ -134,6 +161,7 @@ class DigitalTwinConfig:
             has_pten_loss=profile.has_pten_loss,
             immune_score="hot" if profile.is_tmb_high else "cold",
             neoantigen_count=neo_count,
+            mhc1_downregulation=mhc1_down,
             hla_alleles=profile.hla_alleles or [],
             predicted_neoantigen_count=len(profile.predicted_neoantigens),
             strong_binder_count=profile.strong_binder_count,
