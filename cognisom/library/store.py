@@ -90,6 +90,26 @@ class EntityStore:
             log.info("Using SQLite database at %s", db_path)
 
         self._init_db()
+        self._auto_seed_if_empty()
+
+    def _auto_seed_if_empty(self):
+        """Auto-seed the library with base catalogs if the DB is empty."""
+        try:
+            stats = self.stats()
+            if stats["total_entities"] == 0:
+                log.info("Entity library is empty — running auto-seed...")
+                from .seed_data import seed_prostate_cancer_catalog
+                from .seed_immunology import seed_immunology_catalog
+                seed_prostate_cancer_catalog(self)
+                seed_immunology_catalog(self)
+                final = self.stats()
+                log.info(
+                    "Auto-seeded entity library: %d entities, %d relationships",
+                    final["total_entities"],
+                    final["total_relationships"],
+                )
+        except Exception as e:
+            log.warning("Auto-seed failed (non-fatal): %s", e)
 
     @property
     def conn(self) -> Any:

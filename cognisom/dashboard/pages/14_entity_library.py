@@ -173,7 +173,7 @@ with tab_browse:
                         other_id = rel.target_id if rel.source_id == entity.entity_id else rel.source_id
                         other = store.get_entity(other_id)
                         other_name = other.display_name if other else other_id
-                        st.caption(f"→ {rel.relationship_type.value}: {other_name}")
+                        st.caption(f"→ {rel.rel_type.value}: {other_name}")
 
             # Edit section (expandable)
             with st.expander("Edit Entity", expanded=False):
