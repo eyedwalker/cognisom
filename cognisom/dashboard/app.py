@@ -695,7 +695,17 @@ if user is None:
     st.markdown("### Platform Overview")
     vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
     with vid_col2:
-        st.video("https://www.youtube.com/watch?v=gaLwSzDk2zE")
+        st.markdown("""
+        <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(128,128,128,0.15);">
+            <iframe width="100%" height="400"
+                src="https://www.youtube.com/embed/gaLwSzDk2zE?rel=0"
+                title="Cognisom Platform Overview"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1261,6 +1271,9 @@ else:
     _pages_dir = Path(__file__).resolve().parent / "pages"
 
     pages = {
+        "": [
+            st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
+        ],
         "Digital Twin": [
             st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
             st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
