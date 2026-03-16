@@ -190,20 +190,58 @@ class TreatmentSimulator:
     Models tumor dynamics under different therapies based on the
     patient's genomic profile and immune microenvironment.
 
+    Supports two parameter sources:
+    1. Entity library (preferred): Drug entities with physics_params
+       drive the simulation. Add a drug → automatically available.
+    2. Hardcoded fallback: TREATMENT_PROFILES dict for backward compatibility.
+
     Example:
         twin = DigitalTwinConfig.from_profile_and_classification(profile, classification)
+
+        # Entity-driven (preferred):
+        from cognisom.library.store import EntityStore
+        sim = TreatmentSimulator(store=EntityStore())
+
+        # Or legacy (hardcoded):
         sim = TreatmentSimulator()
 
         result = sim.simulate("pembrolizumab", twin, duration_days=180)
-        print(f"Response: {result.response_category}")
-        print(f"Best response: {result.best_response:.1%} of baseline")
-
-        # Compare treatments
-        comparison = sim.compare_treatments(
-            ["pembrolizumab", "olaparib", "pembro_ipi_combo"],
-            twin,
-        )
     """
+
+    def __init__(self, store=None):
+        """Initialize with optional EntityStore for entity-driven parameters.
+
+        Args:
+            store: EntityStore instance. If provided, drug treatment profiles
+                   are loaded from the entity library instead of TREATMENT_PROFILES.
+        """
+        self._entity_profiles = None
+        if store is not None:
+            try:
+                from .parameter_resolver import SimulationParameterResolver
+                resolver = SimulationParameterResolver(store)
+                self._entity_profiles = resolver.get_all_treatment_profiles()
+                if self._entity_profiles:
+                    logger.info(
+                        "Loaded %d treatment profiles from entity library",
+                        len(self._entity_profiles),
+                    )
+            except Exception as e:
+                logger.warning("Entity profile loading failed, using hardcoded: %s", e)
+
+    @property
+    def _profiles(self) -> dict:
+        """Get active treatment profiles (entity-driven or hardcoded)."""
+        if self._entity_profiles:
+            # Merge: entity profiles + hardcoded (entity takes precedence)
+            merged = dict(TREATMENT_PROFILES)
+            merged.update(self._entity_profiles)
+            return merged
+        return TREATMENT_PROFILES
+
+    def get_available_treatments(self) -> list:
+        """List all available treatment keys."""
+        return sorted(self._profiles.keys())
 
     def simulate(self, treatment_key: str,
                  twin: DigitalTwinConfig,
@@ -211,17 +249,17 @@ class TreatmentSimulator:
         """Simulate a treatment and predict response.
 
         Args:
-            treatment_key: Key into TREATMENT_PROFILES.
+            treatment_key: Key into treatment profiles (entity or hardcoded).
             twin: Personalized DigitalTwinConfig.
             duration_days: Simulation duration in days.
 
         Returns:
             TreatmentResult with tumor response curve and predictions.
         """
-        profile = TREATMENT_PROFILES.get(treatment_key)
+        profile = self._profiles.get(treatment_key)
         if not profile:
             raise ValueError(f"Unknown treatment: {treatment_key}. "
-                           f"Available: {list(TREATMENT_PROFILES.keys())}")
+                           f"Available: {list(self._profiles.keys())}")
 
         # Calculate base effectiveness
         effectiveness = self._calculate_effectiveness(profile, twin)
