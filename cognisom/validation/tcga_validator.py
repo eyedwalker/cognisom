@@ -27,7 +27,44 @@ import requests
 logger = logging.getLogger(__name__)
 
 CBIO_BASE = "https://www.cbioportal.org/api"
-STUDY_ID = "prad_tcga_pan_can_atlas_2018"
+
+# Available studies for validation
+STUDIES = {
+    "tcga_prad": {
+        "id": "prad_tcga_pan_can_atlas_2018",
+        "name": "TCGA-PRAD PanCancer Atlas",
+        "patients": 494,
+        "type": "primary",
+        "treatment_data": False,
+    },
+    "su2c_2019": {
+        "id": "prad_su2c_2019",
+        "name": "SU2C/PCF Dream Team mCRPC 2019",
+        "patients": 444,
+        "type": "mCRPC",
+        "treatment_data": True,
+        "treatment_field": "CHEMO_REGIMEN_CATEGORY",
+        "drugs_available": ["abiraterone", "enzalutamide", "olaparib", "docetaxel", "cabazitaxel"],
+    },
+    "su2c_2015": {
+        "id": "prad_su2c_2015",
+        "name": "SU2C/PCF Dream Team mCRPC 2015",
+        "patients": 150,
+        "type": "mCRPC",
+        "treatment_data": True,
+        "treatment_field": "ABI_ENZA_EXPOSURE_STATUS",
+    },
+    "mpc_broad": {
+        "id": "mpcproject_broad_2021",
+        "name": "Metastatic Prostate Cancer Project (Broad)",
+        "patients": 123,
+        "type": "metastatic",
+        "treatment_data": True,
+    },
+}
+
+DEFAULT_STUDY = "tcga_prad"
+STUDY_ID = STUDIES[DEFAULT_STUDY]["id"]
 MUTATION_PROFILE = f"{STUDY_ID}_mutations"
 
 
@@ -120,13 +157,21 @@ class TCGAValidator:
         self.session = requests.Session()
         self.session.headers["Accept"] = "application/json"
 
-    def fetch_patients(self, n_patients: int = 100) -> List[TCGAPatient]:
-        """Download TCGA-PRAD patient data from cBioPortal."""
-        logger.info("Fetching %d TCGA-PRAD patients from cBioPortal...", n_patients)
+    def fetch_patients(self, n_patients: int = 100,
+                       study: str = "tcga_prad") -> List[TCGAPatient]:
+        """Download patient data from cBioPortal.
+
+        Args:
+            n_patients: Number of patients
+            study: Study key from STUDIES dict (tcga_prad, su2c_2019, etc.)
+        """
+        study_info = STUDIES.get(study, STUDIES[DEFAULT_STUDY])
+        study_id = study_info["id"]
+        logger.info("Fetching %d patients from %s...", n_patients, study_info["name"])
 
         # Get all samples
         resp = self.session.get(
-            f"{CBIO_BASE}/studies/{STUDY_ID}/samples",
+            f"{CBIO_BASE}/studies/{study_id}/samples",
             params={"pageSize": n_patients},
             timeout=30,
         )
@@ -135,7 +180,7 @@ class TCGAValidator:
 
         # Get clinical data for all patients
         patient_ids = list(set(s["patientId"] for s in samples))
-        clinical_map = self._fetch_clinical_data(patient_ids)
+        clinical_map = self._fetch_clinical_data(patient_ids, study_id)
 
         # Build patient objects
         patients = []
@@ -160,11 +205,12 @@ class TCGAValidator:
             patients.append(patient)
 
         # Fetch mutations in batches
+        mutation_profile = f"{study_id}_mutations"
         batch_size = 50
         for i in range(0, len(patients), batch_size):
             batch = patients[i:i+batch_size]
             sample_ids = [p.sample_id for p in batch]
-            mutations = self._fetch_mutations(sample_ids)
+            mutations = self._fetch_mutations(sample_ids, mutation_profile)
 
             # Assign mutations to patients
             for patient in batch:
@@ -176,10 +222,13 @@ class TCGAValidator:
         logger.info("Fetched %d patients with mutations and clinical data", len(patients))
         return patients
 
-    def _fetch_clinical_data(self, patient_ids: List[str]) -> Dict[str, Dict]:
+    def _fetch_clinical_data(self, patient_ids: List[str],
+                             study_id: str = None) -> Dict[str, Dict]:
         """Fetch clinical data for patients."""
+        if study_id is None:
+            study_id = STUDY_ID
         resp = self.session.get(
-            f"{CBIO_BASE}/studies/{STUDY_ID}/clinical-data",
+            f"{CBIO_BASE}/studies/{study_id}/clinical-data",
             params={"clinicalDataType": "PATIENT", "pageSize": 10000},
             timeout=30,
         )
@@ -194,11 +243,14 @@ class TCGAValidator:
 
         return clinical_map
 
-    def _fetch_mutations(self, sample_ids: List[str]) -> List[Dict]:
+    def _fetch_mutations(self, sample_ids: List[str],
+                         mutation_profile: str = None) -> List[Dict]:
         """Fetch mutations for a batch of samples."""
+        if mutation_profile is None:
+            mutation_profile = MUTATION_PROFILE
         try:
             resp = self.session.post(
-                f"{CBIO_BASE}/molecular-profiles/{MUTATION_PROFILE}/mutations/fetch",
+                f"{CBIO_BASE}/molecular-profiles/{mutation_profile}/mutations/fetch",
                 json={"sampleIds": sample_ids},
                 params={"projection": "DETAILED"},
                 headers={"Content-Type": "application/json"},
