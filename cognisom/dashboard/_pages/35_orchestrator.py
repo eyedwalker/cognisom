@@ -101,11 +101,21 @@ elif input_mode == "VCF File Upload":
 
 elif input_mode == "FASTQ on GPU (Parabricks)":
     st.info("Provide FASTQ paths on the GPU instance (requires GPU to be running)")
+
+    use_test = st.checkbox("Use Parabricks sample data (NA12878)", value=True)
+    if use_test:
+        fastq_r1 = "/opt/cognisom/jobs/test_fastq/parabricks_sample/Data/sample_1.fq.gz"
+        fastq_r2 = "/opt/cognisom/jobs/test_fastq/parabricks_sample/Data/sample_2.fq.gz"
+        st.success(f"Test data: `sample_1.fq.gz` (2.5 GB) + `sample_2.fq.gz` (2.7 GB)")
+    else:
+        fastq_r1 = ""
+        fastq_r2 = ""
+
     c1, c2 = st.columns(2)
     with c1:
-        fastq_r1 = st.text_input("FASTQ R1 path", key="orch_r1")
+        fastq_r1 = st.text_input("FASTQ R1 path", value=fastq_r1, key="orch_r1")
     with c2:
-        fastq_r2 = st.text_input("FASTQ R2 path", key="orch_r2")
+        fastq_r2 = st.text_input("FASTQ R2 path", value=fastq_r2, key="orch_r2")
 
 st.divider()
 
