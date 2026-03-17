@@ -1,13 +1,31 @@
 """
-TCGA Validation Module
-========================
+TCGA / SU2C Validation Module
+================================
 
-Validates Cognisom predictions against TCGA-PRAD (prostate adenocarcinoma)
-clinical outcomes. Downloads mutation and clinical data from cBioPortal API,
-runs each patient through the Cognisom pipeline, and compares predicted
-treatment response to actual patient outcomes.
+Validates Cognisom predictions against published prostate cancer genomics
+datasets via the cBioPortal REST API.
 
-Data source: cBioPortal REST API (free, no authentication)
+Data Sources:
+- TCGA-PRAD PanCancer Atlas (494 patients)
+- SU2C/PCF Dream Team mCRPC 2019 (444 patients with treatment data)
+- SU2C/PCF Dream Team mCRPC 2015 (150 patients)
+- Metastatic Prostate Cancer Project (123 patients)
+
+REQUIRED CITATIONS (per cBioPortal terms of use):
+
+1. Cerami et al. The cBio Cancer Genomics Portal: An Open Platform for
+   Exploring Multidimensional Cancer Genomics Data. Cancer Discovery.
+   May 2012; 2:401. PMID: 22588877
+
+2. Gao et al. Integrative analysis of complex cancer genomics and clinical
+   profiles using the cBioPortal. Sci. Signal. 6, pl1 (2013).
+   PMID: 23550210
+
+3. de Bruijn et al. Analysis and Visualization of Longitudinal Genomic
+   and Clinical Data from the AACR Project GENIE Biopharma Collaborative
+   in cBioPortal. Cancer Res (2023). PMID: 37668528
+
+Data source: cBioPortal REST API (free, no authentication for public studies)
 Study: TCGA-PRAD PanCancer Atlas (494 patients)
 
 Usage:

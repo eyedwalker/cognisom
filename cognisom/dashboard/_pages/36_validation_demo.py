@@ -339,3 +339,24 @@ with tab_validate:
             file_name="cognisom_tcga_validation.json",
             mime="application/json",
         )
+
+        # Required citations
+        st.divider()
+        st.markdown("### Data Citations")
+        st.markdown(
+            "This validation uses data from cBioPortal. Per their terms of use, "
+            "the following papers must be cited in any publication or presentation:"
+        )
+        st.markdown("""
+1. Cerami et al. **The cBio Cancer Genomics Portal: An Open Platform for Exploring
+   Multidimensional Cancer Genomics Data.** *Cancer Discovery.* May 2012; 2:401.
+   [PubMed](https://pubmed.ncbi.nlm.nih.gov/22588877/)
+
+2. Gao et al. **Integrative analysis of complex cancer genomics and clinical profiles
+   using the cBioPortal.** *Sci. Signal.* 6, pl1 (2013).
+   [PubMed](https://pubmed.ncbi.nlm.nih.gov/23550210/)
+
+3. de Bruijn et al. **Analysis and Visualization of Longitudinal Genomic and Clinical
+   Data from the AACR Project GENIE Biopharma Collaborative in cBioPortal.**
+   *Cancer Res* (2023). [PubMed](https://pubmed.ncbi.nlm.nih.gov/37668528/)
+        """)
