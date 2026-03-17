@@ -198,27 +198,43 @@ with tab_demo:
 # ══════════════════════════════════════════════════════════════════════
 
 with tab_validate:
-    st.subheader("TCGA-PRAD Validation")
-    st.markdown(
-        "Validate Cognisom predictions against **TCGA prostate adenocarcinoma** "
-        "clinical outcomes. Downloads mutation and clinical data from cBioPortal "
-        "(494 patients available, free API)."
+    st.subheader("Clinical Validation")
+
+    val_source = st.radio(
+        "Validation Dataset",
+        [
+            "SU2C mCRPC 2019 (429 patients, treatment data, flat files — RECOMMENDED)",
+            "TCGA-PRAD (494 patients, primary cancer, API)",
+        ],
+        horizontal=False,
     )
 
-    n_patients = st.slider("Number of patients to validate", 10, 200, 50, step=10)
+    is_su2c = "SU2C" in val_source
 
-    if st.button(f"\U0001f52c Run Validation on {n_patients} TCGA Patients",
+    if is_su2c:
+        st.markdown(
+            "**SU2C/PCF Dream Team mCRPC 2019** — 429 metastatic castration-resistant "
+            "prostate cancer patients with somatic mutations, treatment regimens "
+            "(abiraterone, enzalutamide, olaparib), and overall survival data."
+        )
+        n_patients = st.slider("Number of patients", 10, 429, 100, step=10, key="su2c_n")
+    else:
+        st.markdown(
+            "**TCGA-PRAD PanCancer Atlas** — 494 primary prostate adenocarcinoma "
+            "patients. Mostly early-stage, surgery-treated. Good for subtype validation."
+        )
+        n_patients = st.slider("Number of patients", 10, 200, 50, step=10, key="tcga_n")
+
+    run_label = "SU2C mCRPC" if is_su2c else "TCGA"
+    if st.button(f"\U0001f52c Run Validation on {n_patients} {run_label} Patients",
                  type="primary", use_container_width=True):
 
-        from cognisom.validation.tcga_validator import TCGAValidator
         import os
         os.environ.setdefault('COGNISOM_DATA_DIR',
                               os.environ.get('COGNISOM_DATA_DIR', '/app/data'))
 
-        validator = TCGAValidator()
-
-        progress_bar = st.progress(0, text="Downloading TCGA data from cBioPortal...")
-        status_text = st.empty()
+        source_label = "SU2C mCRPC flat files" if is_su2c else "cBioPortal API"
+        progress_bar = st.progress(0, text=f"Loading data from {source_label}...")
         results_container = st.container()
 
         def on_progress(current, total, patient_id, status):
@@ -226,7 +242,15 @@ with tab_validate:
                 progress_bar.progress(current / total,
                                       text=f"Patient {current}/{total}: {patient_id}")
 
-        summary = validator.run_validation(n_patients, progress_callback=on_progress)
+        if is_su2c:
+            from cognisom.validation.su2c_file_validator import SU2CFileValidator
+            validator = SU2CFileValidator()
+            summary = validator.run_validation(n_patients, progress_callback=on_progress)
+        else:
+            from cognisom.validation.tcga_validator import TCGAValidator
+            validator = TCGAValidator()
+            summary = validator.run_validation(n_patients, progress_callback=on_progress)
+
         progress_bar.progress(1.0, text="Validation complete!")
 
         st.session_state["tcga_summary"] = summary
@@ -248,6 +272,58 @@ with tab_validate:
         m1.metric("Patients", f"{summary.n_completed}/{summary.n_patients}")
         m2.metric("Avg Mutations", f"{summary.mean_mutations:.0f}")
         m3.metric("Avg Drivers", f"{summary.mean_drivers:.1f}")
+
+        # SU2C-specific concordance
+        if hasattr(summary, 'parp_candidates_with_brca') and summary.total_brca_patients:
+            st.divider()
+            st.subheader("Biomarker Concordance")
+            bc1, bc2, bc3 = st.columns(3)
+            parp_pct = summary.parp_candidates_with_brca / max(1, summary.total_brca_patients) * 100
+            bc1.metric("PARP Candidate Sensitivity",
+                       f"{parp_pct:.0f}%",
+                       help=f"{summary.parp_candidates_with_brca}/{summary.total_brca_patients} "
+                       "BRCA/ATM/CDK12 patients correctly identified as PARP candidates")
+            if hasattr(summary, 'mean_tmb_actual') and summary.mean_tmb_actual > 0:
+                tmb_diff = abs(summary.mean_tmb_predicted - summary.mean_tmb_actual) / summary.mean_tmb_actual * 100
+                bc2.metric("TMB Accuracy",
+                           f"{100 - tmb_diff:.0f}%",
+                           delta=f"pred {summary.mean_tmb_predicted:.1f} vs actual {summary.mean_tmb_actual:.1f}",
+                           help="Tumor mutational burden prediction vs SU2C measured value")
+            if hasattr(summary, 'total_ar_treated') and summary.total_ar_treated > 0:
+                ar_pct = summary.ar_mutations_detected / summary.total_ar_treated * 100
+                bc3.metric("AR Mutations in AR-Treated",
+                           f"{ar_pct:.0f}%",
+                           help=f"{summary.ar_mutations_detected}/{summary.total_ar_treated} patients")
+
+        # Driver gene frequency comparison
+        if hasattr(summary, 'driver_frequency') and summary.driver_frequency:
+            st.divider()
+            st.subheader("Driver Gene Frequency (vs Published Literature)")
+            published = {
+                "TP53": (25, 50), "AR": (15, 30), "SPOP": (6, 15), "FOXA1": (5, 12),
+                "ATM": (5, 8), "CDK12": (5, 7), "BRCA2": (3, 8), "PIK3CA": (3, 6),
+                "PTEN": (5, 15), "RB1": (5, 10), "BRCA1": (1, 3), "APC": (3, 8),
+            }
+            driver_fig = go.Figure()
+            genes_sorted = sorted(summary.driver_frequency.items(), key=lambda x: -x[1])[:12]
+            gene_names = [g[0] for g in genes_sorted]
+            gene_pcts = [g[1] / max(1, summary.n_completed) * 100 for g in genes_sorted]
+            # Cognisom detected
+            driver_fig.add_trace(go.Bar(
+                x=gene_names, y=gene_pcts, name="Cognisom Detected",
+                marker_color="#6366f1",
+            ))
+            # Published range (midpoint)
+            pub_mid = [(published.get(g, (0, 0))[0] + published.get(g, (0, 0))[1]) / 2 for g in gene_names]
+            driver_fig.add_trace(go.Bar(
+                x=gene_names, y=pub_mid, name="Published mCRPC Rate",
+                marker_color="rgba(255,255,255,0.2)",
+            ))
+            driver_fig.update_layout(
+                title="Driver Gene Detection Rate: Cognisom vs Published Literature",
+                yaxis_title="% of Patients", height=350, barmode="group",
+            )
+            st.plotly_chart(driver_fig, use_container_width=True)
         m4.metric("Avg TMB", f"{summary.mean_tmb:.1f}")
         m5.metric("Avg Time/Patient", f"{summary.mean_processing_time:.2f}s")
 
