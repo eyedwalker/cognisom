@@ -46,6 +46,7 @@ if user is not None:
         "": [
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
             st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
+            st.Page(str(_pages_dir / "36_validation_demo.py"), title="Demo & Validation", icon=":material/analytics:"),
         ],
         "Digital Twin": [
             st.Page(str(_pages_dir / "32_parabricks.py"), title="GPU Genomics", icon=":material/biotech:"),
