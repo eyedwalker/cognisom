@@ -103,6 +103,7 @@ if user is not None:
             st.Page(str(_pages_dir / "13_organization.py"), title="Organization", icon=":material/business:"),
             st.Page(str(_pages_dir / "10_security.py"), title="Security", icon=":material/lock:"),
             st.Page(str(_pages_dir / "4_admin.py"), title="Platform Admin", icon=":material/admin_panel_settings:"),
+            st.Page(str(_pages_dir / "41_investors.py"), title="Investor Overview", icon=":material/trending_up:"),
         ],
     }
     nav = st.navigation(pages)
