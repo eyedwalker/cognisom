@@ -180,6 +180,39 @@ class HLATyper:
         logger.info(f"Using default HLA alleles for {patient_id}: {alleles}")
         return alleles
 
+    def type_from_bam(
+        self,
+        bam_path: str,
+        sample_id: str = "anonymous",
+    ) -> List[str]:
+        """Type HLA alleles from a BAM file using OptiType.
+
+        This is the gold-standard approach — extracts reads from the
+        HLA region and runs OptiType's ILP solver for optimal typing.
+
+        Falls back to population-frequency assignment if OptiType
+        is not available.
+
+        Args:
+            bam_path: Path to aligned BAM (germline/normal sample).
+            sample_id: Patient/sample identifier.
+
+        Returns:
+            List of 6 HLA-I alleles at 4-digit resolution.
+        """
+        try:
+            from .optitype_hla import type_hla_from_bam, is_optitype_available
+            if is_optitype_available():
+                alleles = type_hla_from_bam(bam_path, sample_id)
+                logger.info("OptiType HLA typing for %s: %s", sample_id, alleles)
+                return alleles
+            else:
+                logger.info("OptiType not available, using fallback for %s", sample_id)
+        except Exception as e:
+            logger.warning("OptiType failed for %s: %s — using fallback", sample_id, e)
+
+        return self._assign_default_alleles()
+
     def _infer_from_hla_variants(self, hla_variants: list) -> List[str]:
         """Attempt to infer HLA alleles from VCF variant annotations.
 

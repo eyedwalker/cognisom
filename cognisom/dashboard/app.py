@@ -48,13 +48,21 @@ if user is not None:
             st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
             st.Page(str(_pages_dir / "36_validation_demo.py"), title="Demo & Validation", icon=":material/analytics:"),
         ],
-        "Digital Twin": [
+        "Clinical Intelligence": [
+            st.Page(str(_pages_dir / "38_real_patient.py"), title="DNA to Decision", icon=":material/labs:"),
+            st.Page(str(_pages_dir / "37_mad_agent.py"), title="MAD Agent", icon=":material/groups:"),
+            st.Page(str(_pages_dir / "33_clinical_report.py"), title="Clinical Report", icon=":material/description:"),
+            st.Page(str(_pages_dir / "39_pipeline_guide.py"), title="Pipeline Guide", icon=":material/menu_book:"),
+        ],
+        "GPU Pipeline": [
             st.Page(str(_pages_dir / "32_parabricks.py"), title="GPU Genomics", icon=":material/biotech:"),
+            st.Page(str(_pages_dir / "40_gpu_status.py"), title="Pipeline Status", icon=":material/monitor_heart:"),
+        ],
+        "Digital Twin": [
             st.Page(str(_pages_dir / "26_genomic_twin.py"), title="Genomic Profile", icon=":material/genetics:"),
             st.Page(str(_pages_dir / "27_cell_states.py"), title="Immune Landscape", icon=":material/biotech:"),
             st.Page(str(_pages_dir / "28_digital_twin.py"), title="Treatment Simulator", icon=":material/medication:"),
             st.Page(str(_pages_dir / "31_neoantigen_vaccine.py"), title="Neoantigen Vaccine", icon=":material/vaccines:"),
-            st.Page(str(_pages_dir / "33_clinical_report.py"), title="Clinical Report", icon=":material/description:"),
             st.Page(str(_pages_dir / "34_pathway_editor.py"), title="Pathway Editor", icon=":material/hub:"),
         ],
         "Visualization": [
@@ -784,40 +792,47 @@ if user is None:
     #     """, unsafe_allow_html=True)
 
     # ── Hero Metrics Row ──────────────────────────────────────────
-    m1, m2, m3, m4, m5 = st.columns(5)
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
     with m1:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-value">14</div>
-            <div class="metric-label">Cancer Driver Genes</div>
+            <div class="metric-value">700+</div>
+            <div class="metric-label">Actionable Genes (OncoKB)</div>
         </div>
         """, unsafe_allow_html=True)
     with m2:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-value">7</div>
-            <div class="metric-label">Treatment Regimens</div>
+            <div class="metric-value">14,847</div>
+            <div class="metric-label">HLA Alleles (MHCflurry)</div>
         </div>
         """, unsafe_allow_html=True)
     with m3:
         st.markdown("""
         <div class="metric-card">
             <div class="metric-value">9</div>
-            <div class="metric-label">Physics Modules</div>
+            <div class="metric-label">Treatment Regimens</div>
         </div>
         """, unsafe_allow_html=True)
     with m4:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-value">11</div>
-            <div class="metric-label">NVIDIA NIM Models</div>
+            <div class="metric-value">3</div>
+            <div class="metric-label">MAD Agent Specialists</div>
         </div>
         """, unsafe_allow_html=True)
     with m5:
         st.markdown("""
         <div class="metric-card">
-            <div class="metric-value">22</div>
-            <div class="metric-label">Research Sources</div>
+            <div class="metric-value">429</div>
+            <div class="metric-label">Patients Validated (SU2C)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with m6:
+        st.markdown("""
+        <div class="metric-card">
+            <div class="metric-value">4 GPU</div>
+            <div class="metric-label">Parabricks Pipeline</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -833,21 +848,22 @@ if user is None:
 
     with col_what1:
         st.markdown("""
-Cognisom is a **personalized molecular digital twin platform** that creates
-computational models of individual cancer patients — starting with prostate cancer.
+Cognisom is an **AI precision-oncology intelligence and evidence platform** that
+combines matched patient germline DNA + tumor DNA, real-time clinical evidence,
+and multi-agent AI to help clinicians rank therapies and match clinical trials.
 
-**From patient DNA to treatment prediction in a single workflow:**
-Upload a patient's variant call file (VCF) and Cognisom automatically identifies
-**cancer driver mutations** across 14 genes, profiles the **tumor immune landscape**
-at single-cell resolution, and simulates **personalized treatment response** across
-7 therapy regimens — including immunotherapy, PARP inhibitors, and combination therapies.
+**From raw DNA to treatment recommendation:**
+Upload matched tumor-normal sequencing (FASTQ) and Cognisom runs the full
+**GPU-accelerated Parabricks pipeline** — alignment, variant calling, HLA typing,
+neoantigen prediction — then feeds results through a **3-agent Molecular AI
+Decision (MAD) Board** that produces an explainable, evidence-traced recommendation.
 
-The platform combines **tumor DNA analysis**, **immune cell profiling**
-(T-cell exhaustion, macrophage polarization, spatial transcriptomics),
-**NVIDIA BioNeMo AI models**, and a **9-module physics engine** to predict
-how a specific patient's cancer will respond to treatment — all *in silico*.
+The MAD Board uses **OncoKB** (700+ actionable genes), **MHCflurry** (14,847 HLA alleles),
+**ClinicalTrials.gov** (live trial matching), and published trial evidence to generate
+recommendations that a clinician can independently review — designed for the
+**FDA's 2026 AI Credibility Framework** as a Non-Device CDS.
 
-Validated against published data from TCGA, GEO, and the Human Cell Atlas.
+Validated against 429 real mCRPC patients from the SU2C/PCF 2019 cohort.
         """)
 
     with col_what2:
@@ -872,13 +888,13 @@ Validated against published data from TCGA, GEO, and the Human Cell Atlas.
 
     st.markdown("""
     <div class="stats-banner">
+        <span class="partner-badge">NVIDIA Parabricks</span>
+        <span class="partner-badge">AWS HealthOmics</span>
+        <span class="partner-badge">OncoKB (MSK)</span>
+        <span class="partner-badge">MHCflurry</span>
+        <span class="partner-badge">ClinicalTrials.gov</span>
+        <span class="partner-badge">SU2C / PCF</span>
         <span class="partner-badge">NVIDIA BioNeMo</span>
-        <span class="partner-badge">NVIDIA NIM</span>
-        <span class="partner-badge">CellxGene</span>
-        <span class="partner-badge">Human Cell Atlas</span>
-        <span class="partner-badge">TCGA / GEO</span>
-        <span class="partner-badge">PubMed</span>
-        <span class="partner-badge">bioRxiv</span>
         <span class="partner-badge">OpenUSD</span>
     </div>
     """, unsafe_allow_html=True)
@@ -1031,36 +1047,38 @@ Validated against published data from TCGA, GEO, and the Human Cell Atlas.
 
     with vis_col1:
         st.markdown("""
-**Where We're Heading**
+**The Intelligence Layer of Precision Oncology**
 
-Every cancer patient deserves a personalized digital twin — a
-computational model built from their own tumor DNA and immune
-profile that predicts treatment response before therapy begins.
+Immunotherapy works for ~25% of patients. The other 75% face
+trial-and-error medicine because current tools can't reconcile the
+immune system's complexity with each patient's unique tumor biology.
 
 **What Cognisom delivers today:**
-- **Genomic profiling** — 14 cancer driver genes, TMB, MSI from patient VCF
-- **Immune landscape analysis** — T-cell exhaustion, macrophage polarization, spatial TME
-- **Treatment simulation** — 9 regimens with RECIST response prediction
-- **Neoantigen vaccine design** — HLA typing + MHC-I binding prediction
-- **AI drug discovery** — 11 NVIDIA BioNeMo NIMs, end-to-end
-- **RTX visualization** — Real-time 3D in NVIDIA Omniverse
+- **GPU variant calling** — Parabricks on HealthOmics, real 30x WGS
+- **OncoKB evidence** — 700+ actionable genes with FDA-level annotations
+- **MHCflurry binding** — Neural network, 14,847 HLA alleles, >90% accuracy
+- **MAD Agent Board** — 3 specialist agents, evidence-traced consensus
+- **Clinical trials** — Live ClinicalTrials.gov matching
+- **429-patient validation** — SU2C mCRPC cohort, real outcomes
         """)
 
     with vis_col2:
         st.markdown("""
-**Personalized mRNA Cancer Vaccine Pipeline**
+**From Raw DNA to Treatment Recommendation**
 
-From patient DNA to vaccine design in a single workflow:
+The full evidence-traced pipeline:
 
-1. Upload tumor VCF → identify cancer driver mutations
-2. HLA type the patient → 6 MHC-I alleles
-3. Predict neoantigens → peptide-MHC binding affinity
-4. Select vaccine targets → top binders with high agretopicity
-5. Design mRNA sequence → LinearDesign optimization
-6. Simulate response → digital twin treatment prediction
+1. Upload matched tumor + normal FASTQ to S3
+2. Parabricks GPU alignment + variant calling (~90 min)
+3. OncoKB variant actionability (700+ genes, evidence levels 1-4)
+4. OptiType HLA typing from germline reads
+5. MHCflurry neoantigen binding prediction (14,847 alleles)
+6. MAD Board: 3 agents deliberate → consensus recommendation
+7. ClinicalTrials.gov: matching recruiting trials
+8. Traceable evidence chain for clinician independent review
 
-Powered by **NVIDIA BioNeMo** and the
-**Inception Program** for accelerated startups.
+Designed for the **FDA 2026 AI Credibility Framework**
+as a **Non-Device Clinical Decision Support** tool.
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1073,16 +1091,16 @@ Powered by **NVIDIA BioNeMo** and the
     """, unsafe_allow_html=True)
 
     phases = [
-        ("Deploy & Stabilize", "Live platform on AWS with security, Cognito authentication, and TLS", "Done"),
+        ("Deploy & Stabilize", "Live platform on AWS with Cognito auth, TLS, split architecture", "Done"),
         ("Genomic Digital Twin", "VCF ingestion, 14 cancer driver genes, variant annotation, TMB/MSI", "Done"),
-        ("Immune Landscape", "Cell2Sentence integration, T-cell exhaustion, macrophage polarization, spatial TME", "Done"),
-        ("Treatment Simulation", "7 therapy regimens, RECIST response, tumor dynamics, irAE risk prediction", "Done"),
-        ("AI Drug Discovery", "11 NVIDIA BioNeMo NIMs, molecule generation to docking pipeline", "Done"),
-        ("RTX Visualization", "Isaac Sim 4.5.0, Bio-USD schema, MJPEG streaming, 3D molecular viewer", "Done"),
-        ("Omniverse Scene Editor", "Interactive RTX scene editing, camera controls, and material tuning", "In Progress"),
-        ("AI Maintenance Agents", "Autonomous agents keeping the biological knowledge base current", "Planned"),
-        ("Clinical Validation", "Multi-patient cohort analysis and clinical-scale validation", "Planned"),
-        ("AOUSD Standardization", "Bio-USD ratified as industry standard by the Alliance for OpenUSD", "Planned"),
+        ("Immune Landscape", "Cell2Sentence, T-cell exhaustion, macrophage polarization, spatial TME", "Done"),
+        ("Treatment Simulation", "9 therapy regimens including neoantigen mRNA vaccine + combinations", "Done"),
+        ("GPU Parabricks Pipeline", "HealthOmics DeepVariant on real 30x WGS, 4-GPU variant calling", "Done"),
+        ("Clinical Intelligence", "OncoKB (700+ genes), MHCflurry (14,847 alleles), ClinicalTrials.gov", "Done"),
+        ("MAD Agent Board", "3-agent consensus (Genomics, Immune, Clinical) with FDA CDS compliance", "Done"),
+        ("429-Patient Validation", "SU2C mCRPC cohort: TMB r=0.987, 100% biomarker concordance", "Done"),
+        ("Matched Tumor-Normal", "Full FASTQ-to-recommendation on real patient data (SEQC2 benchmark)", "In Progress"),
+        ("FDA Credibility Dossier", "7-step framework: COU, model cards, provenance, audit trail", "In Progress"),
     ]
 
     phase_col1, phase_col2 = st.columns(2)
@@ -1198,33 +1216,29 @@ Powered by **NVIDIA BioNeMo** and the
 
     st.markdown("""
     <div class="arch-container">
-<span class="arch-dim">PATIENT DATA LAYER</span>
-Patient VCF (DNA) <span class="arch-dim">──></span> Variant Annotator <span class="arch-dim">──></span> <span class="arch-highlight">Cancer Driver ID (14 genes)</span> <span class="arch-dim">──┐</span>
-scRNA-seq Data <span class="arch-dim">─────></span> Cell Archetypes <span class="arch-dim">──></span> <span class="arch-highlight">Immune Profiling</span> <span class="arch-dim">──────────┤</span>
-Spatial Transcriptomics <span class="arch-dim">──></span> Tissue Map <span class="arch-dim">──></span> <span class="arch-highlight">TME Characterization</span> <span class="arch-dim">───┘</span>
-                                                                        <span class="arch-dim">│</span>
-<span class="arch-dim">DIGITAL TWIN</span>                                                           <span class="arch-dim">v</span>
-  Genomic Profile + Immune Landscape <span class="arch-dim">──></span> <span class="arch-accent">Personalized Digital Twin</span>
-    <span class="arch-dim">──></span> Treatment Simulation (7 regimens) <span class="arch-dim">──></span> <span class="arch-highlight">RECIST + Survival + irAE Risk</span>
+<span class="arch-dim">GPU PIPELINE (NVIDIA Parabricks on AWS HealthOmics)</span>
+Tumor FASTQ <span class="arch-dim">──┐</span>
+             <span class="arch-dim">├──></span> <span class="arch-highlight">Parabricks fq2bam</span> <span class="arch-dim">──></span> <span class="arch-highlight">DeepVariant / Mutect2</span> <span class="arch-dim">──></span> Somatic VCF
+Normal FASTQ <span class="arch-dim">─┘</span>  (4 GPUs, 48 CPUs, 179 GB)                    <span class="arch-dim">│</span>
+                                                                  <span class="arch-dim">v</span>
+<span class="arch-dim">CLINICAL INTELLIGENCE LAYER</span>
+  VCF <span class="arch-dim">──></span> Variant Annotator <span class="arch-dim">──></span> <span class="arch-highlight">OncoKB (700+ genes)</span> <span class="arch-dim">────────────────┐</span>
+  Normal BAM <span class="arch-dim">──></span> OptiType <span class="arch-dim">──></span> <span class="arch-highlight">HLA Typing (6 alleles)</span> <span class="arch-dim">────────────┤</span>
+  Mutations <span class="arch-dim">──></span> <span class="arch-highlight">MHCflurry (14,847 alleles)</span> <span class="arch-dim">──></span> Neoantigen Binding <span class="arch-dim">─┤</span>
+  Biomarkers <span class="arch-dim">──></span> <span class="arch-highlight">ClinicalTrials.gov API</span> <span class="arch-dim">──></span> Trial Matching <span class="arch-dim">──────┘</span>
+                                                                  <span class="arch-dim">│</span>
+<span class="arch-dim">MAD BOARD (Multi-Agent Decision)</span>                                  <span class="arch-dim">v</span>
+  <span class="arch-accent">Genomics Agent</span> <span class="arch-dim">──┐</span>
+  <span class="arch-accent">Immune Agent</span> <span class="arch-dim">────┤──></span> Board Moderator <span class="arch-dim">──></span> <span class="arch-highlight">Consensus Recommendation</span>
+  <span class="arch-accent">Clinical Agent</span> <span class="arch-dim">──┘</span>     + Evidence Chain + Dissent + Audit Trail
+                                                                  <span class="arch-dim">│</span>
+<span class="arch-dim">DIGITAL TWIN</span>                                                     <span class="arch-dim">v</span>
+  Genomic Profile + Immune Landscape <span class="arch-dim">──></span> Treatment Simulator (9 regimens)
+    <span class="arch-dim">──></span> RECIST Response + Survival + irAE Risk + Neoantigen Vaccine Design
 
-<span class="arch-dim">AI LAYER (11 NVIDIA BioNeMo NIMs)</span>
-  MolMIM / GenMol <span class="arch-dim">──></span> Drug Candidates     RFdiffusion / ProteinMPNN <span class="arch-dim">──></span> Protein Design
-  DiffDock / ESM2 <span class="arch-dim">──></span> Docking + Embeddings   OpenFold3 / Boltz-2 <span class="arch-dim">──></span> Structure Prediction
-  Evo2 / MSA-Search <span class="arch-dim">──></span> Genomic Analysis
-
-<span class="arch-dim">SIMULATION LAYER (9 Physics Modules)</span>
-  Cellular + Immune + Vascular + Lymphatic + Molecular
-  + Receptor + Epigenetic + Circadian + Morphogen
-  GPU-Accelerated (NVIDIA Warp) <span class="arch-dim">│</span> Multi-GPU (NCCL)
-
-<span class="arch-dim">VISUALIZATION LAYER</span>
-  Browser: 3Dmol.js + Three.js + Plotly <span class="arch-dim">──></span> <span class="arch-highlight">Dashboard (30 pages)</span>
-  RTX: <span class="arch-accent">NVIDIA Isaac Sim 4.5.0</span> + OpenUSD + MJPEG Streaming
-  Bio-USD Schema (16 prim types) <span class="arch-dim">──></span> Entity Library (99 entities)
-
-<span class="arch-dim">INTELLIGENCE LAYER</span>
-  Research Feed <span class="arch-dim">◀────</span> PubMed / bioRxiv / arXiv / 22 sources
-  Research Agent <span class="arch-dim">───</span> Gene Investigation / Mutation Analysis / Drug Targets
+<span class="arch-dim">FDA COMPLIANCE (Non-Device CDS, 2026 Credibility Framework)</span>
+  Context of Use <span class="arch-dim">│</span> Model Cards <span class="arch-dim">│</span> Data Provenance <span class="arch-dim">│</span> Audit Trail
+  429-patient SU2C validation <span class="arch-dim">│</span> TMB r=0.987 <span class="arch-dim">│</span> 100% biomarker concordance
     </div>
     """, unsafe_allow_html=True)
 

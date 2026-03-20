@@ -24,7 +24,8 @@ st.title("\U0001f916 Cognisom Orchestrator")
 st.markdown(
     "**One command, full analysis.** Upload patient data and the orchestrator "
     "autonomously runs the complete pipeline: variant calling → annotation → "
-    "HLA typing → neoantigen prediction → digital twin → treatment simulation → report."
+    "HLA typing → neoantigen prediction → digital twin → treatment simulation → "
+    "MAD Board (3-agent consensus) → clinical report."
 )
 
 # ── Pipeline Steps Visualization ──────────────────────────────────
@@ -48,7 +49,7 @@ def _step_indicator(label, icon, status):
 # Get orchestrator state
 orch_state = st.session_state.get("orch_steps", {})
 
-steps_row = st.columns(10)
+steps_row = st.columns(11)
 step_defs = [
     ("Init", "\U0001f4cb", "init"),
     ("GPU", "\u26a1", "gpu_start"),
@@ -59,6 +60,7 @@ step_defs = [
     ("Neoantigen", "\U0001f489", "neoantigen"),
     ("Twin", "\U0001f9d1\u200d\U0001f4bb", "digital_twin"),
     ("Treat", "\U0001f48a", "treatment_sim"),
+    ("MAD", "\U0001f3db\ufe0f", "mad_board"),
     ("Report", "\U0001f4ca", "clinical_report"),
 ]
 for col, (label, icon, key) in zip(steps_row, step_defs):
@@ -74,7 +76,12 @@ st.subheader("Patient Input")
 
 input_mode = st.radio(
     "Input type",
-    ["VCF Text (paste or synthetic)", "VCF File Upload", "FASTQ on GPU (Parabricks)"],
+    [
+        "VCF Text (paste or synthetic)",
+        "VCF File Upload",
+        "FASTQ on GPU (Self-Managed)",
+        "FASTQ via HealthOmics (Serverless)",
+    ],
     horizontal=True,
 )
 
@@ -83,6 +90,7 @@ patient_id = st.text_input("Patient ID", value=f"PATIENT-{datetime.now().strftim
 vcf_text = None
 fastq_r1 = None
 fastq_r2 = None
+use_healthomics = False
 
 if input_mode == "VCF Text (paste or synthetic)":
     use_synthetic = st.checkbox("Use synthetic prostate cancer demo", value=True)
@@ -99,7 +107,7 @@ elif input_mode == "VCF File Upload":
         vcf_text = uploaded.read().decode("utf-8", errors="replace")
         st.success(f"Loaded {uploaded.name}")
 
-elif input_mode == "FASTQ on GPU (Parabricks)":
+elif input_mode == "FASTQ on GPU (Self-Managed)":
     st.info("Provide FASTQ paths on the GPU instance (requires GPU to be running)")
 
     use_test = st.checkbox("Use Parabricks sample data (NA12878)", value=True)
@@ -116,6 +124,27 @@ elif input_mode == "FASTQ on GPU (Parabricks)":
         fastq_r1 = st.text_input("FASTQ R1 path", value=fastq_r1, key="orch_r1")
     with c2:
         fastq_r2 = st.text_input("FASTQ R2 path", value=fastq_r2, key="orch_r2")
+
+elif input_mode == "FASTQ via HealthOmics (Serverless)":
+    use_healthomics = True
+    st.info(
+        "**AWS HealthOmics Ready2Run** — Fully serverless GPU genomics. "
+        "No GPU instance needed. FASTQ must be in S3."
+    )
+    use_na12878 = st.checkbox("Use NA12878 benchmark data (in S3)", value=True)
+    if use_na12878:
+        fastq_r1 = "s3://cognisom-genomics/fastq/NA12878/NA12878_30x_R1.fastq.gz"
+        fastq_r2 = "s3://cognisom-genomics/fastq/NA12878/NA12878_30x_R2.fastq.gz"
+        st.success("NA12878 30x WGS from S3 (12.1 + 13.4 GB)")
+    else:
+        fastq_r1 = ""
+        fastq_r2 = ""
+
+    c1, c2 = st.columns(2)
+    with c1:
+        fastq_r1 = st.text_input("S3 URI R1", value=fastq_r1, key="orch_ho_r1")
+    with c2:
+        fastq_r2 = st.text_input("S3 URI R2", value=fastq_r2, key="orch_ho_r2")
 
 st.divider()
 
@@ -146,6 +175,7 @@ if st.button("\U0001f680 Run Complete Pipeline", type="primary",
             fastq_r1=fastq_r1,
             fastq_r2=fastq_r2,
             auto_stop_gpu=False,
+            use_healthomics=use_healthomics,
         )
 
         st.session_state["orch_result"] = result

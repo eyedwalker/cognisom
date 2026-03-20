@@ -152,6 +152,89 @@
       npm install
       npm run build
     -->
+    <!--
+    SDP Rewriting: Kit's streaming SDK generates SDP with c=IN IP4 0.0.0.0
+    and no ICE candidates. This script patches RTCPeerConnection to fix the
+    SDP before the NVIDIA library processes it. Must run BEFORE the module.
+    -->
+    <script>
+    (function() {
+        const PUBLIC_IP = '52.32.247.131';
+        const MEDIA_PORT = 47998;
+
+        function fixSdp(sdp) {
+            // Replace 0.0.0.0 with public IP
+            sdp = sdp.replace(/IN IP4 0\.0\.0\.0/g, 'IN IP4 ' + PUBLIC_IP);
+            sdp = sdp.replace(/IN IP4 127\.0\.0\.1/g, 'IN IP4 ' + PUBLIC_IP);
+            // Replace Docker/EC2 private IPs
+            sdp = sdp.replace(/IN IP4 172\.17\.\d+\.\d+/g, 'IN IP4 ' + PUBLIC_IP);
+            sdp = sdp.replace(/IN IP4 172\.31\.\d+\.\d+/g, 'IN IP4 ' + PUBLIC_IP);
+            sdp = sdp.replace(/IN IP4 10\.\d+\.\d+/g, 'IN IP4 ' + PUBLIC_IP);
+
+            // Inject ICE host candidates if missing
+            if (sdp.indexOf('a=candidate:') === -1) {
+                var lines = sdp.split('\r\n');
+                var result = [];
+                for (var i = 0; i < lines.length; i++) {
+                    result.push(lines[i]);
+                    var m = lines[i].match(/^m=(\w+)\s+(\d+)\s+/);
+                    if (m && parseInt(m[2]) > 0) {
+                        result.push('a=candidate:1 1 udp 2130706431 ' + PUBLIC_IP + ' ' + m[2] + ' typ host');
+                        console.log('[cognisom] Injected ICE candidate for ' + m[1] + ': ' + PUBLIC_IP + ':' + m[2]);
+                    }
+                }
+                sdp = result.join('\r\n');
+            }
+            return sdp;
+        }
+
+        // Patch RTCPeerConnection to intercept setRemoteDescription
+        var OrigRTCPC = window.RTCPeerConnection;
+        window.RTCPeerConnection = function() {
+            var pc = new OrigRTCPC(...arguments);
+
+            var origSetRemote = pc.setRemoteDescription.bind(pc);
+            pc.setRemoteDescription = function(desc) {
+                if (desc && desc.sdp) {
+                    var fixed = fixSdp(desc.sdp);
+                    if (fixed !== desc.sdp) {
+                        console.log('[cognisom] Fixed SDP: replaced 0.0.0.0 with ' + PUBLIC_IP);
+                        desc = new RTCSessionDescription({ type: desc.type, sdp: fixed });
+                    }
+                }
+                return origSetRemote(desc);
+            };
+
+            // Also patch addIceCandidate for trickle candidates
+            var origAddIce = pc.addIceCandidate.bind(pc);
+            pc.addIceCandidate = function(candidate) {
+                if (candidate && candidate.candidate && candidate.candidate.indexOf('0.0.0.0') !== -1) {
+                    var fixed = candidate.candidate.replace(/0\.0\.0\.0/g, PUBLIC_IP);
+                    console.log('[cognisom] Fixed ICE candidate: ' + fixed);
+                    candidate = new RTCIceCandidate({
+                        candidate: fixed,
+                        sdpMLineIndex: candidate.sdpMLineIndex,
+                        sdpMid: candidate.sdpMid
+                    });
+                }
+                return origAddIce(candidate);
+            };
+
+            return pc;
+        };
+        // Preserve prototype chain so instanceof checks work
+        window.RTCPeerConnection.prototype = OrigRTCPC.prototype;
+        Object.defineProperty(window.RTCPeerConnection, 'name', { value: 'RTCPeerConnection' });
+        // Copy static methods
+        Object.getOwnPropertyNames(OrigRTCPC).forEach(function(prop) {
+            if (prop !== 'prototype' && prop !== 'length' && prop !== 'name') {
+                try { window.RTCPeerConnection[prop] = OrigRTCPC[prop]; } catch(e) {}
+            }
+        });
+        console.log('[cognisom] RTCPeerConnection patched for SDP IP rewriting');
+    })();
+    </script>
+
     <script type="module">
         // ═══════════════════════════════════════════════════════════════
         // Configuration
@@ -221,11 +304,12 @@
                     audioElementId: 'remote-audio',
                     authenticate: false,
                     maxReconnects: 3,
-                    server: signalingHost,
+                    // NOTE: Do NOT set 'server' — it triggers OVC session API
+                    // (/v2/session) which our Kit setup doesn't have.
+                    // Only set signalingServer/Port/Path for direct WebSocket.
                     signalingServer: signalingHost,
                     signalingPort: signalingActualPort,
                     signalingPath: signalingPath,
-                    mediaServer: signalingHost,
                     nativeTouchEvents: true,
                     width: 1920,
                     height: 1080,

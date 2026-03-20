@@ -65,7 +65,7 @@ WORKFLOWS = {
 # IAM role for HealthOmics runs
 OMICS_ROLE = os.environ.get(
     "OMICS_SERVICE_ROLE",
-    "arn:aws:iam::780457123717:role/OmicsServiceRole"
+    "arn:aws:iam::780457123717:role/OmicsServiceRole",
 )
 
 

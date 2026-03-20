@@ -209,29 +209,72 @@ tab_germline, tab_somatic, tab_rnaseq = st.tabs([
 ])
 
 with tab_germline:
-    st.markdown("""
-    **Single-sample germline variant calling** — identifies inherited variants.
+    st.markdown("**Single-sample germline variant calling** — identifies inherited variants.")
 
-    | Step | Tool | GPU Time |
-    |------|------|----------|
-    | Alignment | BWA-MEM (fq2bam) | ~25 min |
-    | Variant Calling | DeepVariant | ~20 min |
-    | **Total** | | **~45 min** |
-    """)
+    # Execution path toggle
+    exec_path = st.radio(
+        "Execution Path",
+        [
+            "Self-Managed GPU (L40S + Parabricks Docker)",
+            "AWS HealthOmics (Serverless Ready2Run)",
+        ],
+        horizontal=True,
+        key="germline_exec_path",
+    )
+    is_healthomics = "HealthOmics" in exec_path
+
+    if is_healthomics:
+        st.info(
+            "**AWS HealthOmics** — Fully serverless, zero infrastructure. "
+            "~$8.84 for 30x WGS alignment. FASTQ must be in S3."
+        )
+        st.markdown("""
+        | Step | Workflow | Est. Cost | Est. Time |
+        |------|---------|-----------|-----------|
+        | Alignment | Parabricks FQ2BAM (Ready2Run) | ~$8.84 | ~1:40 |
+        | Variant Calling | Parabricks DeepVariant (Ready2Run) | ~$5-10 | ~1:00 |
+        | **Total** | | **~$14-19** | **~2:40** |
+        """)
+    else:
+        st.markdown("""
+        | Step | Tool | GPU Time |
+        |------|------|----------|
+        | Alignment | BWA-MEM (fq2bam) | ~25 min |
+        | Variant Calling | DeepVariant | ~20 min |
+        | **Total** | | **~45 min** |
+        """)
 
     col1, col2 = st.columns(2)
     with col1:
-        g_r1 = st.text_input("FASTQ R1", placeholder="/opt/cognisom/jobs/sample_R1.fastq.gz",
-                              key="g_r1")
+        placeholder_r1 = "s3://cognisom-genomics/fastq/sample/R1.fastq.gz" if is_healthomics \
+            else "/opt/cognisom/jobs/sample_R1.fastq.gz"
+        g_r1 = st.text_input("FASTQ R1", placeholder=placeholder_r1, key="g_r1")
     with col2:
-        g_r2 = st.text_input("FASTQ R2", placeholder="/opt/cognisom/jobs/sample_R2.fastq.gz",
-                              key="g_r2")
+        placeholder_r2 = "s3://cognisom-genomics/fastq/sample/R2.fastq.gz" if is_healthomics \
+            else "/opt/cognisom/jobs/sample_R2.fastq.gz"
+        g_r2 = st.text_input("FASTQ R2", placeholder=placeholder_r2, key="g_r2")
     g_sample = st.text_input("Sample ID", value="SAMPLE-001", key="g_sample")
 
-    if st.button("\u26a1 Run Germline Pipeline", type="primary",
-                 disabled=(gpu_state != "running"), key="run_germline"):
+    btn_label = "\U0001f680 Run via HealthOmics" if is_healthomics else "\u26a1 Run Germline Pipeline"
+    btn_disabled = False if is_healthomics else (gpu_state != "running")
+
+    if st.button(btn_label, type="primary", disabled=btn_disabled, key="run_germline"):
         if not g_r1 or not g_r2:
             st.error("Both R1 and R2 FASTQ paths required")
+        elif is_healthomics:
+            st.session_state["pipeline_state"] = "aligning"
+            with st.spinner("Submitting to AWS HealthOmics..."):
+                try:
+                    from cognisom.infrastructure.healthomics import HealthOmicsRunner
+                    ho = HealthOmicsRunner()
+                    run_id = ho.run_germline_pipeline(g_r1, g_r2, g_sample)
+                    if run_id:
+                        st.session_state["healthomics_run_id"] = run_id
+                        st.success(f"HealthOmics run submitted: `{run_id}`")
+                    else:
+                        st.error("HealthOmics submission failed")
+                except Exception as e:
+                    st.error(f"Failed: {e}")
         else:
             st.session_state["pipeline_state"] = "aligning"
             with st.spinner("Submitting to GPU..."):
