@@ -152,15 +152,38 @@ with tab_run:
     )
 
     if "Matched" in mode:
+        # Demo data selector
+        demo = st.selectbox("Load Demo Data", [
+            "(Custom — enter S3 paths below)",
+            "SEQC2 WES — HCC1395 breast cancer + matched normal (~12 GB, ~30 min)",
+            "SEQC2 WGS — HCC1395 breast cancer + matched normal (~400 GB, ~3.5 hrs)",
+        ], key="demo_data")
+
+        if "WES" in demo:
+            _t_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WES_R1.fastq.gz"
+            _t_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WES_R2.fastq.gz"
+            _n_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WES_R1.fastq.gz"
+            _n_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WES_R2.fastq.gz"
+            _pid = "SEQC2-HCC1395-WES"
+        elif "WGS" in demo:
+            _t_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WGS_R1.fastq.gz"
+            _t_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WGS_R2.fastq.gz"
+            _n_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WGS_R1.fastq.gz"
+            _n_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WGS_R2.fastq.gz"
+            _pid = "SEQC2-HCC1395-WGS"
+        else:
+            _t_r1 = _t_r2 = _n_r1 = _n_r2 = ""
+            _pid = ""
+
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("##### Tumor Sample")
-            tumor_r1 = st.text_input("Tumor R1", placeholder="s3://cognisom-genomics/fastq/.../tumor_R1.fastq.gz", key="t_r1")
-            tumor_r2 = st.text_input("Tumor R2", placeholder="s3://cognisom-genomics/fastq/.../tumor_R2.fastq.gz", key="t_r2")
+            tumor_r1 = st.text_input("Tumor R1", value=_t_r1, placeholder="s3://cognisom-genomics/fastq/.../tumor_R1.fastq.gz", key="t_r1")
+            tumor_r2 = st.text_input("Tumor R2", value=_t_r2, placeholder="s3://cognisom-genomics/fastq/.../tumor_R2.fastq.gz", key="t_r2")
         with col2:
             st.markdown("##### Normal Sample (Blood/Saliva)")
-            normal_r1 = st.text_input("Normal R1", placeholder="s3://cognisom-genomics/fastq/.../normal_R1.fastq.gz", key="n_r1")
-            normal_r2 = st.text_input("Normal R2", placeholder="s3://cognisom-genomics/fastq/.../normal_R2.fastq.gz", key="n_r2")
+            normal_r1 = st.text_input("Normal R1", value=_n_r1, placeholder="s3://cognisom-genomics/fastq/.../normal_R1.fastq.gz", key="n_r1")
+            normal_r2 = st.text_input("Normal R2", value=_n_r2, placeholder="s3://cognisom-genomics/fastq/.../normal_R2.fastq.gz", key="n_r2")
     elif "Germline" in mode:
         tumor_r1 = tumor_r2 = normal_r1 = normal_r2 = ""
         st.markdown("##### Germline Sample")
@@ -172,7 +195,8 @@ with tab_run:
         tumor_r1 = st.text_input("Tumor R1", key="to_r1")
         tumor_r2 = st.text_input("Tumor R2", key="to_r2")
 
-    patient_id = st.text_input("Patient ID", value="", key="pid")
+    _default_pid = _pid if "Matched" in mode and "_pid" in dir() else ""
+    patient_id = st.text_input("Patient ID", value=_default_pid, key="pid")
 
     col_exec, col_launch = st.columns([2, 1])
     with col_exec:
@@ -295,67 +319,165 @@ with tab_run:
                     states["upload_time"] = "GPU ready"
                     pipeline_container.markdown(render_pipeline(states), unsafe_allow_html=True)
 
-                    # Determine FASTQ paths
-                    if "Germline" in mode:
-                        fq_r1 = germline_r1
-                        fq_r2 = germline_r2
-                        pipeline_type = "germline"
-                    else:
-                        fq_r1 = tumor_r1
-                        fq_r2 = tumor_r2
-                        pipeline_type = "somatic" if "Matched" in mode else "tumor_only"
+                    # Build the SSM script based on mode
+                    is_matched = "Matched" in mode
+                    is_germline = "Germline" in mode
 
-                    # Build the SSM script
-                    ssm_script = f"""#!/bin/bash
+                    script_header = f"""#!/bin/bash
 set -e
-# Disable auto-stop watchdog
 crontab -l 2>/dev/null | grep -v "idle\\|watchdog\\|self.stop\\|auto.stop" | crontab - 2>/dev/null || true
-
-# Stop Kit to free GPU
 docker stop cognisom-kit 2>/dev/null || true
 docker stop vllm-fast 2>/dev/null || true
-
-# Stage FASTQ
 mkdir -p /opt/cognisom/fastq/{patient_id} /opt/cognisom/results/{patient_id}
 echo "STAGE_FASTQ"
+"""
+
+                    if is_matched:
+                        # Matched tumor-normal: download 4 FASTQs
+                        script_stage = f"""
+aws s3 cp {tumor_r1} /opt/cognisom/fastq/{patient_id}/tumor_R1.fastq.gz --quiet 2>/dev/null || true
+aws s3 cp {tumor_r2} /opt/cognisom/fastq/{patient_id}/tumor_R2.fastq.gz --quiet 2>/dev/null || true
+aws s3 cp {normal_r1} /opt/cognisom/fastq/{patient_id}/normal_R1.fastq.gz --quiet 2>/dev/null || true
+aws s3 cp {normal_r2} /opt/cognisom/fastq/{patient_id}/normal_R2.fastq.gz --quiet 2>/dev/null || true
+"""
+                        # Align tumor
+                        script_align = f"""
+echo "FQ2BAM_TUMOR_START"
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/fastq/{patient_id}:/fastq \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun fq2bam \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-fq /fastq/tumor_R1.fastq.gz /fastq/tumor_R2.fastq.gz \\
+    --out-bam /results/tumor.bam \\
+    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \\
+    --out-recal-file /results/tumor.recal.txt \\
+    --num-gpus 1 \\
+    2>&1 | tail -20
+
+echo "FQ2BAM_NORMAL_START"
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/fastq/{patient_id}:/fastq \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun fq2bam \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-fq /fastq/normal_R1.fastq.gz /fastq/normal_R2.fastq.gz \\
+    --out-bam /results/normal.bam \\
+    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \\
+    --out-recal-file /results/normal.recal.txt \\
+    --num-gpus 1 \\
+    2>&1 | tail -20
+
+echo "MUTECT2_START"
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun mutect2 \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --tumor-name tumor \\
+    --in-tumor-bam /results/tumor.bam \\
+    --normal-name normal \\
+    --in-normal-bam /results/normal.bam \\
+    --out-vcf /results/{patient_id}.somatic.vcf \\
+    --num-gpus 1 \\
+    2>&1 | tail -20
+"""
+                        script_upload = f"""
+echo "UPLOAD_RESULTS"
+aws s3 cp /opt/cognisom/results/{patient_id}/{patient_id}.somatic.vcf s3://cognisom-genomics/results/{patient_id}/{patient_id}.somatic.vcf --quiet
+"""
+                    elif is_germline:
+                        fq_r1 = germline_r1
+                        fq_r2 = germline_r2
+                        script_stage = f"""
 aws s3 cp {fq_r1} /opt/cognisom/fastq/{patient_id}/R1.fastq.gz --quiet 2>/dev/null || true
 aws s3 cp {fq_r2} /opt/cognisom/fastq/{patient_id}/R2.fastq.gz --quiet 2>/dev/null || true
-
+"""
+                        script_align = f"""
 echo "FQ2BAM_START"
-docker run --rm --gpus all \
-  -v /opt/cognisom/ref:/ref \
-  -v /opt/cognisom/fastq/{patient_id}:/fastq \
-  -v /opt/cognisom/results/{patient_id}:/results \
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \
-  pbrun fq2bam \
-    --ref /ref/Homo_sapiens_assembly38.fasta \
-    --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \
-    --out-bam /results/{patient_id}.bam \
-    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \
-    --out-recal-file /results/{patient_id}.recal.txt \
-    --num-gpus 1 \
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/fastq/{patient_id}:/fastq \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun fq2bam \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \\
+    --out-bam /results/{patient_id}.bam \\
+    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \\
+    --out-recal-file /results/{patient_id}.recal.txt \\
+    --num-gpus 1 \\
     2>&1 | tail -20
 
 echo "DEEPVARIANT_START"
-docker run --rm --gpus all \
-  -v /opt/cognisom/ref:/ref \
-  -v /opt/cognisom/results/{patient_id}:/results \
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \
-  pbrun deepvariant \
-    --ref /ref/Homo_sapiens_assembly38.fasta \
-    --in-bam /results/{patient_id}.bam \
-    --out-variants /results/{patient_id}.deepvariant.vcf \
-    --num-gpus 1 \
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun deepvariant \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-bam /results/{patient_id}.bam \\
+    --out-variants /results/{patient_id}.deepvariant.vcf \\
+    --num-gpus 1 \\
+    2>&1 | tail -20
+"""
+                        script_upload = f"""
+echo "UPLOAD_RESULTS"
+aws s3 cp /opt/cognisom/results/{patient_id}/{patient_id}.deepvariant.vcf s3://cognisom-genomics/results/{patient_id}/{patient_id}.deepvariant.vcf --quiet
+"""
+                    else:
+                        # Tumor only — same as germline but label differently
+                        fq_r1 = tumor_r1
+                        fq_r2 = tumor_r2
+                        script_stage = f"""
+aws s3 cp {fq_r1} /opt/cognisom/fastq/{patient_id}/R1.fastq.gz --quiet 2>/dev/null || true
+aws s3 cp {fq_r2} /opt/cognisom/fastq/{patient_id}/R2.fastq.gz --quiet 2>/dev/null || true
+"""
+                        script_align = f"""
+echo "FQ2BAM_START"
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/fastq/{patient_id}:/fastq \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun fq2bam \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \\
+    --out-bam /results/{patient_id}.bam \\
+    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \\
+    --out-recal-file /results/{patient_id}.recal.txt \\
+    --num-gpus 1 \\
     2>&1 | tail -20
 
+echo "DEEPVARIANT_START"
+docker run --rm --gpus all \\
+  -v /opt/cognisom/ref:/ref \\
+  -v /opt/cognisom/results/{patient_id}:/results \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  pbrun deepvariant \\
+    --ref /ref/Homo_sapiens_assembly38.fasta \\
+    --in-bam /results/{patient_id}.bam \\
+    --out-variants /results/{patient_id}.deepvariant.vcf \\
+    --num-gpus 1 \\
+    2>&1 | tail -20
+"""
+                        script_upload = f"""
 echo "UPLOAD_RESULTS"
-aws s3 cp /results/{patient_id}.deepvariant.vcf s3://cognisom-genomics/results/{patient_id}/{patient_id}.deepvariant.vcf --quiet
+aws s3 cp /opt/cognisom/results/{patient_id}/{patient_id}.deepvariant.vcf s3://cognisom-genomics/results/{patient_id}/{patient_id}.deepvariant.vcf --quiet
+"""
+
+                    script_footer = f"""
 echo "PIPELINE_COMPLETE"
 ls -lh /opt/cognisom/results/{patient_id}/
-
-# Restart Kit
 docker start cognisom-kit 2>/dev/null || true
 """
+
+                    ssm_script = script_header + script_stage + script_align + script_upload + script_footer
 
                     # Send the command
                     ssm_resp = ssm.send_command(
