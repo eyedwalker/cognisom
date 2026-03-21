@@ -661,19 +661,157 @@ with tab_monitor:
                                 if line.strip():
                                     st.text(line)
 
-                        # Offer to load VCF into MAD Agent
+                        # Full end-to-end analysis: VCF → MAD Agent → 3D Target
                         pid = st.session_state.get("gpu_patient_id", "")
                         if pid:
                             is_somatic = "somatic" in output.lower() or "MUTECT2_START" in output
                             vcf_name = f"{pid}.somatic.vcf" if is_somatic else f"{pid}.deepvariant.vcf"
                             vcf_s3 = f"s3://cognisom-genomics/results/{pid}/{vcf_name}"
                             st.info(f"VCF: `{vcf_s3}`")
-                            if st.button("Analyze with MAD Agent", type="primary",
-                                         icon=":material/groups:", use_container_width=True):
-                                st.session_state["vcf_s3_path"] = vcf_s3
-                                st.switch_page(str(
-                                    __import__("pathlib").Path(__file__).parent / "37_mad_agent.py"
-                                ))
+
+                            if st.button("Run Full Analysis: MAD Agent + Target Visualization",
+                                         type="primary", icon=":material/biotech:",
+                                         use_container_width=True):
+                                with st.spinner("Downloading VCF from S3..."):
+                                    import boto3 as _b3
+                                    import tempfile
+                                    _s3 = _b3.client("s3", region_name="us-west-2")
+                                    bucket = "cognisom-genomics"
+                                    key = vcf_s3.replace(f"s3://{bucket}/", "")
+
+                                    with tempfile.NamedTemporaryFile(suffix=".vcf", delete=False) as tmp:
+                                        _s3.download_file(bucket, key, tmp.name)
+                                        vcf_text = open(tmp.name).read()
+
+                                st.success(f"VCF loaded: {len(vcf_text)//1024:,} KB")
+
+                                # Build patient profile
+                                with st.spinner("Building patient profile..."):
+                                    from cognisom.genomics.patient_profile import PatientProfileBuilder
+                                    _builder = PatientProfileBuilder()
+                                    _profile = _builder.from_vcf_text(vcf_text, pid)
+                                    st.session_state["patient_profile"] = _profile
+
+                                st.markdown(f"**Variants:** {len(_profile.variants)} | "
+                                           f"**Drivers:** {len(_profile.cancer_driver_mutations)} | "
+                                           f"**TMB:** {_profile.tumor_mutational_burden:.1f}")
+
+                                # Digital twin + treatment simulation
+                                with st.spinner("Running treatment simulation..."):
+                                    from cognisom.genomics.twin_config import DigitalTwinConfig
+                                    from cognisom.genomics.treatment_simulator import TreatmentSimulator
+                                    _twin = DigitalTwinConfig.from_profile_only(_profile)
+                                    _sim = TreatmentSimulator()
+                                    _recommended = _sim.get_recommended_treatments(_twin)
+                                    _results = _sim.compare_treatments(_recommended, _twin)
+                                    st.session_state["digital_twin"] = _twin
+                                    st.session_state["treatment_results"] = _results
+
+                                # MAD Board
+                                with st.spinner("MAD Board deliberating..."):
+                                    from cognisom.mad.board import BoardModerator
+                                    _moderator = BoardModerator()
+                                    _decision = _moderator.run_full_analysis(
+                                        patient_id=pid, profile=_profile,
+                                        twin=_twin, treatment_results=_results,
+                                    )
+                                    st.session_state["mad_decision"] = _decision
+
+                                # Show recommendation
+                                st.markdown("---")
+                                st.markdown(f"""
+                                <div style="background:linear-gradient(135deg,#0a0a2e,#1a1a4e);border-radius:16px;padding:24px;margin:16px 0;">
+                                    <div style="font-size:1.5rem;font-weight:700;color:#00d4aa;margin-bottom:8px;">
+                                        MAD Board Recommendation
+                                    </div>
+                                    <div style="font-size:1.2rem;color:white;font-weight:600;">
+                                        {_decision.recommended_treatment_name}
+                                    </div>
+                                    <div style="color:rgba(255,255,255,0.6);margin-top:4px;">
+                                        Consensus: {_decision.consensus_level} ({_decision.confidence:.0%} confidence)
+                                        | Evidence: {len(_decision.evidence_chain)} items
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                                # Show rationale
+                                st.markdown(f"**Rationale:** {_decision.unified_rationale}")
+
+                                # Neoantigen target visualization
+                                if _profile.predicted_neoantigens:
+                                    top_neos = [n for n in _profile.predicted_neoantigens
+                                                if n.is_strong_binder][:3]
+                                    if not top_neos:
+                                        top_neos = [n for n in _profile.predicted_neoantigens
+                                                    if n.is_weak_binder][:3]
+
+                                    if top_neos:
+                                        st.markdown("---")
+                                        st.subheader("Top Neoantigen Target")
+                                        _neo = top_neos[0]
+                                        st.markdown(
+                                            f"**{_neo.source_gene}** {_neo.mutation} | "
+                                            f"Peptide: `{_neo.peptide}` | "
+                                            f"HLA: **{_neo.best_hla_allele}** | "
+                                            f"IC50: **{_neo.binding_affinity_nm:.1f} nM**"
+                                        )
+
+                                        with st.spinner("Fetching peptide-MHC structure..."):
+                                            try:
+                                                from cognisom.genomics.target_structure import TargetStructureBuilder
+                                                _tsb = TargetStructureBuilder()
+                                                _struct = _tsb.build(_neo)
+
+                                                import streamlit.components.v1 as components
+                                                _pdb = _struct.pdb_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+                                                _pc = _struct.peptide_chain_id
+                                                _mp = _neo.mutation_position_in_peptide
+
+                                                _viewer = f"""
+                                                <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+                                                <div id="target-pmhc" style="width:100%;height:450px;border-radius:12px;
+                                                     overflow:hidden;border:1px solid rgba(128,128,128,0.2);background:#0a0a2e;"></div>
+                                                <script>
+                                                (function(){{
+                                                    var v=$3Dmol.createViewer("target-pmhc",{{backgroundColor:"0x0a0a2e"}});
+                                                    v.addModel(`{_pdb}`,"pdb");
+                                                    v.setStyle({{chain:"A"}},{{cartoon:{{color:"0xcccccc",opacity:0.5}}}});
+                                                    v.addSurface($3Dmol.SurfaceType.VDW,{{opacity:0.12,color:"0xdddddd"}},{{chain:"A"}});
+                                                    v.setStyle({{chain:"B"}},{{cartoon:{{color:"0x6366f1",opacity:0.25}}}});
+                                                    v.setStyle({{chain:"{_pc}"}},{{stick:{{radius:0.25,colorscheme:"Jmol"}},sphere:{{radius:0.5,colorscheme:"Jmol"}}}});
+                                                    v.addStyle({{chain:"{_pc}",resi:{_mp+1}}},{{sphere:{{radius:0.8,color:"0xff4444"}}}});
+                                                    "DEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(function(c){{v.setStyle({{chain:c}},{{cartoon:{{color:"0x333",opacity:0.1}}}});}});
+                                                    v.zoomTo({{chain:"{_pc}"}},600);
+                                                    v.spin("y",0.3);
+                                                    v.render();
+                                                }})();
+                                                </script>
+                                                """
+                                                components.html(_viewer, height=470)
+
+                                                _method = {
+                                                    "rcsb_template": f"RCSB PDB ({_struct.template_pdb_id})",
+                                                    "alphafold2_multimer": "AlphaFold2-Multimer",
+                                                    "peptide_only": "Extended peptide",
+                                                }.get(_struct.method, _struct.method)
+
+                                                c1, c2, c3, c4 = st.columns(4)
+                                                c1.metric("Peptide", _neo.peptide)
+                                                c2.metric("HLA", _neo.best_hla_allele)
+                                                c3.metric("IC50", f"{_neo.binding_affinity_nm:.1f} nM")
+                                                c4.metric("Structure", _method)
+
+                                                st.caption(
+                                                    f"Gray surface: MHC groove | Purple: b2m | "
+                                                    f"Colored atoms: neoantigen peptide | Red: mutation site"
+                                                )
+                                            except Exception as e:
+                                                st.warning(f"3D visualization unavailable: {e}")
+
+                                # Update all pipeline steps to complete
+                                for s in PIPELINE_STEPS:
+                                    states[s["key"]] = "complete"
+                                st.markdown(render_pipeline(states), unsafe_allow_html=True)
                     else:
                         st.warning("Command completed but pipeline may not have finished.")
                         st.text(output[-500:])
