@@ -525,40 +525,134 @@ with tab_monitor:
             key="monitor_ssm_cmd",
         )
 
-        if st.button("Check GPU Status", type="primary") and ssm_cmd:
+        if st.button("Check GPU Status", type="primary", use_container_width=True) and ssm_cmd:
             try:
                 import boto3
-                ssm = boto3.client("ssm", region_name="us-west-2")
-                r = ssm.get_command_invocation(
+                ssm_client = boto3.client("ssm", region_name="us-west-2")
+                r = ssm_client.get_command_invocation(
                     CommandId=ssm_cmd,
                     InstanceId="i-0ac9eb88c1b046163",
                 )
                 cmd_status = r["Status"]
                 output = r.get("StandardOutputContent", "")
 
+                # Determine pipeline stage from stdout markers
+                stages_detected = []
+                for marker in ["STAGE_FASTQ", "FQ2BAM_START", "FQ2BAM_TUMOR_START",
+                               "FQ2BAM_NORMAL_START", "MUTECT2_START",
+                               "DEEPVARIANT_START", "UPLOAD_RESULTS", "PIPELINE_COMPLETE"]:
+                    if marker in output:
+                        stages_detected.append(marker)
+
+                last_stage = stages_detected[-1] if stages_detected else "PENDING"
+
+                # Map to pipeline step states
                 states = {s["key"]: "pending" for s in PIPELINE_STEPS}
-                states["upload"] = "complete"
+
+                # Build progress based on detected stages
+                stage_progress = {
+                    "PENDING": (0, "Initializing..."),
+                    "STAGE_FASTQ": (8, "Staging FASTQ from S3..."),
+                    "FQ2BAM_START": (20, "Aligning reads (BWA-MEM + BQSR)..."),
+                    "FQ2BAM_TUMOR_START": (15, "Aligning tumor reads..."),
+                    "FQ2BAM_NORMAL_START": (40, "Aligning normal reads..."),
+                    "MUTECT2_START": (65, "Somatic variant calling (Mutect2)..."),
+                    "DEEPVARIANT_START": (70, "Variant calling (DeepVariant CNN)..."),
+                    "UPLOAD_RESULTS": (92, "Uploading VCF to S3..."),
+                    "PIPELINE_COMPLETE": (100, "Complete!"),
+                }
+
+                progress_pct, stage_label = stage_progress.get(last_stage, (0, "Unknown"))
 
                 if cmd_status == "InProgress":
-                    if "DEEPVARIANT_START" in output:
+                    # Update step states for pipeline viz
+                    states["upload"] = "complete" if "STAGE_FASTQ" in stages_detected else "running"
+                    if "FQ2BAM_START" in stages_detected or "FQ2BAM_TUMOR_START" in stages_detected:
+                        states["upload"] = "complete"
+                        states["align_tumor"] = "running" if "FQ2BAM_NORMAL_START" not in stages_detected else "complete"
+                    if "FQ2BAM_NORMAL_START" in stages_detected:
                         states["align_tumor"] = "complete"
+                        states["align_normal"] = "running" if "MUTECT2_START" not in stages_detected else "complete"
+                    if "MUTECT2_START" in stages_detected or "DEEPVARIANT_START" in stages_detected:
+                        states["align_tumor"] = "complete"
+                        states["align_normal"] = "complete"
                         states["somatic_call"] = "running"
-                        states["somatic_call_time"] = "DeepVariant CNN"
-                    elif "FQ2BAM_START" in output:
-                        states["align_tumor"] = "running"
-                        states["align_tumor_time"] = "Alignment + BQSR"
-                    elif "STAGE_FASTQ" in output:
-                        states["upload"] = "running"
-                        states["upload_time"] = "Staging FASTQ"
+
+                    # DNA Helix Progress Animation
+                    import math
+                    num_pairs = 12
+                    pairs_html = ""
+                    for i in range(num_pairs):
+                        pair_pct = (i + 1) / num_pairs * 100
+                        top = i * 15
+                        offset_x = math.sin(i * 0.5) * 15
+                        if pair_pct <= progress_pct:
+                            cls = "completed"
+                        elif pair_pct <= progress_pct + 10:
+                            cls = "running active"
+                        else:
+                            cls = "pending"
+                        pairs_html += f'<div class="base-pair {cls}" style="top:{top}px;transform:translateX({offset_x:.0f}px) rotateY({i*30}deg);"></div>'
+
+                    particles = ""
+                    for i in range(6):
+                        particles += f'<div class="dna-bg-particle" style="left:{10+i*15}%;top:{5+i*14}%;animation-delay:{i*0.4}s;"></div>'
+
+                    st.markdown(f"""
+                    <style>
+                    @keyframes helixSpin {{ 0% {{ transform: rotateY(0deg); }} 100% {{ transform: rotateY(360deg); }} }}
+                    @keyframes helixPulse {{ 0%,100% {{ opacity: 0.3; }} 50% {{ opacity: 1; }} }}
+                    @keyframes basePairGlow {{ 0%,100% {{ box-shadow: 0 0 3px rgba(0,212,170,0.3); }} 50% {{ box-shadow: 0 0 12px rgba(0,212,170,0.8); }} }}
+                    .dna-progress-container {{ display:flex;align-items:center;justify-content:center;gap:24px;padding:24px;
+                        background:linear-gradient(135deg,#0a0a2e,#1a1a4e,#0a2a3e);border-radius:16px;margin:16px 0;min-height:200px;position:relative;overflow:hidden; }}
+                    .dna-helix {{ width:60px;height:180px;position:relative;perspective:400px;transform-style:preserve-3d;animation:helixSpin 4s linear infinite; }}
+                    .base-pair {{ position:absolute;width:50px;height:4px;left:5px;border-radius:2px;transition:all 0.5s ease; }}
+                    .base-pair.active {{ animation:basePairGlow 1.5s ease-in-out infinite; }}
+                    .base-pair.completed {{ background:linear-gradient(90deg,#10b981,#00d4aa)!important;box-shadow:0 0 8px rgba(16,185,129,0.5); }}
+                    .base-pair.pending {{ background:rgba(255,255,255,0.08); }}
+                    .base-pair.running {{ background:linear-gradient(90deg,#3b82f6,#6366f1);animation:basePairGlow 1.5s ease-in-out infinite; }}
+                    .dna-progress-info {{ text-align:left;color:white;flex:1;max-width:400px; }}
+                    .dna-progress-bar-bg {{ width:100%;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin:8px 0; }}
+                    .dna-progress-bar-fill {{ height:100%;background:linear-gradient(90deg,#00d4aa,#6366f1);border-radius:4px;transition:width 1s ease; }}
+                    .dna-bg-particle {{ position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(0,212,170,0.2);animation:helixPulse 3s ease-in-out infinite; }}
+                    </style>
+                    <div class="dna-progress-container">
+                        {particles}
+                        <div class="dna-helix">{pairs_html}</div>
+                        <div class="dna-progress-info">
+                            <div style="font-size:1.3rem;font-weight:700;background:linear-gradient(135deg,#00d4aa,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                                Genomics Pipeline Running
+                            </div>
+                            <div style="font-size:0.9rem;color:rgba(255,255,255,0.7);margin:4px 0;">{stage_label}</div>
+                            <div class="dna-progress-bar-bg">
+                                <div class="dna-progress-bar-fill" style="width:{progress_pct}%;"></div>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;">
+                                <span style="font-size:2rem;font-weight:800;color:#00d4aa;">{progress_pct}%</span>
+                                <span style="font-size:0.8rem;color:rgba(255,255,255,0.5);align-self:end;">L40S GPU</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Also show the step-by-step pipeline
                     st.markdown(render_pipeline(states), unsafe_allow_html=True)
-                    st.info(f"Pipeline running... Status: **{cmd_status}**")
 
                 elif cmd_status == "Success":
                     if "PIPELINE_COMPLETE" in output:
                         for s in PIPELINE_STEPS[:4]:
                             states[s["key"]] = "complete"
+
+                        # Completed DNA helix (all green)
+                        st.markdown(f"""
+                        <div style="background:linear-gradient(135deg,#0a0a2e,#1a1a4e);border-radius:16px;padding:24px;text-align:center;margin:16px 0;">
+                            <div style="font-size:3rem;">✅</div>
+                            <div style="font-size:1.5rem;font-weight:700;color:#10b981;margin:8px 0;">Pipeline Complete</div>
+                            <div style="color:rgba(255,255,255,0.6);">VCF uploaded to S3 — ready for MAD Agent analysis</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                         st.markdown(render_pipeline(states), unsafe_allow_html=True)
-                        st.success("GPU pipeline complete! VCF uploaded to S3.")
 
                         # Show output files
                         last_lines = output.strip().split("\n")[-10:]
@@ -567,22 +661,25 @@ with tab_monitor:
                                 if line.strip():
                                     st.text(line)
 
-                        # Offer to load VCF
+                        # Offer to load VCF into MAD Agent
                         pid = st.session_state.get("gpu_patient_id", "")
                         if pid:
-                            vcf_s3 = f"s3://cognisom-genomics/results/{pid}/{pid}.deepvariant.vcf"
+                            is_somatic = "somatic" in output.lower() or "MUTECT2_START" in output
+                            vcf_name = f"{pid}.somatic.vcf" if is_somatic else f"{pid}.deepvariant.vcf"
+                            vcf_s3 = f"s3://cognisom-genomics/results/{pid}/{vcf_name}"
                             st.info(f"VCF: `{vcf_s3}`")
-                            if st.button("Load VCF into MAD Agent", type="primary"):
+                            if st.button("Analyze with MAD Agent", type="primary",
+                                         icon=":material/groups:", use_container_width=True):
                                 st.session_state["vcf_s3_path"] = vcf_s3
                                 st.switch_page(str(
                                     __import__("pathlib").Path(__file__).parent / "37_mad_agent.py"
                                 ))
                     else:
-                        st.warning(f"Command completed but pipeline may not have finished. Check output.")
+                        st.warning("Command completed but pipeline may not have finished.")
                         st.text(output[-500:])
 
                 elif cmd_status == "Failed":
-                    st.error(f"Pipeline failed.")
+                    st.error("Pipeline failed.")
                     st.text(r.get("StandardErrorContent", "")[-500:])
 
                 elif cmd_status == "TimedOut":
