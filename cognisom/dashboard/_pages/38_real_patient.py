@@ -548,25 +548,25 @@ with tab_monitor:
                 except Exception as e:
                     st.error(f"Status check failed: {e}")
 
-    with col_list:
-        if st.button("List Recent Jobs"):
-            try:
-                import boto3
-                omics = boto3.client("omics", region_name="us-west-2")
-                runs = omics.list_runs(maxResults=10)
-                items = runs.get("items", [])
-                if items:
-                    for run in items:
-                        status_icon = {"COMPLETED": "🟢", "RUNNING": "🔵",
-                                       "FAILED": "🔴", "PENDING": "🟡"}.get(run.get("status", ""), "⚪")
-                        st.caption(
-                            f"{status_icon} **{run.get('id')}** — {run.get('name', '')} "
-                            f"({run.get('status', '')})"
-                        )
-                else:
-                    st.info("No recent HealthOmics runs.")
-            except Exception as e:
-                st.error(f"List failed: {e}")
+        with col_list:
+            if st.button("List Recent Jobs"):
+                try:
+                    import boto3
+                    omics = boto3.client("omics", region_name="us-west-2")
+                    runs = omics.list_runs(maxResults=10)
+                    items = runs.get("items", [])
+                    if items:
+                        for run in items:
+                            status_icon = {"COMPLETED": "🟢", "RUNNING": "🔵",
+                                           "FAILED": "🔴", "PENDING": "🟡"}.get(run.get("status", ""), "⚪")
+                            st.caption(
+                                f"{status_icon} **{run.get('id')}** — {run.get('name', '')} "
+                                f"({run.get('status', '')})"
+                            )
+                    else:
+                        st.info("No recent HealthOmics runs.")
+                except Exception as e:
+                    st.error(f"List failed: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────
 # TAB 3: VCF UPLOAD
