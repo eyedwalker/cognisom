@@ -377,7 +377,7 @@ docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/results/{patient_id}:/results \\
   nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
-  pbrun mutect2 \\
+  pbrun mutectcaller \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --tumor-name tumor \\
     --in-tumor-bam /results/tumor.bam \\
