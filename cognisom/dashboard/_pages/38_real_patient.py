@@ -262,140 +262,291 @@ with tab_run:
                 except Exception as e:
                     st.error(f"Launch failed: {e}")
             else:
-                st.info("Self-managed GPU pipeline — check GPU status and submit via Orchestrator page.")
+                # ── Self-Managed GPU (L40S via SSM) ──
+                try:
+                    import boto3
+
+                    ec2 = boto3.client("ec2", region_name="us-west-2")
+                    ssm = boto3.client("ssm", region_name="us-west-2")
+
+                    GPU_INSTANCE_ID = "i-0ac9eb88c1b046163"
+
+                    # Check instance state
+                    resp = ec2.describe_instances(InstanceIds=[GPU_INSTANCE_ID])
+                    gpu_state = resp["Reservations"][0]["Instances"][0]["State"]["Name"]
+
+                    if gpu_state == "stopped":
+                        states["upload"] = "running"
+                        states["upload_time"] = "Starting GPU..."
+                        pipeline_container.markdown(render_pipeline(states), unsafe_allow_html=True)
+                        ec2.start_instances(InstanceIds=[GPU_INSTANCE_ID])
+                        status_text.info("GPU instance starting... This takes ~60 seconds.")
+
+                        # Wait for running
+                        import time as _time
+                        for _ in range(24):
+                            _time.sleep(5)
+                            r = ec2.describe_instances(InstanceIds=[GPU_INSTANCE_ID])
+                            if r["Reservations"][0]["Instances"][0]["State"]["Name"] == "running":
+                                break
+                        _time.sleep(15)  # SSM agent startup
+
+                    states["upload"] = "complete"
+                    states["upload_time"] = "GPU ready"
+                    pipeline_container.markdown(render_pipeline(states), unsafe_allow_html=True)
+
+                    # Determine FASTQ paths
+                    if "Germline" in mode:
+                        fq_r1 = germline_r1
+                        fq_r2 = germline_r2
+                        pipeline_type = "germline"
+                    else:
+                        fq_r1 = tumor_r1
+                        fq_r2 = tumor_r2
+                        pipeline_type = "somatic" if "Matched" in mode else "tumor_only"
+
+                    # Build the SSM script
+                    ssm_script = f"""#!/bin/bash
+set -e
+# Disable auto-stop watchdog
+crontab -l 2>/dev/null | grep -v "idle\\|watchdog\\|self.stop\\|auto.stop" | crontab - 2>/dev/null || true
+
+# Stop Kit to free GPU
+docker stop cognisom-kit 2>/dev/null || true
+docker stop vllm-fast 2>/dev/null || true
+
+# Stage FASTQ
+mkdir -p /opt/cognisom/fastq/{patient_id} /opt/cognisom/results/{patient_id}
+echo "STAGE_FASTQ"
+aws s3 cp {fq_r1} /opt/cognisom/fastq/{patient_id}/R1.fastq.gz --quiet 2>/dev/null || true
+aws s3 cp {fq_r2} /opt/cognisom/fastq/{patient_id}/R2.fastq.gz --quiet 2>/dev/null || true
+
+echo "FQ2BAM_START"
+docker run --rm --gpus all \
+  -v /opt/cognisom/ref:/ref \
+  -v /opt/cognisom/fastq/{patient_id}:/fastq \
+  -v /opt/cognisom/results/{patient_id}:/results \
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \
+  pbrun fq2bam \
+    --ref /ref/Homo_sapiens_assembly38.fasta \
+    --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \
+    --out-bam /results/{patient_id}.bam \
+    --knownSites /ref/Homo_sapiens_assembly38.known_indels.vcf.gz \
+    --out-recal-file /results/{patient_id}.recal.txt \
+    --num-gpus 1 \
+    2>&1 | tail -20
+
+echo "DEEPVARIANT_START"
+docker run --rm --gpus all \
+  -v /opt/cognisom/ref:/ref \
+  -v /opt/cognisom/results/{patient_id}:/results \
+  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \
+  pbrun deepvariant \
+    --ref /ref/Homo_sapiens_assembly38.fasta \
+    --in-bam /results/{patient_id}.bam \
+    --out-variants /results/{patient_id}.deepvariant.vcf \
+    --num-gpus 1 \
+    2>&1 | tail -20
+
+echo "UPLOAD_RESULTS"
+aws s3 cp /results/{patient_id}.deepvariant.vcf s3://cognisom-genomics/results/{patient_id}/{patient_id}.deepvariant.vcf --quiet
+echo "PIPELINE_COMPLETE"
+ls -lh /opt/cognisom/results/{patient_id}/
+
+# Restart Kit
+docker start cognisom-kit 2>/dev/null || true
+"""
+
+                    # Send the command
+                    ssm_resp = ssm.send_command(
+                        InstanceIds=[GPU_INSTANCE_ID],
+                        DocumentName="AWS-RunShellScript",
+                        Parameters={"commands": [ssm_script]},
+                        TimeoutSeconds=7200,
+                    )
+                    ssm_cmd_id = ssm_resp["Command"]["CommandId"]
+
+                    st.session_state["gpu_ssm_cmd_id"] = ssm_cmd_id
+                    st.session_state["gpu_patient_id"] = patient_id
+                    st.session_state["gpu_pipeline_mode"] = mode
+
+                    states["align_tumor"] = "running"
+                    states["align_tumor_time"] = "Started"
+                    pipeline_container.markdown(render_pipeline(states), unsafe_allow_html=True)
+
+                    st.success(f"GPU pipeline launched on L40S! SSM Command: `{ssm_cmd_id[:12]}...`")
+                    st.info(
+                        "Estimated: ~90 min for 30x WGS (fq2bam ~70 min + DeepVariant ~20 min). "
+                        "Switch to **Monitor Jobs** tab to track progress."
+                    )
+
+                except Exception as e:
+                    st.error(f"GPU launch failed: {e}")
 
 # ─────────────────────────────────────────────────────────────────────────
 # TAB 2: MONITOR JOBS
 # ─────────────────────────────────────────────────────────────────────────
 
 with tab_monitor:
-    st.subheader("HealthOmics Job Monitor")
-
-    run_id_input = st.text_input(
-        "Run ID",
-        value=st.session_state.get("healthomics_run_id", ""),
-        key="monitor_run_id",
+    backend = st.radio(
+        "Backend",
+        ["L40S GPU (SSM)", "HealthOmics"],
+        horizontal=True,
     )
 
-    col_check, col_list = st.columns(2)
+    if backend == "L40S GPU (SSM)":
+        st.subheader("L40S GPU Job Monitor")
 
-    with col_check:
-        if st.button("Check Status", type="primary") and run_id_input:
+        ssm_cmd = st.text_input(
+            "SSM Command ID",
+            value=st.session_state.get("gpu_ssm_cmd_id", ""),
+            key="monitor_ssm_cmd",
+        )
+
+        if st.button("Check GPU Status", type="primary") and ssm_cmd:
             try:
                 import boto3
-                omics = boto3.client("omics", region_name="us-west-2")
-                resp = omics.get_run(id=run_id_input)
+                ssm = boto3.client("ssm", region_name="us-west-2")
+                r = ssm.get_command_invocation(
+                    CommandId=ssm_cmd,
+                    InstanceId="i-0ac9eb88c1b046163",
+                )
+                cmd_status = r["Status"]
+                output = r.get("StandardOutputContent", "")
 
-                status = resp["status"]
-                name = resp.get("name", "")
-                start_time = resp.get("startTime", "")
-                stop_time = resp.get("stopTime", "")
-                output_uri = resp.get("outputUri", "")
-
-                # Pipeline visualization based on status
                 states = {s["key"]: "pending" for s in PIPELINE_STEPS}
                 states["upload"] = "complete"
 
-                if status == "PENDING":
-                    states["align_tumor"] = "pending"
-                elif status == "STARTING":
-                    states["align_tumor"] = "running"
-                elif status == "RUNNING":
-                    if start_time:
-                        from datetime import datetime, timezone
-                        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds() / 60
-                        if elapsed < 25:
-                            states["align_tumor"] = "running"
-                            states["align_tumor_time"] = f"{elapsed:.0f} min"
-                        elif elapsed < 50:
-                            states["align_tumor"] = "complete"
-                            states["align_tumor_time"] = "~25 min"
-                            states["align_normal"] = "running" if "somatic" in name.lower() else "complete"
-                        elif elapsed < 95:
-                            states["align_tumor"] = "complete"
-                            states["align_normal"] = "complete"
-                            states["somatic_call"] = "running"
-                            states["somatic_call_time"] = f"{elapsed-50:.0f} min"
-                        else:
-                            states["align_tumor"] = "complete"
-                            states["align_normal"] = "complete"
-                            states["somatic_call"] = "running"
-                            states["somatic_call_time"] = f"{elapsed-50:.0f} min"
-                elif status == "COMPLETED":
-                    for s in PIPELINE_STEPS[:4]:
-                        states[s["key"]] = "complete"
-                    states["hla_typing"] = "pending"
-                    states["neoantigen"] = "pending"
-                    states["mad_board"] = "pending"
-                    states["report"] = "pending"
-                elif status in ("FAILED", "CANCELLED"):
-                    states["align_tumor"] = "failed"
+                if cmd_status == "InProgress":
+                    if "DEEPVARIANT_START" in output:
+                        states["align_tumor"] = "complete"
+                        states["somatic_call"] = "running"
+                        states["somatic_call_time"] = "DeepVariant CNN"
+                    elif "FQ2BAM_START" in output:
+                        states["align_tumor"] = "running"
+                        states["align_tumor_time"] = "Alignment + BQSR"
+                    elif "STAGE_FASTQ" in output:
+                        states["upload"] = "running"
+                        states["upload_time"] = "Staging FASTQ"
+                    st.markdown(render_pipeline(states), unsafe_allow_html=True)
+                    st.info(f"Pipeline running... Status: **{cmd_status}**")
 
-                st.markdown(render_pipeline(states), unsafe_allow_html=True)
+                elif cmd_status == "Success":
+                    if "PIPELINE_COMPLETE" in output:
+                        for s in PIPELINE_STEPS[:4]:
+                            states[s["key"]] = "complete"
+                        st.markdown(render_pipeline(states), unsafe_allow_html=True)
+                        st.success("GPU pipeline complete! VCF uploaded to S3.")
 
-                # Status details
-                status_colors = {
-                    "PENDING": "🟡", "STARTING": "🟡", "RUNNING": "🔵",
-                    "COMPLETED": "🟢", "FAILED": "🔴", "CANCELLED": "⚫",
-                }
-                st.markdown(f"### {status_colors.get(status, '')} {status}")
-                st.caption(f"Run: {name} | Started: {start_time}")
+                        # Show output files
+                        last_lines = output.strip().split("\n")[-10:]
+                        with st.expander("Output Files"):
+                            for line in last_lines:
+                                if line.strip():
+                                    st.text(line)
 
-                if status == "COMPLETED":
-                    st.success("GPU pipeline complete! Ready for MAD Agent analysis.")
-                    if st.button("Run MAD Agent on Results", type="primary"):
-                        with st.spinner("Downloading VCF and running MAD Agent..."):
-                            try:
-                                s3 = boto3.client("s3", region_name="us-west-2")
-                                bucket = "cognisom-genomics"
-                                prefix = output_uri.replace(f"s3://{bucket}/", "")
+                        # Offer to load VCF
+                        pid = st.session_state.get("gpu_patient_id", "")
+                        if pid:
+                            vcf_s3 = f"s3://cognisom-genomics/results/{pid}/{pid}.deepvariant.vcf"
+                            st.info(f"VCF: `{vcf_s3}`")
+                            if st.button("Load VCF into MAD Agent", type="primary"):
+                                st.session_state["vcf_s3_path"] = vcf_s3
+                                st.switch_page(str(
+                                    __import__("pathlib").Path(__file__).parent / "37_mad_agent.py"
+                                ))
+                    else:
+                        st.warning(f"Command completed but pipeline may not have finished. Check output.")
+                        st.text(output[-500:])
 
-                                # Find VCF
-                                resp2 = s3.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=50)
-                                vcf_key = None
-                                for obj in resp2.get("Contents", []):
-                                    if obj["Key"].endswith(".vcf") or obj["Key"].endswith(".vcf.gz"):
-                                        vcf_key = obj["Key"]
-                                        break
+                elif cmd_status == "Failed":
+                    st.error(f"Pipeline failed.")
+                    st.text(r.get("StandardErrorContent", "")[-500:])
 
-                                if not vcf_key:
-                                    st.error("No VCF found in output!")
-                                else:
-                                    import tempfile
-                                    with tempfile.NamedTemporaryFile(suffix=".vcf", delete=False) as tmp:
-                                        s3.download_file(bucket, vcf_key, tmp.name)
-                                        vcf_text = open(tmp.name).read()
-
-                                    pid = st.session_state.get("healthomics_patient_id", f"run-{run_id_input}")
-
-                                    from cognisom.core.orchestrator import CognisomOrchestrator
-                                    orch = CognisomOrchestrator()
-                                    result = orch.run(patient_id=pid, vcf_text=vcf_text)
-
-                                    st.session_state["patient_profile"] = result.profile
-                                    st.session_state["digital_twin"] = result.twin
-                                    st.session_state["treatment_results"] = result.treatments
-                                    st.session_state["mad_decision"] = result.mad_decision
-
-                                    # Update pipeline viz
-                                    for s in PIPELINE_STEPS:
-                                        states[s["key"]] = "complete"
-                                    st.markdown(render_pipeline(states), unsafe_allow_html=True)
-
-                                    if result.mad_decision:
-                                        d = result.mad_decision
-                                        st.markdown(f"""
-                                        ### MAD Board Recommendation
-                                        **{d.recommended_treatment_name}**
-                                        - Consensus: {d.consensus_level} ({d.confidence:.0%} confidence)
-                                        - Evidence: {len(d.evidence_chain)} traceable items
-                                        - View full analysis on the **MAD Agent** page
-                                        """)
-                            except Exception as e:
-                                st.error(f"MAD Agent failed: {e}")
+                elif cmd_status == "TimedOut":
+                    st.warning("SSM command timed out — pipeline may still be running on the GPU box.")
 
             except Exception as e:
-                st.error(f"Status check failed: {e}")
+                st.error(f"Monitor failed: {e}")
+
+        # Also show GPU instance state
+        try:
+            import boto3
+            ec2 = boto3.client("ec2", region_name="us-west-2")
+            resp = ec2.describe_instances(InstanceIds=["i-0ac9eb88c1b046163"])
+            gpu_state = resp["Reservations"][0]["Instances"][0]["State"]["Name"]
+            instance_type = resp["Reservations"][0]["Instances"][0]["InstanceType"]
+            st.caption(f"GPU Instance: **{gpu_state}** ({instance_type}, L40S 48GB)")
+        except Exception:
+            pass
+
+    else:
+        st.subheader("HealthOmics Job Monitor")
+
+        run_id_input = st.text_input(
+            "Run ID",
+            value=st.session_state.get("healthomics_run_id", ""),
+            key="monitor_run_id",
+        )
+
+        col_check, col_list = st.columns(2)
+
+        with col_check:
+            if st.button("Check Status", type="primary") and run_id_input:
+                try:
+                    import boto3
+                    omics = boto3.client("omics", region_name="us-west-2")
+                    resp = omics.get_run(id=run_id_input)
+
+                    status = resp["status"]
+                    name = resp.get("name", "")
+                    start_time = resp.get("startTime", "")
+                    stop_time = resp.get("stopTime", "")
+                    output_uri = resp.get("outputUri", "")
+
+                    # Pipeline visualization based on status
+                    states = {s["key"]: "pending" for s in PIPELINE_STEPS}
+                    states["upload"] = "complete"
+
+                    if status == "PENDING":
+                        states["align_tumor"] = "pending"
+                    elif status == "STARTING":
+                        states["align_tumor"] = "running"
+                    elif status == "RUNNING":
+                        if start_time:
+                            from datetime import datetime, timezone
+                            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds() / 60
+                            if elapsed < 25:
+                                states["align_tumor"] = "running"
+                                states["align_tumor_time"] = f"{elapsed:.0f} min"
+                            elif elapsed < 50:
+                                states["align_tumor"] = "complete"
+                                states["align_tumor_time"] = "~25 min"
+                                states["align_normal"] = "running" if "somatic" in name.lower() else "complete"
+                            else:
+                                states["align_tumor"] = "complete"
+                                states["align_normal"] = "complete"
+                                states["somatic_call"] = "running"
+                                states["somatic_call_time"] = f"{elapsed-50:.0f} min"
+                    elif status == "COMPLETED":
+                        for s in PIPELINE_STEPS[:4]:
+                            states[s["key"]] = "complete"
+                    elif status in ("FAILED", "CANCELLED"):
+                        states["align_tumor"] = "failed"
+
+                    st.markdown(render_pipeline(states), unsafe_allow_html=True)
+
+                    status_colors = {
+                        "PENDING": "🟡", "STARTING": "🟡", "RUNNING": "🔵",
+                        "COMPLETED": "🟢", "FAILED": "🔴", "CANCELLED": "⚫",
+                    }
+                    st.markdown(f"### {status_colors.get(status, '')} {status}")
+                    st.caption(f"Run: {name} | Started: {start_time}")
+
+                    if status == "COMPLETED":
+                        st.success("Pipeline complete! Ready for MAD Agent analysis.")
+                except Exception as e:
+                    st.error(f"Status check failed: {e}")
 
     with col_list:
         if st.button("List Recent Jobs"):

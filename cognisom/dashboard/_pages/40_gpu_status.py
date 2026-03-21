@@ -22,9 +22,195 @@ logger = logging.getLogger(__name__)
 
 st.title("GPU Pipeline Status")
 st.caption(
-    "Real-time monitoring of AWS HealthOmics Parabricks runs. "
-    "Track alignment, variant calling, and VCF output on GPU hardware."
+    "Real-time monitoring of GPU genomics pipelines. "
+    "Track alignment, variant calling, and VCF output."
 )
+
+# ── DNA Helix Progress Animation CSS ──
+st.markdown("""
+<style>
+@keyframes helixSpin {
+    0% { transform: rotateY(0deg); }
+    100% { transform: rotateY(360deg); }
+}
+@keyframes helixPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1.0; }
+}
+@keyframes strandBuild {
+    0% { height: 0%; }
+    100% { height: var(--progress, 50%); }
+}
+@keyframes basePairGlow {
+    0%, 100% { box-shadow: 0 0 3px rgba(0,212,170,0.3); }
+    50% { box-shadow: 0 0 12px rgba(0,212,170,0.8), 0 0 20px rgba(99,102,241,0.4); }
+}
+
+.dna-progress-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+    background: linear-gradient(135deg, #0a0a2e, #1a1a4e, #0a2a3e);
+    border-radius: 16px;
+    margin: 16px 0;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+}
+
+.dna-helix {
+    width: 60px;
+    height: 180px;
+    position: relative;
+    perspective: 400px;
+    transform-style: preserve-3d;
+    animation: helixSpin 4s linear infinite;
+}
+
+.base-pair {
+    position: absolute;
+    width: 50px;
+    height: 4px;
+    left: 5px;
+    border-radius: 2px;
+    transition: all 0.5s ease;
+}
+
+.base-pair.active {
+    animation: basePairGlow 2s ease-in-out infinite;
+}
+
+.base-pair.completed {
+    background: linear-gradient(90deg, #10b981, #00d4aa) !important;
+    box-shadow: 0 0 8px rgba(16,185,129,0.5);
+}
+
+.base-pair.pending {
+    background: rgba(255,255,255,0.08);
+}
+
+.base-pair.running {
+    background: linear-gradient(90deg, #3b82f6, #6366f1);
+    animation: basePairGlow 1.5s ease-in-out infinite;
+}
+
+.dna-progress-info {
+    text-align: left;
+    color: white;
+    flex: 1;
+    max-width: 400px;
+}
+
+.dna-progress-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, #00d4aa, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.dna-progress-status {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 12px;
+}
+
+.dna-progress-bar-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.dna-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00d4aa, #6366f1);
+    border-radius: 4px;
+    transition: width 1s ease;
+}
+
+.dna-progress-pct {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #00d4aa;
+}
+
+.dna-progress-stage {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+}
+
+.dna-bg-particle {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(0,212,170,0.2);
+    animation: helixPulse 3s ease-in-out infinite;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+def _render_dna_progress(progress_pct: int, stage: str, elapsed: str, status: str = "running"):
+    """Render animated DNA helix progress indicator."""
+    num_pairs = 12
+    pairs_html = ""
+    for i in range(num_pairs):
+        pair_pct = (i + 1) / num_pairs * 100
+        top = i * 15
+        # Sine wave offset for helix shape
+        import math
+        offset_x = math.sin(i * 0.5) * 15
+
+        if pair_pct <= progress_pct:
+            cls = "completed"
+        elif pair_pct <= progress_pct + 10:
+            cls = "running active"
+        else:
+            cls = "pending"
+
+        pairs_html += (
+            f'<div class="base-pair {cls}" style="top:{top}px;'
+            f'transform:translateX({offset_x:.0f}px) rotateY({i*30}deg);"></div>\n'
+        )
+
+    # Background particles
+    particles = ""
+    for i in range(8):
+        x = 10 + (i * 12) % 90
+        y = 5 + (i * 17) % 85
+        delay = i * 0.4
+        particles += f'<div class="dna-bg-particle" style="left:{x}%;top:{y}%;animation-delay:{delay}s;"></div>\n'
+
+    status_icon = {"running": "🧬", "complete": "✅", "failed": "❌", "pending": "⏳"}.get(status, "🧬")
+
+    html = f"""
+    <div class="dna-progress-container">
+        {particles}
+        <div class="dna-helix">
+            {pairs_html}
+        </div>
+        <div class="dna-progress-info">
+            <div class="dna-progress-title">{status_icon} Genomics Pipeline</div>
+            <div class="dna-progress-status">{stage}</div>
+            <div class="dna-progress-bar-bg">
+                <div class="dna-progress-bar-fill" style="width:{progress_pct}%;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <div class="dna-progress-pct">{progress_pct}%</div>
+                <div class="dna-progress-stage">{elapsed}</div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════
 # AWS CLIENT
@@ -211,13 +397,30 @@ if active_runs:
             except Exception as e:
                 st.caption(f"Could not fetch tasks: {e}")
 
-            # Progress indicator
+            # DNA Helix Progress Indicator
             if status == "RUNNING" and start:
                 elapsed_min = (datetime.now(timezone.utc) - start).total_seconds() / 60
-                # Estimate progress (30x WGS typically ~150 min)
-                estimated_total = 150
-                progress = min(elapsed_min / estimated_total, 0.99)
-                st.progress(progress, text=f"~{elapsed_min:.0f} / ~{estimated_total} min estimated")
+                estimated_total = 45  # ~45 min on L40S
+                progress_pct = min(int(elapsed_min / estimated_total * 100), 99)
+
+                # Determine current stage based on elapsed time
+                if elapsed_min < 5:
+                    stage = "Initializing GPU + loading reference genome..."
+                elif elapsed_min < 25:
+                    stage = "BWA-MEM alignment + coordinate sorting..."
+                elif elapsed_min < 35:
+                    stage = "Duplicate marking + Base Quality Score Recalibration..."
+                elif elapsed_min < 45:
+                    stage = "Variant calling (DeepVariant CNN inference)..."
+                else:
+                    stage = "Finalizing output + uploading results..."
+
+                _render_dna_progress(
+                    progress_pct=progress_pct,
+                    stage=stage,
+                    elapsed=_format_elapsed(start),
+                    status="running",
+                )
 
             # Output URI
             output_uri = detail.get("outputUri", "")
