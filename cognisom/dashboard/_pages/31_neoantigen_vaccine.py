@@ -340,6 +340,168 @@ else:
         "and non-coding regions."
     )
 
+# ── 3D Target Visualization ────────────────────────────────────
+st.divider()
+st.header("4. Target Structure Visualization")
+st.markdown(
+    "View the peptide-MHC complex in 3D. The immune system recognizes "
+    "tumor neoantigens when mutant peptides are presented in the MHC groove."
+)
+
+# Let user select which neoantigen to visualize
+viz_candidates = [n for n in neoantigens if n.is_weak_binder][:20]
+
+if viz_candidates:
+    viz_options = {
+        f"{n.source_gene} {n.mutation} | {n.peptide} | {n.best_hla_allele} | {n.binding_affinity_nm:.0f} nM": i
+        for i, n in enumerate(viz_candidates)
+    }
+
+    selected_label = st.selectbox(
+        "Select neoantigen to visualize",
+        options=list(viz_options.keys()),
+        help="Choose a neoantigen to see its peptide-MHC complex structure",
+    )
+
+    selected_neo = viz_candidates[viz_options[selected_label]]
+
+    col_viz_info, col_viz_btn = st.columns([3, 1])
+    with col_viz_info:
+        st.markdown(
+            f"**{selected_neo.source_gene}** {selected_neo.mutation} | "
+            f"Peptide: `{selected_neo.peptide}` | "
+            f"HLA: **{selected_neo.best_hla_allele}** | "
+            f"IC50: **{selected_neo.binding_affinity_nm:.1f} nM** "
+            f"({'Strong' if selected_neo.is_strong_binder else 'Weak'} binder) | "
+            f"Agretopicity: {selected_neo.agretopicity:.2f}"
+        )
+    with col_viz_btn:
+        build_clicked = st.button(
+            "Build 3D Structure",
+            type="primary",
+            use_container_width=True,
+            icon=":material/view_in_ar:",
+        )
+
+    if build_clicked or st.session_state.get("pmhc_structure"):
+        if build_clicked:
+            with st.spinner("Fetching peptide-MHC structure..."):
+                try:
+                    from cognisom.genomics.target_structure import TargetStructureBuilder
+                    builder = TargetStructureBuilder()
+                    structure = builder.build(selected_neo)
+                    st.session_state["pmhc_structure"] = structure
+                    st.session_state["pmhc_neoantigen"] = selected_neo
+                except Exception as e:
+                    st.error(f"Failed to build structure: {e}")
+                    structure = None
+        else:
+            structure = st.session_state.get("pmhc_structure")
+            selected_neo = st.session_state.get("pmhc_neoantigen", selected_neo)
+
+        if structure:
+            import streamlit.components.v1 as components
+
+            # Info banner
+            method_label = {
+                "rcsb_template": f"RCSB PDB template ({structure.template_pdb_id}, {structure.confidence}A resolution)",
+                "alphafold2_multimer": f"AlphaFold2-Multimer prediction (pLDDT: {structure.confidence:.0f})" if structure.confidence else "AlphaFold2-Multimer prediction",
+                "peptide_only": "Extended peptide (no MHC structure available)",
+            }.get(structure.method, structure.method)
+
+            st.info(f"Structure source: **{method_label}**")
+
+            # 3Dmol.js viewer with chain-specific styling
+            pdb_escaped = structure.pdb_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+
+            peptide_chain = structure.peptide_chain_id
+            mut_pos = selected_neo.mutation_position_in_peptide
+
+            viewer_html = f"""
+            <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+            <div id="pmhc-viewer" style="width: 100%; height: 550px;
+                 border-radius: 12px; overflow: hidden;
+                 border: 1px solid rgba(128,128,128,0.2);
+                 background: #0a0a2e;"></div>
+            <script>
+            (function() {{
+                var viewer = $3Dmol.createViewer("pmhc-viewer", {{
+                    backgroundColor: "0x0a0a2e"
+                }});
+
+                var pdbData = `{pdb_escaped}`;
+                viewer.addModel(pdbData, "pdb");
+
+                // MHC heavy chain (A) — semi-transparent surface
+                viewer.setStyle({{chain: "A"}}, {{
+                    cartoon: {{color: "0xcccccc", opacity: 0.6}}
+                }});
+                viewer.addSurface($3Dmol.SurfaceType.VDW, {{
+                    opacity: 0.15,
+                    color: "0xdddddd"
+                }}, {{chain: "A"}});
+
+                // Beta-2-microglobulin (B) — transparent ribbon
+                viewer.setStyle({{chain: "B"}}, {{
+                    cartoon: {{color: "0x6366f1", opacity: 0.3}}
+                }});
+
+                // Peptide chain — ball-and-stick, prominent
+                viewer.setStyle({{chain: "{peptide_chain}"}}, {{
+                    stick: {{radius: 0.25, colorscheme: "Jmol"}},
+                    sphere: {{radius: 0.5, colorscheme: "Jmol"}}
+                }});
+
+                // Highlight mutation position (red sphere)
+                viewer.addStyle(
+                    {{chain: "{peptide_chain}", resi: {mut_pos + 1}}},
+                    {{sphere: {{radius: 0.8, color: "0xff4444"}}}}
+                );
+
+                // Label the mutation
+                viewer.addLabel("{selected_neo.source_gene} {selected_neo.mutation}", {{
+                    position: {{x: 0, y: 0, z: 0}},
+                    backgroundColor: "0xff4444",
+                    backgroundOpacity: 0.8,
+                    fontColor: "white",
+                    fontSize: 14,
+                    showBackground: true
+                }}, {{chain: "{peptide_chain}", resi: {mut_pos + 1}}});
+
+                // Other chains (D, E, F...) — hide or de-emphasize
+                var allChains = "DEFGHIJKLMNOPQRSTUVWXYZ";
+                for (var i = 0; i < allChains.length; i++) {{
+                    viewer.setStyle({{chain: allChains[i]}}, {{
+                        cartoon: {{color: "0x444444", opacity: 0.15}}
+                    }});
+                }}
+
+                // Zoom to peptide
+                viewer.zoomTo({{chain: "{peptide_chain}"}}, 800);
+                viewer.spin("y", 0.3);
+                viewer.render();
+            }})();
+            </script>
+            """
+
+            components.html(viewer_html, height=570)
+
+            # Annotation below viewer
+            ann_col1, ann_col2, ann_col3, ann_col4 = st.columns(4)
+            ann_col1.metric("Peptide", selected_neo.peptide)
+            ann_col2.metric("HLA Allele", selected_neo.best_hla_allele)
+            ann_col3.metric("Binding (IC50)", f"{selected_neo.binding_affinity_nm:.1f} nM")
+            ann_col4.metric("Agretopicity", f"{selected_neo.agretopicity:.2f}")
+
+            st.caption(
+                f"Chain A (gray surface): MHC-I heavy chain | "
+                f"Chain B (purple ribbon): Beta-2-microglobulin | "
+                f"Chain {peptide_chain} (colored atoms): Neoantigen peptide | "
+                f"Red sphere: Mutation site ({selected_neo.mutation})"
+            )
+else:
+    st.info("No binding peptides available for visualization.")
+
 # ── Export ──────────────────────────────────────────────────────
 st.divider()
 with st.expander("Export Neoantigen Data"):

@@ -222,6 +222,68 @@ with tab_board:
             for w in decision.warnings:
                 st.warning(w)
 
+        # Neoantigen Target Visualization
+        profile_for_viz = st.session_state.get("patient_profile")
+        if profile_for_viz and profile_for_viz.predicted_neoantigens:
+            top_neos = [n for n in profile_for_viz.predicted_neoantigens if n.is_strong_binder][:3]
+            if not top_neos:
+                top_neos = [n for n in profile_for_viz.predicted_neoantigens if n.is_weak_binder][:3]
+
+            if top_neos:
+                st.subheader("Top Neoantigen Target")
+                neo = top_neos[0]
+                st.markdown(
+                    f"**{neo.source_gene}** {neo.mutation} | "
+                    f"Peptide: `{neo.peptide}` | "
+                    f"HLA: **{neo.best_hla_allele}** | "
+                    f"IC50: **{neo.binding_affinity_nm:.1f} nM**"
+                )
+                if st.button("View 3D Peptide-MHC Complex", icon=":material/view_in_ar:"):
+                    with st.spinner("Fetching structure from RCSB PDB..."):
+                        try:
+                            from cognisom.genomics.target_structure import TargetStructureBuilder
+                            builder = TargetStructureBuilder()
+                            structure = builder.build(neo)
+                            st.session_state["mad_pmhc_structure"] = structure
+                            st.session_state["mad_pmhc_neo"] = neo
+                        except Exception as e:
+                            st.error(f"Structure build failed: {e}")
+
+                if st.session_state.get("mad_pmhc_structure"):
+                    import streamlit.components.v1 as components
+                    s = st.session_state["mad_pmhc_structure"]
+                    n = st.session_state.get("mad_pmhc_neo", neo)
+                    pdb_esc = s.pdb_text.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+                    pc = s.peptide_chain_id
+                    mp = n.mutation_position_in_peptide
+
+                    html = f"""
+                    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+                    <div id="mad-pmhc" style="width:100%;height:400px;border-radius:12px;
+                         overflow:hidden;border:1px solid rgba(128,128,128,0.2);background:#0a0a2e;"></div>
+                    <script>
+                    (function(){{
+                        var v=$3Dmol.createViewer("mad-pmhc",{{backgroundColor:"0x0a0a2e"}});
+                        v.addModel(`{pdb_esc}`,"pdb");
+                        v.setStyle({{chain:"A"}},{{cartoon:{{color:"0xcccccc",opacity:0.5}}}});
+                        v.addSurface($3Dmol.SurfaceType.VDW,{{opacity:0.12,color:"0xdddddd"}},{{chain:"A"}});
+                        v.setStyle({{chain:"B"}},{{cartoon:{{color:"0x6366f1",opacity:0.25}}}});
+                        v.setStyle({{chain:"{pc}"}},{{stick:{{radius:0.25,colorscheme:"Jmol"}},sphere:{{radius:0.5,colorscheme:"Jmol"}}}});
+                        v.addStyle({{chain:"{pc}",resi:{mp+1}}},{{sphere:{{radius:0.8,color:"0xff4444"}}}});
+                        "DEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(function(c){{v.setStyle({{chain:c}},{{cartoon:{{color:"0x333333",opacity:0.1}}}});}});
+                        v.zoomTo({{chain:"{pc}"}},600);
+                        v.spin("y",0.3);
+                        v.render();
+                    }})();
+                    </script>
+                    """
+                    components.html(html, height=420)
+                    st.caption(
+                        f"Structure: {s.method} | "
+                        f"Template: {s.template_pdb_id or 'predicted'} | "
+                        f"Peptide chain: {pc}"
+                    )
+
         # Limitations
         with st.expander("Limitations & Disclaimers"):
             for lim in decision.limitations:
