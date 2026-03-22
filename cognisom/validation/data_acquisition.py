@@ -253,7 +253,7 @@ CONTROLLED_SOURCES = [
 REQUIRED_TOOLS = {
     "variant_calling": {
         "name": "NVIDIA Parabricks 4.3",
-        "docker": "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1",
+        "docker": "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1",
         "gpu_required": True,
         "min_gpu_ram": "24 GB (A10), 40 GB (A100) recommended",
         "status": "integrated",

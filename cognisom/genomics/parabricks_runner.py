@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 GPU_INSTANCE_ID = os.environ.get("GPU_INSTANCE_ID", "i-0ac9eb88c1b046163")
 GPU_REGION = os.environ.get("GPU_REGION", "us-west-2")
-PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
+PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1"
 REF_DIR = "/opt/cognisom/ref"
 JOBS_DIR = "/opt/cognisom/jobs"
 REF_FASTA = f"{REF_DIR}/Homo_sapiens_assembly38.fasta"

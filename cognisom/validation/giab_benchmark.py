@@ -167,7 +167,7 @@ class GIABBenchmarkRunner:
     FASTQ_DIR = "/opt/cognisom/benchmark/giab/wgs"
     OUTPUT_DIR = "/opt/cognisom/jobs/giab_benchmark"
     COMPARISON_DIR = "/opt/cognisom/benchmark/giab/comparison"
-    PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
+    PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1"
 
     # L40S cost: $1.836/hr on-demand (g6e.2xlarge)
     GPU_COST_PER_HOUR = 1.836

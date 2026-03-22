@@ -936,7 +936,7 @@ with tab_compare:
                         color: #10b981; margin-bottom: 0.5rem;">Self-Managed</div>
             <div style="font-size: 0.8rem; color: #94a3b8; text-align: center;">
                 NVIDIA L40S 48GB (g6e.2xlarge)<br>
-                Parabricks Docker 4.3.0-1<br>
+                Parabricks Docker 4.7.0-1<br>
                 BWA-MEM + DeepVariant<br>
                 <strong style="color: #10b981;">$1.84/hr on-demand</strong>
             </div>

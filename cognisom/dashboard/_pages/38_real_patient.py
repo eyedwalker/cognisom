@@ -347,7 +347,7 @@ docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/fastq/{patient_id}:/fastq \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun fq2bam \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-fq /fastq/tumor_R1.fastq.gz /fastq/tumor_R2.fastq.gz \\
@@ -362,7 +362,7 @@ docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/fastq/{patient_id}:/fastq \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun fq2bam \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-fq /fastq/normal_R1.fastq.gz /fastq/normal_R2.fastq.gz \\
@@ -376,7 +376,7 @@ echo "MUTECT2_START"
 docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun mutectcaller \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --tumor-name tumor \\
@@ -404,7 +404,7 @@ docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/fastq/{patient_id}:/fastq \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun fq2bam \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \\
@@ -418,7 +418,7 @@ echo "DEEPVARIANT_START"
 docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun deepvariant \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-bam /results/{patient_id}.bam \\
@@ -444,7 +444,7 @@ docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/fastq/{patient_id}:/fastq \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun fq2bam \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-fq /fastq/R1.fastq.gz /fastq/R2.fastq.gz \\
@@ -458,7 +458,7 @@ echo "DEEPVARIANT_START"
 docker run --rm --gpus all \\
   -v /opt/cognisom/ref:/ref \\
   -v /opt/cognisom/results/{patient_id}:/results \\
-  nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1 \\
+  nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1 \\
   pbrun deepvariant \\
     --ref /ref/Homo_sapiens_assembly38.fasta \\
     --in-bam /results/{patient_id}.bam \\

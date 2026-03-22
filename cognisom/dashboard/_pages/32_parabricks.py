@@ -154,7 +154,7 @@ with st.expander("System Readiness", expanded=(gpu_state != "running")):
                     '<div style="text-align:center">'
                     '<div style="font-size:2rem">\u2705</div>'
                     '<div style="font-size:0.8rem; font-weight:600; color:#10b981;">Parabricks</div>'
-                    '<div style="font-size:0.65rem; opacity:0.5;">v4.3.0-1</div></div>',
+                    '<div style="font-size:0.65rem; opacity:0.5;">v4.7.0-1</div></div>',
                     unsafe_allow_html=True)
             else:
                 st.markdown(

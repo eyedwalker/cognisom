@@ -70,7 +70,7 @@ REFERENCE_FILES = {
 }
 
 # Parabricks Docker image
-PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.3.0-1"
+PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1"
 
 
 class ReferenceSetup:
