@@ -89,3 +89,6 @@ models/*.xml
 data/
 *.csv
 *.tsv
+cognisom.pem
+cognisom.txt
+SESSION_STATE_*.md
