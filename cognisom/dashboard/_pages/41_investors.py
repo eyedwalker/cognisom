@@ -798,35 +798,11 @@ with cap1:
     """, unsafe_allow_html=True)
 
 with cap2:
-    st.markdown("""
-    <div class="inv-card" style="min-height: 220px;">
-        <div class="inv-card-title" style="margin-bottom: 1rem;">Fund Allocation</div>
-
-        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
-            <span>Platform Development</span>
-            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">40%</span>
-        </div>
-        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#00d4aa,#00d4aa);width:40%;"></div>
-
-        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
-            <span>Clinical Validation</span>
-            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">30%</span>
-        </div>
-        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#6366f1,#6366f1);width:30%;"></div>
-
-        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
-            <span>Regulatory &amp; Quality</span>
-            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">15%</span>
-        </div>
-        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#818cf8,#818cf8);width:15%;"></div>
-
-        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
-            <span>Team &amp; Operations</span>
-            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">15%</span>
-        </div>
-        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,rgba(255,255,255,0.3),rgba(255,255,255,0.3));width:15%;"></div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("**Fund Allocation**")
+    st.progress(40, text="Platform Development — 40%")
+    st.progress(30, text="Clinical Validation — 30%")
+    st.progress(15, text="Regulatory & Quality — 15%")
+    st.progress(15, text="Team & Operations — 15%")
 
 
 # ═══════════════════════════════════════════════════════════════════
