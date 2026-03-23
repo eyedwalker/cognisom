@@ -160,16 +160,12 @@ elif data_source == "SEQC2 Breast Cancer (Real Somatic)":
 - **Source**: ENA/SRA (SRR7890943 + SRR7890944)
         """)
     try:
-        import boto3
-        _s3 = boto3.client("s3", region_name="us-west-2")
-        _resp = _s3.get_object(
-            Bucket="cognisom-genomics",
-            Key="results/SEQC2-HCC1395-WES/SEQC2-HCC1395-drivers.vcf",
-        )
-        vcf_text = _resp["Body"].read().decode("utf-8", errors="replace")
+        from pathlib import Path
+        _vcf_path = Path(__file__).resolve().parent.parent.parent / "genomics" / "seqc2_demo.vcf"
+        vcf_text = _vcf_path.read_text()
         st.success(f"Loaded SEQC2 somatic VCF: {len(vcf_text)//1024} KB, 1,468 driver variants")
     except Exception as e:
-        st.error(f"Failed to load SEQC2 data from S3: {e}")
+        st.error(f"Failed to load SEQC2 data: {e}")
         vcf_text = None
 
 elif data_source == "Upload VCF File":
