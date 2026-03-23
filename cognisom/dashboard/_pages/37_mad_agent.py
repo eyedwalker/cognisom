@@ -279,11 +279,28 @@ with tab_board:
             for alt in decision.alternative_treatments:
                 st.write(f"- {BoardModerator._get_display_name(alt)}")
 
-        # Warnings
+        # Warnings (with descriptions)
         if decision.warnings:
-            st.subheader("Warnings")
+            st.subheader("Clinical Considerations")
+            _warning_descriptions = {
+                "MAD-001": ("Variant Coverage", "Limited number of coding variants detected. TMB estimate may have wider confidence interval. Consider whether sequencing panel size or tumor purity could affect variant detection."),
+                "MAD-002": ("HLA Data", "HLA typing not available from sequencing data. Neoantigen predictions use population-frequency HLA assignment. For clinical use, confirm HLA type with dedicated typing assay."),
+                "MAD-003": ("Immune Classification", "Immune microenvironment classification confidence is below threshold. Spatial transcriptomics or immunohistochemistry may provide more reliable assessment."),
+                "MAD-004": ("Conflicting Biomarkers", "Contradictory biomarker signals detected (e.g., MSI-H with low TMB). Recommend confirmatory testing before treatment selection."),
+                "MAD-005": ("No Actionable Targets", "No established biomarker-drug associations found at FDA evidence levels 1-2. Consider clinical trial enrollment or expanded molecular profiling."),
+                "MAD-006": ("Agent Disagreement", "The three specialist agents did not reach majority consensus on the top treatment. This reflects genuine clinical complexity — review each agent's rationale above to understand the trade-offs."),
+                "MAD-007": ("Data Provenance", "Reference genome version, annotation source, or input data hash could not be fully verified. Ensure data integrity for clinical decision-making."),
+                "MAD-008": ("Tumor-Only Analysis", "Running without matched normal sample. Somatic variant calls may include germline variants (estimated 30% higher false positive rate). Matched tumor-normal is recommended."),
+                "MAD-009": ("Simulation Issue", "Treatment response simulation could not complete for one or more regimens. Results may be incomplete."),
+                "MAD-010": ("Entity Library", "Entity library not accessible. Using built-in fallback parameters for simulation."),
+            }
             for w in decision.warnings:
-                st.warning(w)
+                title, desc = _warning_descriptions.get(w, (w, ""))
+                if desc:
+                    with st.expander(f"{w}: {title}"):
+                        st.markdown(desc)
+                else:
+                    st.warning(w)
 
         # Neoantigen Target Visualization
         profile_for_viz = st.session_state.get("patient_profile")
