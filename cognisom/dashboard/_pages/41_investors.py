@@ -371,23 +371,23 @@ footer {visibility: hidden;}
 # ── Hero ───────────────────────────────────────────────────────────
 st.markdown("""
 <div class="inv-hero">
-    <p class="inv-hero-title">Cognisom Therapeutics</p>
-    <p class="inv-hero-sub">Investor Overview</p>
+    <p class="inv-hero-title">Cognisom</p>
+    <p class="inv-hero-sub">The Operating System for Decentralized Precision Oncology</p>
     <p class="inv-hero-byline">eyentelligence inc. &mdash; Confidential</p>
 </div>
 """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SECTION 1: THE OPPORTUNITY
+# SECTION 1: WHY THIS OPPORTUNITY MATTERS
 # ═══════════════════════════════════════════════════════════════════
 
 st.markdown("""
-<div class="inv-section">The Opportunity</div>
+<div class="inv-section">Why This Opportunity Matters</div>
 <div class="inv-line"></div>
 """, unsafe_allow_html=True)
 
-opp1, opp2, opp3 = st.columns(3)
+opp1, opp2 = st.columns(2)
 
 with opp1:
     st.markdown("""
@@ -395,9 +395,8 @@ with opp1:
         <div class="inv-stat-val" style="font-size: 2.2rem;">$200B+</div>
         <div class="inv-stat-label" style="margin-bottom: 0.8rem;">Immunotherapy market by 2030</div>
         <div class="inv-card-text">
-            Immuno-oncology is the fastest-growing segment in oncology,
-            driven by checkpoint inhibitors, cell therapies, and
-            personalized cancer vaccines.
+            Large and growing oncology market driven by checkpoint inhibitors,
+            cell therapies, and personalized cancer vaccines.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -405,111 +404,111 @@ with opp1:
 with opp2:
     st.markdown("""
     <div class="inv-card">
-        <div class="inv-stat-val" style="font-size: 2.2rem;">~25%</div>
-        <div class="inv-stat-label" style="margin-bottom: 0.8rem;">Patients who respond today</div>
+        <div class="inv-card-title">Fragmented Infrastructure</div>
         <div class="inv-card-text">
-            Immunotherapy only works for roughly 1 in 4 patients.
-            The other 75% face trial-and-error medicine because
-            current tools cannot reconcile each patient's unique
-            tumor biology with the immune system's complexity.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with opp3:
-    st.markdown("""
-    <div class="inv-card">
-        <div class="inv-stat-val" style="font-size: 2.2rem;">75%</div>
-        <div class="inv-stat-label" style="margin-bottom: 0.8rem;">Addressable gap</div>
-        <div class="inv-card-text">
-            Cognisom is an AI evidence platform that makes immunotherapy
-            effective for the other 75% &mdash; by giving clinicians
-            the molecular intelligence they need to match the right
-            patient to the right therapy, with traceable evidence.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ═══════════════════════════════════════════════════════════════════
-# SECTION 2: THE SOLUTION
-# ═══════════════════════════════════════════════════════════════════
-
-st.markdown("""
-<div class="inv-section">The Solution</div>
-<div class="inv-line"></div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-Cognisom is an **AI precision-oncology intelligence and evidence platform** that transforms
-raw patient DNA into actionable, evidence-traced treatment recommendations.
-""")
-
-sol1, sol2 = st.columns(2)
-
-with sol1:
-    st.markdown("""
-    <div class="inv-card">
-        <div class="inv-card-title">Matched Tumor-Normal Analysis</div>
-        <div class="inv-card-text">
-            Gold-standard somatic variant calling from matched tumor + germline
-            sequencing. GPU-accelerated via NVIDIA Parabricks on AWS HealthOmics.
-            Full pipeline: alignment, variant calling, HLA typing, neoantigen
-            prediction &mdash; in under 90 minutes for 30x WGS.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with sol2:
-    st.markdown("""
-    <div class="inv-card">
-        <div class="inv-card-title">MAD Agent: AI Molecular Tumor Board</div>
-        <div class="inv-card-text">
-            Three specialist AI agents (Genomics, Immune, Clinical) deliberate
-            on each case and produce a consensus recommendation with full
-            evidence chain, dissent tracking, and audit trail &mdash; designed
-            for independent clinician review.
+            Precision medicine infrastructure remains fragmented.
+            AI can improve interpretation and operational coordination
+            across the oncology workflow.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<div style='height: 0.8rem'></div>", unsafe_allow_html=True)
 
-sol3, sol4 = st.columns(2)
+opp3, opp4 = st.columns(2)
 
-with sol3:
+with opp3:
     st.markdown("""
     <div class="inv-card">
-        <div class="inv-card-title">Evidence-Traced Recommendations</div>
+        <div class="inv-card-title">Decentralized Execution</div>
         <div class="inv-card-text">
-            Every recommendation links back to its source: OncoKB evidence levels,
-            MHCflurry binding scores, published clinical trial data, and
-            ClinicalTrials.gov matching. Clinicians can independently verify
-            every step in the reasoning chain.
+            Decentralized execution models could reshape delivery economics,
+            bringing precision oncology closer to where patients are treated.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-with sol4:
+with opp4:
     st.markdown("""
     <div class="inv-card">
-        <div class="inv-card-title">FDA 2026 AI Credibility Framework</div>
+        <div class="inv-card-title">Outcome-Aligned Finance</div>
         <div class="inv-card-text">
-            Designed from the ground up as a Non-Device Clinical Decision Support
-            tool under the FDA's 2026 AI Credibility Framework. Context of Use
-            documentation, model cards, data provenance, and full audit trail
-            are built into the platform architecture.
+            Outcome-aligned financial structures could unlock payer relevance,
+            connecting clinical decision-making with reimbursement accountability.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SECTION 3: TRACTION & VALIDATION
+# SECTION 2: INVESTMENT THESIS
 # ═══════════════════════════════════════════════════════════════════
 
 st.markdown("""
-<div class="inv-section">Traction & Validation</div>
+<div class="inv-section">Investment Thesis</div>
+<div class="inv-section-sub">An integrated approach to a massive market</div>
+<div class="inv-line"></div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+Cognisom is designed around the belief that the next major opportunity in oncology is not just
+inventing a therapy, but building the infrastructure that makes individualized therapy more
+**actionable**, **scalable**, and **accountable**.
+""")
+
+pil1, pil2, pil3 = st.columns(3)
+
+with pil1:
+    st.markdown("""
+    <div class="inv-card">
+        <div class="inv-card-title">Cognisom</div>
+        <div style="font-size: 0.75rem; color: #00d4aa; font-weight: 600;
+                    text-transform: uppercase; letter-spacing: 0.5px;
+                    margin-bottom: 0.6rem;">Data & Intelligence Layer</div>
+        <div class="inv-card-text">
+            AI-guided molecular interpretation built on matched tumor-normal
+            analysis, multimodal biological data, and compounding oncology insight.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with pil2:
+    st.markdown("""
+    <div class="inv-card">
+        <div class="inv-card-title">Cognisom Therapeutics</div>
+        <div style="font-size: 0.75rem; color: #6366f1; font-weight: 600;
+                    text-transform: uppercase; letter-spacing: 0.5px;
+                    margin-bottom: 0.6rem;">Execution & Manufacturing Readiness</div>
+        <div class="inv-card-text">
+            A workflow and quality framework designed to support partner-enabled
+            therapeutic execution now and distributed manufacturing integration
+            in the future.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with pil3:
+    st.markdown("""
+    <div class="inv-card">
+        <div class="inv-card-title">Cognisom Assurance</div>
+        <div style="font-size: 0.75rem; color: #818cf8; font-weight: 600;
+                    text-transform: uppercase; letter-spacing: 0.5px;
+                    margin-bottom: 0.6rem;">Risk & Payment Alignment</div>
+        <div class="inv-card-text">
+            A model designed to connect oncology decision-making with financial
+            accountability, predictive triage, and future outcome-aligned
+            reimbursement structures.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SECTION 3: PLATFORM VALIDATION
+# ═══════════════════════════════════════════════════════════════════
+
+st.markdown("""
+<div class="inv-section">Platform Validation</div>
 <div class="inv-line"></div>
 """, unsafe_allow_html=True)
 
@@ -676,13 +675,12 @@ with bm1:
     <div class="inv-card">
         <div class="inv-card-title">Cognisom Clinical</div>
         <div class="inv-card-text" style="margin-bottom: 0.8rem;">
-            SaaS for molecular tumor boards. Per-patient, per-analysis pricing.
-            Evidence-traced recommendations that integrate into existing
-            clinical workflows. Designed for CLIA/CAP lab partnerships.
+            AI-guided molecular interpretation to support clinically informed
+            therapy selection. Designed for independent clinician review.
         </div>
         <div style="font-size: 0.75rem; color: #00d4aa; font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.5px;">
-            Near-term revenue
+            Interpretation & Decision Support
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -692,13 +690,13 @@ with bm2:
     <div class="inv-card">
         <div class="inv-card-title">Cognisom Sponsor</div>
         <div class="inv-card-text" style="margin-bottom: 0.8rem;">
-            Evidence-as-a-Service for biopharma. Trial enrichment
-            (identify likely responders), companion diagnostics support,
-            and real-world evidence packages for regulatory submissions.
+            Evidence-as-a-Service helping biopharma with biomarker strategy,
+            patient stratification, trial enrichment, companion-diagnostic
+            support, and RWD/RWE packages.
         </div>
         <div style="font-size: 0.75rem; color: #6366f1; font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.5px;">
-            High-margin contracts
+            Biopharma Evidence Services
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -708,14 +706,13 @@ with bm3:
     <div class="inv-card">
         <div class="inv-card-title">Cognisom Therapeutics</div>
         <div class="inv-card-text" style="margin-bottom: 0.8rem;">
-            Future expansion into AI-guided therapeutic design.
-            Neoantigen vaccine candidate selection, combination therapy
-            optimization, and target identification from digital twin
-            simulations.
+            Execution and manufacturing readiness. Partner-enabled therapeutic
+            workflow. Future distributed manufacturing integration as
+            technologies mature.
         </div>
-        <div style="font-size: 0.75rem; color: rgba(255,255,255,0.35);
+        <div style="font-size: 0.75rem; color: #818cf8; font-weight: 600;
                     text-transform: uppercase; letter-spacing: 0.5px;">
-            Long-term upside
+            Execution & Manufacturing
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -776,7 +773,64 @@ st.markdown("""
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SECTION 7: 12-MONTH ROADMAP
+# SECTION 7: USE OF CAPITAL
+# ═══════════════════════════════════════════════════════════════════
+
+st.markdown("""
+<div class="inv-section">What Early Capital Supports</div>
+<div class="inv-line"></div>
+""", unsafe_allow_html=True)
+
+cap1, cap2 = st.columns([1, 2])
+
+with cap1:
+    st.markdown("""
+    <div class="inv-card">
+        <div class="inv-card-title">Focus Areas</div>
+        <div class="inv-card-text" style="line-height: 2.2;">
+            &bull; Platform and workflow development<br>
+            &bull; Clinical and scientific partnerships<br>
+            &bull; Regulatory and quality architecture<br>
+            &bull; Validation and partner readiness<br>
+            &bull; Corporate, IP, and operating infrastructure
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with cap2:
+    st.markdown("""
+    <div class="inv-card" style="min-height: 220px;">
+        <div class="inv-card-title" style="margin-bottom: 1rem;">Fund Allocation</div>
+
+        <div class="inv-fund-label">
+            <span>Platform Development</span>
+            <span class="inv-fund-pct">40%</span>
+        </div>
+        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #00d4aa 0%, #00d4aa 100%); width: 40%;"></div>
+
+        <div class="inv-fund-label">
+            <span>Clinical Validation</span>
+            <span class="inv-fund-pct">30%</span>
+        </div>
+        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #6366f1 0%, #6366f1 100%); width: 30%;"></div>
+
+        <div class="inv-fund-label">
+            <span>Regulatory & Quality</span>
+            <span class="inv-fund-pct">15%</span>
+        </div>
+        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #818cf8 0%, #818cf8 100%); width: 15%;"></div>
+
+        <div class="inv-fund-label">
+            <span>Team & Operations</span>
+            <span class="inv-fund-pct">15%</span>
+        </div>
+        <div class="inv-fund-bar" style="background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 100%); width: 15%;"></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SECTION 8: 12-MONTH ROADMAP
 # ═══════════════════════════════════════════════════════════════════
 
 st.markdown("""
@@ -827,7 +881,7 @@ with rm2:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SECTION 8: TEAM
+# SECTION 9: TEAM
 # ═══════════════════════════════════════════════════════════════════
 
 st.markdown("""
@@ -872,90 +926,20 @@ with team2:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# SECTION 9: THE ASK
+# SECTION 10: CURRENT FOCUS
 # ═══════════════════════════════════════════════════════════════════
 
 st.markdown("""
-<div class="inv-section">The Ask</div>
-<div class="inv-line"></div>
-""", unsafe_allow_html=True)
-
-ask1, ask2 = st.columns([1, 2])
-
-with ask1:
-    st.markdown("""
-    <div class="inv-card" style="text-align: center; display: flex; flex-direction: column;
-                justify-content: center; min-height: 220px;">
-        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-color, #e2e8f0);
-                    margin-bottom: 0.3rem;">Seed Round</div>
-        <div style="font-size: 0.85rem; color: var(--text-color, rgba(255,255,255,0.5));
-                    opacity: 0.6; margin-bottom: 1.2rem;">
-            Pre-revenue, post-validation
-        </div>
-        <div style="font-size: 0.9rem; color: #00d4aa; font-weight: 600;">
-            Contact for details
-        </div>
-        <div style="font-size: 0.75rem; color: var(--text-color, rgba(255,255,255,0.4));
-                    margin-top: 0.3rem;">
-            david@cognisom.com
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with ask2:
-    st.markdown("""
-    <div class="inv-card" style="min-height: 220px;">
-        <div class="inv-card-title" style="margin-bottom: 1rem;">Use of Funds</div>
-
-        <div class="inv-fund-label">
-            <span>Platform Development</span>
-            <span class="inv-fund-pct">40%</span>
-        </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #00d4aa 0%, #00d4aa 100%); width: 40%;"></div>
-
-        <div class="inv-fund-label">
-            <span>Clinical Validation</span>
-            <span class="inv-fund-pct">30%</span>
-        </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #6366f1 0%, #6366f1 100%); width: 30%;"></div>
-
-        <div class="inv-fund-label">
-            <span>Regulatory & Compliance</span>
-            <span class="inv-fund-pct">15%</span>
-        </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #818cf8 0%, #818cf8 100%); width: 15%;"></div>
-
-        <div class="inv-fund-label">
-            <span>Team & Operations</span>
-            <span class="inv-fund-pct">15%</span>
-        </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 100%); width: 15%;"></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ═══════════════════════════════════════════════════════════════════
-# SECTION 10: PITCH DECK
-# ═══════════════════════════════════════════════════════════════════
-
-st.markdown("""
-<div class="inv-section">Pitch Deck</div>
+<div class="inv-section">Current Focus</div>
 <div class="inv-line"></div>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="inv-card" style="text-align: center; padding: 2.5rem 2rem;">
-    <div style="font-size: 0.9rem; color: var(--text-color, rgba(255,255,255,0.6));
-                margin-bottom: 0.5rem;">
-        Pitch deck available upon request
-    </div>
-    <div style="font-size: 1rem; color: #00d4aa; font-weight: 600;">
-        david@cognisom.com
-    </div>
-    <div style="font-size: 0.75rem; color: var(--text-color, rgba(255,255,255,0.35));
-                margin-top: 0.8rem;">
-        Full deck includes detailed financials, technical architecture deep-dive,
-        clinical validation methodology, and regulatory strategy.
+    <div class="inv-card-text" style="font-size: 0.95rem; opacity: 0.85; max-width: 700px; margin: 0 auto;">
+        Cognisom is currently focused on platform formation, strategic partnerships,
+        workflow architecture, and validation planning to support long-term execution
+        across its three core platform pillars.
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -967,8 +951,11 @@ st.markdown("""
 
 st.markdown("""
 <div class="inv-contact">
-    <div class="inv-contact-title">Get in Touch</div>
-    <div class="inv-contact-sub">We welcome conversations with aligned investors and strategic partners.</div>
+    <div class="inv-contact-title">Request the Investor Deck</div>
+    <div class="inv-contact-sub">
+        We welcome conversations with cancer centers, translational researchers,
+        manufacturers, payer organizations, strategic investors, and infrastructure partners.
+    </div>
     <div style="margin-bottom: 0.8rem;">
         <a href="mailto:david@cognisom.com" class="inv-contact-link">david@cognisom.com</a>
     </div>
@@ -983,6 +970,6 @@ st.markdown("""
 
 st.markdown("""
 <div class="inv-footer">
-    Confidential &mdash; For intended recipients only. &copy; 2026 eyentelligence inc.
+    Confidential &mdash; For intended recipients only.
 </div>
 """, unsafe_allow_html=True)

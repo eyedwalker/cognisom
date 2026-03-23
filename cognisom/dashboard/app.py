@@ -1276,6 +1276,17 @@ Normal FASTQ <span class="arch-dim">─┘</span>  (4 GPUs, 48 CPUs, 179 GB)    
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Investor note ──────────────────────────────────────────────
+    st.markdown("""
+    <div style="text-align: center; margin: 2rem 0 0.5rem 0; padding: 0.8rem 1.2rem;
+                font-size: 0.82rem; color: var(--text-color, rgba(255,255,255,0.45));
+                letter-spacing: 0.3px;">
+        <span style="opacity: 0.6;">Investors:</span>
+        Sign in and navigate to <span style="opacity: 0.7;">Admin &rarr; Investor Overview</span>
+        <span style="opacity: 0.5;">(access code required)</span>
+    </div>
+    """, unsafe_allow_html=True)
+
     # ── Sign In / Register ─────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
