@@ -23,7 +23,7 @@ from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("26_genomic_twin")
 
 from cognisom.genomics.vcf_parser import VCFParser
-from cognisom.genomics.variant_annotator import VariantAnnotator, PROSTATE_CANCER_DRIVERS
+from cognisom.genomics.variant_annotator import VariantAnnotator, ALL_CANCER_DRIVERS
 from cognisom.genomics.patient_profile import PatientProfileBuilder, PatientProfile
 from cognisom.genomics.synthetic_vcf import get_synthetic_vcf, get_synthetic_profile_description
 
@@ -107,12 +107,24 @@ with st.sidebar:
 
     data_source = st.radio(
         "Choose data source:",
-        ["Synthetic Demo (Prostate Cancer)", "Upload VCF File", "Paste VCF Text"],
+        [
+            "Synthetic Demo (Prostate Cancer)",
+            "SEQC2 Breast Cancer (Real Somatic)",
+            "Upload VCF File",
+            "Paste VCF Text",
+        ],
         index=0,
     )
 
-    patient_id = st.text_input("Patient ID", value="COGNISOM-DEMO-001")
-    cancer_type = st.selectbox("Cancer Type", ["prostate"], index=0)
+    patient_id = st.text_input(
+        "Patient ID",
+        value="SEQC2-HCC1395" if "SEQC2" in data_source else "COGNISOM-DEMO-001",
+    )
+    cancer_type = st.selectbox(
+        "Cancer Type",
+        ["prostate", "breast", "lung", "colorectal", "melanoma", "pan-cancer"],
+        index=1 if "SEQC2" in data_source else 0,
+    )
 
     st.divider()
     st.header("Analysis Options")
@@ -133,6 +145,32 @@ if data_source == "Synthetic Demo (Prostate Cancer)":
     vcf_text = get_synthetic_vcf()
     with st.expander("About Synthetic Demo Data", expanded=False):
         st.markdown(get_synthetic_profile_description())
+
+elif data_source == "SEQC2 Breast Cancer (Real Somatic)":
+    with st.expander("About SEQC2 HCC1395 Data", expanded=True):
+        st.markdown("""
+**Real matched tumor-normal somatic analysis** from the FDA SEQC2 consortium.
+
+- **Tumor**: HCC1395 (breast cancer cell line)
+- **Normal**: HCC1395BL (matched lymphoblastoid)
+- **Pipeline**: Parabricks 4.7.0-1 on NVIDIA L40S GPU
+  - fq2bam alignment (tumor + normal)
+  - Mutectcaller somatic variant calling
+- **Result**: 1,468 variants in 35 cancer driver genes
+- **Source**: ENA/SRA (SRR7890943 + SRR7890944)
+        """)
+    try:
+        import boto3
+        _s3 = boto3.client("s3", region_name="us-west-2")
+        _resp = _s3.get_object(
+            Bucket="cognisom-genomics",
+            Key="results/SEQC2-HCC1395-WES/SEQC2-HCC1395-drivers.vcf",
+        )
+        vcf_text = _resp["Body"].read().decode("utf-8", errors="replace")
+        st.success(f"Loaded SEQC2 somatic VCF: {len(vcf_text)//1024} KB, 1,468 driver variants")
+    except Exception as e:
+        st.error(f"Failed to load SEQC2 data from S3: {e}")
+        vcf_text = None
 
 elif data_source == "Upload VCF File":
     uploaded = st.file_uploader(
@@ -435,7 +473,7 @@ else:
     )
 
     gene_data = []
-    for gene, info in PROSTATE_CANCER_DRIVERS.items():
+    for gene, info in ALL_CANCER_DRIVERS.items():
         gene_data.append({
             "Gene": gene,
             "Full Name": info["full_name"],
