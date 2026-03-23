@@ -99,7 +99,7 @@ with st.sidebar:
                         hla_alleles=_data["hla_alleles"],
                         affected_genes=_data["driver_genes_found"],
                         cancer_driver_mutations=[
-                            Variant(chrom="", pos=0, ref="", alt="", gene=g, is_cancer_driver=True)
+                            Variant(chrom="", pos=0, id=".", ref="", alt="", qual=0, filter_status=".", gene=g, is_cancer_driver=True)
                             for g in _data["driver_genes_found"]
                         ],
                         predicted_neoantigens=[
