@@ -108,7 +108,87 @@ if user is not None:
     }
     nav = st.navigation(pages)
 
-    # Sidebar user info (visible on all authenticated pages)
+    # ── Patient Data Loader (TOP of sidebar, visible on all pages) ──
+    _profile = st.session_state.get("patient_profile")
+    if _profile:
+        st.sidebar.markdown(
+            f'<div style="background:linear-gradient(135deg,rgba(0,212,170,0.1),rgba(99,102,241,0.1));'
+            f'border:1px solid rgba(0,212,170,0.2);border-radius:8px;padding:0.6rem 0.8rem;margin-bottom:0.5rem;">'
+            f'<div style="font-size:0.75rem;opacity:0.5;text-transform:uppercase;letter-spacing:1px;">Patient Loaded</div>'
+            f'<div style="font-weight:700;font-size:0.95rem;">{_profile.patient_id}</div>'
+            f'<div style="font-size:0.75rem;opacity:0.6;">'
+            f'TMB: {_profile.tumor_mutational_burden:.1f} | '
+            f'Drivers: {len(_profile.cancer_driver_mutations)} | '
+            f'Neoantigens: {len(_profile.predicted_neoantigens)}'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        _demo_choice = st.sidebar.radio(
+            "Load Patient",
+            ["Synthetic Demo (Prostate)", "SEQC2 HCC1395 (Real Breast Cancer)"],
+            key="global_demo_choice",
+            label_visibility="collapsed",
+        )
+        if st.sidebar.button("Load Patient", type="primary", key="global_load", use_container_width=True):
+            with st.sidebar:
+                with st.spinner("Loading..."):
+                    from cognisom.genomics.patient_profile import PatientProfileBuilder, PatientProfile
+                    from cognisom.genomics.synthetic_vcf import get_synthetic_vcf
+                    from cognisom.genomics.twin_config import DigitalTwinConfig
+                    from cognisom.genomics.treatment_simulator import TreatmentSimulator
+                    from cognisom.genomics.neoantigen_predictor import Neoantigen
+                    from cognisom.genomics.vcf_parser import Variant
+
+                    if "SEQC2" in _demo_choice:
+                        import json
+                        _json_path = _pages_dir.parent / "genomics" / "seqc2_precomputed.json"
+                        _data = json.loads(_json_path.read_text())
+                        _profile = PatientProfile(
+                            patient_id=_data["patient_id"], cancer_type=_data["cancer_type"],
+                            tumor_mutational_burden=_data["tmb"], hla_alleles=_data["hla_alleles"],
+                            affected_genes=_data["driver_genes_found"],
+                            cancer_driver_mutations=[
+                                Variant(chrom="", pos=0, id=".", ref="", alt="", qual=0,
+                                        filter_status=".", gene=g, is_cancer_driver=True)
+                                for g in _data["driver_genes_found"]
+                            ],
+                            predicted_neoantigens=[
+                                Neoantigen(
+                                    peptide=n["peptide"], wild_type_peptide="",
+                                    source_gene=n.get("source_gene", n.get("gene", "")),
+                                    mutation=n.get("mutation", ""),
+                                    protein_change=n.get("mutation", ""),
+                                    mutation_position_in_peptide=4, peptide_length=len(n["peptide"]),
+                                    best_hla_allele=n.get("best_hla_allele", n.get("hla", "")),
+                                    binding_affinity_nm=n.get("binding_affinity_nm", n.get("ic50_nm", 999)),
+                                    percentile_rank=n.get("percentile_rank", 1.0),
+                                    is_strong_binder=n.get("is_strong_binder", False),
+                                    is_weak_binder=n.get("is_weak_binder", False),
+                                    binding_level=n.get("binding_level", "weak"),
+                                    agretopicity=n.get("agretopicity", 1.0),
+                                    vaccine_priority=i+1, include_in_vaccine=n.get("include_in_vaccine", False),
+                                )
+                                for i, n in enumerate(_data["neoantigens"])
+                            ],
+                        )
+                    else:
+                        _builder = PatientProfileBuilder()
+                        _profile = _builder.from_vcf_text(get_synthetic_vcf(), "COGNISOM-DEMO-001")
+
+                    _twin = DigitalTwinConfig.from_profile_only(_profile)
+                    _sim = TreatmentSimulator()
+                    _rec = _sim.get_recommended_treatments(_twin)
+                    _results = _sim.compare_treatments(_rec, _twin)
+
+                    st.session_state["patient_profile"] = _profile
+                    st.session_state["digital_twin"] = _twin
+                    st.session_state["treatment_results"] = _results
+            st.rerun()
+
+    st.sidebar.divider()
+
+    # Sidebar user info
     st.sidebar.markdown(f"**{st.session_state.get('username', 'user')}**")
     st.sidebar.markdown(
         '<span style="color: #f97316; font-weight: 600; font-size: 0.7rem;">BETA</span>'
