@@ -71,12 +71,27 @@ with st.sidebar:
         st.caption(f"TMB: {profile.tumor_mutational_burden:.1f} | "
                    f"Drivers: {len(profile.cancer_driver_mutations)}")
     else:
-        st.info("No patient loaded. Use synthetic demo or load from Page 26.")
-        if st.button("Load Synthetic Demo Patient", type="primary"):
+        st.info("No patient loaded.")
+
+        demo_choice = st.radio(
+            "Load patient:",
+            ["Synthetic Demo (Prostate)", "SEQC2 HCC1395 (Real Breast Cancer)"],
+            key="mad_demo_choice",
+        )
+
+        if st.button("Load Patient", type="primary", use_container_width=True):
             with st.spinner("Building patient profile..."):
                 builder = PatientProfileBuilder()
-                vcf_text = get_synthetic_vcf()
-                profile = builder.from_vcf_text(vcf_text, "COGNISOM-DEMO-001")
+
+                if "SEQC2" in demo_choice:
+                    from pathlib import Path
+                    _vcf_path = Path(__file__).resolve().parent.parent.parent / "genomics" / "seqc2_demo.vcf"
+                    vcf_text = _vcf_path.read_text()
+                    profile = builder.from_vcf_text(vcf_text, "SEQC2-HCC1395")
+                else:
+                    vcf_text = get_synthetic_vcf()
+                    profile = builder.from_vcf_text(vcf_text, "COGNISOM-DEMO-001")
+
                 twin = DigitalTwinConfig.from_profile_only(profile)
 
                 simulator = TreatmentSimulator()
