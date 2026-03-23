@@ -131,6 +131,24 @@ if user is not None:
 
 
 # ════════════════════════════════════════════════════════════════════
+# INVESTOR PAGE (accessible without login, has own password gate)
+# ════════════════════════════════════════════════════════════════════
+
+_query = st.query_params
+if _query.get("page") == "investors":
+    st.set_page_config(
+        page_title="Cognisom | Investor Overview",
+        page_icon=":material/trending_up:",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+    # Run the investor page directly (it has its own password gate)
+    _investor_page = _pages_dir / "41_investors.py"
+    exec(compile(_investor_page.read_text(), str(_investor_page), "exec"))
+    st.stop()
+
+
+# ════════════════════════════════════════════════════════════════════
 # PUBLIC LANDING PAGE (not logged in — st.navigation not used)
 # ════════════════════════════════════════════════════════════════════
 
@@ -1276,14 +1294,19 @@ Normal FASTQ <span class="arch-dim">─┘</span>  (4 GPUs, 48 CPUs, 179 GB)    
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Investor note ──────────────────────────────────────────────
+    # ── Investor link ─────────────────────────────────────────────
     st.markdown("""
-    <div style="text-align: center; margin: 2rem 0 0.5rem 0; padding: 0.8rem 1.2rem;
-                font-size: 0.82rem; color: var(--text-color, rgba(255,255,255,0.45));
-                letter-spacing: 0.3px;">
-        <span style="opacity: 0.6;">Investors:</span>
-        Sign in and navigate to <span style="opacity: 0.7;">Admin &rarr; Investor Overview</span>
-        <span style="opacity: 0.5;">(access code required)</span>
+    <div style="text-align: center; margin: 2rem 0 0.5rem 0;">
+        <a href="?page=investors" style="display: inline-block; padding: 0.6rem 2rem;
+           background: linear-gradient(135deg, rgba(0,212,170,0.15), rgba(99,102,241,0.15));
+           border: 1px solid rgba(0,212,170,0.3); border-radius: 8px;
+           color: #00d4aa; text-decoration: none; font-weight: 600; font-size: 0.9rem;
+           letter-spacing: 0.5px; transition: all 0.3s ease;">
+            Investor Overview
+        </a>
+        <div style="font-size: 0.72rem; color: rgba(255,255,255,0.35); margin-top: 0.5rem;">
+            Access code required
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
