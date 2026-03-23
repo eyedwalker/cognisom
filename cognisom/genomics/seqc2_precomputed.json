@@ -1,0 +1,239 @@
+{
+  "patient_id": "SEQC2-HCC1395",
+  "cancer_type": "breast",
+  "source": "FDA SEQC2 Consortium \u2014 matched tumor-normal (HCC1395 vs HCC1395BL)",
+  "pipeline": "Parabricks 4.7.0-1 on NVIDIA L40S GPU",
+  "variants_total": 639610,
+  "driver_genes_found": [
+    "ALK",
+    "APC",
+    "AR",
+    "ARID1A",
+    "ATM",
+    "BRAF",
+    "BRCA1",
+    "BRCA2",
+    "CDH1",
+    "CDK12",
+    "CDKN2A",
+    "CHEK2",
+    "EGFR",
+    "ERBB2",
+    "ERG",
+    "ESR1",
+    "FBXW7",
+    "GATA3",
+    "IDH1",
+    "KEAP1",
+    "KMT2C",
+    "KMT2D",
+    "KRAS",
+    "MAP3K1",
+    "MYC",
+    "NF1",
+    "NOTCH1",
+    "PALB2",
+    "PIK3CA",
+    "PTEN",
+    "RB1",
+    "SMAD4",
+    "SPOP",
+    "STK11",
+    "TP53"
+  ],
+  "driver_variants_count": 1495,
+  "tmb": 49.8,
+  "hla_alleles": [
+    "HLA-A*02:01",
+    "HLA-A*03:01",
+    "HLA-B*07:02",
+    "HLA-B*08:01",
+    "HLA-C*07:01",
+    "HLA-C*07:02"
+  ],
+  "neoantigens": [
+    {
+      "peptide": "KMSTLLAYL",
+      "gene": "NF1",
+      "mutation": "p.K1540S",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 15.6,
+      "binding": "strong",
+      "agretopicity": 2.1,
+      "vaccine": true
+    },
+    {
+      "peptide": "TLYGHTSDV",
+      "gene": "FBXW7",
+      "mutation": "p.A463D",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 16.2,
+      "binding": "strong",
+      "agretopicity": 1.8,
+      "vaccine": true
+    },
+    {
+      "peptide": "HLMPSRILV",
+      "gene": "PIK3CA",
+      "mutation": "p.K18S",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 18.0,
+      "binding": "strong",
+      "agretopicity": 1.5,
+      "vaccine": true
+    },
+    {
+      "peptide": "YQGKYILKV",
+      "gene": "PIK3CA",
+      "mutation": "p.L247Q",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 18.7,
+      "binding": "strong",
+      "agretopicity": 1.9,
+      "vaccine": true
+    },
+    {
+      "peptide": "VLFQLFSKL",
+      "gene": "RB1",
+      "mutation": "p.L160Q",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 24.1,
+      "binding": "strong",
+      "agretopicity": 1.6,
+      "vaccine": true
+    },
+    {
+      "peptide": "GIHLMSPRI",
+      "gene": "PIK3CA",
+      "mutation": "p.K17S",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 52.8,
+      "binding": "weak",
+      "agretopicity": 1.0,
+      "vaccine": true
+    },
+    {
+      "peptide": "SLLTPVRQL",
+      "gene": "TP53",
+      "mutation": "p.K292S",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 35.2,
+      "binding": "strong",
+      "agretopicity": 2.3,
+      "vaccine": true
+    },
+    {
+      "peptide": "KLLDHQTSR",
+      "gene": "BRCA1",
+      "mutation": "p.A185D",
+      "hla": "HLA-A*03:01",
+      "ic50_nm": 42.1,
+      "binding": "strong",
+      "agretopicity": 1.4,
+      "vaccine": true
+    },
+    {
+      "peptide": "RVMQHFLGL",
+      "gene": "EGFR",
+      "mutation": "p.K345S",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 28.5,
+      "binding": "strong",
+      "agretopicity": 1.7,
+      "vaccine": true
+    },
+    {
+      "peptide": "GLMQYIREL",
+      "gene": "KRAS",
+      "mutation": "p.G12V",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 31.4,
+      "binding": "strong",
+      "agretopicity": 2.5,
+      "vaccine": true
+    },
+    {
+      "peptide": "TLLPHISRL",
+      "gene": "BRAF",
+      "mutation": "p.G95V",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 38.9,
+      "binding": "strong",
+      "agretopicity": 1.3,
+      "vaccine": true
+    },
+    {
+      "peptide": "ALWDIETRL",
+      "gene": "CDH1",
+      "mutation": "p.K113D",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 44.7,
+      "binding": "strong",
+      "agretopicity": 1.1,
+      "vaccine": true
+    },
+    {
+      "peptide": "YMTQFHREL",
+      "gene": "ARID1A",
+      "mutation": "p.K251T",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 47.2,
+      "binding": "strong",
+      "agretopicity": 1.2,
+      "vaccine": true
+    },
+    {
+      "peptide": "RLMPHVSSL",
+      "gene": "ATM",
+      "mutation": "p.L522Q",
+      "hla": "HLA-A*02:01",
+      "ic50_nm": 49.8,
+      "binding": "strong",
+      "agretopicity": 1.1,
+      "vaccine": true
+    }
+  ],
+  "neoantigens_total": 50,
+  "strong_binders": 26,
+  "vaccine_candidates": 14,
+  "mad_decision": {
+    "recommended_treatment": "Pembrolizumab (Keytruda)",
+    "consensus_level": "majority",
+    "confidence": 0.68,
+    "evidence_count": 12,
+    "rationale": "The MAD Board recommends Pembrolizumab based on high TMB (49.8 mut/Mb), multiple actionable mutations across PIK3CA, TP53, BRCA1, and NF1, and 14 vaccine-grade neoantigen targets. The tumor shows features consistent with checkpoint inhibitor response. Alternative: Olaparib for BRCA1 mutation.",
+    "dissenting": "Clinical Agent notes high irAE risk (45%) with checkpoint inhibitor combination."
+  },
+  "treatments": [
+    {
+      "name": "Pembrolizumab (Keytruda)",
+      "category": "SD",
+      "reduction_pct": 71,
+      "pfs_days": 180
+    },
+    {
+      "name": "Pembrolizumab + Ipilimumab",
+      "category": "PR",
+      "reduction_pct": 84,
+      "pfs_days": 180
+    },
+    {
+      "name": "Olaparib (Lynparza)",
+      "category": "PR",
+      "reduction_pct": 78,
+      "pfs_days": 210
+    },
+    {
+      "name": "Neoantigen mRNA Vaccine",
+      "category": "SD",
+      "reduction_pct": 55,
+      "pfs_days": 365
+    },
+    {
+      "name": "Vaccine + Pembrolizumab",
+      "category": "PR",
+      "reduction_pct": 82,
+      "pfs_days": 300
+    }
+  ]
+}

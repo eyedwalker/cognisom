@@ -404,12 +404,18 @@ class VariantAnnotator:
                 variant.is_cancer_driver = True
                 self._annotate_driver_details(variant, gene_upper)
                 # Generate protein change if missing (for raw VCFs without annotation)
+                # Limit to ~3 variants per gene to simulate exonic fraction
+                # (real genes are ~5% exonic, so 50 variants → ~2-3 coding)
                 if not variant.protein_change and variant.ref and variant.alt:
-                    variant.protein_change = self._predict_protein_change(
-                        variant, gene_upper
-                    )
-                    if variant.protein_change:
-                        variant.consequence = "missense_variant"
+                    gene_count_key = f"_pchange_count_{gene_upper}"
+                    count = getattr(self, gene_count_key, 0)
+                    if count < 3:  # Max 3 coding variants per gene
+                        variant.protein_change = self._predict_protein_change(
+                            variant, gene_upper
+                        )
+                        if variant.protein_change:
+                            variant.consequence = "missense_variant"
+                            setattr(self, gene_count_key, count + 1)
 
     # GRCh38 gene coordinates for cancer driver genes (chr, start, end)
     GENE_COORDS = {

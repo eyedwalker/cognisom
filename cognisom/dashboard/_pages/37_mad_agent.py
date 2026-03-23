@@ -80,28 +80,70 @@ with st.sidebar:
         )
 
         if st.button("Load Patient", type="primary", use_container_width=True):
-            with st.spinner("Building patient profile..."):
-                builder = PatientProfileBuilder()
-
-                if "SEQC2" in demo_choice:
+            if "SEQC2" in demo_choice:
+                # Load pre-computed results (instant — no MHCflurry needed)
+                with st.spinner("Loading pre-computed SEQC2 results..."):
+                    import json
                     from pathlib import Path
-                    _vcf_path = Path(__file__).resolve().parent.parent.parent / "genomics" / "seqc2_demo.vcf"
-                    vcf_text = _vcf_path.read_text()
-                    profile = builder.from_vcf_text(vcf_text, "SEQC2-HCC1395")
-                else:
+                    _json_path = Path(__file__).resolve().parent.parent.parent / "genomics" / "seqc2_precomputed.json"
+                    _data = json.loads(_json_path.read_text())
+
+                    # Build a minimal profile from pre-computed data
+                    from cognisom.genomics.neoantigen_predictor import Neoantigen
+                    from cognisom.genomics.vcf_parser import Variant
+
+                    profile = PatientProfile(
+                        patient_id=_data["patient_id"],
+                        cancer_type=_data["cancer_type"],
+                        tumor_mutational_burden=_data["tmb"],
+                        hla_alleles=_data["hla_alleles"],
+                        affected_genes=_data["driver_genes_found"],
+                        cancer_driver_mutations=[
+                            Variant(chrom="", pos=0, ref="", alt="", gene=g, is_cancer_driver=True)
+                            for g in _data["driver_genes_found"]
+                        ],
+                        predicted_neoantigens=[
+                            Neoantigen(
+                                peptide=n["peptide"], wild_type_peptide="", source_gene=n["gene"],
+                                mutation=n["mutation"], protein_change=n["mutation"],
+                                mutation_position_in_peptide=4, peptide_length=len(n["peptide"]),
+                                best_hla_allele=n["hla"], binding_affinity_nm=n["ic50_nm"],
+                                percentile_rank=1.0, is_strong_binder=n["ic50_nm"] < 50,
+                                is_weak_binder=n["ic50_nm"] < 500,
+                                binding_level="strong" if n["ic50_nm"] < 50 else "weak",
+                                agretopicity=n["agretopicity"],
+                                vaccine_priority=i+1, include_in_vaccine=n["vaccine"],
+                            )
+                            for i, n in enumerate(_data["neoantigens"])
+                        ],
+                    )
+
+                    twin = DigitalTwinConfig.from_profile_only(profile)
+
+                    simulator = TreatmentSimulator()
+                    recommended = simulator.get_recommended_treatments(twin)
+                    treatment_results = simulator.compare_treatments(recommended, twin)
+
+                    st.session_state["patient_profile"] = profile
+                    st.session_state["digital_twin"] = twin
+                    st.session_state["treatment_results"] = treatment_results
+                    st.session_state["seqc2_precomputed"] = _data
+                st.rerun()
+            else:
+                with st.spinner("Building synthetic profile..."):
+                    builder = PatientProfileBuilder()
                     vcf_text = get_synthetic_vcf()
                     profile = builder.from_vcf_text(vcf_text, "COGNISOM-DEMO-001")
+                    twin = DigitalTwinConfig.from_profile_only(profile)
 
-                twin = DigitalTwinConfig.from_profile_only(profile)
+                    simulator = TreatmentSimulator()
+                    recommended = simulator.get_recommended_treatments(twin)
+                    treatment_results = simulator.compare_treatments(recommended, twin)
 
-                simulator = TreatmentSimulator()
-                recommended = simulator.get_recommended_treatments(twin)
-                treatment_results = simulator.compare_treatments(recommended, twin)
-
-                st.session_state["patient_profile"] = profile
-                st.session_state["digital_twin"] = twin
-                st.session_state["treatment_results"] = treatment_results
-            st.rerun()
+                    st.session_state["patient_profile"] = profile
+                    st.session_state["digital_twin"] = twin
+                    st.session_state["treatment_results"] = treatment_results
+                st.rerun()
 
     st.divider()
     st.caption("FOR RESEARCH USE ONLY")
