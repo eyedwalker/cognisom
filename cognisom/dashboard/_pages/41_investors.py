@@ -53,7 +53,7 @@ if not st.session_state.get("investor_auth"):
 
         st.markdown("""
         <div style="text-align: center; margin-top: 2rem; font-size: 0.8rem; opacity: 0.4;">
-            Request access at david@cognisom.com
+            Request access at david@eyentelligence.com
         </div>
         """, unsafe_allow_html=True)
     st.stop()
@@ -802,29 +802,29 @@ with cap2:
     <div class="inv-card" style="min-height: 220px;">
         <div class="inv-card-title" style="margin-bottom: 1rem;">Fund Allocation</div>
 
-        <div class="inv-fund-label">
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
             <span>Platform Development</span>
-            <span class="inv-fund-pct">40%</span>
+            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">40%</span>
         </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #00d4aa 0%, #00d4aa 100%); width: 40%;"></div>
+        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#00d4aa,#00d4aa);width:40%;"></div>
 
-        <div class="inv-fund-label">
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
             <span>Clinical Validation</span>
-            <span class="inv-fund-pct">30%</span>
+            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">30%</span>
         </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #6366f1 0%, #6366f1 100%); width: 30%;"></div>
+        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#6366f1,#6366f1);width:30%;"></div>
 
-        <div class="inv-fund-label">
-            <span>Regulatory & Quality</span>
-            <span class="inv-fund-pct">15%</span>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
+            <span>Regulatory &amp; Quality</span>
+            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">15%</span>
         </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, #818cf8 0%, #818cf8 100%); width: 15%;"></div>
+        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,#818cf8,#818cf8);width:15%;"></div>
 
-        <div class="inv-fund-label">
-            <span>Team & Operations</span>
-            <span class="inv-fund-pct">15%</span>
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-color,rgba(255,255,255,0.65));margin-bottom:0.3rem;">
+            <span>Team &amp; Operations</span>
+            <span style="font-weight:700;color:var(--text-color,#e2e8f0);">15%</span>
         </div>
-        <div class="inv-fund-bar" style="background: linear-gradient(90deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.3) 100%); width: 15%;"></div>
+        <div style="height:8px;border-radius:4px;margin-bottom:0.8rem;background:linear-gradient(90deg,rgba(255,255,255,0.3),rgba(255,255,255,0.3));width:15%;"></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -957,7 +957,7 @@ st.markdown("""
         manufacturers, payer organizations, strategic investors, and infrastructure partners.
     </div>
     <div style="margin-bottom: 0.8rem;">
-        <a href="mailto:david@cognisom.com" class="inv-contact-link">david@cognisom.com</a>
+        <a href="mailto:david@eyentelligence.com" class="inv-contact-link">david@eyentelligence.com</a>
     </div>
     <div style="font-size: 0.82rem; color: rgba(255,255,255,0.5);">
         cognisom.com
