@@ -165,19 +165,87 @@ The cancer_transmission_demo also runs end-to-end with the new KRAS reference:
 4/4 normal cells transformed via oncogenic exosomes (same behavior as before
 but now built on biologically correct KRAS).
 
-**TP53 and BRAF deferred.** Their demo sequences are still short
-synthetic prefixes that DO NOT reach their canonical oncogenic loci
-(TP53 R175 at codon 175 needs >= 525 bases; BRAF V600 at codon 600 needs
->= 1800 bases). Marked with TODO comments in molecular_module.py. No
-demo currently exercises TP53 R175H or BRAF V600E, so this is not
-blocking. Will be addressed before patent filing as part of the
-"all-holes-patched" pre-filing audit.
+**TP53 and BRAF deferred** [updated entry below].
 
 **Patent relevance.** Strengthens enablement: the disclosed simulator
 now produces biologically sensible output when exercised. An examiner
 running the self-test will see a real 51-AA KRAS protein with the G12D
 substitution clearly visible, classifier-validated as missense with
 correct BLOSUM62 score and impact estimate.
+
+---
+
+## 2026-05-11 - Decision: TP53 and BRAF synthetic CDSes with real hotspots
+
+**Conceived by:** David Walker (Sprint 1c, following the "patch all holes"
+filing strategy).
+
+**Context.** TP53 R175H/R248W and BRAF V600E reside at codons 175, 248,
+and 600 of their respective canonical CDSes (NM_000546.6 length 1182 bases,
+NM_004333.6 length 2301 bases). The demo placeholders were 134 bases
+each, far short of reaching these positions. With those placeholders,
+calling Gene.introduce_oncogenic_mutation('R175H') etc. raises ValueError
+at the DNA layer (position out of range).
+
+**Alternatives considered.**
+
+  - Embed authentic NCBI CDSes from memory. Rejected for engineering risk:
+    reproducing ~1200 and ~2300 bases of DNA character-for-character from
+    memory is unreliable. A single error anywhere could introduce a frame
+    issue or wrong codon at a hotspot, undetected.
+  - Synthetic CDSes with all-alanine filler. Accepted with caveat: easy
+    to write, easy to verify, gets hotspot positions exactly right. The
+    resulting protein outside the hotspot region is biologically
+    meaningless (poly-Ala), but the patent claims do not depend on
+    biological authenticity of off-hotspot codons -- they depend on
+    position-correct hotspots and the classifier's ability to evaluate
+    arbitrary substitutions.
+  - Reverse-translate from authentic protein. Rejected for v1: requires
+    embedding ~393 + ~766 amino acids of protein sequence accurately,
+    which is the same memory-risk problem one step up. The user can
+    upgrade to this approach (or to authentic NCBI CDSes via Biopython)
+    before patent filing.
+
+**Decision.** Constructed synthetic TP53_CDS (393 codons + stop, 1182 b)
+and BRAF_CDS (766 codons + stop, 2301 b) using:
+
+  - first 30 codons = best-recall canonical N-terminal sequence
+  - codons 31..n with single filler GCG (Ala), except hotspots
+  - canonical hotspot codons inserted at biologically correct positions:
+    TP53 codon 175 = CGC (R), codon 248 = CGG (R); BRAF codon 600 = GTG (V)
+  - TAA stop codon appended
+
+Implementation in engine/py/molecular/data/reference_cds.py with module-
+load-time assertions that hotspot codons are correct, lengths match, and
+no premature stops exist. KRAS uses authentic NM_004985.5 prefix (51
+codons) as before.
+
+modules/molecular_module.py refactored to import from reference_cds.py.
+
+After this change, all six entries in ONCOGENIC_SUBSTITUTIONS produce
+correct AA changes with zero warnings:
+
+  KRAS G12D: missense, BLOSUM -1, impact 0.51
+  KRAS G12V: missense, BLOSUM -3, impact 0.74
+  KRAS G13D: missense, BLOSUM -1, impact 0.51
+  TP53 R175H: missense, BLOSUM 0, impact 0.40
+  TP53 R248W: missense, BLOSUM -3, impact 0.74
+  BRAF V600E: missense, BLOSUM -2, impact 0.62
+
+Tests: 58 total pass (was 49). Cancer_transmission_demo still runs
+end-to-end with the new gene library.
+
+**Pre-filing checklist item added.** TP53_CDS and BRAF_CDS should be
+replaced with authentic NM_000546.6 and NM_004333.6 CDSes via Biopython
+or an NCBI download before patent filing. The reference_cds.py module
+has a VERIFY-BEFORE-FILING note. The classifier-driven tests will catch
+any hotspot regression during that replacement.
+
+**Patent relevance.** Closes the molecular-layer enablement holes
+identified during Sprint 1. All named oncogenic mutations now produce
+biologically correct AA changes verifiable by the classifier. The
+disclosed simulation can be exercised end-to-end on the canonical KRAS
+G12D / G12V / G13D, TP53 R175H / R248W, and BRAF V600E mutations.
 
 ---
 

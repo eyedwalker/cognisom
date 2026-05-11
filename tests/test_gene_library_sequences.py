@@ -114,3 +114,109 @@ def test_kras_g13d_via_named_mutation_does_not_warn():
         mutation = gene.introduce_oncogenic_mutation("G13D", classifier=clf)
     assert mutation.effect.aa_change == "G13D"
     assert mutation.effect.category == "missense"
+
+
+# --- TP53 --------------------------------------------------------------------
+
+def test_tp53_codon_175_is_CGC(module):
+    seq = module.genes['TP53'].dna.sequence
+    assert seq[522:525] == "CGC", f"TP53 codon 175 is {seq[522:525]!r}, must be CGC"
+
+
+def test_tp53_codon_248_is_CGG(module):
+    seq = module.genes['TP53'].dna.sequence
+    assert seq[741:744] == "CGG", f"TP53 codon 248 is {seq[741:744]!r}, must be CGG"
+
+
+def test_tp53_no_premature_stop(module):
+    """TP53 must not contain in-frame stop codon before codon 393."""
+    seq = module.genes['TP53'].dna.sequence
+    for codon_index in range(393):
+        codon = seq[codon_index * 3 : codon_index * 3 + 3]
+        assert codon not in ("TAA", "TAG", "TGA"), (
+            f"TP53 has premature stop {codon} at codon {codon_index+1}"
+        )
+
+
+def test_tp53_r175h_via_named_mutation_does_not_warn():
+    """R175H must classify as missense R175H with no warning."""
+    m = MolecularModule(config={})
+    m.initialize()
+    clf = MutationEffectClassifier()
+    gene = m.genes['TP53']
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        mutation = gene.introduce_oncogenic_mutation("R175H", classifier=clf)
+    assert mutation.effect.aa_change == "R175H"
+    assert mutation.effect.category == "missense"
+    assert mutation.effect.blosum62_score == 0  # R->H is BLOSUM 0
+
+
+def test_tp53_r248w_via_named_mutation_does_not_warn():
+    """R248W must classify as missense R248W with no warning."""
+    m = MolecularModule(config={})
+    m.initialize()
+    clf = MutationEffectClassifier()
+    gene = m.genes['TP53']
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        mutation = gene.introduce_oncogenic_mutation("R248W", classifier=clf)
+    assert mutation.effect.aa_change == "R248W"
+    assert mutation.effect.category == "missense"
+    assert mutation.effect.blosum62_score == -3  # R->W is BLOSUM -3 (radical)
+
+
+# --- BRAF --------------------------------------------------------------------
+
+def test_braf_codon_600_is_GTG(module):
+    seq = module.genes['BRAF'].dna.sequence
+    assert seq[1797:1800] == "GTG", f"BRAF codon 600 is {seq[1797:1800]!r}, must be GTG"
+
+
+def test_braf_no_premature_stop(module):
+    """BRAF must not contain in-frame stop codon before codon 766."""
+    seq = module.genes['BRAF'].dna.sequence
+    for codon_index in range(766):
+        codon = seq[codon_index * 3 : codon_index * 3 + 3]
+        assert codon not in ("TAA", "TAG", "TGA"), (
+            f"BRAF has premature stop {codon} at codon {codon_index+1}"
+        )
+
+
+def test_braf_v600e_via_named_mutation_does_not_warn():
+    """V600E must classify as missense V600E with no warning."""
+    m = MolecularModule(config={})
+    m.initialize()
+    clf = MutationEffectClassifier()
+    gene = m.genes['BRAF']
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        mutation = gene.introduce_oncogenic_mutation("V600E", classifier=clf)
+    assert mutation.effect.aa_change == "V600E"
+    assert mutation.effect.category == "missense"
+    assert mutation.effect.blosum62_score == -2
+
+
+# --- Cross-cutting ----------------------------------------------------------
+
+def test_all_six_oncogenic_mutations_produce_correct_aa_change():
+    """Smoke test: every entry in the ONCOGENIC_SUBSTITUTIONS table must
+    classify with no warnings as the named AA change. This is the single
+    most important regression test for the patent-claim integrity."""
+    cases = [
+        ('KRAS', 'G12D'), ('KRAS', 'G12V'), ('KRAS', 'G13D'),
+        ('TP53', 'R175H'), ('TP53', 'R248W'),
+        ('BRAF', 'V600E'),
+    ]
+    clf = MutationEffectClassifier()
+    for gene_name, mut_name in cases:
+        m = MolecularModule(config={})
+        m.initialize()
+        gene = m.genes[gene_name]
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            mutation = gene.introduce_oncogenic_mutation(mut_name, classifier=clf)
+        assert mutation is not None, f"{gene_name} {mut_name}: returned None"
+        assert mutation.effect.aa_change == mut_name, (
+            f"{gene_name} {mut_name}: classifier produced {mutation.effect.aa_change}"
+        )
