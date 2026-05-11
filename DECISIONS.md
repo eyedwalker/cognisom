@@ -175,6 +175,72 @@ correct BLOSUM62 score and impact estimate.
 
 ---
 
+## 2026-05-11 - Decision: Sprint 2 / Upgrade 1 - Reference + Sparse Delta architecture
+
+**Conceived by:** David Walker.
+
+**Context.** UPGRADES_SPEC.md Upgrade 1 calls for a memory architecture
+that scales per-cell memory with mutation count, not with genome size.
+This is the patent-claim anchor under USPTO 35 USC 101 (Alice/Mayo):
+a specific technical improvement to computer functioning that defeats
+abstract-idea rejection.
+
+**Decision.** Implemented as two new modules:
+
+  engine/py/molecular/reference_genome.py
+    - ReferenceGenome (canonical, immutable after freeze())
+    - GeneMetadata (per-gene shared annotations)
+    - SubstitutionDelta (frozen dataclass with validation)
+    - build_default_reference_genome() builds KRAS/TP53/BRAF from
+      reference_cds.py
+
+  engine/py/molecular/sequence_view.py
+    - CellGenomeView with base_at(), codon_at(), iter_codons(),
+      materialize(), add_substitution(), fork()
+    - O(1) per-base lookup via dict-indexed delta map
+    - Chronological delta log preserved for daughter inheritance and
+      provenance
+    - materialize() is the escape hatch for callers that need a full
+      sequence string (e.g., for an ML model)
+
+Both classes are read-mostly. Mutations are tracked via append-only
+delta records.
+
+**Patent-relevant invariants tested:**
+
+  - fork() shares ReferenceGenome by Python object identity
+    (not by copy)
+  - Sequence of substitutions applied through view's API gives identical
+    answers to the deep-copy + apply approach (tested across 5 random
+    seeds with 50 substitutions each)
+  - Independence after fork: parent mutations after fork do not affect
+    daughter, and vice versa
+  - Multi-generation fork chains carry cumulative ancestor deltas
+
+**Benchmark numbers (psutil RSS):**
+
+  - 10k cells with 3 mutations each: 8.2 MB total (budget was 50 MB)
+  - At 100-gene synthetic genome (~300 KB total ref): naive 61.0 MB vs
+    view 2.6 MB = 23x more efficient
+  - 83x larger genome under fixed mutation count produces 0x extra
+    memory (asymptotic O(deltas) confirmed)
+  - Forking 10k times allocates no per-fork reference copies
+
+**Not yet integrated.** ModuleularModule still uses the legacy
+per-cell-Gene-copy approach. Sprint 2b will wire MolecularModule to use
+CellGenomeView. The new classes are exercised only by their own tests
+in this sprint.
+
+**Total tests added:** 46 (18 reference_genome + 24 sequence_view + 4
+memory benchmarks). Total project tests now: 104 (was 58).
+
+**Patent relevance.** This sprint produces the load-bearing claim. The
+disclosure now demonstrates a specific computational improvement
+verifiable at the bench (psutil RSS measurement) over the prior-art
+approach (per-cell deep copy).
+
+---
+
 ## 2026-05-11 - Decision: TP53 and BRAF synthetic CDSes with real hotspots
 
 **Conceived by:** David Walker (Sprint 1c, following the "patch all holes"
