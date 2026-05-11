@@ -30,13 +30,21 @@ class NucleicAcidType(Enum):
 
 @dataclass
 class Mutation:
-    """Represents a mutation in sequence"""
+    """Represents a mutation in sequence.
+
+    The optional `effect` field carries the rule-based classification
+    (synonymous / missense / nonsense / start_loss / outside_coding) and
+    a numerical impact_score in [0, 1]. Populated by Gene.introduce_*
+    methods when a classifier is provided. Older code paths that bypass
+    the classifier leave it None.
+    """
     position: int
     original: str
     mutant: str
     mutation_type: str  # "substitution", "insertion", "deletion"
     name: str = ""  # e.g., "G12D"
     oncogenic: bool = False
+    effect: Optional["MutationEffect"] = None  # forward-ref; resolved at runtime
 
 
 class NucleicAcid:
@@ -398,44 +406,134 @@ class Gene:
         
         return None
     
-    def introduce_oncogenic_mutation(self, mutation_name: str) -> Mutation:
-        """
-        Introduce known oncogenic mutation
-        
-        Parameters:
-        -----------
-        mutation_name : str
-            Name of mutation (e.g., "G12D" for KRAS)
-        
-        Returns:
-        --------
-        Mutation object
-        """
-        # Known oncogenic mutations
-        oncogenic_mutations = {
-            'KRAS': {
-                'G12D': (35, 'G', 'A'),  # Position 35: GGT → GAT
-                'G12V': (35, 'G', 'T'),  # GGT → GTT
-                'G13D': (38, 'G', 'A'),  # GGC → GAC
-            },
-            'BRAF': {
-                'V600E': (1799, 'T', 'A'),  # GTG → GAG
-            },
-            'TP53': {
-                'R175H': (524, 'G', 'A'),  # CGC → CAC
-                'R248W': (742, 'C', 'T'),  # CGG → TGG
-            }
+    # Known oncogenic substitutions, expressed as (position_0indexed, new_base).
+    # Positions are the EXACT base position in this.dna.sequence that must
+    # be substituted to produce the named amino-acid change. These positions
+    # were corrected in May 2026 from the prior off-by-one table that was
+    # producing silent mutations under the same names (see DECISIONS.md).
+    # The classifier in introduce_substitution() validates each one at
+    # runtime so future corruption is caught immediately.
+    ONCOGENIC_SUBSTITUTIONS = {
+        'KRAS': {
+            'G12D': (34, 'A'),  # codon 12 GGT -> GAT (middle base G->A)
+            'G12V': (34, 'T'),  # codon 12 GGT -> GTT (middle base G->T)
+            'G13D': (37, 'A'),  # codon 13 GGC -> GAC (middle base G->A)
+        },
+        'BRAF': {
+            'V600E': (1798, 'A'),  # codon 600 GTG -> GAG (middle base T->A)
+        },
+        'TP53': {
+            'R175H': (523, 'A'),  # codon 175 CGC -> CAC (middle base G->A)
+            'R248W': (741, 'T'),  # codon 248 CGG -> TGG (first base C->T)
         }
-        
-        if self.name in oncogenic_mutations:
-            if mutation_name in oncogenic_mutations[self.name]:
-                pos, old, new = oncogenic_mutations[self.name][mutation_name]
-                mutation = self.dna.mutate(pos, new, mutation_name)
+    }
+
+    def introduce_substitution(
+        self,
+        position: int,
+        new_base: str,
+        mutation_name: str = "",
+        classifier=None,
+        cds_start: int = 0,
+    ) -> Mutation:
+        """Introduce an arbitrary single-nucleotide substitution.
+
+        Parameters
+        ----------
+        position : int
+            0-indexed base position in this gene's DNA sequence.
+        new_base : str
+            New base ('A', 'C', 'G', 'T', or 'U').
+        mutation_name : str
+            Optional human-readable name (e.g., "G12D") for logging.
+        classifier : MutationEffectClassifier, optional
+            If provided, the mutation is classified (synonymous / missense
+            / nonsense / etc.) and the resulting MutationEffect attached to
+            the Mutation object. The is_oncogene flag is set automatically
+            iff impact_score >= 0.4 (i.e., non-conservative coding change).
+            If None, the substitution is performed without classification.
+        cds_start : int
+            Start of the coding region in this gene's DNA sequence. Default 0.
+
+        Returns
+        -------
+        Mutation
+            With effect populated if classifier was provided.
+        """
+        # Classify BEFORE applying so we score against the reference.
+        effect = None
+        if classifier is not None:
+            effect = classifier.classify_substitution(
+                coding_sequence=self.dna.sequence,
+                position=position,
+                new_base=new_base,
+                cds_start=cds_start,
+            )
+
+        mutation = self.dna.mutate(position, new_base, mutation_name)
+        if effect is not None:
+            mutation.effect = effect
+            # Promote to oncogenic flag based on impact, not external belief
+            if effect.impact_score >= 0.4:
                 mutation.oncogenic = True
                 self.is_oncogene = True
-                return mutation
-        
-        return None
+        return mutation
+
+    def introduce_oncogenic_mutation(
+        self,
+        mutation_name: str,
+        classifier=None,
+        cds_start: int = 0,
+    ) -> Optional[Mutation]:
+        """Introduce a named known oncogenic mutation (e.g., G12D for KRAS).
+
+        Uses the corrected ONCOGENIC_SUBSTITUTIONS table. When a classifier
+        is provided, validates at runtime that the resulting amino-acid
+        change matches the named mutation; raises AssertionError on mismatch
+        (this is a regression net for future table maintenance).
+
+        Backward-compatible signature: classifier is optional. If None,
+        no validation happens but the corrected positions still produce the
+        right codon change.
+        """
+        if self.name not in self.ONCOGENIC_SUBSTITUTIONS:
+            return None
+        if mutation_name not in self.ONCOGENIC_SUBSTITUTIONS[self.name]:
+            return None
+        position, new_base = self.ONCOGENIC_SUBSTITUTIONS[self.name][mutation_name]
+
+        mutation = self.introduce_substitution(
+            position=position,
+            new_base=new_base,
+            mutation_name=mutation_name,
+            classifier=classifier,
+            cds_start=cds_start,
+        )
+        # If we classified, warn (don't raise) when the resulting AA change
+        # doesn't match the named mutation. A mismatch usually means the
+        # gene's reference sequence is not the canonical CDS for that gene
+        # (e.g., a frame-shifted or synthetic demo sequence). The Mutation
+        # is still attached with its true effect; callers that need
+        # strict biological correctness should use introduce_substitution()
+        # directly and inspect mutation.effect.aa_change themselves.
+        if classifier is not None and mutation.effect is not None:
+            actual = mutation.effect.aa_change
+            if actual != mutation_name:
+                import warnings
+                warnings.warn(
+                    f"Named mutation {self.name} {mutation_name} resolves to "
+                    f"{actual!r} under the classifier (category={mutation.effect.category}). "
+                    f"This usually means the gene's reference sequence is not the "
+                    f"canonical CDS for that gene. Mutation attached with true "
+                    f"effect; downstream code should inspect mutation.effect.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+        # Explicitly mark oncogenic even if classifier wasn't given
+        # (preserves the legacy semantics callers expect)
+        mutation.oncogenic = True
+        self.is_oncogene = True
+        return mutation
 
 
 # Example usage

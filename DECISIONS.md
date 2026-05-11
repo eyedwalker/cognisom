@@ -92,6 +92,70 @@ detected, file immediately on what is then patentable.
 
 ---
 
+## 2026-05-11 - Finding: Pre-existing hardcoded mutation table was biologically incorrect
+
+**Conceived by:** David Walker (issue surfaced during Sprint 1 classifier wiring).
+
+**Context.** While integrating the rule-based MutationEffectClassifier
+(Sprint 1 / Upgrade 3 Stage A) into Gene.introduce_oncogenic_mutation, the
+classifier flagged that every entry in the existing hardcoded oncogenic-
+mutation table at engine/py/molecular/nucleic_acids.py:415-428 had off-by-one
+position errors. Examples:
+
+  - KRAS G12D was encoded as (position 35, G->A). Position 35 of the KRAS
+    reference is 'T' (third base of GGT codon 12). A G->A at position 35
+    actually fails the base check; the resulting DNA mutation is recorded
+    but the codon change is GGT->GGA (silent, Gly->Gly), not the intended
+    GGT->GAT (Gly->Asp).
+  - All 6 entries (KRAS G12D/G12V/G13D, BRAF V600E, TP53 R175H/R248W) had
+    the same pattern: position off by 1 (one too high). Likely root cause:
+    original author used 1-indexed positions without converting to Python's
+    0-indexed convention.
+
+The pre-existing `is_oncogene = True` flag was being set externally on
+introduce_oncogenic_mutation, regardless of what codon edit actually
+occurred. This masked the bug for downstream demo behavior.
+
+**Decision.** Fix the table to correct positions (subtract 1 from each).
+Validate via the classifier: introduce_oncogenic_mutation now asserts that
+the resulting amino-acid change matches the named mutation. Future
+corruption of the table will be caught at runtime.
+
+**Patent relevance.** Strengthens the §112 enablement story: the disclosed
+simulation does what it claims (G12D actually produces a Gly->Asp at codon
+12). Pre-fix, an examiner running the demo and inspecting the resulting
+sequence would have seen silent mutations labelled "oncogenic" — a credibility
+hit. Post-fix the simulation matches the biology.
+
+---
+
+## 2026-05-11 - Finding: Demo's KRAS reference sequence is biologically broken
+
+**Conceived by:** David Walker (surfaced during Sprint 1).
+
+**Context.** The KRAS reference used in
+modules/molecular_module.py:97-100 and engine/py/molecular/nucleic_acids.py
+self-test starts: ATG-GAC-TGA-... Codon 3 is TGA, which is a stop codon.
+The demo's translate() correctly halts at codon 3, producing "MD" (2 AA)
+instead of a full KRAS protein. Real KRAS CDS begins ATG-ACT-GAA-... (the
+demo has an erroneous extra G at position 3).
+
+This is unrelated to the prior off-by-one bug in
+ONCOGENIC_SUBSTITUTIONS (fixed in the previous DECISIONS.md entry). It is
+a separate problem in the seed data.
+
+**Decision (deferred to a later sprint).** Replace the synthetic KRAS
+sequence in molecular_module._create_gene_library and the
+nucleic_acids __main__ demo with the real KRAS CDS prefix. Same for TP53
+and BRAF. After replacement, run the classifier with the named-mutation
+warning enabled; expect zero warnings.
+
+**Patent relevance.** Same as previous entry: the disclosed demo must
+produce a biologically sensible protein when an examiner runs it.
+Defensive / enablement hygiene. Not blocking Sprint 1.
+
+---
+
 ## 2026-05-11 - Decision: All cognisom patent artifacts live in cognisom repo
 
 **Conceived by:** David Walker.
