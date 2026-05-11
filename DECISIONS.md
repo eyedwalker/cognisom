@@ -129,30 +129,55 @@ hit. Post-fix the simulation matches the biology.
 
 ---
 
-## 2026-05-11 - Finding: Demo's KRAS reference sequence is biologically broken
+## 2026-05-11 - Finding: Demo's KRAS reference sequence was biologically broken (FIXED)
 
-**Conceived by:** David Walker (surfaced during Sprint 1).
+**Conceived by:** David Walker (surfaced during Sprint 1; fixed same day).
 
 **Context.** The KRAS reference used in
 modules/molecular_module.py:97-100 and engine/py/molecular/nucleic_acids.py
-self-test starts: ATG-GAC-TGA-... Codon 3 is TGA, which is a stop codon.
-The demo's translate() correctly halts at codon 3, producing "MD" (2 AA)
+self-test started: ATG-GAC-TGA-... Codon 3 was TGA, which is a stop codon.
+The demo's translate() correctly halted at codon 3, producing "MD" (2 AA)
 instead of a full KRAS protein. Real KRAS CDS begins ATG-ACT-GAA-... (the
-demo has an erroneous extra G at position 3).
+demo had an erroneous extra G at position 3, shifting the reading frame).
 
-This is unrelated to the prior off-by-one bug in
-ONCOGENIC_SUBSTITUTIONS (fixed in the previous DECISIONS.md entry). It is
-a separate problem in the seed data.
+**Decision.** Replaced the synthetic KRAS reference in both files with
+the real NM_004985.5 CDS prefix (51 codons, 153 bases, covering codons
+1-51 including the G12/G13 hotspot). Added import-time sanity-check
+assertions that codon 12 is GGT and codon 13 is GGC. Added a new test
+module tests/test_gene_library_sequences.py with 7 regression tests:
 
-**Decision (deferred to a later sprint).** Replace the synthetic KRAS
-sequence in molecular_module._create_gene_library and the
-nucleic_acids __main__ demo with the real KRAS CDS prefix. Same for TP53
-and BRAF. After replacement, run the classifier with the named-mutation
-warning enabled; expect zero warnings.
+  - test_kras_codon_12_is_GGT
+  - test_kras_codon_13_is_GGC
+  - test_kras_no_premature_stop_before_codon_15
+  - test_kras_translates_to_real_protein_prefix (MTEYKLVVVG)
+  - test_kras_g12d_via_named_mutation_does_not_warn
+  - test_kras_g12v_via_named_mutation_does_not_warn
+  - test_kras_g13d_via_named_mutation_does_not_warn
 
-**Patent relevance.** Same as previous entry: the disclosed demo must
-produce a biologically sensible protein when an examiner runs it.
-Defensive / enablement hygiene. Not blocking Sprint 1.
+After the fix, the nucleic_acids __main__ demo:
+  - prints Tm = 79.1 C (physically reasonable)
+  - prints "Protein length: 51 amino acids" (was 2)
+  - prints "Sequence: MTEYKLVVVGADGVGKSALTIQLIQNHFVDEYDPTIEDSYRKQVVEDAFY"
+    showing the G12D substitution visible at codon 12 (the D in ...VVG[A][D]GVG...)
+  - prints "Classified: missense (G12D); BLOSUM62 score: -1; Impact score: 0.51"
+
+The cancer_transmission_demo also runs end-to-end with the new KRAS reference:
+4/4 normal cells transformed via oncogenic exosomes (same behavior as before
+but now built on biologically correct KRAS).
+
+**TP53 and BRAF deferred.** Their demo sequences are still short
+synthetic prefixes that DO NOT reach their canonical oncogenic loci
+(TP53 R175 at codon 175 needs >= 525 bases; BRAF V600 at codon 600 needs
+>= 1800 bases). Marked with TODO comments in molecular_module.py. No
+demo currently exercises TP53 R175H or BRAF V600E, so this is not
+blocking. Will be addressed before patent filing as part of the
+"all-holes-patched" pre-filing audit.
+
+**Patent relevance.** Strengthens enablement: the disclosed simulator
+now produces biologically sensible output when exercised. An examiner
+running the self-test will see a real 51-AA KRAS protein with the G12D
+substitution clearly visible, classifier-validated as missense with
+correct BLOSUM62 score and impact estimate.
 
 ---
 

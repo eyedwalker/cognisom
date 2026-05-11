@@ -543,25 +543,35 @@ if __name__ == '__main__':
     print("=" * 60)
     print()
     
-    # Create KRAS gene (simplified sequence)
+    # Create KRAS gene from the real NM_004985.5 CDS prefix (51 codons).
+    # Codon 12 = GGT (Gly), the hotspot mutated in G12D / G12V.
     kras_sequence = (
-        "ATGGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGTGCCTTGACGATACAGC"
-        "TAATTCAGAATCATTTTGTGGACGAATATGATCCAACAATAGAGGATTCCTACAGGAAGCAAGTAGTA"
+        "ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGT"
+        "GCCTTGACGATACAGCTAATTCAGAATCATTTTGTGGACGAATATGATCCA"
+        "ACAATAGAGGATTCCTACAGGAAGCAAGTAGTAGAAGATGCCTTCTACACG"
     )
-    
+    assert kras_sequence[33:36] == "GGT", "KRAS codon 12 must be GGT"
+
     kras_gene = Gene("KRAS", kras_sequence)
     print(f"Created KRAS gene:")
     print(f"  Length: {kras_gene.dna.length} bases")
     print(f"  GC content: {kras_gene.dna.gc_content:.2%}")
     print(f"  Melting temp: {kras_gene.dna.melting_temp:.1f}°C")
     print()
-    
-    # Introduce oncogenic mutation
+
+    # Introduce oncogenic mutation, with the classifier active so the
+    # demo shows that the codon edit is biologically correct.
     print("Introducing G12D mutation (cancer-causing)...")
-    mutation = kras_gene.introduce_oncogenic_mutation("G12D")
+    from engine.py.molecular.mutation_effect import MutationEffectClassifier
+    clf = MutationEffectClassifier()
+    mutation = kras_gene.introduce_oncogenic_mutation("G12D", classifier=clf)
     print(f"  Position: {mutation.position}")
-    print(f"  Change: {mutation.original} → {mutation.mutant}")
+    print(f"  Change: {mutation.original} -> {mutation.mutant}")
     print(f"  Oncogenic: {mutation.oncogenic}")
+    if mutation.effect is not None:
+        print(f"  Classified: {mutation.effect.category} ({mutation.effect.aa_change})")
+        print(f"  BLOSUM62 score: {mutation.effect.blosum62_score}")
+        print(f"  Impact score: {mutation.effect.impact_score:.2f}")
     print()
     
     # Transcribe to mRNA

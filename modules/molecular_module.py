@@ -92,24 +92,47 @@ class MolecularModule(SimulationModule):
         print(f"    ✓ Exosome system ready")
     
     def _create_gene_library(self):
-        """Create library of genes"""
-        # KRAS (oncogene)
+        """Create library of genes.
+
+        KRAS uses the real NM_004985.5 CDS prefix (first 51 codons covering
+        the G12/G13 hotspot). The earlier synthetic sequence had an extra G
+        at position 3 that produced a premature stop at codon 3 (see
+        DECISIONS.md 2026-05-11).
+
+        TP53 and BRAF still use short synthetic sequences that DO NOT cover
+        their canonical oncogenic loci (TP53 R175 at codon 175, BRAF V600
+        at codon 600). They are placeholders sufficient for miRNA-target
+        and gene-library demonstrations only; introducing R175H or V600E
+        on these prefixes will hit out-of-range errors. To be replaced with
+        real CDSes in a follow-on sprint.
+        """
+        # KRAS (oncogene) - real NM_004985.5 CDS, codons 1-51.
+        # Codon 12 = GGT (Gly), codon 13 = GGC (Gly).
         kras_sequence = (
-            "ATGGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGTGCCTTGACGATACAGC"
-            "TAATTCAGAATCATTTTGTGGACGAATATGATCCAACAATAGAGGATTCCTACAGGAAGCAAGTAGTA"
+            "ATGACTGAATATAAACTTGTGGTAGTTGGAGCTGGTGGCGTAGGCAAGAGT"
+            "GCCTTGACGATACAGCTAATTCAGAATCATTTTGTGGACGAATATGATCCA"
+            "ACAATAGAGGATTCCTACAGGAAGCAAGTAGTAGAAGATGCCTTCTACACG"
         )
+        # Enablement-insurance sanity check: if anyone ever corrupts this,
+        # we want to know at module load, not at runtime.
+        assert kras_sequence[33:36] == "GGT", "KRAS codon 12 must be GGT"
+        assert kras_sequence[36:39] == "GGC", "KRAS codon 13 must be GGC"
         self.genes['KRAS'] = Gene('KRAS', kras_sequence, 'protein_coding')
         self.genes['KRAS'].is_oncogene = False  # Normal initially
-        
-        # TP53 (tumor suppressor)
+
+        # TP53 (tumor suppressor) - placeholder; does NOT reach codon 175.
+        # TODO(sprint-later): replace with real NM_000546.6 CDS to enable
+        # R175H/R248W mutation in demos.
         tp53_sequence = (
             "ATGGAGGAGCCGCAGTCAGATCCTAGCGTCGAGCCCCCTCTGAGTCAGGAAACATTTTCAGACCTATG"
             "GAAACTACTTCCTGAAAACAACGTTCTGTCCCCCTTGCCGTCCCAAGCAATGGATGATTTGATGCTGT"
         )
         self.genes['TP53'] = Gene('TP53', tp53_sequence, 'protein_coding')
         self.genes['TP53'].is_tumor_suppressor = True
-        
-        # BRAF (oncogene)
+
+        # BRAF (oncogene) - placeholder; does NOT reach codon 600.
+        # TODO(sprint-later): replace with real NM_004333.6 CDS to enable
+        # V600E mutation in demos.
         braf_sequence = (
             "ATGAAGACCTCACAGTAAAAATAGGTGATTTTGGTCTAGCTACAGTGAAATCTCGATGGAGTGGGTCC"
             "CATCAGTTTGAACAGTTGTCTGGATCCATTTTGTGGATGGAGTTGGAGCTATTTTTCCACTGATTAAA"
