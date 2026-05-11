@@ -89,12 +89,24 @@ class NucleicAcid:
     
     def _calculate_tm(self) -> float:
         """
-        Calculate melting temperature
-        Simple formula: Tm = 4(G+C) + 2(A+T/U)
+        Calculate melting temperature in degrees Celsius.
+
+        Wallace rule (Tm = 4(G+C) + 2(A+T)) is valid only for short oligos
+        (<= 14 bases). For longer sequences it overestimates badly (a 100mer
+        gives ~300C, which is non-physical: DNA melts <= ~100C in water).
+        For sequences > 14 bases we use Marmur-Doty (1962), which is the
+        standard simple long-sequence approximation.
         """
-        gc = self.sequence.count('G') + self.sequence.count('C')
-        at = self.sequence.count('A') + self.sequence.count('T') + self.sequence.count('U')
-        return 4 * gc + 2 * at
+        seq = self.sequence.upper()
+        gc = seq.count('G') + seq.count('C')
+        at = seq.count('A') + seq.count('T') + seq.count('U')
+        n = gc + at
+        if n == 0:
+            return 0.0
+        if n <= 14:
+            return 4.0 * gc + 2.0 * at
+        gc_fraction = gc / n
+        return 64.9 + 41.0 * gc_fraction - 500.0 / n
     
     def _calculate_stability(self) -> float:
         """
