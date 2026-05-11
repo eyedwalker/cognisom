@@ -55,17 +55,70 @@ the filing:
 - Upgrade 3: Zero-shot mutation-effect biophysics replacing the hardcoded
   oncogenic-mutation table.
 
+**Decision.** Execute the three upgrades. Build out the implementation until
+all holes are patched, then file once. See UPGRADES_SPEC.md for the
+implementation plan.
+
+**Patent relevance.** Defines the entire filing strategy.
+
+---
+
+## 2026-05-11 - Decision: File once after all holes patched (not provisional-now)
+
+**Conceived by:** David Walker.
+
+**Context.** UPGRADES_SPEC.md originally recommended a two-stage filing
+strategy: provisional now on narrow scope, non-provisional in week 14 with
+strengthened claims. The advisor's spec leaned heavily on locking priority
+date early.
+
 **Alternatives considered.**
-- File now on narrow scope. Rejected as primary plan; weak Section 101 posture.
-- Implement upgrades first, then file. Rejected: priority date risk if a
-  competitor publishes a sequence-aware tissue simulator in the meantime.
+- Provisional-now + non-provisional later. Rejected: filing narrow claims
+  invites prosecution history that may be used against broader future
+  claims; cheaper to file once strongly.
+- File a second provisional after each upgrade. Rejected: complexity, cost.
 
-**Decision.** File a provisional NOW on current narrow scope to lock priority
-date. Execute the three upgrades over 12 weeks. File the non-provisional with
-strengthened claims in week 14, well inside the 12-month provisional deadline.
+**Decision.** Defer all filing until all three upgrades pass their tests in
+tests/test_patent_evidence.py. File a single strong non-provisional then.
 
-**Patent relevance.** Defines the entire filing strategy. See UPGRADES_SPEC.md
-for the full implementation plan.
+**Risk accepted.** Priority date for Inventions A, B, C does not start
+running until the eventual filing date. If PhysiCell, BioDynaMo, or another
+competitor publishes a sequence-aware tissue simulator before our filing,
+that publication becomes prior art against our application. Mitigation:
+re-run prior-art search at each sprint completion; if a near-collision is
+detected, file immediately on what is then patentable.
+
+**Patent relevance.** Replaces the filing strategy from the prior entry.
+
+---
+
+## 2026-05-11 - Decision: All cognisom patent artifacts live in cognisom repo
+
+**Conceived by:** David Walker.
+
+**Context.** Earlier scoping work produced two artifacts outside the cognisom
+directory: ~/.claude/plans/do-a-much-deeper-swift-lerdorf.md (Claude Code's
+session-scoped plan file, associated with a Claude Code session started in
+the wabah working directory) and /tmp/cognisom_patent_disclosure.md (the
+markdown source for the .docx). Mixing patent work across project
+directories creates inventorship trail confusion and risks accidental
+inclusion of unrelated wabah/wubba work.
+
+**Decision.** All cognisom patent artifacts live under
+/Users/davidwalker/CascadeProjects/cognisom/. Specifically:
+- docs/patent/SCOPING.md - the technical scoping document.
+- docs/patent/DISCLOSURE_SOURCE.md - markdown source of the .docx.
+- COGNISOM_PATENT_DISCLOSURE.docx - attorney-facing Word version.
+- UPGRADES_SPEC.md - implementation spec.
+- DECISIONS.md - this file.
+- tests/test_tm_calculation.py and similar patent-evidence tests.
+
+Going forward: no patent-related artifact is to be written to .claude/plans
+or /tmp. Working directory for cognisom Claude Code sessions must be
+/Users/davidwalker/CascadeProjects/cognisom/ so that Claude's session state
+is associated with the cognisom project, not wabah.
+
+**Patent relevance.** Defensive / inventorship-trail hygiene.
 
 ---
 
