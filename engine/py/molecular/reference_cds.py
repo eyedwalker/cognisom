@@ -159,8 +159,10 @@ def _assert_codon(seq: str, codon_1indexed: int, expected: str, gene: str) -> No
 
 
 def _assert_no_premature_stop(seq: str, gene: str, up_to_codon: int) -> None:
-    """Assert no in-frame stop codon before `up_to_codon` (1-indexed)."""
-    for i in range(up_to_codon - 1):
+    """Assert no in-frame stop codon in codons 1..up_to_codon (1-indexed,
+    inclusive). The stop codon at position up_to_codon+1 (the intended
+    terminus) is not checked."""
+    for i in range(up_to_codon):
         codon = seq[i * 3 : i * 3 + 3]
         assert codon not in ("TAA", "TAG", "TGA"), (
             f"{gene} has premature stop {codon} at codon {i+1}; "
