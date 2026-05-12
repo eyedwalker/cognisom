@@ -164,6 +164,27 @@ class MolecularModule(SimulationModule):
         self.cell_oncogene_flags.pop(cell_id, None)
         self.cell_mrnas.pop(cell_id, None)
 
+    def get_reference_protein(self, gene_name: str) -> str:
+        """Translate the reference DNA sequence for this gene into the
+        wild-type protein sequence.
+
+        Used by the cellular module to seed neoantigen peptide
+        generation on MUTATION_OCCURRED (Upgrade 2). Translation starts
+        at the first base (CDS-aligned reference sequences are stored
+        in reference_cds.py) and stops at the first stop codon.
+        Returns an empty string if the gene is not in the reference
+        genome.
+        """
+        if self.reference_genome is None or not self.reference_genome.has_gene(gene_name):
+            return ""
+        dna = self.reference_genome.get_reference_sequence(gene_name)
+        rna = RNA(dna.replace("T", "U"), gene_name, NucleicAcidType.mRNA)
+        protein = rna.translate()
+        # RNA.translate searches for AUG; the curated reference CDSes
+        # are already CDS-aligned, so the result is the canonical
+        # protein N-terminus through the first stop codon.
+        return protein
+
     def _build_mrna_from_view(self, view: CellGenomeView, gene_name: str,
                               cell_id: int) -> RNA:
         """Materialize this cell's sequence for gene_name and produce an

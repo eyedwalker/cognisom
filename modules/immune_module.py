@@ -18,11 +18,14 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
 
 from core.module_base import SimulationModule
 from core.event_bus import EventTypes
+from engine.py.immune.mhc_loading import MHCPresentation
+from engine.py.immune.tcr_repertoire import TCRMatch, TCRRepertoire
+from engine.py.immune.tcell_kill import kill_outcome
 
 
 @dataclass
@@ -37,12 +40,18 @@ class ImmuneCell:
     activated: bool = False
     target_cell_id: int = None
     in_blood: bool = False
-    
+
+    # TCR-pMHC match that activated this T cell (None for NK/macrophage
+    # or for not-yet-activated T cells). Carried so _kill_target can
+    # parametrize kill probability with the actual affinity that drove
+    # recognition.
+    active_tcr_match: Optional[TCRMatch] = None
+
     # Parameters
     speed: float = 10.0  # μm/min
     detection_radius: float = 10.0  # μm
     kill_radius: float = 5.0  # μm
-    
+
     def __post_init__(self):
         if self.velocity is None:
             self.velocity = np.zeros(3)
@@ -72,23 +81,43 @@ class ImmuneModule(SimulationModule):
     
     def __init__(self, config: Dict = None):
         super().__init__(config)
-        
+
         # Immune cell population
         self.immune_cells: Dict[int, ImmuneCell] = {}
         self.next_immune_id = 0
-        
+
         # Parameters
         self.n_t_cells = config.get('n_t_cells', 15)
         self.n_nk_cells = config.get('n_nk_cells', 10)
         self.n_macrophages = config.get('n_macrophages', 8)
         self.patrol_speed = config.get('patrol_speed', 5.0)  # μm/min
+        # Baseline kill probability used by NK / macrophage and as a
+        # fallback when a T cell engages a cancer cell that has no
+        # MHC-I-displayed neoantigens (e.g., immune-escape variants).
         self.kill_probability = config.get('kill_probability', 0.8)
-        
+
+        # TCR-pMHC matching for T cells (Upgrade 2). The repertoire is
+        # patient-specific; seed is stable so the closed-loop test can
+        # reproduce a recognized match.
+        self.tcr_repertoire_size = int(config.get('tcr_repertoire_size', 1000))
+        self.tcr_recognition_threshold = float(
+            config.get('tcr_recognition_threshold', 0.7)
+        )
+        self.tcr_seed = int(config.get('tcr_seed', 0))
+        # Costimulation strength on the tumor side. Real tumors
+        # downregulate CD80/CD86; we leave this exposed for sensitivity
+        # studies (immunotherapy ON / OFF).
+        self.costimulation = float(config.get('costimulation', 0.6))
+        self.checkpoint_block = float(config.get('checkpoint_block', 0.0))
+        self._tcr_repertoire: Optional[TCRRepertoire] = None
+
         # Statistics
         self.total_kills = 0
+        self.total_tcell_kills = 0
         self.total_activations = 0
         self.total_recruited = 0
-        
+        self.total_tcr_recognitions = 0
+
         # Reference to cellular module (for target cells)
         self.cellular_module = None
     
@@ -129,13 +158,23 @@ class ImmuneModule(SimulationModule):
                 cell_type='macrophage'
             )
         
+        # Build the patient TCR repertoire (Upgrade 2). Same scorer the
+        # closed-loop test relies on; reproducible from tcr_seed.
+        self._tcr_repertoire = TCRRepertoire(
+            size=self.tcr_repertoire_size,
+            recognition_threshold=self.tcr_recognition_threshold,
+            seed=self.tcr_seed,
+        )
+
         # Subscribe to events
         self.subscribe(EventTypes.CELL_TRANSFORMED, self.on_cell_transformed)
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
-        
+
         print(f"    ✓ {self.n_t_cells} T cells")
         print(f"    ✓ {self.n_nk_cells} NK cells")
         print(f"    ✓ {self.n_macrophages} macrophages")
+        print(f"    ✓ TCR repertoire: {self.tcr_repertoire_size} clones "
+              f"(threshold={self.tcr_recognition_threshold})")
     
     def add_immune_cell(self, position, cell_type):
         """Add immune cell"""
@@ -175,19 +214,30 @@ class ImmuneModule(SimulationModule):
                 # Look for cancer cells
                 for cancer_id, cancer_cell in cancer_cells.items():
                     distance = np.linalg.norm(immune_cell.position - cancer_cell.position)
-                    
+
                     if distance < immune_cell.detection_radius:
-                        # Check if can recognize
-                        if self._can_recognize(immune_cell, cancer_cell):
+                        recognized, tcr_match = self._recognize(
+                            immune_cell, cancer_cell
+                        )
+                        if recognized:
                             immune_cell.activated = True
                             immune_cell.target_cell_id = cancer_id
+                            immune_cell.active_tcr_match = tcr_match
                             self.total_activations += 1
-                            
+                            if tcr_match is not None:
+                                self.total_tcr_recognitions += 1
+
                             self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
                                 'immune_id': immune_id,
                                 'immune_type': immune_cell.cell_type,
                                 'target_id': cancer_id,
-                                'position': immune_cell.position.tolist()
+                                'position': immune_cell.position.tolist(),
+                                'tcr_id': (
+                                    tcr_match.tcr.tcr_id if tcr_match else None
+                                ),
+                                'affinity': (
+                                    tcr_match.affinity if tcr_match else None
+                                ),
                             })
                             break
             
@@ -205,14 +255,21 @@ class ImmuneModule(SimulationModule):
                         immune_cell.velocity = direction * immune_cell.speed
                         immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
                     
-                    # Kill if close enough
+                    # Kill if close enough. T cells with a TCR match use
+                    # the closed-loop kill_probability(affinity, mhc,
+                    # costim); NK / macrophage retain the baseline flat
+                    # probability.
                     if distance < immune_cell.kill_radius:
-                        if np.random.random() < self.kill_probability:
+                        p_kill = self._target_kill_probability(
+                            immune_cell, target
+                        )
+                        if np.random.random() < p_kill:
                             self._kill_target(immune_cell, target)
                 else:
                     # Target lost, deactivate
                     immune_cell.activated = False
                     immune_cell.target_cell_id = None
+                    immune_cell.active_tcr_match = None
             
             # Keep in bounds
             immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
@@ -226,39 +283,101 @@ class ImmuneModule(SimulationModule):
         immune_cell.velocity = direction * self.patrol_speed
         immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
     
-    def _can_recognize(self, immune_cell: ImmuneCell, cancer_cell) -> bool:
-        """Check if immune cell can recognize cancer cell"""
+    def _recognize(self, immune_cell: ImmuneCell, cancer_cell):
+        """Decide whether this immune cell recognizes this cancer cell.
+
+        Returns (recognized: bool, tcr_match: Optional[TCRMatch]).
+        TCRMatch is populated only for T-cell recognitions; NK and
+        macrophage paths keep the legacy threshold heuristic.
+        """
         if immune_cell.cell_type == 'T_cell':
-            # T cells need MHC-I presentation
-            # Cancer often downregulates MHC-I to evade
-            return cancer_cell.mhc1_expression > 0.2
-        
+            # Upgrade 2: TCR-pMHC matching. The cancer cell must have at
+            # least one MHC-I-displayed neoantigen, AND a clone in the
+            # patient TCR repertoire must clear the recognition
+            # threshold against one of those presentations.
+            presentations: List[MHCPresentation] = getattr(
+                cancer_cell, 'mhc1_displayed_peptides', []
+            )
+            if not presentations or self._tcr_repertoire is None:
+                return False, None
+            # MHC-I downregulation gates display visibility too: a
+            # cancer cell with mhc1_expression near 0 hides its
+            # neoantigens. We require the displayed pool to be non-
+            # empty *and* the surface expression to be above a small
+            # epsilon -- the patent claim is the closed loop, not the
+            # surface gate, so the threshold is intentionally lenient.
+            if cancer_cell.mhc1_expression < 0.05:
+                return False, None
+            for pres in presentations:
+                match = self._tcr_repertoire.best_match(pres)
+                if match is not None and match.is_recognized:
+                    return True, match
+            return False, None
+
         elif immune_cell.cell_type == 'NK_cell':
-            # NK cells detect MISSING MHC-I (missing-self)
-            # This is why cancer can't escape both T cells and NK cells!
-            return cancer_cell.mhc1_expression < 0.4
-        
+            # NK cells detect MISSING MHC-I (missing-self).
+            return cancer_cell.mhc1_expression < 0.4, None
+
         elif immune_cell.cell_type == 'macrophage':
-            # Macrophages can recognize via other markers
-            return True
-        
-        return False
-    
+            return True, None
+
+        return False, None
+
+    def _target_kill_probability(self, immune_cell: ImmuneCell, target_cell) -> float:
+        """Per-encounter kill probability.
+
+        T cells with an active TCR match use the affinity * MHC * costim
+        Hill rule from tcell_kill.kill_probability; NK and macrophage
+        retain the legacy flat self.kill_probability.
+        """
+        if (immune_cell.cell_type == 'T_cell'
+                and immune_cell.active_tcr_match is not None):
+            outcome = kill_outcome(
+                affinity=immune_cell.active_tcr_match.affinity,
+                mhc_level=getattr(target_cell, 'mhc1_expression', 1.0),
+                costimulation=self.costimulation,
+                checkpoint_block=self.checkpoint_block,
+            )
+            return outcome.kill_probability
+        return self.kill_probability
+
     def _kill_target(self, immune_cell: ImmuneCell, target_cell):
-        """Kill target cancer cell"""
-        # Emit kill event (cellular module will handle actual death)
+        """Kill target cancer cell.
+
+        Always emits CANCER_KILLED (backwards-compat with everything
+        subscribed to it). T-cell kills additionally emit
+        CELL_KILLED_BY_TCELL so the closed-loop event trace
+        MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
+        CELL_KILLED_BY_TCELL is recoverable from the event log.
+        """
         self.emit_event(EventTypes.CANCER_KILLED, {
             'cell_id': target_cell.cell_id,
             'killer_id': immune_cell.cell_id,
             'killer_type': immune_cell.cell_type,
             'position': target_cell.position.tolist()
         })
-        
         self.total_kills += 1
-        
+
+        if (immune_cell.cell_type == 'T_cell'
+                and immune_cell.active_tcr_match is not None):
+            match = immune_cell.active_tcr_match
+            self.total_tcell_kills += 1
+            self.emit_event(EventTypes.CELL_KILLED_BY_TCELL, {
+                'cell_id': target_cell.cell_id,
+                'killer_id': immune_cell.cell_id,
+                'tcr_id': match.tcr.tcr_id,
+                'peptide': match.presentation.peptide.sequence,
+                'hla_allele': match.presentation.hla_allele,
+                'mutation': match.presentation.peptide.mutation_label,
+                'source_gene': match.presentation.peptide.source_gene,
+                'affinity': match.affinity,
+                'position': target_cell.position.tolist(),
+            })
+
         # Deactivate immune cell
         immune_cell.activated = False
         immune_cell.target_cell_id = None
+        immune_cell.active_tcr_match = None
     
     def get_state(self) -> Dict[str, Any]:
         """Return current immune state"""

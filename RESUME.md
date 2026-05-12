@@ -1,9 +1,9 @@
 # Resume Point - Cognisom Pre-Filing Patent Sprint
 
-**Last session:** 2026-05-12
+**Last session:** 2026-05-12 (continued)
 **Branch:** main
-**Latest commit:** dc442da (sprint 2b: wire CellGenomeView into MolecularModule)
-**Tests passing:** 122 (patent-evidence suite)
+**Latest commit:** Upgrade 2 part 2 (closed-loop neoantigen integration)
+**Tests passing:** 214 (patent-evidence + Upgrade-2 unit + closed-loop end-to-end)
 
 ## How to resume
 
@@ -18,10 +18,9 @@ Then say something like: "resume cognisom patent sprint - check RESUME.md".
 
 ## Where we are
 
-The pre-filing audit on the cognisom molecular layer is half-done.
-Three of the four planned upgrades from `UPGRADES_SPEC.md` are complete and
-landed; the fourth (closed-loop neoantigen presentation) is the next big
-patent claim to build.
+The pre-filing audit on the cognisom molecular layer is more than half done.
+Upgrades 1 and 2 from `UPGRADES_SPEC.md` are complete and landed (USC 101
+anchors). Upgrade 3 Stage A is in. Stages B and C remain.
 
 ### Sprints completed
 
@@ -35,49 +34,39 @@ patent claim to build.
 | 1c.1 - off-by-one assertion fix | b88016a | regression-net consistency |
 | 2 - reference-genome + per-cell delta architecture | 261aa4d | Upgrade 1 (USC 101 anchor) |
 | 2b - wire CellGenomeView into MolecularModule | dc442da | Upgrade 1 integration |
+| 2c - drop hardcoded driver set + sprint2 demo | 610dc4b | enablement + Upgrade 1 evidence |
+| 2d - Upgrade 2 part 1: peptidome / MHC / TCR / kill | c131efc | Upgrade 2 primitives |
+| 2e - Upgrade 2 part 2: closed-loop integration + e2e | (this session) | Upgrade 2 (USC 101 anchor) |
+
+### Closed-loop neoantigen pipeline (Upgrade 2)
+
+Event trace `MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
+CELL_KILLED_BY_TCELL` is asserted end-to-end in
+`tests/test_closed_loop_neoantigen.py`. Pipeline modules:
+
+- `engine/py/molecular/peptidome.py` - protein -> 8-11mer peptide pool
+  with simple proteasomal cleavage scoring (NetChop deferred)
+- `engine/py/immune/mhc_loading.py` - MHC-I scoring via the same PWM
+  scorer the neoantigen predictor uses (MHCflurry picked up when
+  installed; PWM fallback)
+- `engine/py/immune/tcr_repertoire.py` - stochastic TCR repertoire,
+  16-dim feature embeddings keyed on CDR3 + pMHC, sigmoid-of-cosine
+  affinity (TCRdist3 deferred)
+- `engine/py/immune/tcell_kill.py` - Hill-curve kill probability
+  from affinity x MHC-I level x costimulation, with optional
+  checkpoint-block rescue
+
+Integration:
+- `modules/cellular_module.py` subscribes to MUTATION_OCCURRED and
+  populates `CellState.mhc1_displayed_peptides`, emitting
+  PEPTIDE_GENERATED and PEPTIDE_PRESENTED. HLA panel and max
+  displayed-per-mutation are config-driven.
+- `modules/immune_module.py` builds a per-simulation `TCRRepertoire`
+  on initialize; T cells recognize cancer cells via TCR-pMHC against
+  displayed peptides; kill probability uses `tcell_kill.kill_outcome`;
+  T-cell kills emit `CELL_KILLED_BY_TCELL` with full provenance.
 
 ### Remaining work
-
-Two quick fixes flagged at the Sprint 2b checkpoint, then Upgrade 2.
-
-**Quick fix #1 (~30 min, ~5 lines)** - Derive driver-mutation set in
-`modules/molecular_module.py:introduce_mutation` from
-`Gene.ONCOGENIC_SUBSTITUTIONS.keys()` instead of hardcoding
-`{"G12D","G12V","G13D","V600E","R175H","R248W"}`. The hardcoded set
-duplicates knowledge with the table; adding a new entry to one would
-require remembering the other.
-
-**Quick fix #2 (~30 min)** - Write a new patent-evidence demo at
-`examples/patent_evidence/sprint2_module_demo.py` that drives
-SimulationEngine + MolecularModule with ~20 cells, induces multi-
-generation transformation, and prints reference-identity + delta counts.
-The existing `cancer_transmission_demo.py` uses raw Gene/Exosome and
-does NOT exercise the MolecularModule refactor end-to-end.
-
-**Upgrade 2 - closed-loop neoantigen presentation** (2-3 sessions).
-This is the strongest USC 101 patent claim: concrete medical output
-(predicted neoantigens + immunotherapy response trajectories). Per
-UPGRADES_SPEC.md Section 2:
-
-1. NEW `engine/py/molecular/peptidome.py` - protein -> peptide pool
-   (sliding window 8-11mers around mutation site, simple proteasomal
-   cleavage rules; NetChop integration deferred)
-2. NEW `engine/py/immune/mhc_loading.py` - score peptides vs HLA
-   alleles (use existing PWM scorer at
-   `cognisom/genomics/neoantigen_predictor.py:116-235`)
-3. NEW `engine/py/immune/tcr_repertoire.py` - stochastic TCR-pMHC
-   affinity (16-dim feature vectors; TCRdist3 deferred)
-4. NEW `engine/py/immune/tcell_kill.py` - kill probability from
-   affinity x MHC-I level x costimulation
-5. Refactor `modules/cellular_module.py` to populate
-   `mhc1_displayed_peptides` per cell
-6. Refactor `modules/immune_module.py` to use TCR-pMHC matching instead
-   of the current threshold heuristic at `gpu/spatial_ops.py:200-240`
-7. End-to-end test asserting event trace
-   MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
-   CELL_KILLED_BY_TCELL in causal order
-
-### Remaining after Upgrade 2
 
 - **Upgrade 3 Stage B** (domain-aware impact) - annotate genes with
   UniProt domains; mutations in critical regions get 2-5x impact
@@ -107,8 +96,23 @@ UPGRADES_SPEC.md Section 2:
 - `engine/py/molecular/sequence_view.py` - per-cell sparse delta view (Sprint 2)
 - `engine/py/molecular/mutation_effect.py` - classifier (Sprint 1)
 - `engine/py/molecular/reference_cds.py` - KRAS/TP53/BRAF reference CDSes
-- `modules/molecular_module.py` - refactored to use views (Sprint 2b)
-- `tests/test_*.py` - 122 patent-evidence tests
+- `modules/molecular_module.py` - refactored to use views (Sprint 2b);
+  exposes `get_reference_protein(gene)` for the Upgrade 2 chain
+- `modules/cellular_module.py` - subscribes to MUTATION_OCCURRED;
+  populates `CellState.mhc1_displayed_peptides`; emits PEPTIDE_GENERATED
+  and PEPTIDE_PRESENTED
+- `modules/immune_module.py` - builds TCRRepertoire on initialize;
+  TCR-pMHC recognition for T cells; emits CELL_KILLED_BY_TCELL with
+  provenance
+- `engine/py/immune/{mhc_loading,tcr_repertoire,tcell_kill}.py` -
+  closed-loop neoantigen primitives (Upgrade 2)
+- `engine/py/molecular/peptidome.py` - peptide generation around
+  mutation sites (Upgrade 2)
+- `examples/patent_evidence/sprint2_module_demo.py` - end-to-end
+  evidence for Upgrade 1 (reference-identity + per-cell delta)
+- `tests/test_closed_loop_neoantigen.py` - end-to-end event-trace
+  assertion for Upgrade 2
+- `tests/test_*.py` - 214 patent-evidence + Upgrade 2 unit + closed-loop tests
 
 ## Snapshot tags
 

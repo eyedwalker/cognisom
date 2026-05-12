@@ -17,11 +17,22 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
 
 from core.module_base import SimulationModule
 from core.event_bus import EventTypes
+from engine.py.immune.mhc_loading import MHCLoader, MHCPresentation
+from engine.py.molecular.peptidome import (
+    Peptide,
+    generate_neoantigen_peptides,
+)
+
+
+# Default patient HLA-I alleles for the simulation. Same three-allele
+# panel used by the neoantigen vaccine pipeline (HLA-A/B/C). Override
+# via module config 'hla_alleles'.
+DEFAULT_HLA_ALLELES = ("HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02")
 
 
 @dataclass
@@ -33,17 +44,23 @@ class CellState:
     phase: str  # 'G1', 'S', 'G2', 'M'
     age: float = 0.0
     alive: bool = True
-    
+
     # Metabolism
     oxygen: float = 0.21
     glucose: float = 5.0
     atp: float = 1000.0
     lactate: float = 0.0
-    
+
     # Cancer properties
     mhc1_expression: float = 1.0
     mutations: List[str] = None
-    
+
+    # Closed-loop neoantigen presentation (Upgrade 2). Populated when
+    # MUTATION_OCCURRED fires for this cell; each entry carries the
+    # peptide + HLA allele + binding affinity for downstream TCR-pMHC
+    # matching. Empty for cells without displayed neoantigens.
+    mhc1_displayed_peptides: List[MHCPresentation] = field(default_factory=list)
+
     def __post_init__(self):
         if self.mutations is None:
             self.mutations = []
@@ -74,21 +91,38 @@ class CellularModule(SimulationModule):
     
     def __init__(self, config: Dict = None):
         super().__init__(config)
-        
+
         # Cell population
         self.cells: Dict[int, CellState] = {}
         self.next_cell_id = 0
-        
+
         # Parameters
         self.division_time_normal = config.get('division_time_normal', 24.0)  # hours
         self.division_time_cancer = config.get('division_time_cancer', 12.0)  # hours
         self.glucose_consumption_normal = config.get('glucose_consumption', 0.2)
         self.glucose_consumption_cancer = config.get('glucose_consumption_cancer', 0.5)
-        
+
+        # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
+        # neoantigen predictor uses; auto-picks up MHCflurry when
+        # available, otherwise PWM fallback.
+        self.hla_alleles: List[str] = list(
+            config.get('hla_alleles', DEFAULT_HLA_ALLELES)
+        )
+        self.max_displayed_per_mutation = int(
+            config.get('max_displayed_per_mutation', 5)
+        )
+        self._mhc_loader: Optional[MHCLoader] = None
+
+        # Linked molecular module supplies WT protein sequences for
+        # neoantigen peptide generation (set via set_molecular_module).
+        self.molecular_module = None
+
         # Statistics
         self.total_divisions = 0
         self.total_deaths = 0
         self.total_transformations = 0
+        self.total_peptides_generated = 0
+        self.total_peptides_presented = 0
     
     def initialize(self):
         """Initialize cellular system"""
@@ -118,12 +152,21 @@ class CellularModule(SimulationModule):
             self.cells[cell_id].mutations = ['KRAS_G12D']
             self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
         
+        # Initialize MHC loader (Upgrade 2). Construction reaches into
+        # NeoantigenPredictor which instantiates a GeneProteinMapper;
+        # this preseeds from BUILTIN_PROTEINS and does not touch the
+        # network. Doing it here keeps the per-cell update path cheap.
+        self._mhc_loader = MHCLoader()
+
         # Subscribe to events
         self.subscribe(EventTypes.EXOSOME_UPTAKEN, self.on_exosome_uptaken)
         self.subscribe(EventTypes.CANCER_KILLED, self.on_cancer_killed)
-        
+        self.subscribe(EventTypes.MUTATION_OCCURRED, self.on_mutation_occurred)
+
         print(f"    ✓ {n_normal} normal cells")
         print(f"    ✓ {n_cancer} cancer cells")
+        print(f"    ✓ MHC-I display: {len(self.hla_alleles)} HLA alleles "
+              f"({', '.join(self.hla_alleles)})")
     
     def add_cell(self, position, cell_type='normal'):
         """Add new cell"""
@@ -297,21 +340,121 @@ class CellularModule(SimulationModule):
             'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0
         }
     
+    def set_molecular_module(self, molecular_module):
+        """Link to molecular module for reference protein lookups.
+
+        Required for the MUTATION_OCCURRED -> PEPTIDE_GENERATED ->
+        PEPTIDE_PRESENTED chain (Upgrade 2): the molecular module owns
+        the canonical WT protein sequence; the cellular module owns
+        per-cell MHC-I display state.
+        """
+        self.molecular_module = molecular_module
+
     # Event handlers
     def on_exosome_uptaken(self, data):
         """Handle exosome uptake - check for transformation"""
         cell_id = data['cell_id']
-        
+
         if cell_id in self.cells and data['cargo']['oncogenic']:
             # Oncogenic cargo can transform cell
             if self.cells[cell_id].cell_type == 'normal':
                 if np.random.random() < 0.3:  # 30% chance
                     self.transform_cell(cell_id)
-    
+
     def on_cancer_killed(self, data):
         """Handle cancer cell killed by immune system"""
         cell_id = data['cell_id']
         self._kill_cell(cell_id, cause='immune_killed')
+
+    def on_mutation_occurred(self, data):
+        """Generate neoantigen peptides and load them onto MHC-I.
+
+        Closed-loop neoantigen presentation, stage 1 -> 2 (Upgrade 2):
+            MUTATION_OCCURRED  ->  PEPTIDE_GENERATED  ->  PEPTIDE_PRESENTED
+
+        Required event fields:
+            cell_id (int), gene (str), mutation (str), aa_change (str)
+            optional: impact_score, oncogenic
+
+        Skips silently when:
+            * the cell is not tracked here,
+            * no aa_change is present (synonymous / nonsense mutations
+              do not produce a canonical missense neoantigen),
+            * the linked molecular module cannot supply a WT protein,
+            * aa_change is not parseable as "WTposMUT" (e.g., "G12D").
+        """
+        cell_id = data.get('cell_id')
+        gene = data.get('gene')
+        mutation_label = data.get('mutation')
+        aa_change = data.get('aa_change')
+
+        if cell_id not in self.cells or self.molecular_module is None:
+            return
+        if not gene or not aa_change:
+            return
+
+        # Parse "G12D" -> ("G", 12, "D"). Reject anything not matching
+        # the simple missense pattern; nonsense / frameshift / start-loss
+        # paths are handled by separate event types in future work.
+        wt_aa, pos_str, mut_aa = aa_change[:1], aa_change[1:-1], aa_change[-1:]
+        if not (wt_aa.isalpha() and mut_aa.isalpha() and pos_str.isdigit()):
+            return
+        mut_position_1based = int(pos_str)
+
+        wt_protein = self.molecular_module.get_reference_protein(gene)
+        if not wt_protein or mut_position_1based < 1 or mut_position_1based > len(wt_protein):
+            return
+        # Defensive: skip silently if the declared WT residue does not
+        # match the reference protein at this position (rather than
+        # raising, which would propagate to the event bus).
+        if wt_protein[mut_position_1based - 1] != wt_aa:
+            return
+
+        peptides: List[Peptide] = generate_neoantigen_peptides(
+            wild_type_protein=wt_protein,
+            mutant_position_1based=mut_position_1based,
+            wild_type_aa=wt_aa,
+            mutant_aa=mut_aa,
+            source_gene=gene,
+            mutation_label=mutation_label or aa_change,
+        )
+        if not peptides:
+            return
+
+        self.total_peptides_generated += len(peptides)
+        self.emit_event(EventTypes.PEPTIDE_GENERATED, {
+            'cell_id': cell_id,
+            'gene': gene,
+            'mutation': mutation_label,
+            'aa_change': aa_change,
+            'n_peptides': len(peptides),
+            'peptide_sequences': [p.sequence for p in peptides],
+        })
+
+        # Score against the patient HLA panel; drop non-binders. Keep up
+        # to max_displayed_per_mutation strongest binders (by IC50) for
+        # downstream TCR matching.
+        presentations = self._mhc_loader.score_all(peptides, self.hla_alleles)
+        if not presentations:
+            return
+        presentations.sort(key=lambda p: p.ic50_nm)
+        kept = presentations[:self.max_displayed_per_mutation]
+
+        cell = self.cells[cell_id]
+        cell.mhc1_displayed_peptides.extend(kept)
+        self.total_peptides_presented += len(kept)
+
+        for pres in kept:
+            self.emit_event(EventTypes.PEPTIDE_PRESENTED, {
+                'cell_id': cell_id,
+                'gene': gene,
+                'mutation': mutation_label,
+                'peptide': pres.peptide.sequence,
+                'hla_allele': pres.hla_allele,
+                'ic50_nm': pres.ic50_nm,
+                'binding_level': pres.binding_level,
+                'presentation_score': pres.presentation_score,
+            })
 
 
 # Test
