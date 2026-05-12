@@ -271,12 +271,16 @@ class MolecularModule(SimulationModule):
         ref_base = self.reference_genome.get_reference_base(gene_name, position)
 
         # Classify against the reference (the substitution is what the
-        # cell carries going forward; the classifier reads the reference)
+        # cell carries going forward; the classifier reads the reference).
+        # gene_name is forwarded so the classifier can apply the
+        # Upgrade 3 Stage B domain multiplier when the codon falls in
+        # a curated functional region.
         ref_seq = self.reference_genome.get_reference_sequence(gene_name)
         effect = self.classifier.classify_substitution(
             coding_sequence=ref_seq,
             position=position,
             new_base=new_base,
+            gene_name=gene_name,
         )
 
         # Apply the delta to the view

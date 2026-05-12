@@ -2,8 +2,8 @@
 
 **Last session:** 2026-05-12 (continued)
 **Branch:** main
-**Latest commit:** Upgrade 2 part 2 (closed-loop neoantigen integration)
-**Tests passing:** 214 (patent-evidence + Upgrade-2 unit + closed-loop end-to-end)
+**Latest commit:** Upgrade 3 Stage B (domain-aware missense impact)
+**Tests passing:** 234 (patent-evidence + Upgrade-2 unit + closed-loop end-to-end + Stage B)
 
 ## How to resume
 
@@ -36,7 +36,9 @@ anchors). Upgrade 3 Stage A is in. Stages B and C remain.
 | 2b - wire CellGenomeView into MolecularModule | dc442da | Upgrade 1 integration |
 | 2c - drop hardcoded driver set + sprint2 demo | 610dc4b | enablement + Upgrade 1 evidence |
 | 2d - Upgrade 2 part 1: peptidome / MHC / TCR / kill | c131efc | Upgrade 2 primitives |
-| 2e - Upgrade 2 part 2: closed-loop integration + e2e | (this session) | Upgrade 2 (USC 101 anchor) |
+| 2e - Upgrade 2 part 2: closed-loop integration + e2e | 9f47de7 | Upgrade 2 (USC 101 anchor) |
+| 2f - Upgrade 2 patent-evidence demo (closed loop) | 1e561a9 | Upgrade 2 visible evidence |
+| 3B - Upgrade 3 Stage B: UniProt domain multiplier | (this session) | Upgrade 3 Stage B |
 
 ### Closed-loop neoantigen pipeline (Upgrade 2)
 
@@ -68,9 +70,6 @@ Integration:
 
 ### Remaining work
 
-- **Upgrade 3 Stage B** (domain-aware impact) - annotate genes with
-  UniProt domains; mutations in critical regions get 2-5x impact
-  multiplier
 - **Upgrade 3 Stage C** (ESM-2 protein language model) - zero-shot
   stability prediction for arbitrary mutations; replaces the current
   rule-based-only impact score with biophysics-derived modifiers.

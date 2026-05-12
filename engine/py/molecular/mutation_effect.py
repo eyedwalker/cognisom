@@ -24,6 +24,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
 
+# Upgrade 3 Stage B: optional domain-aware impact lookup. Importing the
+# lookup directly (as a module-level name aliased to _domain_at_codon)
+# keeps the classifier hot-path free of module attribute resolution
+# and isolates Stage B's dependency from Stage A's API.
+from engine.py.molecular.protein_domains import (
+    domain_at_codon as _domain_at_codon,
+)
+
 
 # ---------------------------------------------------------------------------
 # Genetic code (standard, table 1)
@@ -152,6 +160,17 @@ class MutationEffect:
     truncation_fraction: Optional[float] = None
     notes: str = ""
 
+    # Upgrade 3 Stage B: domain-aware impact. Populated when the caller
+    # passes ``gene_name`` to classify_substitution() AND the codon
+    # falls inside a curated domain in protein_domains.DOMAINS.
+    # domain_name / domain_role are descriptive; domain_multiplier is
+    # the factor applied to the base missense impact (1.0 means no
+    # multiplier was applied -- i.e., the mutation is in a linker /
+    # disordered region or the gene is not annotated).
+    domain_name: Optional[str] = None
+    domain_role: Optional[str] = None
+    domain_multiplier: float = 1.0
+
 
 # ---------------------------------------------------------------------------
 # Classifier
@@ -185,6 +204,7 @@ class MutationEffectClassifier:
         position: int,
         new_base: str,
         cds_start: int = 0,
+        gene_name: Optional[str] = None,
     ) -> MutationEffect:
         """Classify a substitution.
 
@@ -203,6 +223,13 @@ class MutationEffectClassifier:
             Position in coding_sequence where the open reading frame begins.
             Defaults to 0. Substitutions before cds_start are classified
             outside_coding.
+        gene_name : str, optional
+            When supplied, the classifier looks up ``codon_index`` in
+            ``protein_domains.DOMAINS`` and applies a 1.5x-4x multiplier
+            to the BLOSUM62-derived missense impact (Upgrade 3 Stage B).
+            The base score, multiplier, and the resolved domain are all
+            recorded on the returned MutationEffect. When omitted, the
+            classifier behaves exactly as Stage A.
         """
         ref = coding_sequence.upper().replace('U', 'T')
         new_base = new_base.upper().replace('U', 'T')
@@ -350,7 +377,21 @@ class MutationEffectClassifier:
         # Missense
         if wt_aa != mut_aa and wt_aa != _STOP and mut_aa != _STOP:
             score = blosum62(wt_aa, mut_aa)
-            impact = self._missense_impact_from_blosum(score)
+            base_impact = self._missense_impact_from_blosum(score)
+
+            # Upgrade 3 Stage B: domain-aware impact. The multiplier is
+            # applied to the BLOSUM-derived base score, then clamped to
+            # the missense ceiling so nonsense / start-loss remain the
+            # categorically more severe outcomes.
+            domain = (
+                _domain_at_codon(gene_name, codon_index + 1)
+                if gene_name else None
+            )
+            multiplier = domain.impact_multiplier if domain is not None else 1.0
+            if multiplier > 1.0:
+                impact = min(self._MISSENSE_IMPACT_MAX, base_impact * multiplier)
+            else:
+                impact = base_impact
             return MutationEffect(
                 category="missense",
                 impact_score=impact,
@@ -359,7 +400,18 @@ class MutationEffectClassifier:
                 wild_type_aa=wt_aa,
                 mutant_aa=mut_aa,
                 codon_index=codon_index,
-                notes=f"missense at codon {codon_index+1}: {wt_codon}({wt_aa})->{mut_codon}({mut_aa})",
+                notes=(
+                    f"missense at codon {codon_index+1}: "
+                    f"{wt_codon}({wt_aa})->{mut_codon}({mut_aa})"
+                    + (
+                        f"; in {domain.gene}/{domain.name} ({domain.role}), "
+                        f"impact {base_impact:.2f}x{multiplier:.1f}={impact:.2f}"
+                        if domain is not None else ""
+                    )
+                ),
+                domain_name=domain.name if domain is not None else None,
+                domain_role=domain.role if domain is not None else None,
+                domain_multiplier=multiplier,
             )
 
         # Fallthrough (should not occur)
