@@ -17,12 +17,18 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Set
 
 from core.module_base import SimulationModule
 from core.event_bus import EventTypes
-from engine.py.molecular.nucleic_acids import Gene, RNA, NucleicAcidType
+from engine.py.molecular.nucleic_acids import Gene, RNA, NucleicAcidType, Mutation
 from engine.py.molecular.exosomes import ExosomeSystem
+from engine.py.molecular.reference_genome import (
+    ReferenceGenome,
+    build_default_reference_genome,
+)
+from engine.py.molecular.sequence_view import CellGenomeView
+from engine.py.molecular.mutation_effect import MutationEffectClassifier
 
 
 class MolecularModule(SimulationModule):
@@ -50,45 +56,69 @@ class MolecularModule(SimulationModule):
     
     def __init__(self, config: Dict = None):
         super().__init__(config)
-        
-        # Genes database (shared across cells)
+
+        # Legacy gene library (Gene objects) - kept for backward-compat with
+        # tests that access module.genes['KRAS'].dna.sequence etc. Per-cell
+        # state no longer uses these; see self.cell_views below.
         self.genes: Dict[str, Gene] = {}
-        
+
+        # Authoritative reference genome (Upgrade 1 / Sprint 2).
+        # Shared by all cell views. Populated at initialize().
+        self.reference_genome: Optional[ReferenceGenome] = None
+
+        # Per-cell sparse genome state. Replaces the legacy
+        # self.cell_genes: Dict[int, Dict[str, Gene]] full-copy structure.
+        # Each cell holds a CellGenomeView pointing at the shared reference;
+        # per-cell deviations are sparse SubstitutionDelta records.
+        self.cell_views: Dict[int, CellGenomeView] = {}
+
+        # Per-cell flags that are NOT sequence state (e.g., "this cell
+        # carries an oncogenic driver mutation"). Parallel to cell_views.
+        self.cell_oncogene_flags: Dict[int, Set[str]] = {}
+
+        # Per-cell mRNA pool (unchanged semantics; mRNA carries sequence
+        # materialized from the view at transcription time)
+        self.cell_mrnas: Dict[int, List[RNA]] = {}
+
+        # Mutation effect classifier (used for impact scoring and to set
+        # the oncogene flag based on classifier output, not external belief)
+        self.classifier = MutationEffectClassifier()
+
         # Exosome system
         self.exosome_system = None
-        
-        # Cell-specific molecular data
-        self.cell_genes: Dict[int, Dict[str, Gene]] = {}  # {cell_id: {gene_name: Gene}}
-        self.cell_mrnas: Dict[int, List[RNA]] = {}  # {cell_id: [RNA]}
-        
+
         # Parameters (adjustable)
         self.transcription_rate = config.get('transcription_rate', 1.0)
         self.translation_rate = config.get('translation_rate', 0.5)
         self.exosome_release_rate = config.get('exosome_release_rate', 0.1)
         self.mutation_rate = config.get('mutation_rate', 0.001)
-        
+
         # Statistics
         self.total_exosomes_released = 0
         self.total_exosomes_uptaken = 0
         self.total_mutations = 0
         self.total_transcriptions = 0
-    
+
     def initialize(self):
         """Initialize molecular system"""
         print("  Creating gene library...")
-        
-        # Create gene library
+
+        # Build the shared reference genome (Upgrade 1)
+        self.reference_genome = build_default_reference_genome()
+
+        # Build the legacy Gene objects (backward compat)
         self._create_gene_library()
-        
+
         # Create exosome system
         self.exosome_system = ExosomeSystem()
-        
+
         # Subscribe to cellular events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
         self.subscribe(EventTypes.CELL_TRANSFORMED, self.on_cell_transformed)
         self.subscribe(EventTypes.CELL_DIED, self.on_cell_died)
-        
-        print(f"    ✓ {len(self.genes)} genes in library")
+
+        print(f"    ✓ {len(self.genes)} genes in library "
+              f"({self.reference_genome.total_bases()} reference bases shared)")
         print(f"    ✓ Exosome system ready")
     
     def _create_gene_library(self):
@@ -118,37 +148,53 @@ class MolecularModule(SimulationModule):
         self.genes['BRAF'].is_oncogene = False  # Normal initially
     
     def add_cell(self, cell_id: int):
+        """Add cell to molecular tracking.
+
+        Creates a CellGenomeView pointing at the shared ReferenceGenome.
+        Per-cell memory cost is constant + (n_mutations * delta size),
+        NOT (n_genes * genome_size).
         """
-        Add cell to molecular tracking
-        
-        Parameters:
-        -----------
-        cell_id : int
-            Cell identifier
-        """
-        # Copy genes for this cell
-        self.cell_genes[cell_id] = {}
-        for name, gene in self.genes.items():
-            # Each cell gets its own copy
-            cell_gene = Gene(gene.name, gene.dna.sequence, gene.gene_type)
-            cell_gene.is_oncogene = gene.is_oncogene
-            cell_gene.is_tumor_suppressor = gene.is_tumor_suppressor
-            self.cell_genes[cell_id][name] = cell_gene
-        
+        self.cell_views[cell_id] = CellGenomeView(self.reference_genome)
+        self.cell_oncogene_flags[cell_id] = set()
         self.cell_mrnas[cell_id] = []
-    
+
     def remove_cell(self, cell_id: int):
         """Remove cell from tracking"""
-        if cell_id in self.cell_genes:
-            del self.cell_genes[cell_id]
-        if cell_id in self.cell_mrnas:
-            del self.cell_mrnas[cell_id]
-    
+        self.cell_views.pop(cell_id, None)
+        self.cell_oncogene_flags.pop(cell_id, None)
+        self.cell_mrnas.pop(cell_id, None)
+
+    def _build_mrna_from_view(self, view: CellGenomeView, gene_name: str,
+                              cell_id: int) -> RNA:
+        """Materialize this cell's sequence for gene_name and produce an
+        RNA object carrying any deltas as Mutation records.
+        """
+        # Materialize the per-cell DNA sequence (reference + deltas) and
+        # transcribe to RNA (T->U substitution).
+        dna_seq = view.materialize(gene_name)
+        rna_seq = dna_seq.replace("T", "U")
+        mrna = RNA(rna_seq, gene_name, NucleicAcidType.mRNA)
+        mrna.from_gene = gene_name
+        oncogenic_flag = gene_name in self.cell_oncogene_flags.get(cell_id, set())
+        for delta in view.deltas_for_gene(gene_name):
+            ref_base = self.reference_genome.get_reference_base(
+                gene_name, delta.position
+            )
+            mrna.mutations.append(Mutation(
+                position=delta.position,
+                original=ref_base,
+                mutant=delta.new_base,
+                mutation_type="substitution",
+                name=delta.mutation_id,
+                oncogenic=oncogenic_flag,
+            ))
+        return mrna
+
     def update(self, dt: float):
         """Update molecular dynamics"""
         # Update exosomes (diffusion)
         self.exosome_system.update(dt)
-        
+
         # Check for exosome uptake events
         for exosome in self.exosome_system.exosomes:
             if exosome.uptaken and not hasattr(exosome, 'processed'):
@@ -163,90 +209,120 @@ class MolecularModule(SimulationModule):
                 })
                 exosome.processed = True
                 self.total_exosomes_uptaken += 1
-        
-        # Transcription (stochastic)
-        for cell_id, genes in self.cell_genes.items():
-            for gene_name, gene in genes.items():
+
+        # Transcription (stochastic). Reads per-cell sequence state through
+        # CellGenomeView; mRNA is built by materializing the view at
+        # transcription time.
+        if self.reference_genome is None:
+            return
+        gene_names = list(self.reference_genome.gene_names())
+        for cell_id, view in list(self.cell_views.items()):
+            cell_onco = self.cell_oncogene_flags.get(cell_id, set())
+            for gene_name in gene_names:
                 if np.random.random() < self.transcription_rate * dt:
-                    mrna = gene.transcribe()
-                    if mrna:
-                        self.cell_mrnas[cell_id].append(mrna)
-                        self.total_transcriptions += 1
-                        
-                        # Emit event
-                        self.emit_event(EventTypes.GENE_EXPRESSED, {
-                            'cell_id': cell_id,
-                            'gene': gene_name,
-                            'oncogenic': gene.is_oncogene
-                        })
+                    mrna = self._build_mrna_from_view(view, gene_name, cell_id)
+                    self.cell_mrnas[cell_id].append(mrna)
+                    self.total_transcriptions += 1
+                    self.emit_event(EventTypes.GENE_EXPRESSED, {
+                        'cell_id': cell_id,
+                        'gene': gene_name,
+                        'oncogenic': gene_name in cell_onco,
+                    })
     
     def introduce_mutation(self, cell_id: int, gene_name: str, mutation_name: str):
+        """Introduce a named oncogenic mutation in a cell's view.
+
+        Uses Gene.ONCOGENIC_SUBSTITUTIONS as the canonical mapping from
+        name (e.g., 'G12D') to (position, new_base). Writes a sparse
+        delta to the cell's CellGenomeView, classifies the substitution
+        via MutationEffectClassifier, and sets cell_oncogene_flags if
+        the classifier reports a sufficiently disruptive change.
         """
-        Introduce mutation in cell's gene
-        
-        Parameters:
-        -----------
-        cell_id : int
-            Cell identifier
-        gene_name : str
-            Gene to mutate
-        mutation_name : str
-            Mutation name (e.g., 'G12D')
-        """
-        if cell_id in self.cell_genes and gene_name in self.cell_genes[cell_id]:
-            gene = self.cell_genes[cell_id][gene_name]
-            mutation = gene.introduce_oncogenic_mutation(mutation_name)
-            
-            if mutation:
-                self.total_mutations += 1
-                self.emit_event(EventTypes.MUTATION_OCCURRED, {
-                    'cell_id': cell_id,
-                    'gene': gene_name,
-                    'mutation': mutation_name,
-                    'oncogenic': mutation.oncogenic
-                })
-    
-    def create_exosome(self, cell_id: int, oncogenic: bool = False):
-        """
-        Create exosome from cell
-        
-        Parameters:
-        -----------
-        cell_id : int
-            Source cell
-        oncogenic : bool
-            Whether to package oncogenic content
-        
-        Returns:
-        --------
-        Exosome or None
-        """
-        if cell_id not in self.cell_genes:
+        if cell_id not in self.cell_views:
             return None
-        
+        if gene_name not in Gene.ONCOGENIC_SUBSTITUTIONS:
+            return None
+        if mutation_name not in Gene.ONCOGENIC_SUBSTITUTIONS[gene_name]:
+            return None
+        position, new_base = Gene.ONCOGENIC_SUBSTITUTIONS[gene_name][mutation_name]
+
+        view = self.cell_views[cell_id]
+        ref_base = self.reference_genome.get_reference_base(gene_name, position)
+
+        # Classify against the reference (the substitution is what the
+        # cell carries going forward; the classifier reads the reference)
+        ref_seq = self.reference_genome.get_reference_sequence(gene_name)
+        effect = self.classifier.classify_substitution(
+            coding_sequence=ref_seq,
+            position=position,
+            new_base=new_base,
+        )
+
+        # Apply the delta to the view
+        view.add_substitution(gene_name, position, new_base, mutation_id=mutation_name)
+
+        # Flag oncogenic if classifier reports significant impact OR the
+        # named mutation is a known driver (KRAS/BRAF flagged as oncogene
+        # baseline, TP53 as tumor suppressor; either way a named hotspot
+        # mutation is by convention treated as cancer-driving here)
+        is_driver = effect.impact_score >= 0.4 or mutation_name in {
+            "G12D", "G12V", "G13D", "V600E", "R175H", "R248W",
+        }
+        if is_driver:
+            self.cell_oncogene_flags.setdefault(cell_id, set()).add(gene_name)
+
+        mutation = Mutation(
+            position=position,
+            original=ref_base,
+            mutant=new_base,
+            mutation_type="substitution",
+            name=mutation_name,
+            oncogenic=is_driver,
+            effect=effect,
+        )
+
+        self.total_mutations += 1
+        self.emit_event(EventTypes.MUTATION_OCCURRED, {
+            'cell_id': cell_id,
+            'gene': gene_name,
+            'mutation': mutation_name,
+            'oncogenic': is_driver,
+            'impact_score': effect.impact_score,
+            'aa_change': effect.aa_change,
+        })
+        return mutation
+
+    def create_exosome(self, cell_id: int, oncogenic: bool = False):
+        """Create exosome from a cell.
+
+        Oncogenic exosomes package mRNA for every gene flagged as
+        oncogenic in this cell (via cell_oncogene_flags) plus a miRNA
+        targeting TP53. The mRNA sequences are materialized from the
+        cell's CellGenomeView so they carry the cell's specific deltas.
+        """
+        if cell_id not in self.cell_views:
+            return None
+
         exosome = self.exosome_system.create_exosome(cell_id)
-        
+        view = self.cell_views[cell_id]
+
         if oncogenic:
-            # Package oncogenic mRNA
-            for gene_name, gene in self.cell_genes[cell_id].items():
-                if gene.is_oncogene:
-                    mrna = gene.transcribe()
-                    if mrna:
-                        exosome.package_mrna(mrna)
-            
-            # Package miRNA targeting tumor suppressors
+            # Package mRNA for every gene this cell carries as oncogenic
+            for gene_name in self.cell_oncogene_flags.get(cell_id, set()):
+                mrna = self._build_mrna_from_view(view, gene_name, cell_id)
+                exosome.package_mrna(mrna)
+
+            # Package miRNA targeting TP53 (tumor suppressor knockdown)
             mirna = RNA("UAAGGCACGCGGUGAAUGCC", "miR-125b", NucleicAcidType.miRNA)
             mirna.target_genes = ["TP53"]
             exosome.package_mirna(mirna)
         else:
-            # Package normal mRNA
-            if self.cell_mrnas[cell_id]:
-                mrna = self.cell_mrnas[cell_id][0]  # Take first available
+            # Package normal mRNA: take first available from cell pool
+            if self.cell_mrnas.get(cell_id):
+                mrna = self.cell_mrnas[cell_id][0]
                 exosome.package_mrna(mrna)
-        
-        # Set surface markers
+
         exosome.set_surface_markers(['CD63', 'CD81', 'integrin_alpha_v'])
-        
         return exosome
     
     def release_exosome(self, exosome, position):
@@ -273,9 +349,9 @@ class MolecularModule(SimulationModule):
         """Return current molecular state"""
         return {
             'n_genes': len(self.genes),
-            'n_cells_tracked': len(self.cell_genes),
+            'n_cells_tracked': len(self.cell_views),
             'n_exosomes': len(self.exosome_system.exosomes),
-            'n_active_exosomes': len([e for e in self.exosome_system.exosomes 
+            'n_active_exosomes': len([e for e in self.exosome_system.exosomes
                                      if not e.uptaken and not e.is_degraded()]),
             'total_released': self.total_exosomes_released,
             'total_uptaken': self.total_exosomes_uptaken,
@@ -283,35 +359,32 @@ class MolecularModule(SimulationModule):
             'total_transcriptions': self.total_transcriptions,
             'exosome_stats': self.exosome_system.get_statistics()
         }
-    
+
     # Event handlers
     def on_cell_divided(self, data):
-        """Handle cell division - create genes for daughter cell"""
+        """Handle cell division: daughter inherits parent's deltas via fork().
+
+        This is the key memory-architecture operation: a daughter view
+        shares the same ReferenceGenome object and copies the parent's
+        delta log. Subsequent mutations on either parent or daughter
+        diverge.
+        """
         parent_id = data['cell_id']
         daughter_id = data.get('daughter_id')
-        
-        if daughter_id and parent_id in self.cell_genes:
-            # Daughter inherits parent's genes (with mutations)
-            self.cell_genes[daughter_id] = {}
-            for name, gene in self.cell_genes[parent_id].items():
-                # Copy gene with mutations
-                daughter_gene = Gene(gene.name, gene.dna.sequence, gene.gene_type)
-                daughter_gene.is_oncogene = gene.is_oncogene
-                daughter_gene.is_tumor_suppressor = gene.is_tumor_suppressor
-                # Copy mutations
-                for mutation in gene.dna.mutations:
-                    daughter_gene.dna.mutations.append(mutation)
-                
-                self.cell_genes[daughter_id][name] = daughter_gene
-            
+
+        if daughter_id and parent_id in self.cell_views:
+            self.cell_views[daughter_id] = self.cell_views[parent_id].fork()
+            # Inherit oncogene flags
+            parent_flags = self.cell_oncogene_flags.get(parent_id, set())
+            self.cell_oncogene_flags[daughter_id] = set(parent_flags)
             self.cell_mrnas[daughter_id] = []
-    
+
     def on_cell_transformed(self, data):
         """Handle cell transformation - create oncogenic exosomes"""
         cell_id = data['cell_id']
         position = data['position']
-        
-        if cell_id in self.cell_genes:
+
+        if cell_id in self.cell_views:
             # Introduce oncogenic mutations
             self.introduce_mutation(cell_id, 'KRAS', 'G12D')
             

@@ -241,6 +241,79 @@ approach (per-cell deep copy).
 
 ---
 
+## 2026-05-12 - Decision: Sprint 2b - Wire CellGenomeView into MolecularModule
+
+**Conceived by:** David Walker.
+
+**Context.** Sprint 2 built the ReferenceGenome + CellGenomeView
+architecture as a standalone library. Sprint 2b integrates it into the
+live simulator so cell-level state actually flows through the new
+data structures.
+
+**Decision.** Refactored modules/molecular_module.py:
+
+  - Removed self.cell_genes (per-cell deep Gene copies)
+  - Added self.reference_genome: ReferenceGenome (shared across cells)
+  - Added self.cell_views: Dict[int, CellGenomeView]
+  - Added self.cell_oncogene_flags: Dict[int, Set[str]]
+  - Added self.classifier: MutationEffectClassifier
+
+  Refactored methods:
+    - add_cell: creates CellGenomeView pointing at the shared reference
+    - on_cell_divided: invokes view.fork() (key memory-architecture op)
+    - on_cell_died: cleans up all per-cell dicts
+    - introduce_mutation: writes a delta to the view AND classifies via
+      the classifier; sets oncogene flag based on classifier impact
+      score (not external belief)
+    - update: transcribes by materializing the cell's view-derived
+      sequence at transcription time
+    - create_exosome: packages mRNA materialized from view (so the
+      mRNA carries the cell's specific deltas)
+    - get_state: reports view population
+
+  Kept self.genes (legacy Gene library) for backward-compat with the
+  existing tests in test_gene_library_sequences.py. It is populated at
+  initialize() from the same reference_cds source.
+
+**Patent relevance.** This sprint converts the simulator from "demonstrates
+the architecture in tests" to "uses the architecture as its actual
+runtime data substrate". An examiner running the cancer_transmission
+demo now sees the architecture in operation: 5 cells share one
+ReferenceGenome; mutations are recorded as sparse deltas; cell division
+produces forks that share the reference by Python identity.
+
+**Tests added (18):** tests/test_molecular_module_views.py
+  - Reference genome present after initialize and shared by identity
+  - cell_genes attribute is gone
+  - cells use views
+  - introduce_mutation writes deltas, classifies, flags oncogene, isolates
+    to target cell, rejects unknown/missing inputs
+  - on_cell_divided forks; parent/daughter diverge after; share ref
+  - on_cell_died cleans up
+  - oncogenic exosomes carry mutated mRNA (with G12D substitution in the
+    sequence) and the mutation log records the mutation name
+  - normal exosomes from non-mutated cells carry reference mRNA
+  - get_state reports view population
+
+**Total tests now:** 122 (was 104). Cancer transmission demo passes
+end-to-end with 3 of 4 cells transformed (stochastic, within prior range).
+
+**Pre-filing audit progress:**
+
+  - [DONE] Sprint 0: Tm fix, repo hygiene, snapshot tag
+  - [DONE] Sprint 0.5: patent artifact consolidation
+  - [DONE] Sprint 1: rule-based mutation effect classifier (Upgrade 3 Stage A)
+  - [DONE] Sprint 1b: KRAS reference fix
+  - [DONE] Sprint 1c: TP53 and BRAF reference CDSes
+  - [DONE] Sprint 2: reference-genome + per-cell-delta memory architecture
+  - [DONE] Sprint 2b: integrate views into MolecularModule
+  - [REMAINING] Upgrade 2: closed-loop neoantigen presentation
+  - [REMAINING] Upgrade 3 Stage B/C: domain-aware + ESM-2 stability
+  - [VERIFY-BEFORE-FILING] replace synthetic TP53/BRAF with NCBI authentic
+  - [DEFERRED] full clean-up of duplicate cognisom/modules/ tree
+
+---
+
 ## 2026-05-11 - Decision: TP53 and BRAF synthetic CDSes with real hotspots
 
 **Conceived by:** David Walker (Sprint 1c, following the "patch all holes"
