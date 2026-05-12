@@ -29,6 +29,15 @@ class EventTypes:
     CANCER_KILLED = 'cancer_killed'
     IMMUNE_SUPPRESSED = 'immune_suppressed'
     IMMUNE_RECRUITED = 'immune_recruited'
+
+    # Closed-loop neoantigen presentation (Upgrade 2). Ordered causally:
+    # MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
+    # CELL_KILLED_BY_TCELL. End-to-end test asserts this trace appears
+    # for a transformed cell whose neoantigen is recognized by the
+    # patient's TCR repertoire.
+    PEPTIDE_GENERATED = 'peptide_generated'
+    PEPTIDE_PRESENTED = 'peptide_presented'
+    CELL_KILLED_BY_TCELL = 'cell_killed_by_tcell'
     
     # Tissue events
     HYPOXIA_DETECTED = 'hypoxia_detected'
