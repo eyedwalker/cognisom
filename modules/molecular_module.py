@@ -261,13 +261,15 @@ class MolecularModule(SimulationModule):
         # Apply the delta to the view
         view.add_substitution(gene_name, position, new_base, mutation_id=mutation_name)
 
-        # Flag oncogenic if classifier reports significant impact OR the
-        # named mutation is a known driver (KRAS/BRAF flagged as oncogene
-        # baseline, TP53 as tumor suppressor; either way a named hotspot
-        # mutation is by convention treated as cancer-driving here)
-        is_driver = effect.impact_score >= 0.4 or mutation_name in {
-            "G12D", "G12V", "G13D", "V600E", "R175H", "R248W",
-        }
+        # Any entry in Gene.ONCOGENIC_SUBSTITUTIONS is a curated driver by
+        # definition; impact_score also promotes any high-impact substitution
+        # the classifier flags. The curated-table path is what makes adding
+        # a new hotspot (e.g., KRAS G12C) automatically inherit driver status
+        # without touching this function.
+        is_driver = (
+            effect.impact_score >= 0.4
+            or mutation_name in Gene.ONCOGENIC_SUBSTITUTIONS[gene_name]
+        )
         if is_driver:
             self.cell_oncogene_flags.setdefault(cell_id, set()).add(gene_name)
 
