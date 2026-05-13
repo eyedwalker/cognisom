@@ -30,6 +30,10 @@ from engine.py.immune.tme_classifier import (
     TMEClassification,
     classify_tme as _classify_tme,
 )
+from engine.py.spatial.ecm_barrier import (
+    detection_attenuation,
+    motility_attenuation,
+)
 
 
 @dataclass
@@ -235,6 +239,8 @@ class ImmuneModule(SimulationModule):
             'n_til': result.n_til,
             'til_ratio': result.til_ratio,
             'pdl1_positive_fraction': result.pdl1_positive_fraction,
+            'mean_ecm_density': result.mean_ecm_density,
+            'ecm_excluded': result.ecm_excluded,
             'predicted_icb_response': result.predicted_icb_response,
             'description': result.description,
         })
@@ -256,12 +262,24 @@ class ImmuneModule(SimulationModule):
             # Patrol (random walk)
             if not immune_cell.activated:
                 self._patrol(immune_cell, dt)
-                
+
+                # ECM barrier (Upgrade 6): the stromal density at the
+                # T cell's position compresses its effective sensing
+                # radius. In a fully fibrotic region a T cell may have
+                # functionally zero detection range, even though
+                # antigens are present nearby.
+                local_ecm = self.cellular_module.ecm_density_at(
+                    immune_cell.position
+                )
+                effective_detection = detection_attenuation(
+                    immune_cell.detection_radius, local_ecm,
+                )
+
                 # Look for cancer cells
                 for cancer_id, cancer_cell in cancer_cells.items():
                     distance = np.linalg.norm(immune_cell.position - cancer_cell.position)
 
-                    if distance < immune_cell.detection_radius:
+                    if distance < effective_detection:
                         recognized, tcr_match = self._recognize(
                             immune_cell, cancer_cell
                         )
@@ -335,14 +353,27 @@ class ImmuneModule(SimulationModule):
             else:
                 if immune_cell.target_cell_id in cancer_cells:
                     target = cancer_cells[immune_cell.target_cell_id]
-                    
+
                     # Move toward target
                     direction = target.position - immune_cell.position
                     distance = np.linalg.norm(direction)
-                    
+
                     if distance > 0:
+                        # ECM barrier (Upgrade 6) attenuates the T
+                        # cell's speed at its current position. The
+                        # stromal density on the path matters most;
+                        # we sample at the T cell, which is the
+                        # cheapest first-order approximation.
+                        local_ecm = (
+                            self.cellular_module.ecm_density_at(
+                                immune_cell.position
+                            )
+                        )
+                        effective_speed = motility_attenuation(
+                            immune_cell.speed, local_ecm,
+                        )
                         direction = direction / distance
-                        immune_cell.velocity = direction * immune_cell.speed
+                        immune_cell.velocity = direction * effective_speed
                         immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
                     
                     # Kill if close enough. T cells with a TCR match use
@@ -407,12 +438,23 @@ class ImmuneModule(SimulationModule):
             immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
     
     def _patrol(self, immune_cell: ImmuneCell, dt: float):
-        """Random patrol movement"""
+        """Random patrol movement, ECM-attenuated."""
         # Random walk
         direction = np.random.randn(3)
         direction = direction / (np.linalg.norm(direction) + 1e-6)
-        
-        immune_cell.velocity = direction * self.patrol_speed
+
+        # ECM barrier (Upgrade 6): patrol speed scales down with the
+        # local stromal density. A T cell wandering into a fibrotic
+        # region effectively stalls.
+        effective_speed = self.patrol_speed
+        if self.cellular_module is not None:
+            local_ecm = self.cellular_module.ecm_density_at(
+                immune_cell.position
+            )
+            effective_speed = motility_attenuation(
+                self.patrol_speed, local_ecm,
+            )
+        immune_cell.velocity = direction * effective_speed
         immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
     
     def _recognize(self, immune_cell: ImmuneCell, cancer_cell):

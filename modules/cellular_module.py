@@ -90,6 +90,15 @@ class CellState:
     # See engine/py/immune/tme_classifier.py for how this gets read.
     pdl1_expression: float = 0.0
 
+    # Local desmoplastic stroma / fibrotic ECM density in [0, 1]
+    # (Upgrade 6). Cancer cells deposit ECM proportional to their
+    # age + cell-type baseline; T-cell motility + detection radius
+    # are attenuated by the ECM density sampled at their position
+    # (see engine/py/spatial/ecm_barrier.py). High-ECM tumors
+    # exclude TILs even when neoantigens are displayed -- the
+    # "cold but mutated" PDAC phenotype.
+    local_ecm_density: float = 0.0
+
     # Closed-loop neoantigen presentation (Upgrade 2). Populated when
     # MUTATION_OCCURRED fires for this cell; each entry carries the
     # peptide + HLA allele + binding affinity for downstream TCR-pMHC
@@ -136,6 +145,28 @@ class CellularModule(SimulationModule):
         self.division_time_cancer = config.get('division_time_cancer', 12.0)  # hours
         self.glucose_consumption_normal = config.get('glucose_consumption', 0.2)
         self.glucose_consumption_cancer = config.get('glucose_consumption_cancer', 0.5)
+
+        # ECM / desmoplasia dynamics (Upgrade 6). Cancer cells deposit
+        # local stromal ECM proportional to ``ecm_deposition_rate``
+        # (units: per-hour fraction). Anti-fibrotic therapy degrades
+        # ECM at ``ecm_degradation_rate`` when ``anti_fibrotic_active``
+        # is True. Defaults model a moderately fibrotic tumor; PDAC-
+        # like configs can set the rate ~5-10x higher.
+        self.ecm_deposition_rate = float(
+            config.get('ecm_deposition_rate', 0.05)
+        )
+        self.ecm_degradation_rate = float(
+            config.get('ecm_degradation_rate', 0.10)
+        )
+        self.anti_fibrotic_active = bool(
+            config.get('anti_fibrotic_active', False)
+        )
+        # Cancer cells start with this baseline ECM at spawn time,
+        # matching the lecture's "PDAC tumors arrive with 80% stroma"
+        # observation. Override per cancer-type preset.
+        self.cancer_baseline_ecm = float(
+            config.get('cancer_baseline_ecm', 0.0)
+        )
 
         # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
         # neoantigen predictor uses; auto-picks up MHCflurry when
@@ -210,21 +241,46 @@ class CellularModule(SimulationModule):
         """Add new cell"""
         cell_id = self.next_cell_id
         self.next_cell_id += 1
-        
+
         cell = CellState(
             cell_id=cell_id,
             position=np.array(position, dtype=np.float32),
             cell_type=cell_type,
             phase='G1'
         )
-        
+        # Seed cancer cells with the configured stromal baseline (e.g.,
+        # PDAC presets arrive with 0.5-0.7 already laid down; soft-tissue
+        # tumors closer to 0.0).
+        if cell_type == 'cancer' and self.cancer_baseline_ecm > 0.0:
+            cell.local_ecm_density = float(self.cancer_baseline_ecm)
+
         self.cells[cell_id] = cell
         return cell_id
-    
+
     def remove_cell(self, cell_id: int):
         """Remove cell"""
         if cell_id in self.cells:
             del self.cells[cell_id]
+
+    def ecm_density_at(
+        self,
+        position,
+        sample_radius_um: float = 30.0,
+    ) -> float:
+        """Sample the local ECM density at a 3D position.
+
+        Returns the mean ``local_ecm_density`` of cancer cells within
+        ``sample_radius_um`` of ``position``. Used by the immune module
+        to gate T-cell motility + detection radius (Upgrade 6 ECM
+        barrier). Result is clamped to [0, 1]; positions outside any
+        tumor return 0.0.
+        """
+        from engine.py.spatial.ecm_barrier import ecm_density_at
+        cancers = [
+            c for c in self.cells.values()
+            if c.cell_type == 'cancer' and c.alive
+        ]
+        return ecm_density_at(position, cancers, sample_radius_um)
     
     def update(self, dt: float):
         """Update all cells"""
@@ -237,9 +293,24 @@ class CellularModule(SimulationModule):
             
             # Age
             cell.age += dt
-            
+
             # Metabolism
             self._update_metabolism(cell, dt)
+
+            # ECM dynamics (Upgrade 6). Cancer cells continuously
+            # remodel their local stroma; anti-fibrotic therapy
+            # degrades ECM uniformly when active.
+            if cell.cell_type == 'cancer':
+                if self.anti_fibrotic_active:
+                    cell.local_ecm_density = max(
+                        0.0,
+                        cell.local_ecm_density - self.ecm_degradation_rate * dt,
+                    )
+                else:
+                    cell.local_ecm_density = min(
+                        1.0,
+                        cell.local_ecm_density + self.ecm_deposition_rate * dt,
+                    )
             
             # Check for division
             division_time = (self.division_time_cancer if cell.cell_type == 'cancer' 

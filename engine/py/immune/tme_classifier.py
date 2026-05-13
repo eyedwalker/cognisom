@@ -50,6 +50,11 @@ DEFAULT_PDL1_FRAC_POS: float = 0.25
 DEFAULT_PDL1_PER_CELL_POS: float = 0.5  # a single cell is PD-L1+ at this level
 DEFAULT_TIL_PROXIMITY_UM: float = 20.0  # within this radius of a cancer cell
 
+# ECM threshold above which the tumor is classified "stromally dense"
+# enough to plausibly exclude TILs (Upgrade 6). 0.4 picks up tumors in
+# the moderately-fibrotic regime; PDAC presets typically land at 0.7+.
+DEFAULT_ECM_EXCLUDED_THRESHOLD: float = 0.4
+
 
 class TMEType(str, Enum):
     """Four TME categories from Teng et al. 2015."""
@@ -113,6 +118,16 @@ class TMEClassification:
         Fraction of cancer cells with pdl1_expression >= the per-cell
         threshold. The tumor as a whole is classified PD-L1+ when this
         is at least ``pdl1_fraction_threshold``.
+    mean_ecm_density:
+        Average ``local_ecm_density`` across cancer cells. Drives the
+        ``ecm_excluded`` flag below.
+    ecm_excluded:
+        True iff the tumor is TIL-negative AND has high stromal
+        density AND its cancer cells display at least one MHC-I
+        neoantigen. This is a clinically actionable sub-classification
+        of Teng Type II: instead of "no antigens / cold and unfixable",
+        the patient has *antigens behind a wall* -- a candidate for
+        anti-fibrotic + ICB combo (Upgrade 6).
     tme_type:
         One of the four Teng categories.
     predicted_icb_response:
@@ -129,6 +144,8 @@ class TMEClassification:
     tme_type: TMEType
     predicted_icb_response: str
     description: str
+    mean_ecm_density: float = 0.0
+    ecm_excluded: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +219,7 @@ def classify_tme(
     pdl1_per_cell_threshold: float = DEFAULT_PDL1_PER_CELL_POS,
     til_proximity_um: float = DEFAULT_TIL_PROXIMITY_UM,
     immune_type_filter: Optional[Tuple[str, ...]] = ("T_cell",),
+    ecm_excluded_threshold: float = DEFAULT_ECM_EXCLUDED_THRESHOLD,
 ) -> TMEClassification:
     """Classify the TME state into one of Teng's four types.
 
@@ -258,8 +276,24 @@ def classify_tme(
     n_pdl1_pos = _count_pdl1_positive(cancer_list, pdl1_per_cell_threshold)
     pdl1_frac = n_pdl1_pos / n_cancer
 
+    # Mean ECM density across the tumor + any-neoantigen-displayed
+    # check (Upgrade 6). The exclusion flag fires when the tumor is
+    # cold *despite* carrying neoantigens behind a fibrotic wall.
+    ecm_values = [
+        float(getattr(c, "local_ecm_density", 0.0)) for c in cancer_list
+    ]
+    mean_ecm = float(np.mean(ecm_values)) if ecm_values else 0.0
+    any_antigens = any(
+        getattr(c, "mhc1_displayed_peptides", None) for c in cancer_list
+    )
+
     til_positive = til_ratio >= til_ratio_threshold
     pdl1_positive = pdl1_frac >= pdl1_fraction_threshold
+    ecm_excluded = (
+        not til_positive
+        and mean_ecm >= ecm_excluded_threshold
+        and any_antigens
+    )
 
     if til_positive and pdl1_positive:
         t = TMEType.TYPE_I
@@ -270,6 +304,19 @@ def classify_tme(
     else:  # til_positive and not pdl1_positive
         t = TMEType.TYPE_IV
 
+    description = _DESCRIPTION[t]
+    if ecm_excluded:
+        # Override the Type-II / Type-III description with the
+        # actionable ECM-exclusion narrative when the flag fires.
+        description = (
+            "ECM-excluded (Upgrade 6 sub-classification of Type "
+            f"{t.value}): TILs are absent and mean stromal density is "
+            f"{mean_ecm:.2f}, yet the tumor carries neoantigens that "
+            "would be MHC-presentable. The barrier is physical, not "
+            "antigenic -- candidate for anti-fibrotic + ICB combination "
+            "(e.g., PDAC-style desmoplasia, Herzog et al. 2023 in NSCLC)."
+        )
+
     return TMEClassification(
         n_cancer_cells=n_cancer,
         n_til=n_til,
@@ -279,5 +326,7 @@ def classify_tme(
         pdl1_fraction_threshold=pdl1_fraction_threshold,
         tme_type=t,
         predicted_icb_response=_ICB_RESPONSE[t],
-        description=_DESCRIPTION[t],
+        description=description,
+        mean_ecm_density=mean_ecm,
+        ecm_excluded=ecm_excluded,
     )
