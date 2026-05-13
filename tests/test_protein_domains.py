@@ -76,12 +76,28 @@ def test_every_curated_domain_has_well_formed_range():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("gene,codon,expected_domain_name", [
+    # Core three (curated CDSes in cognisom)
     ("KRAS", 12, "P-loop"),
     ("KRAS", 13, "P-loop"),
     ("BRAF", 600, "Activation loop"),
     ("TP53", 175, "DNA-binding domain"),
     ("TP53", 248, "DNA-binding domain"),
     ("TP53", 273, "DNA-binding domain"),
+    # Expanded panel (TCGA Pan-Cancer top drivers, Bailey et al. 2018)
+    ("PIK3CA", 545, "Helical domain"),
+    ("PIK3CA", 1047, "Kinase domain"),
+    ("PTEN", 130, "Phosphatase domain"),
+    ("PTEN", 124, "Phosphatase domain"),
+    ("EGFR", 858, "Kinase activation loop"),
+    ("NRAS", 61, "Switch II"),
+    ("IDH1", 132, "Substrate-binding domain"),
+    ("IDH2", 140, "Substrate-binding domain"),
+    ("RB1", 552, "Pocket domain A"),
+    ("AR", 877, "Ligand-binding domain"),
+    ("AR", 702, "Ligand-binding domain"),
+    ("FGFR3", 249, "Immunoglobulin-like III"),
+    ("BRCA1", 1755, "BRCT repeats"),
+    ("CDH1", 200, "Cadherin repeat 1 (EC1)"),
 ])
 def test_canonical_hotspots_resolve_to_critical_domain(
     gene, codon, expected_domain_name
@@ -90,6 +106,26 @@ def test_canonical_hotspots_resolve_to_critical_domain(
     assert d is not None, f"{gene} codon {codon} not in any annotated domain"
     assert d.name == expected_domain_name
     assert d.role == "critical"
+
+
+def test_expanded_panel_covers_20_plus_cancer_drivers():
+    """Patent-claim breadth: the domain table covers a clinically
+    meaningful panel of cancer driver genes, not just the three
+    canonical hotspots used for the closed-loop demo."""
+    from engine.py.molecular.protein_domains import DOMAINS
+    assert len(DOMAINS) >= 20, (
+        f"expanded driver panel has only {len(DOMAINS)} genes; "
+        "patent breadth claim expects >= 20"
+    )
+    # Every annotated gene must contribute at least one critical-role
+    # domain so the multiplier path produces a meaningful signal for
+    # its hotspots.
+    for gene, domains in DOMAINS.items():
+        roles = {d.role for d in domains}
+        assert "critical" in roles, (
+            f"{gene} has no critical-role domain; classifier cannot "
+            "produce a 4x multiplier for any mutation in this gene"
+        )
 
 
 def test_braf_activation_loop_beats_kinase_domain_at_v600():
