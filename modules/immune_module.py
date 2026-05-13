@@ -26,6 +26,10 @@ from core.event_bus import EventTypes
 from engine.py.immune.mhc_loading import MHCPresentation
 from engine.py.immune.tcr_repertoire import TCRMatch, TCRRepertoire
 from engine.py.immune.tcell_kill import kill_outcome
+from engine.py.immune.tme_classifier import (
+    TMEClassification,
+    classify_tme as _classify_tme,
+)
 
 
 @dataclass
@@ -193,7 +197,46 @@ class ImmuneModule(SimulationModule):
     def set_cellular_module(self, cellular_module):
         """Link to cellular module for target access"""
         self.cellular_module = cellular_module
-    
+
+    def classify_tme(self, **kwargs) -> TMEClassification:
+        """Classify the current tumor microenvironment into Teng's
+        4-type scheme (Cancer Res 2015) and emit a TME_CLASSIFIED
+        event with the result.
+
+        Reads cancer cells from the linked cellular module and immune
+        cells from this module's population. Keyword args are forwarded
+        to ``engine.py.immune.tme_classifier.classify_tme`` so callers
+        can override TIL / PD-L1 thresholds at the call site.
+
+        Returns the TMEClassification dataclass; also emits a
+        TME_CLASSIFIED event whose data dict contains the resolved
+        ``tme_type`` (as a string), TIL / PD-L1 counts, and the
+        clinical-readout fields ``predicted_icb_response`` and
+        ``description``.
+        """
+        if self.cellular_module is None:
+            raise RuntimeError(
+                "ImmuneModule.classify_tme requires a linked cellular "
+                "module; call set_cellular_module() first."
+            )
+        cancer_cells = [
+            c for c in self.cellular_module.cells.values()
+            if c.cell_type == 'cancer' and c.alive
+        ]
+        immune_cells = list(self.immune_cells.values())
+        result = _classify_tme(cancer_cells, immune_cells, **kwargs)
+
+        self.emit_event(EventTypes.TME_CLASSIFIED, {
+            'tme_type': result.tme_type.value,
+            'n_cancer_cells': result.n_cancer_cells,
+            'n_til': result.n_til,
+            'til_ratio': result.til_ratio,
+            'pdl1_positive_fraction': result.pdl1_positive_fraction,
+            'predicted_icb_response': result.predicted_icb_response,
+            'description': result.description,
+        })
+        return result
+
     def update(self, dt: float):
         """Update immune system"""
         if not self.cellular_module:
@@ -226,6 +269,16 @@ class ImmuneModule(SimulationModule):
                             self.total_activations += 1
                             if tcr_match is not None:
                                 self.total_tcr_recognitions += 1
+                                # Adaptive PD-L1 induction (Type I TME
+                                # mechanism): an activated TCR-pMHC
+                                # engagement releases IFN-gamma, which
+                                # paramedically up-regulates PD-L1 on
+                                # the target tumor cell. Bumped per
+                                # engagement, clamped to 1.0.
+                                cancer_cell.pdl1_expression = float(min(
+                                    1.0,
+                                    cancer_cell.pdl1_expression + 0.5,
+                                ))
 
                             self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
                                 'immune_id': immune_id,

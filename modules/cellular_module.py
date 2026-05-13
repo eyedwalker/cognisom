@@ -35,6 +35,29 @@ from engine.py.molecular.peptidome import (
 DEFAULT_HLA_ALLELES = ("HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02")
 
 
+# Oncogenes known to drive intrinsic PD-L1 expression (Type III TME
+# in Teng et al. 2015). The per-cell baseline is how much PD-L1
+# expression each oncogene contributes when the cell carries an
+# oncogenic flag for that gene. Multiple matching oncogenes stack
+# additively, clamped at 1.0.
+# Sources: Spranger 2015 (PI3K/AKT); Casey 2016 (MYC); Akbay 2013
+# (EGFR mutant NSCLC drives PD-L1 via ERK/MAPK).
+_INTRINSIC_PDL1_INDUCERS = {
+    "PIK3CA": 0.35,
+    "MYC": 0.30,
+    "EGFR": 0.40,
+}
+
+
+def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
+    """Sum the intrinsic PD-L1 contributions of any matching oncogenes,
+    clamped to [0, 1]. ``oncogenes`` is an iterable of gene names."""
+    if not oncogenes:
+        return 0.0
+    total = sum(_INTRINSIC_PDL1_INDUCERS.get(g, 0.0) for g in oncogenes)
+    return float(max(0.0, min(1.0, total)))
+
+
 @dataclass
 class CellState:
     """State of a single cell"""
@@ -54,6 +77,18 @@ class CellState:
     # Cancer properties
     mhc1_expression: float = 1.0
     mutations: List[str] = None
+
+    # PD-L1 surface expression in [0, 1]. Two induction modes:
+    #   * adaptive (Type I TME, Teng et al. 2015): bumped by
+    #     IFN-gamma signalling from activated T cells in the
+    #     vicinity (the immune module increments this on
+    #     IMMUNE_ACTIVATED).
+    #   * intrinsic (Type III TME): bumped at transformation time
+    #     for cancer cells carrying oncogenes known to constitutively
+    #     induce PD-L1 (PIK3CA, MYC, EGFR per the cancer-immunology
+    #     literature -- Spranger / Pardoll).
+    # See engine/py/immune/tme_classifier.py for how this gets read.
+    pdl1_expression: float = 0.0
 
     # Closed-loop neoantigen presentation (Upgrade 2). Populated when
     # MUTATION_OCCURRED fires for this cell; each entry carries the
@@ -147,10 +182,13 @@ class CellularModule(SimulationModule):
             x = 120 + np.random.uniform(-15, 15)
             y = 120 + np.random.uniform(-15, 15)
             z = 50 + np.random.uniform(-5, 5)
-            
+
             cell_id = self.add_cell(position=[x, y, z], cell_type='cancer')
             self.cells[cell_id].mutations = ['KRAS_G12D']
             self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
+            # KRAS alone does not drive intrinsic PD-L1, so this stays
+            # at 0; PIK3CA/MYC/EGFR mutations would bump it here via
+            # _intrinsic_pdl1_for_oncogenes.
         
         # Initialize MHC loader (Upgrade 2). Construction reaches into
         # NeoantigenPredictor which instantiates a GeneProteinMapper;
@@ -390,6 +428,19 @@ class CellularModule(SimulationModule):
 
         if cell_id not in self.cells or self.molecular_module is None:
             return
+
+        # Intrinsic PD-L1 induction (Type III TME mechanism): some
+        # oncogenes constitutively up-regulate PD-L1 via downstream
+        # signalling independent of TIL pressure. Fire this as soon as
+        # the mutation lands, regardless of whether we go on to
+        # generate a presentable neoantigen.
+        if gene and data.get('oncogenic') and gene in _INTRINSIC_PDL1_INDUCERS:
+            cell = self.cells[cell_id]
+            cell.pdl1_expression = float(min(
+                1.0,
+                cell.pdl1_expression + _INTRINSIC_PDL1_INDUCERS[gene],
+            ))
+
         if not gene or not aa_change:
             return
 

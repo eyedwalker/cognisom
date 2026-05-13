@@ -38,6 +38,11 @@ class EventTypes:
     PEPTIDE_GENERATED = 'peptide_generated'
     PEPTIDE_PRESENTED = 'peptide_presented'
     CELL_KILLED_BY_TCELL = 'cell_killed_by_tcell'
+
+    # TME 4-type classification (Teng et al., Cancer Res 2015).
+    # Emitted when ImmuneModule.classify_tme() is called; data carries
+    # the full TMEClassification dataclass fields plus the resolved type.
+    TME_CLASSIFIED = 'tme_classified'
     
     # Tissue events
     HYPOXIA_DETECTED = 'hypoxia_detected'
