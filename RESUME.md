@@ -1,9 +1,10 @@
 # Resume Point - Cognisom Pre-Filing Patent Sprint
 
-**Last session:** 2026-05-12 (continued)
+**Last session:** 2026-05-13
 **Branch:** main
-**Latest commit:** Upgrade 3 Stage B (domain-aware missense impact)
-**Tests passing:** 234 (patent-evidence + Upgrade-2 unit + closed-loop end-to-end + Stage B)
+**Latest commit:** Upgrade 3 Stage C (ESM-2 zero-shot stability composition)
+**Tests passing:** 271 (+1 opt-in real-ESM smoke skipped)
+**Filing readiness:** all four pre-filing gaps closed; remaining items are housekeeping (duplicate package tree, cleanup of pre-existing test_registry failures).
 
 ## How to resume
 
@@ -18,9 +19,12 @@ Then say something like: "resume cognisom patent sprint - check RESUME.md".
 
 ## Where we are
 
-The pre-filing audit on the cognisom molecular layer is more than half done.
-Upgrades 1 and 2 from `UPGRADES_SPEC.md` are complete and landed (USC 101
-anchors). Upgrade 3 Stage A is in. Stages B and C remain.
+The pre-filing audit on the cognisom molecular layer is now complete.
+All three upgrades from `UPGRADES_SPEC.md` are landed (Upgrade 1 +
+Upgrade 2 = USC 101 anchors; Upgrade 3 Stages A/B/C = USC 103
+differentiator). All four pre-filing checklist gaps -- authentic
+NCBI CDSes, VCF round-trip, expanded driver-gene panel, ESM-2
+stability -- are closed.
 
 ### Sprints completed
 
@@ -38,7 +42,11 @@ anchors). Upgrade 3 Stage A is in. Stages B and C remain.
 | 2d - Upgrade 2 part 1: peptidome / MHC / TCR / kill | c131efc | Upgrade 2 primitives |
 | 2e - Upgrade 2 part 2: closed-loop integration + e2e | 9f47de7 | Upgrade 2 (USC 101 anchor) |
 | 2f - Upgrade 2 patent-evidence demo (closed loop) | 1e561a9 | Upgrade 2 visible evidence |
-| 3B - Upgrade 3 Stage B: UniProt domain multiplier | (this session) | Upgrade 3 Stage B |
+| 3B - Upgrade 3 Stage B: UniProt domain multiplier | 2e17718 | Upgrade 3 Stage B |
+| pre-filing #1 - authentic NCBI CDSes (KRAS/TP53/BRAF) | fe49568 | enablement / §112 |
+| pre-filing #2 - VCF round-trip end-to-end test | 3bdd733 | end-to-end provenance |
+| pre-filing #4 - 21-gene driver panel for Stage B | 0b15a87 | patent claim breadth |
+| 3C - Upgrade 3 Stage C: ESM-2 stability composition | 9489543 | Upgrade 3 Stage C (USC 103 differentiator) |
 
 ### Closed-loop neoantigen pipeline (Upgrade 2)
 
@@ -68,20 +76,28 @@ Integration:
   displayed peptides; kill probability uses `tcell_kill.kill_outcome`;
   T-cell kills emit `CELL_KILLED_BY_TCELL` with full provenance.
 
-### Remaining work
+### Stage C composition (Upgrade 3)
 
-- **Upgrade 3 Stage C** (ESM-2 protein language model) - zero-shot
-  stability prediction for arbitrary mutations; replaces the current
-  rule-based-only impact score with biophysics-derived modifiers.
-  Optional GPU; ESM-2-150M runs on CPU in ~2s per inference. The
-  strongest USC 103 differentiator vs PhysiCell + COSMIC-lookup
-  competitors.
-- **Verify-before-filing items**:
-  - Replace synthetic TP53_CDS and BRAF_CDS with authentic NM_000546.6
-    / NM_004333.6 CDSes via Biopython (`engine/py/molecular/reference_cds.py`
-    has the VERIFY-BEFORE-FILING note)
-  - Delete or shim the duplicate `cognisom/engine/` and `cognisom/modules/`
-    package tree (causes the 9 pre-existing test_registry failures)
+The classifier composes three orthogonal signals into the missense
+impact score (a USC 103 differentiator vs prior-art classifiers that
+use at most one or two):
+
+  Stage A (BLOSUM62)        -- evolutionary conservation
+  Stage B (UniProt domains) -- functional-region proximity (1.5x-4x)
+  Stage C (ESM-2 dLL)       -- biophysics-grounded stability
+
+Stage C is wired through `MolecularModule.set_esm_scorer(scorer)`.
+The scorer interface is duck-typed; the production path uses
+`RealESMStabilityScorer` (HuggingFace transformers + ESM-2 150M),
+test fixtures use `StubESMStabilityScorer`. Opt-in real-ESM smoke
+test: `ENABLE_ESM_SMOKE=1 pytest tests/test_esm_stability.py`.
+
+### Remaining work (housekeeping only -- not patent-load-bearing)
+
+- Delete or shim the duplicate `cognisom/engine/` and `cognisom/modules/`
+  package tree (causes the 9 pre-existing `test_registry` failures).
+- Pre-existing `test_ode_solver::test_cell_heterogeneity` failure
+  (parameter-noise CV; unrelated to patent surface).
 
 ## Key file pointers
 
@@ -107,11 +123,22 @@ Integration:
   closed-loop neoantigen primitives (Upgrade 2)
 - `engine/py/molecular/peptidome.py` - peptide generation around
   mutation sites (Upgrade 2)
+- `engine/py/molecular/protein_domains.py` - 21-gene UniProt domain
+  panel for Stage B multiplier
+- `engine/py/molecular/esm_stability.py` - ESM-2 zero-shot stability
+  scoring (Stage C); Real + Stub scorers
 - `examples/patent_evidence/sprint2_module_demo.py` - end-to-end
   evidence for Upgrade 1 (reference-identity + per-cell delta)
-- `tests/test_closed_loop_neoantigen.py` - end-to-end event-trace
-  assertion for Upgrade 2
-- `tests/test_*.py` - 214 patent-evidence + Upgrade 2 unit + closed-loop tests
+- `examples/patent_evidence/upgrade2_closed_loop_demo.py` - end-to-end
+  evidence for Upgrade 2 (claims A sensitivity, B HLA restriction,
+  C wild-type negative)
+- `tests/test_closed_loop_neoantigen.py` - event-trace assertion
+- `tests/test_vcf_round_trip.py` - raw VCF -> simulation -> kill
+  with provenance (closes the "we never read DNA" critique)
+- `tests/test_esm_stability.py` - Stage C unit tests + opt-in
+  real-ESM smoke test
+- `tests/test_*.py` - 271 patent-evidence + Upgrade 2 unit +
+  closed-loop + Stage B/C tests
 
 ## Snapshot tags
 
