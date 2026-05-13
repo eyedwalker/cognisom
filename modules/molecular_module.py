@@ -84,6 +84,14 @@ class MolecularModule(SimulationModule):
         # the oncogene flag based on classifier output, not external belief)
         self.classifier = MutationEffectClassifier()
 
+        # Optional ESM-2 zero-shot stability scorer (Upgrade 3 Stage C).
+        # When set via set_esm_scorer(scorer), every missense
+        # introduce_mutation also calls the scorer and the resulting
+        # delta-log-likelihood composes with the BLOSUM + domain
+        # impact. Default None means Stage C is silently skipped --
+        # classifier falls back to Stage A + B behaviour.
+        self.esm_scorer = None
+
         # Exosome system
         self.exosome_system = None
 
@@ -161,6 +169,21 @@ class MolecularModule(SimulationModule):
         self.cell_views.pop(cell_id, None)
         self.cell_oncogene_flags.pop(cell_id, None)
         self.cell_mrnas.pop(cell_id, None)
+
+    def set_esm_scorer(self, scorer) -> None:
+        """Plug an ESM-2 stability scorer into the classifier path.
+
+        Once set, every missense introduce_mutation also passes the
+        translated WT protein + this scorer to the classifier, which
+        composes the Stage C dLL with the Stage A + B impact. Pass
+        ``None`` to disable (silently fall back to Stage A + B).
+        The scorer object must implement ``score_substitution(
+        protein_sequence, position_1based, wild_type_aa, mutant_aa)
+        -> ESMStabilityResult``; use ``RealESMStabilityScorer`` for the
+        production HuggingFace path or ``StubESMStabilityScorer`` for
+        tests / graceful-degradation paths.
+        """
+        self.esm_scorer = scorer
 
     def get_reference_protein(self, gene_name: str) -> str:
         """Translate the reference DNA sequence for this gene into the
@@ -270,15 +293,21 @@ class MolecularModule(SimulationModule):
 
         # Classify against the reference (the substitution is what the
         # cell carries going forward; the classifier reads the reference).
-        # gene_name is forwarded so the classifier can apply the
-        # Upgrade 3 Stage B domain multiplier when the codon falls in
-        # a curated functional region.
+        # gene_name is forwarded so the classifier can apply the Stage B
+        # domain multiplier; protein_sequence + esm_scorer are forwarded
+        # when Stage C (ESM-2 stability) has been wired in via
+        # set_esm_scorer.
         ref_seq = self.reference_genome.get_reference_sequence(gene_name)
+        protein_seq: Optional[str] = None
+        if self.esm_scorer is not None:
+            protein_seq = self.get_reference_protein(gene_name) or None
         effect = self.classifier.classify_substitution(
             coding_sequence=ref_seq,
             position=position,
             new_base=new_base,
             gene_name=gene_name,
+            protein_sequence=protein_seq,
+            esm_scorer=self.esm_scorer,
         )
 
         # Apply the delta to the view

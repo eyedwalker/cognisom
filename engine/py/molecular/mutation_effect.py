@@ -32,6 +32,14 @@ from engine.py.molecular.protein_domains import (
     domain_at_codon as _domain_at_codon,
 )
 
+# Upgrade 3 Stage C: optional ESM-2 zero-shot stability scoring.
+# The classifier never imports ESM-2 itself; the caller injects a
+# scorer that implements the ESMStabilityScorer protocol. Keeps the
+# heavy ML dependency optional.
+from engine.py.molecular.esm_stability import (
+    apply_stability_to_impact as _apply_stability_to_impact,
+)
+
 
 # ---------------------------------------------------------------------------
 # Genetic code (standard, table 1)
@@ -171,6 +179,16 @@ class MutationEffect:
     domain_role: Optional[str] = None
     domain_multiplier: float = 1.0
 
+    # Upgrade 3 Stage C: ESM-2 zero-shot stability. Populated when the
+    # caller passes an ``esm_scorer`` AND a ``protein_sequence`` to
+    # classify_substitution(). delta_log_likelihood is the ESM-2
+    # output (negative = destabilizing); stability_modifier is its
+    # [0, 1] mapping used to compose with Stage A + B; esm_model_name
+    # records which variant produced the score for audit purposes.
+    esm_delta_log_likelihood: Optional[float] = None
+    esm_stability_modifier: Optional[float] = None
+    esm_model_name: Optional[str] = None
+
 
 # ---------------------------------------------------------------------------
 # Classifier
@@ -205,6 +223,8 @@ class MutationEffectClassifier:
         new_base: str,
         cds_start: int = 0,
         gene_name: Optional[str] = None,
+        protein_sequence: Optional[str] = None,
+        esm_scorer=None,
     ) -> MutationEffect:
         """Classify a substitution.
 
@@ -230,6 +250,21 @@ class MutationEffectClassifier:
             The base score, multiplier, and the resolved domain are all
             recorded on the returned MutationEffect. When omitted, the
             classifier behaves exactly as Stage A.
+        protein_sequence : str, optional
+            Wild-type protein sequence for the gene being mutated. Used
+            only when ``esm_scorer`` is also supplied; required in that
+            case so the scorer can read context residues around the
+            mutation site. If the classifier needs to translate the CDS
+            internally instead, the caller should pass the translated
+            sequence here rather than relying on a built-in translator
+            (keeps the classifier framework-free).
+        esm_scorer : ESMStabilityScorer, optional
+            When supplied along with ``protein_sequence``, the missense
+            path queries the scorer for a delta-log-likelihood at the
+            mutation site (Upgrade 3 Stage C) and composes it with the
+            Stage A + B impact. The scorer interface is duck-typed
+            (anything with ``score_substitution(seq, pos, wt, mut) ->
+            ESMStabilityResult``). Use StubESMStabilityScorer for tests.
         """
         ref = coding_sequence.upper().replace('U', 'T')
         new_base = new_base.upper().replace('U', 'T')
@@ -389,9 +424,58 @@ class MutationEffectClassifier:
             )
             multiplier = domain.impact_multiplier if domain is not None else 1.0
             if multiplier > 1.0:
-                impact = min(self._MISSENSE_IMPACT_MAX, base_impact * multiplier)
+                stage_b_impact = min(
+                    self._MISSENSE_IMPACT_MAX, base_impact * multiplier
+                )
             else:
-                impact = base_impact
+                stage_b_impact = base_impact
+
+            # Stage C: optional ESM-2 zero-shot stability composition.
+            esm_delta_ll: Optional[float] = None
+            esm_modifier: Optional[float] = None
+            esm_model: Optional[str] = None
+            impact = stage_b_impact
+            if esm_scorer is not None and protein_sequence:
+                # codon_index is 0-based; ESM expects 1-based position
+                # in the protein sequence. The scorer will validate that
+                # ``protein_sequence[position-1] == wt_aa`` -- callers
+                # that supply a desynced sequence get a loud error.
+                try:
+                    esm_result = esm_scorer.score_substitution(
+                        protein_sequence=protein_sequence,
+                        position_1based=codon_index + 1,
+                        wild_type_aa=wt_aa,
+                        mutant_aa=mut_aa,
+                    )
+                    esm_delta_ll = float(esm_result.delta_log_likelihood)
+                    esm_modifier = float(esm_result.stability_modifier)
+                    esm_model = esm_result.model_name
+                    impact = _apply_stability_to_impact(
+                        stage_b_impact, esm_modifier,
+                        ceiling=self._MISSENSE_IMPACT_MAX,
+                    )
+                except Exception:
+                    # ESM scoring is advisory. If it fails (model not
+                    # loaded, bad input, etc.), fall back to Stage B.
+                    # The MutationEffect carries esm_* = None so the
+                    # caller can see ESM did not contribute.
+                    impact = stage_b_impact
+
+            notes = (
+                f"missense at codon {codon_index+1}: "
+                f"{wt_codon}({wt_aa})->{mut_codon}({mut_aa})"
+            )
+            if domain is not None:
+                notes += (
+                    f"; in {domain.gene}/{domain.name} ({domain.role}), "
+                    f"BLOSUM impact {base_impact:.2f} x{multiplier:.1f} "
+                    f"= Stage B {stage_b_impact:.2f}"
+                )
+            if esm_modifier is not None:
+                notes += (
+                    f"; ESM modifier {esm_modifier:.2f} "
+                    f"(dLL={esm_delta_ll:+.2f}) -> impact {impact:.2f}"
+                )
             return MutationEffect(
                 category="missense",
                 impact_score=impact,
@@ -400,18 +484,13 @@ class MutationEffectClassifier:
                 wild_type_aa=wt_aa,
                 mutant_aa=mut_aa,
                 codon_index=codon_index,
-                notes=(
-                    f"missense at codon {codon_index+1}: "
-                    f"{wt_codon}({wt_aa})->{mut_codon}({mut_aa})"
-                    + (
-                        f"; in {domain.gene}/{domain.name} ({domain.role}), "
-                        f"impact {base_impact:.2f}x{multiplier:.1f}={impact:.2f}"
-                        if domain is not None else ""
-                    )
-                ),
+                notes=notes,
                 domain_name=domain.name if domain is not None else None,
                 domain_role=domain.role if domain is not None else None,
                 domain_multiplier=multiplier,
+                esm_delta_log_likelihood=esm_delta_ll,
+                esm_stability_modifier=esm_modifier,
+                esm_model_name=esm_model,
             )
 
         # Fallthrough (should not occur)
