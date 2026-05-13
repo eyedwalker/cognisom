@@ -62,6 +62,8 @@ class KillOutcome:
     checkpoint_block: float
     combined_signal: float   # the value fed into the Hill curve
     kill_probability: float
+    is_exhausted: bool = False
+    exhaustion_multiplier: float = 1.0
 
 
 def kill_probability(
@@ -71,27 +73,47 @@ def kill_probability(
     checkpoint_block: float = 0.0,
     hill_threshold: float = DEFAULT_HILL_THRESHOLD,
     hill_slope: float = DEFAULT_HILL_SLOPE,
+    is_exhausted: bool = False,
+    exhaustion_multiplier: float = 0.1,
 ) -> float:
     """Probability that this TCR-pMHC encounter results in cell death.
 
     All inputs are clamped to [0, 1]. The combined signal is
 
         signal = affinity * mhc_level * costimulation
-                 + (1 - costimulation) * checkpoint_block * 0.5
+                 + (1 - costimulation) * checkpoint_block * 0.5     [precursor only]
 
-    The second term gives checkpoint inhibitors a partial rescue path
-    when costimulation is weak. The final probability is
+    The second (checkpoint-rescue) term is GATED on the engaging T
+    cell being a PD-1-lo precursor; exhausted PD-1-hi clones are not
+    rescuable by ICB (Dolina et al. 2021, lecture slide 52). Without
+    this gate, the formula would imply ICB rescues every dysfunctional
+    T cell, which is the rule-based-only error the Stage-D exhaustion
+    model is specifically built to correct.
+
+    Exhausted clones additionally get their entire kill probability
+    multiplied by ``exhaustion_multiplier`` (default 0.1): they retain
+    residual cytotoxicity but at a fraction of the precursor pool.
+
+    The final probability is
 
         p = signal^slope / (signal^slope + threshold^slope)
 
-    which is a Hill function with EC50 = threshold.
+    which is a Hill function with EC50 = threshold, optionally scaled
+    down for exhausted clones.
     """
     a = _clamp01(affinity)
     m = _clamp01(mhc_level)
     c = _clamp01(costimulation)
     b = _clamp01(checkpoint_block)
+    mult = _clamp01(exhaustion_multiplier)
 
-    signal = a * m * c + (1.0 - c) * b * 0.5
+    if is_exhausted:
+        # No checkpoint rescue for exhausted T cells -- they remain
+        # locked at the PD-1-hi dysfunctional state regardless of
+        # how much PD-1 is blocked at the surface.
+        signal = a * m * c
+    else:
+        signal = a * m * c + (1.0 - c) * b * 0.5
     signal = max(0.0, min(1.0, signal))
 
     if signal <= 0:
@@ -100,7 +122,10 @@ def kill_probability(
     thr = max(1e-6, hill_threshold)
     num = signal ** slope
     den = num + thr ** slope
-    return float(num / den)
+    p = float(num / den)
+    if is_exhausted:
+        p *= mult
+    return max(0.0, min(1.0, p))
 
 
 def kill_outcome(
@@ -110,16 +135,26 @@ def kill_outcome(
     checkpoint_block: float = 0.0,
     hill_threshold: float = DEFAULT_HILL_THRESHOLD,
     hill_slope: float = DEFAULT_HILL_SLOPE,
+    is_exhausted: bool = False,
+    exhaustion_multiplier: float = 0.1,
 ) -> KillOutcome:
     """Same as ``kill_probability`` but returns the full decomposition."""
     a = _clamp01(affinity)
     m = _clamp01(mhc_level)
     c = _clamp01(costimulation)
     b = _clamp01(checkpoint_block)
-    signal = a * m * c + (1.0 - c) * b * 0.5
+    mult = _clamp01(exhaustion_multiplier)
+    if is_exhausted:
+        signal = a * m * c
+    else:
+        signal = a * m * c + (1.0 - c) * b * 0.5
     signal = max(0.0, min(1.0, signal))
     p = kill_probability(
-        a, m, c, b, hill_threshold=hill_threshold, hill_slope=hill_slope,
+        a, m, c, b,
+        hill_threshold=hill_threshold,
+        hill_slope=hill_slope,
+        is_exhausted=is_exhausted,
+        exhaustion_multiplier=exhaustion_multiplier,
     )
     return KillOutcome(
         affinity=a,
@@ -128,6 +163,8 @@ def kill_outcome(
         checkpoint_block=b,
         combined_signal=signal,
         kill_probability=p,
+        is_exhausted=is_exhausted,
+        exhaustion_multiplier=mult,
     )
 
 

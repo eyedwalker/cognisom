@@ -43,6 +43,14 @@ class EventTypes:
     # Emitted when ImmuneModule.classify_tme() is called; data carries
     # the full TMEClassification dataclass fields plus the resolved type.
     TME_CLASSIFIED = 'tme_classified'
+
+    # T-cell exhaustion transition (Dolina et al. 2021, Wherry / Bengsch
+    # exhaustion literature). Fires once per clone when its encounter
+    # counter crosses the exhaustion threshold and it transitions from
+    # PD-1-lo precursor to PD-1-hi exhausted. The patent-evidence point
+    # is gating ICB rescue on the precursor pool: this event marks
+    # clones that have left it.
+    TCELL_EXHAUSTED = 'tcell_exhausted'
     
     # Tissue events
     HYPOXIA_DETECTED = 'hypoxia_detected'

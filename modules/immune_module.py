@@ -121,6 +121,9 @@ class ImmuneModule(SimulationModule):
         self.total_activations = 0
         self.total_recruited = 0
         self.total_tcr_recognitions = 0
+        # Cumulative count of clones that have transitioned from PD-1-lo
+        # precursor to PD-1-hi exhausted during this run.
+        self.total_exhaustion_transitions = 0
 
         # Reference to cellular module (for target cells)
         self.cellular_module = None
@@ -279,6 +282,40 @@ class ImmuneModule(SimulationModule):
                                     1.0,
                                     cancer_cell.pdl1_expression + 0.5,
                                 ))
+                                # Chronic-antigen exhaustion bookkeeping
+                                # (Dolina 2021, lecture slide 52): every
+                                # recognized engagement increments the
+                                # clone's encounter counter. When the
+                                # exhaustion threshold is crossed, the
+                                # clone transitions from PD-1-lo
+                                # precursor to PD-1-hi exhausted and we
+                                # fire a TCELL_EXHAUSTED event so
+                                # downstream consumers (analytics, ICB
+                                # response models) can see it.
+                                new_count, did_exhaust = (
+                                    self._tcr_repertoire.register_engagement(
+                                        tcr_match.tcr.tcr_id
+                                    )
+                                )
+                                if did_exhaust:
+                                    self.total_exhaustion_transitions += 1
+                                    self.emit_event(
+                                        EventTypes.TCELL_EXHAUSTED,
+                                        {
+                                            'tcr_id': tcr_match.tcr.tcr_id,
+                                            'cdr3': tcr_match.tcr.cdr3,
+                                            'encounter_count': new_count,
+                                            'target_id': cancer_id,
+                                            'peptide': (
+                                                tcr_match.presentation
+                                                .peptide.sequence
+                                            ),
+                                            'mutation': (
+                                                tcr_match.presentation
+                                                .peptide.mutation_label
+                                            ),
+                                        },
+                                    )
 
                             self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
                                 'immune_id': immune_id,
@@ -313,6 +350,48 @@ class ImmuneModule(SimulationModule):
                     # costim); NK / macrophage retain the baseline flat
                     # probability.
                     if distance < immune_cell.kill_radius:
+                        # Continuous-contact engagement: every step a
+                        # T cell sits on its target, the clone
+                        # accumulates engagement signal (real-biology
+                        # chronic-antigen exposure). This is what
+                        # drives precursor -> exhausted transition
+                        # over time even when the tumor doesn't die.
+                        if (
+                            immune_cell.cell_type == 'T_cell'
+                            and immune_cell.active_tcr_match is not None
+                        ):
+                            tcr_id = (
+                                immune_cell.active_tcr_match.tcr.tcr_id
+                            )
+                            new_count, did_exhaust = (
+                                self._tcr_repertoire.register_engagement(
+                                    tcr_id
+                                )
+                            )
+                            if did_exhaust:
+                                self.total_exhaustion_transitions += 1
+                                pres = (
+                                    immune_cell.active_tcr_match.presentation
+                                )
+                                self.emit_event(
+                                    EventTypes.TCELL_EXHAUSTED,
+                                    {
+                                        'tcr_id': tcr_id,
+                                        'cdr3': (
+                                            immune_cell.active_tcr_match
+                                            .tcr.cdr3
+                                        ),
+                                        'encounter_count': new_count,
+                                        'target_id': (
+                                            immune_cell.target_cell_id
+                                        ),
+                                        'peptide': pres.peptide.sequence,
+                                        'mutation': (
+                                            pres.peptide.mutation_label
+                                        ),
+                                    },
+                                )
+
                         p_kill = self._target_kill_probability(
                             immune_cell, target
                         )
@@ -385,11 +464,17 @@ class ImmuneModule(SimulationModule):
         """
         if (immune_cell.cell_type == 'T_cell'
                 and immune_cell.active_tcr_match is not None):
+            match = immune_cell.active_tcr_match
             outcome = kill_outcome(
-                affinity=immune_cell.active_tcr_match.affinity,
+                affinity=match.affinity,
                 mhc_level=getattr(target_cell, 'mhc1_expression', 1.0),
                 costimulation=self.costimulation,
                 checkpoint_block=self.checkpoint_block,
+                # Lecture slide 52: exhausted clones cannot be rescued
+                # by checkpoint blockade. Pass through the match's
+                # exhaustion state so kill_outcome gates the rescue
+                # term and applies the exhaustion multiplier.
+                is_exhausted=match.is_exhausted,
             )
             return outcome.kill_probability
         return self.kill_probability

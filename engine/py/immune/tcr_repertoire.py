@@ -28,7 +28,8 @@ from __future__ import annotations
 import hashlib
 import math
 from dataclasses import dataclass, field
-from typing import Iterable, List, Optional, Sequence
+from enum import Enum
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -37,6 +38,34 @@ from engine.py.immune.mhc_loading import MHCPresentation
 
 FEATURE_DIM: int = 16
 _SIGMOID_SCALE: float = 4.0  # see ``affinity()`` for rationale
+
+
+# Exhaustion machinery (Dolina et al. 2021; lecture slides 51-52).
+# Threshold is the number of TCR-pMHC engagements before a clone
+# transitions from PD-1-lo precursor to PD-1-hi exhausted. Empirical
+# chronic-antigen models put this in the 3-10 range; 5 is the default.
+EXHAUSTION_ENCOUNTER_THRESHOLD: int = 5
+
+# Multiplier applied to an exhausted clone's contribution to kill
+# probability. Clinical observation (Dolina): exhausted TILs retain
+# some cytotoxicity but at a fraction of the precursor pool. 0.1
+# matches the order-of-magnitude reduction observed in chronic LCMV
+# and tumor models.
+EXHAUSTED_KILL_MULTIPLIER: float = 0.1
+
+
+class ExhaustionState(str, Enum):
+    """T-cell exhaustion state per Dolina et al. 2021.
+
+    PRECURSOR: PD-1-lo, fully functional. Rescuable by checkpoint
+    blockade -- this is the pool that ICB expands.
+    EXHAUSTED: PD-1-hi, dysfunctional. NOT rescued by checkpoint
+    blockade alone; this is the patent-evidence-relevant
+    distinction the lecture (slide 52) flagged as missing in
+    rule-based prior art.
+    """
+    PRECURSOR = "precursor"
+    EXHAUSTED = "exhausted"
 # Synthetic CDR3 length range -- the real distribution is V-J recombination
 # biased toward 12-18 amino acids. We use a similar bias so the repertoire
 # has realistic-looking diversity even though sequences are random.
@@ -78,11 +107,24 @@ class TCR:
 
 @dataclass(frozen=True)
 class TCRMatch:
-    """A TCR-pMHC affinity assessment."""
+    """A TCR-pMHC affinity assessment.
+
+    exhaustion_state and encounter_count are populated by
+    TCRRepertoire.best_match from the repertoire's per-clone exhaustion
+    bookkeeping. Downstream consumers (kill probability, ICB rescue
+    gating) read these to decide whether the match can be rescued by
+    checkpoint blockade.
+    """
     tcr: TCR
     presentation: MHCPresentation
     affinity: float           # in [0, 1]
     is_recognized: bool       # affinity >= recognition_threshold
+    exhaustion_state: ExhaustionState = ExhaustionState.PRECURSOR
+    encounter_count: int = 0
+
+    @property
+    def is_exhausted(self) -> bool:
+        return self.exhaustion_state is ExhaustionState.EXHAUSTED
 
 
 # ---------------------------------------------------------------------------
@@ -178,11 +220,23 @@ class TCRRepertoire:
         size: int = 1000,
         recognition_threshold: float = 0.7,
         seed: int = 0,
+        exhaustion_threshold: int = EXHAUSTION_ENCOUNTER_THRESHOLD,
     ):
         self.size = int(size)
         self.recognition_threshold = float(recognition_threshold)
+        self.exhaustion_threshold = int(exhaustion_threshold)
         self._rng = np.random.default_rng(seed)
         self.tcrs: List[TCR] = self._generate(self.size)
+
+        # Per-clone exhaustion bookkeeping. Every TCR starts as a
+        # PRECURSOR with zero encounters; each successful TCR-pMHC
+        # engagement (recorded via register_engagement) increments
+        # the counter, and crossing exhaustion_threshold transitions
+        # the clone to EXHAUSTED.
+        self._encounters: Dict[str, int] = {t.tcr_id: 0 for t in self.tcrs}
+        self._states: Dict[str, ExhaustionState] = {
+            t.tcr_id: ExhaustionState.PRECURSOR for t in self.tcrs
+        }
 
     def _generate(self, size: int) -> List[TCR]:
         tcrs: List[TCR] = []
@@ -207,7 +261,10 @@ class TCRRepertoire:
         """Find the highest-affinity TCR for this pMHC.
 
         Returns None if the repertoire is empty. The returned TCRMatch
-        has ``is_recognized`` set when affinity >= recognition_threshold.
+        has ``is_recognized`` set when affinity >= recognition_threshold
+        and carries the matched clone's current ``exhaustion_state``
+        and ``encounter_count`` for downstream kill-probability and
+        ICB-rescue gating.
         """
         if not self.tcrs:
             return None
@@ -220,11 +277,14 @@ class TCRRepertoire:
         affinities = 1.0 / (1.0 + np.exp(-_SIGMOID_SCALE * cosines))
         idx = int(np.argmax(affinities))
         aff = float(affinities[idx])
+        chosen = self.tcrs[idx]
         return TCRMatch(
-            tcr=self.tcrs[idx],
+            tcr=chosen,
             presentation=presentation,
             affinity=aff,
             is_recognized=aff >= self.recognition_threshold,
+            exhaustion_state=self._states[chosen.tcr_id],
+            encounter_count=self._encounters[chosen.tcr_id],
         )
 
     def recognized_matches(
@@ -238,3 +298,53 @@ class TCRRepertoire:
             if match is not None and match.is_recognized:
                 out.append(match)
         return out
+
+    # ----- exhaustion bookkeeping -------------------------------------
+
+    def register_engagement(self, tcr_id: str) -> Tuple[int, bool]:
+        """Record one successful TCR-pMHC engagement.
+
+        Increments the clone's encounter counter and, when the
+        threshold is crossed, transitions the clone from PRECURSOR
+        to EXHAUSTED. The transition is one-way -- exhaustion is
+        epigenetically enforced in the real biology (Bengsch /
+        Wherry), so we model it as terminal here.
+
+        Returns
+        -------
+        (new_count, did_exhaust)
+            new_count: the encounter counter after the increment.
+            did_exhaust: True only on the engagement that causes the
+            PRECURSOR -> EXHAUSTED transition. False on every
+            subsequent engagement of an already-exhausted clone.
+        """
+        if tcr_id not in self._encounters:
+            raise KeyError(f"unknown TCR id {tcr_id!r}")
+        new_count = self._encounters[tcr_id] + 1
+        self._encounters[tcr_id] = new_count
+        did_exhaust = False
+        if (
+            self._states[tcr_id] is ExhaustionState.PRECURSOR
+            and new_count >= self.exhaustion_threshold
+        ):
+            self._states[tcr_id] = ExhaustionState.EXHAUSTED
+            did_exhaust = True
+        return new_count, did_exhaust
+
+    def exhaustion_state(self, tcr_id: str) -> ExhaustionState:
+        return self._states[tcr_id]
+
+    def encounters(self, tcr_id: str) -> int:
+        return self._encounters[tcr_id]
+
+    def precursor_count(self) -> int:
+        return sum(
+            1 for s in self._states.values()
+            if s is ExhaustionState.PRECURSOR
+        )
+
+    def exhausted_count(self) -> int:
+        return sum(
+            1 for s in self._states.values()
+            if s is ExhaustionState.EXHAUSTED
+        )
