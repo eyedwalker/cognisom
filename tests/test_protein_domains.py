@@ -189,11 +189,11 @@ def test_stage_a_path_unchanged_without_gene_name(clf):
 def test_missense_outside_any_domain_no_multiplier(clf):
     """Mutate a position in KRAS that's between annotated domains.
 
-    The curated KRAS CDS in reference_cds covers only the 51 N-terminal
-    codons (G12/G13 hotspot region). Codons 18-29 fall between the
-    P-loop end (codon 17) and Switch I start (codon 30) -- a true
-    linker stretch in the GTPase fold with no functional annotation
-    in protein_domains._KRAS. Stage B must leave impact unchanged here.
+    The authentic KRAS CDS (NM_004985.5, 188 aa) carries the full
+    GTPase fold. Codons 18-29 fall between the P-loop end (codon 17)
+    and Switch I start (codon 30) -- a true linker stretch with no
+    functional annotation in protein_domains._KRAS. Stage B must leave
+    impact unchanged here.
     """
     from engine.py.molecular.reference_cds import KRAS_CDS
 

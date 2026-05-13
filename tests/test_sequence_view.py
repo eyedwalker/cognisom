@@ -154,7 +154,8 @@ def test_iter_codons_does_not_overrun(genome, view):
     """iter_codons must not yield partial trailing codons."""
     codons = list(view.iter_codons("KRAS"))
     kras_len = genome.length("KRAS")
-    # KRAS length must be divisible by 3 (it is: 153 = 51*3)
+    # KRAS authentic CDS length must be divisible by 3 (567 = 189*3,
+    # including the stop codon).
     assert len(codons) == kras_len // 3
 
 

@@ -124,12 +124,10 @@ class MolecularModule(SimulationModule):
     def _create_gene_library(self):
         """Create library of genes from engine.py.molecular.data.reference_cds.
 
-        KRAS uses the real NM_004985.5 CDS prefix (51 codons covering the
-        G12/G13 hotspot). TP53 and BRAF use synthetic CDSes that place
-        their canonical oncogenic hotspots (R175H/R248W and V600E) at the
-        correct codon positions; see reference_cds.py for the construction
-        details and VERIFY-BEFORE-FILING note. All three sequences are
-        import-time validated at codon resolution.
+        All three reference CDSes are authentic NCBI sequences inlined in
+        reference_cds.py: KRAS (NM_004985.5, 188 aa), TP53 (NM_000546.6,
+        393 aa), BRAF (NM_004333.6, 766 aa). Hotspots are validated at
+        codon resolution at module-import time.
         """
         from engine.py.molecular.reference_cds import (
             KRAS_CDS, TP53_CDS, BRAF_CDS,

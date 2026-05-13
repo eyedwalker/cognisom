@@ -95,9 +95,9 @@ def _build_naive_population(genome, n_cells: int, n_mutations_per_cell: int):
 
 # --- The actual benchmark --------------------------------------------------
 
-# Stock cognisom genome is 3 genes totaling ~3636 bases:
-#   KRAS 153, TP53 1182, BRAF 2301
-# Naive cost per cell: ~3636 bytes (one string of length ~3636 per cell)
+# Stock cognisom genome is 3 genes totaling 4050 bases (authentic CDSes):
+#   KRAS 567 (NM_004985.5), TP53 1182 (NM_000546.6), BRAF 2301 (NM_004333.6)
+# Naive cost per cell: ~4050 bytes (one string of length ~4050 per cell)
 # Plus Python object overhead: ~200-500 bytes per cell.
 
 N_CELLS = 10_000
