@@ -34,6 +34,12 @@ from engine.py.spatial.ecm_barrier import (
     detection_attenuation,
     motility_attenuation,
 )
+from engine.py.immune.sympathetic import (
+    DEFAULT_MAX_SUPPRESSION,
+    SympatheticState,
+    sympathetic_attenuation,
+    sympathetic_state,
+)
 
 
 @dataclass
@@ -117,6 +123,15 @@ class ImmuneModule(SimulationModule):
         # studies (immunotherapy ON / OFF).
         self.costimulation = float(config.get('costimulation', 0.6))
         self.checkpoint_block = float(config.get('checkpoint_block', 0.0))
+
+        # Sympathetic / β2-adrenergic axis (Upgrade 7). Patient
+        # chronic-stress proxy + propranolol-style β-blocker rescue.
+        # See engine/py/immune/sympathetic.py for the rationale.
+        self.stress_level = float(config.get('stress_level', 0.0))
+        self.beta_blocker = float(config.get('beta_blocker', 0.0))
+        self.sympathetic_max_suppression = float(
+            config.get('sympathetic_max_suppression', DEFAULT_MAX_SUPPRESSION)
+        )
         self._tcr_repertoire: Optional[TCRRepertoire] = None
 
         # Statistics
@@ -204,6 +219,33 @@ class ImmuneModule(SimulationModule):
     def set_cellular_module(self, cellular_module):
         """Link to cellular module for target access"""
         self.cellular_module = cellular_module
+
+    def set_stress(
+        self,
+        stress_level: Optional[float] = None,
+        beta_blocker: Optional[float] = None,
+    ) -> SympatheticState:
+        """Runtime control of the sympathetic axis.
+
+        Update one or both knobs (``stress_level``, ``beta_blocker``)
+        and return the resulting SympatheticState snapshot. Useful for
+        treatment-arm experiments: e.g., run the engine, then call
+        ``imm.set_stress(beta_blocker=1.0)`` mid-run to model the
+        addition of propranolol.
+        """
+        if stress_level is not None:
+            self.stress_level = float(stress_level)
+        if beta_blocker is not None:
+            self.beta_blocker = float(beta_blocker)
+        return self.get_sympathetic_state()
+
+    def get_sympathetic_state(self) -> SympatheticState:
+        """Current SympatheticState given module configuration."""
+        return sympathetic_state(
+            self.stress_level,
+            self.beta_blocker,
+            max_suppression=self.sympathetic_max_suppression,
+        )
 
     def classify_tme(self, **kwargs) -> TMEClassification:
         """Classify the current tumor microenvironment into Teng's
@@ -518,7 +560,17 @@ class ImmuneModule(SimulationModule):
                 # term and applies the exhaustion multiplier.
                 is_exhausted=match.is_exhausted,
             )
-            return outcome.kill_probability
+            # Sympathetic suppression (Upgrade 7): β2AR drive scales
+            # T-cell function down; β-blocker rescues. Composes with
+            # the affinity / MHC / costim / exhaustion axes as a
+            # final multiplicative gate -- the cleanest place to add
+            # it because every other knob has already resolved.
+            sympathetic_mult = sympathetic_attenuation(
+                self.stress_level,
+                self.beta_blocker,
+                max_suppression=self.sympathetic_max_suppression,
+            )
+            return outcome.kill_probability * sympathetic_mult
         return self.kill_probability
 
     def _kill_target(self, immune_cell: ImmuneCell, target_cell):
