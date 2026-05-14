@@ -1,5 +1,5 @@
 """
-Page 32: Patent Pipeline — full closed-loop demonstrator
+Page 42: Patent Pipeline — full closed-loop demonstrator
 ========================================================
 
 Single-page surface for the eight patent-evidence upgrades:
@@ -31,9 +31,11 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 import numpy as np
 import streamlit as st
 
-# Ensure repo root is on sys.path so engine.py + modules resolve when
-# Streamlit invokes this page from any cwd.
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# Ensure repo root is on sys.path so engine.py + modules + core
+# resolve when Streamlit invokes this page from any cwd. From this
+# file's location (cognisom/dashboard/_pages/42_patent_pipeline.py),
+# parents[3] is the repo root.
+REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -45,7 +47,7 @@ st.set_page_config(
 
 try:
     from cognisom.auth.middleware import streamlit_page_gate
-    user = streamlit_page_gate("32_patent_pipeline")
+    user = streamlit_page_gate("42_patent_pipeline")
 except Exception:
     user = None
 
