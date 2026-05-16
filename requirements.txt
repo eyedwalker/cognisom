@@ -53,6 +53,27 @@ boto3>=1.34.0  # AWS SDK for Secrets Manager
 # GPU-accelerated physics (Warp bundles its own CUDA runtime)
 warp-lang>=1.0.0
 
+# Neoantigen MHC-I binding prediction. The patent pipeline's MHCLoader
+# (engine/py/immune/mhc_loading.py) and the MAD pipeline's
+# NeoantigenPredictor (cognisom/genomics/neoantigen_predictor.py) both
+# prefer MHCflurry when available and fall back to a position-weight
+# matrix scorer when not. Pinning the version here eliminates the drift
+# risk flagged in docs/patent/MAD_INTEGRATION_AUDIT.md (two parallel
+# installations loading different model versions).
+#
+# Production note: as of 2026-05-16 the production container does NOT
+# install MHCflurry (PWM fallback is active). To enable the published
+# MHCflurry path in prod, uncomment the line below AND add
+# ``RUN mhcflurry-downloads fetch`` to the Dockerfile to bake the model
+# weights into the image (~600 MB; first-run-without-cache is otherwise
+# slow). The PWM fallback is correct for the patent claim; MHCflurry is
+# the production-grade upgrade.
+# mhcflurry==2.0.6
+#
+# Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
+# default; the real path requires transformers + torch.
+# transformers>=4.30.0
+# torch>=2.0.0
+
 # Optional: GPU support (install separately if you have NVIDIA GPU)
-# torch>=2.0.0  # Uncomment if you have CUDA-capable GPU
 # cupy-cuda12x>=12.0.0  # Uncomment for CUDA 12.x support

@@ -94,15 +94,120 @@ with st.sidebar:
     )
 
     if mutation_class == "missense":
-        driver = st.selectbox(
-            "Driver mutation",
-            options=[
-                "KRAS G12D", "KRAS G12V", "BRAF V600E",
-                "TP53 R175H", "TP53 R248W",
-            ],
+        source = st.radio(
+            "Mutation source",
+            options=["Curated examples", "Upload patient VCF"],
             index=0,
+            help=(
+                "Curated examples drive the pipeline with the six "
+                "canonical patent-evidence hotspots. Upload patient VCF "
+                "parses a real VCF (e.g., from Tempus / Foundation / "
+                "Caris / in-house) and resolves driver mutations via "
+                "the MAD-pipeline adapter; only mutations in the "
+                "patent-pipeline curated CDS set (KRAS, TP53, BRAF) "
+                "will be drivable."
+            ),
         )
-        gene, mut_label = driver.split(" ")
+
+        if source == "Curated examples":
+            driver = st.selectbox(
+                "Driver mutation",
+                options=[
+                    "KRAS G12D", "KRAS G12V", "BRAF V600E",
+                    "TP53 R175H", "TP53 R248W",
+                ],
+                index=0,
+            )
+            gene, mut_label = driver.split(" ")
+        else:  # Upload patient VCF
+            uploaded_vcf = st.file_uploader(
+                "Patient VCF (.vcf or .vcf.txt)",
+                type=["vcf", "txt"],
+                help=(
+                    "Standard VCF 4.x with GENE / AA_CHANGE / "
+                    "CONSEQUENCE INFO fields (SnpEff ANN and VEP CSQ "
+                    "annotations are also supported)."
+                ),
+            )
+            if uploaded_vcf is None:
+                st.info(
+                    "Upload a VCF to continue, or switch back to "
+                    "Curated examples."
+                )
+                st.stop()
+
+            # Parse + adapt
+            from cognisom.genomics.mutation_adapter import (
+                adapt_patient_profile,
+            )
+            from cognisom.genomics.vcf_parser import VCFParser
+
+            try:
+                vcf_text = uploaded_vcf.getvalue().decode("utf-8")
+            except UnicodeDecodeError as exc:
+                st.error(f"Could not decode VCF as UTF-8: {exc}")
+                st.stop()
+
+            try:
+                variants = VCFParser().parse_text(vcf_text)
+            except Exception as exc:
+                st.error(f"VCF parse error: {exc}")
+                st.stop()
+
+            # Wrap parsed variants in a minimal profile shim so the
+            # adapter sees the cancer_driver_mutations field it expects.
+            class _ProfileShim:
+                def __init__(self, vs):
+                    self.cancer_driver_mutations = vs
+                    self.coding_variants = None
+                    self.variants = vs
+            profile = _ProfileShim(variants)
+            drivable, rejections = adapt_patient_profile(profile)
+
+            st.caption(
+                f"Parsed {len(variants)} variants; "
+                f"{len(drivable)} drivable through the patent pipeline, "
+                f"{len(rejections)} not drivable."
+            )
+
+            if not drivable:
+                st.warning(
+                    "No driver mutations in this VCF map to the "
+                    "patent-pipeline curated CDS set (KRAS / TP53 / "
+                    "BRAF). Expand the curated set in "
+                    "engine/py/molecular/reference_cds.py + "
+                    "ONCOGENIC_SUBSTITUTIONS to support more genes. "
+                    "See the rejections below for details."
+                )
+                with st.expander("Why each variant was rejected"):
+                    for r in rejections[:20]:
+                        st.write(
+                            f"  • **{r.gene}** {r.protein_change}: "
+                            f"{r.reason}"
+                        )
+                st.stop()
+
+            chosen = st.selectbox(
+                f"Drivable mutations from VCF ({len(drivable)} found)",
+                options=[f"{g} {m}" for g, m in drivable],
+                index=0,
+            )
+            gene, mut_label = chosen.split(" ")
+
+            if rejections:
+                with st.expander(
+                    f"{len(rejections)} variants not drivable "
+                    "(click to inspect)"
+                ):
+                    for r in rejections[:30]:
+                        st.write(
+                            f"  • **{r.gene}** {r.protein_change}: "
+                            f"{r.reason}"
+                        )
+                    if len(rejections) > 30:
+                        st.caption(
+                            f"... and {len(rejections) - 30} more"
+                        )
     elif mutation_class == "frameshift":
         gene = st.selectbox(
             "Gene", options=["BRCA2", "BRCA1", "CDK12", "PTEN"], index=0,
