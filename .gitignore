@@ -5,6 +5,10 @@ __pycache__/
 *.so
 .Python
 build/
+
+# Microsoft Office lock files (~$Document.docx, ~$Spreadsheet.xlsx)
+# Auto-created whenever Word / Excel / PowerPoint has a doc open.
+~$*
 develop-eggs/
 dist/
 downloads/
