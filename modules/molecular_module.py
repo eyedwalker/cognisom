@@ -240,13 +240,35 @@ class MolecularModule(SimulationModule):
         # Check for exosome uptake events
         for exosome in self.exosome_system.exosomes:
             if exosome.uptaken and not hasattr(exosome, 'processed'):
+                # Surface the cargo's oncogenic mutations as (gene, label)
+                # pairs so the receiver-side handler can apply them as
+                # sparse deltas (horizontal genome transfer).
+                cargo_mutations = []
+                seen = set()
+                for mrna in exosome.cargo.mrnas:
+                    gene_name = getattr(mrna, 'from_gene', None)
+                    if not gene_name:
+                        continue
+                    for mut in getattr(mrna, 'mutations', []):
+                        if not getattr(mut, 'oncogenic', False):
+                            continue
+                        label = getattr(mut, 'name', None)
+                        if not label:
+                            continue
+                        key = (gene_name, label)
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        cargo_mutations.append(key)
+
                 self.emit_event(EventTypes.EXOSOME_UPTAKEN, {
                     'exosome_id': exosome.id,
                     'cell_id': exosome.uptake_cell_id,
                     'cargo': {
                         'n_mrnas': len(exosome.cargo.mrnas),
                         'n_mirnas': len(exosome.cargo.mirnas),
-                        'oncogenic': exosome.cargo.has_oncogenic_content()
+                        'oncogenic': exosome.cargo.has_oncogenic_content(),
+                        'mutations': cargo_mutations,
                     }
                 })
                 exosome.processed = True
@@ -434,15 +456,21 @@ class MolecularModule(SimulationModule):
             self.cell_mrnas[daughter_id] = []
 
     def on_cell_transformed(self, data):
-        """Handle cell transformation - create oncogenic exosomes"""
+        """Handle cell transformation - create oncogenic exosomes.
+
+        Cells that already carry an oncogene flag (set by an upstream
+        ``introduce_mutation``, e.g. via the exosome horizontal-transfer
+        wire) skip the legacy hardcoded KRAS G12D so the same delta is
+        not written twice. The oncogenic-exosome release still fires for
+        both paths so downstream cells can be exposed.
+        """
         cell_id = data['cell_id']
         position = data['position']
 
         if cell_id in self.cell_views:
-            # Introduce oncogenic mutations
-            self.introduce_mutation(cell_id, 'KRAS', 'G12D')
-            
-            # Create and release oncogenic exosome
+            if not self.cell_oncogene_flags.get(cell_id):
+                self.introduce_mutation(cell_id, 'KRAS', 'G12D')
+
             exosome = self.create_exosome(cell_id, oncogenic=True)
             if exosome:
                 self.release_exosome(exosome, position)

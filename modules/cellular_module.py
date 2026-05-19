@@ -461,13 +461,26 @@ class CellularModule(SimulationModule):
 
     # Event handlers
     def on_exosome_uptaken(self, data):
-        """Handle exosome uptake - check for transformation"""
+        """Handle exosome uptake.
+
+        Oncogenic cargo can transform a normal recipient (30% probability).
+        On transformation, cargo mutations are written into the recipient's
+        CellGenomeView as sparse deltas BEFORE the cell-type flip, so
+        daughter cells inherit the transmitted mutation through
+        CellGenomeView.fork() (Claim 4 architecture) and the
+        MUTATION_OCCURRED chain engages for the recipient (Claim 1 chain).
+        """
         cell_id = data['cell_id']
 
         if cell_id in self.cells and data['cargo']['oncogenic']:
-            # Oncogenic cargo can transform cell
             if self.cells[cell_id].cell_type == 'normal':
                 if np.random.random() < 0.3:  # 30% chance
+                    cargo_mutations = data.get('cargo', {}).get('mutations', [])
+                    if self.molecular_module is not None:
+                        for gene_name, mutation_label in cargo_mutations:
+                            self.molecular_module.introduce_mutation(
+                                cell_id, gene_name, mutation_label
+                            )
                     self.transform_cell(cell_id)
 
     def on_cancer_killed(self, data):
