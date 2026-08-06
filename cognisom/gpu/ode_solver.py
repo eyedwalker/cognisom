@@ -217,6 +217,13 @@ class ODESystem:
         Shared model parameters
     stiff : bool
         Whether the system is stiff (affects default method)
+    gpu_bdf_compatible : bool
+        Whether this system matches the hardcoded 2-species mass-action model
+        baked into the built-in BDF CUDA kernels. Those kernels ignore
+        ``rhs_func`` and only solve a 2x2 Newton system, so they produce correct
+        results for that one model and silently wrong results for anything else.
+        Systems must opt in explicitly; everything else uses the CPU BDF path,
+        which solves the real ``rhs_func``.
     """
     n_species: int
     species_names: List[str]
@@ -225,6 +232,7 @@ class ODESystem:
     jacobian_func: Optional[Callable] = None
     parameters: Dict[str, float] = field(default_factory=dict)
     stiff: bool = True
+    gpu_bdf_compatible: bool = False
 
     @staticmethod
     def gene_expression_2species() -> "ODESystem":
@@ -272,6 +280,8 @@ class ODESystem:
                 'k_deg_prot': 0.5,   # 1/hour (half-life ~1.4 h)
             },
             stiff=False,
+            # This is exactly the model the built-in BDF CUDA kernels implement.
+            gpu_bdf_compatible=True,
         )
 
     @staticmethod
@@ -428,6 +438,7 @@ class BatchedODEIntegrator:
         self._jac_kernel = None
         self._newton_kernel = None
         self._error_kernel = None
+        self._gpu_bdf_warned = False
 
         if self._backend.has_gpu:
             self._compile_kernels()
@@ -569,11 +580,39 @@ class BatchedODEIntegrator:
                 self._step_rk45()
 
     def _step_bdf(self):
-        """BDF (implicit) step for stiff systems."""
-        if self._backend.has_gpu and self._newton_kernel is not None:
+        """BDF (implicit) step for stiff systems.
+
+        The GPU kernels hardcode a 2-species mass-action RHS/Jacobian and only
+        perform the Newton update when ``n_species == 2``. For any other system
+        they would leave the state completely unchanged while still reporting
+        success, so the GPU path is used only for systems that explicitly declare
+        compatibility; everything else falls back to the CPU solver, which
+        integrates the system's real ``rhs_func``.
+        """
+        if self._can_use_gpu_bdf():
             self._step_bdf_gpu()
         else:
             self._step_bdf_cpu()
+
+    def _can_use_gpu_bdf(self) -> bool:
+        """Whether the GPU BDF kernels can correctly integrate this system."""
+        if not self._backend.has_gpu or self._newton_kernel is None:
+            return False
+
+        if self.system.n_species != 2 or not self.system.gpu_bdf_compatible:
+            if not self._gpu_bdf_warned:
+                log.warning(
+                    "GPU BDF kernels only support the built-in 2-species "
+                    "mass-action model (system '%s' has %d species, "
+                    "gpu_bdf_compatible=%s). Falling back to the CPU BDF solver.",
+                    ",".join(self.system.species_names[:4]) or "unnamed",
+                    self.system.n_species,
+                    self.system.gpu_bdf_compatible,
+                )
+                self._gpu_bdf_warned = True
+            return False
+
+        return True
 
     def _step_bdf_gpu(self):
         """GPU BDF step using CUDA kernels."""

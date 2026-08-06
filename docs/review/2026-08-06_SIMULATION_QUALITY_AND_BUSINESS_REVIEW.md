@@ -170,3 +170,33 @@ truth-in-labeling*, not more features.
 3. Honestly label the TCR recognition step at the API boundary; scaffold TCRdist3.
 4. Fix diffusion sub-cycling (`grid.py`); delete the two empty stubs.
 5. Gate or retract GPU-ODE claims; add a regression test on the default BDF path.
+
+---
+
+## 5. Status — correctness fixes applied (2026-08-06)
+
+Fixed in this branch, with regression tests in `tests/test_correctness_fixes.py`
+(mirrored to `cognisom/tests/`). All changed files exist in both the top-level and
+nested `cognisom/` trees and were kept byte-identical.
+
+| # | Defect | Fix |
+|---|---|---|
+| 1 | Twin RNG seeded on drug name only; used global `np.random.seed` | Per-`(patient, treatment)` `np.random.default_rng` seeded via `hashlib` (stable across processes; global RNG untouched) |
+| 2 | `eval/simulation_accuracy.py` fabricated `simulated = observed ± noise` in two places; fake sequential PMIDs | Fabrication removed — benchmarks that cannot run are reported as `NOT EVALUATED`, excluded from pass rate/metrics; grade returns `N/A` when nothing ran; fake PMIDs replaced with `UNVERIFIED — citation required` and every built-in benchmark marked `verified: False` |
+| 3 | Diffusion took one clamped sub-step instead of covering the requested `dt` | Sub-cycles `ceil(dt/dt_stable)` stable steps, with a capped-substep warning |
+| 4 | **Diffusion did not conserve mass** (1000 → 1634 units) — `np.roll` implies periodic BCs, then the boundary copy injected material each step | Replaced with replicated ghost-cell (`np.pad(..., mode='edge')`) Laplacian, which *is* the no-flux condition and conserves mass to round-off |
+| 5 | Ribosome constraint was a no-op (`is_translating` never written) | Finite ribosome pool consumed across all mRNAs within a step, reset each `step()`; flags now maintained |
+| 6 | GPU BDF kernels no-op for `n_species != 2` yet report success | `ODESystem.gpu_bdf_compatible` opt-in; incompatible systems fall back to the real CPU solver with a warning |
+| 7 | Empty `mutations.py` / `proteins.py` stubs **shadowed** the real `Mutation` dataclass via `molecular/__init__.py` | Stubs deleted; the real `Mutation` from `nucleic_acids.py` is re-exported |
+
+Defect #4 was not in the original review — it was uncovered by writing a
+mass-conservation test for #3.
+
+**Not addressed** (needs a design decision, not a bug fix): the hash-random TCR
+recognition in `engine/py/immune/tcr_repertoire.py`, which requires substituting a
+real sequence-based model such as TCRdist3. Also unaddressed: the tautological MAD
+concordance metric in `cognisom/validation/mad_study.py:547-549`, which needs real
+outcome labels rather than a code change.
+
+Pre-existing unrelated failures, untouched: `tests/test_ode_solver.py::test_cell_heterogeneity`
+and `::test_get_species` fail identically before and after these changes.

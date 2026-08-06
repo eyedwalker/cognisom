@@ -10,6 +10,7 @@ PARP inhibitors, and combination therapies based on the patient's
 genomic profile and immune landscape.
 """
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -436,7 +437,7 @@ class TreatmentSimulator:
 
         Returns list of relative tumor volumes (1.0 = baseline).
         """
-        np.random.seed(hash(profile.get("name", "")) % 2**31)
+        rng = self._make_rng(profile, twin)
 
         onset = profile.get("effect_onset_days", 14)
         volumes = [1.0]
@@ -464,7 +465,7 @@ class TreatmentSimulator:
             net_rate = growth_rate - treatment_factor
 
             # Add stochastic noise
-            noise = np.random.normal(0, 0.002)
+            noise = rng.normal(0, 0.002)
 
             volume *= (1.0 + net_rate + noise)
             volume = max(0.01, volume)  # Floor at 1% (not full eradication)
@@ -477,6 +478,32 @@ class TreatmentSimulator:
             volumes.append(round(volume, 4))
 
         return volumes
+
+    @staticmethod
+    def _make_rng(profile: Dict, twin: DigitalTwinConfig) -> np.random.Generator:
+        """Build a deterministic RNG scoped to this (patient, treatment) pair.
+
+        Two properties matter here:
+
+        1. **Patient-specific.** The seed incorporates the patient identity and
+           genomic state, so two different patients receiving the same drug get
+           different noise realisations. Seeding on the drug name alone made every
+           patient share one trajectory, which silently defeated personalisation.
+        2. **Reproducible and local.** ``hashlib`` is used rather than the builtin
+           ``hash()``, which is salted per process and therefore not stable across
+           runs. A local ``Generator`` is returned instead of calling
+           ``np.random.seed`` so that global NumPy RNG state is left untouched.
+        """
+        patient_id = getattr(twin.patient, "patient_id", None) or "anonymous"
+        key = "|".join([
+            patient_id,
+            str(profile.get("name", "")),
+            f"{twin.tumor_mutational_burden:.4f}",
+            twin.immune_score,
+            f"{twin.mean_exhaustion:.4f}",
+        ]).encode("utf-8")
+        seed = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+        return np.random.default_rng(seed)
 
     @staticmethod
     def _classify_response(best_response: float) -> str:

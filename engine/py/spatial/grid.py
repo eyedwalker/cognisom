@@ -11,11 +11,14 @@ Features:
 - Cell-environment interactions
 """
 
+import logging
 import numpy as np
 from typing import Tuple, List, Optional
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -105,42 +108,72 @@ class SpatialGrid:
         """Check if voxel is within grid bounds"""
         return all(0 <= v < s for v, s in zip(voxel, self.size))
     
+    # Safety cap on explicit diffusion sub-steps per call. Hitting this means the
+    # requested dt is too large for the grid resolution to resolve explicitly.
+    MAX_DIFFUSION_SUBSTEPS = 10000
+
     def diffuse_field(self, field: np.ndarray, D: float, dt: float) -> np.ndarray:
         """
         Solve diffusion PDE: ∂C/∂t = D∇²C
-        
-        Uses explicit finite difference (3D Laplacian)
+
+        Uses explicit finite difference (3D Laplacian).
+
+        The explicit scheme is only stable for dt < dx²/(6D). When the requested
+        dt exceeds that limit we sub-cycle — taking ceil(dt/dt_stable) internal
+        steps that each satisfy the criterion — so the field is advanced by the
+        *full* requested interval. Previously this clamped to a single stable
+        step, which silently advanced the field by a small fraction of dt and
+        left the diffusion fields lagging the rest of the simulation clock.
         """
-        # Stability criterion: dt < dx²/(6D)
-        # For D=2000 μm²/s, dx=10 μm: dt_max = 100/(6*2000) = 0.0083 s
+        if D <= 0:
+            return field
+
         # Convert dt from hours to seconds
         dt_seconds = dt * 3600
+        if dt_seconds <= 0:
+            return field
+
         dx = self.resolution
-        dt_stable = dx**2 / (6 * D)
-        
-        if dt_seconds > dt_stable:
-            # Use stable time step
-            dt_seconds = dt_stable * 0.5
-        
-        # 3D Laplacian using finite differences
-        laplacian = (
-            np.roll(field, 1, axis=0) + np.roll(field, -1, axis=0) +
-            np.roll(field, 1, axis=1) + np.roll(field, -1, axis=1) +
-            np.roll(field, 1, axis=2) + np.roll(field, -1, axis=2) -
-            6 * field
-        ) / (dx ** 2)
-        
-        # Update field
-        field_new = field + D * laplacian * dt_seconds
-        
-        # Boundary conditions (Neumann - no flux)
-        field_new[0, :, :] = field_new[1, :, :]
-        field_new[-1, :, :] = field_new[-2, :, :]
-        field_new[:, 0, :] = field_new[:, 1, :]
-        field_new[:, -1, :] = field_new[:, -2, :]
-        field_new[:, :, 0] = field_new[:, :, 1]
-        field_new[:, :, -1] = field_new[:, :, -2]
-        
+        # Stability criterion: dt < dx²/(6D)
+        # For D=2000 μm²/s, dx=10 μm: dt_max = 100/(6*2000) = 0.0083 s
+        # Use a 0.5 safety factor on the theoretical limit.
+        dt_stable = 0.5 * dx**2 / (6 * D)
+
+        n_substeps = max(1, int(np.ceil(dt_seconds / dt_stable)))
+        if n_substeps > self.MAX_DIFFUSION_SUBSTEPS:
+            logger.warning(
+                "diffuse_field: dt=%.4g h needs %d explicit sub-steps for D=%.4g "
+                "(dx=%.4g um); capping at %d. Diffusion is under-resolved for this "
+                "step size — reduce dt or coarsen the grid.",
+                dt, n_substeps, D, dx, self.MAX_DIFFUSION_SUBSTEPS,
+            )
+            n_substeps = self.MAX_DIFFUSION_SUBSTEPS
+
+        dt_sub = dt_seconds / n_substeps
+
+        field_new = field.astype(float, copy=True)
+        for _ in range(n_substeps):
+            # 3D Laplacian with replicated ("edge") ghost cells.
+            #
+            # The ghost layer *is* the Neumann no-flux boundary condition: a
+            # ghost equal to its neighbouring interior cell gives zero gradient,
+            # hence zero flux, across the domain face. This conserves total mass.
+            #
+            # The previous implementation used np.roll — which wraps around,
+            # i.e. periodic boundaries — and then overwrote the boundary slabs by
+            # copying their interior neighbours. That copy injected material on
+            # every step, so the field gained mass instead of conserving it.
+            padded = np.pad(field_new, 1, mode='edge')
+            laplacian = (
+                padded[2:, 1:-1, 1:-1] + padded[:-2, 1:-1, 1:-1] +
+                padded[1:-1, 2:, 1:-1] + padded[1:-1, :-2, 1:-1] +
+                padded[1:-1, 1:-1, 2:] + padded[1:-1, 1:-1, :-2] -
+                6 * field_new
+            ) / (dx ** 2)
+
+            # Update field
+            field_new = field_new + D * laplacian * dt_sub
+
         return field_new
     
     def step_diffusion(self, dt: float = 0.01):

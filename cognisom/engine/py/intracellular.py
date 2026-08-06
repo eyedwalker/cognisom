@@ -146,8 +146,13 @@ class IntracellularModel:
         self.proteins: Dict[str, Protein] = {}
         
         # Ribosomes
+        # `ribosomes` holds explicitly tracked ribosome objects; `num_ribosomes`
+        # is the size of the translating pool the cell can draw on in a step.
+        # `_ribosomes_busy` is reset at the start of every step() and consumed by
+        # translate(), so the pool is genuinely shared across competing mRNAs.
         self.ribosomes: List[Ribosome] = []
         self.num_ribosomes: int = 10000  # Typical mammalian cell
+        self._ribosomes_busy: int = 0
         
         # Organelles (counts/volumes)
         self.organelles = {
@@ -246,6 +251,28 @@ class IntracellularModel:
     def add_gene(self, gene: Gene):
         """Add a gene to the genome"""
         self.genes[gene.name] = gene
+
+    def _mark_ribosomes_busy(self, count: int):
+        """Flag tracked ribosome objects as engaged in translation.
+
+        `self.ribosomes` is a sampled subset of the full `num_ribosomes` pool, so
+        the flags are set proportionally — they exist for inspection/visualisation
+        and mirror the authoritative `_ribosomes_busy` counter.
+        """
+        if not self.ribosomes or count <= 0:
+            return
+        fraction = min(1.0, self._ribosomes_busy / max(1, self.num_ribosomes))
+        n_flagged = int(round(fraction * len(self.ribosomes)))
+        for i, ribosome in enumerate(self.ribosomes):
+            ribosome.is_translating = i < n_flagged
+
+    def _release_ribosomes(self):
+        """Return every ribosome to the free pool (start of a new step)."""
+        self._ribosomes_busy = 0
+        for ribosome in self.ribosomes:
+            ribosome.is_translating = False
+            ribosome.current_mrna = None
+            ribosome.progress = 0.0
     
     def transcribe(self, gene_name: str, dt: float = 0.01) -> int:
         """
@@ -302,13 +329,22 @@ class IntracellularModel:
         if self.metabolites['ATP'] < 200 or self.metabolites['amino_acids'] < 100:
             return 0
         
-        # Translation rate depends on mRNA count and ribosome availability
-        available_ribosomes = sum(1 for r in self.ribosomes if not r.is_translating)
+        # Translation rate depends on mRNA count and ribosome availability.
+        # Ribosomes are a finite pool shared by every mRNA translated this step,
+        # so each call consumes from the pool rather than re-reading a flag that
+        # was never written (which made the constraint a no-op).
+        available_ribosomes = max(0, self.num_ribosomes - self._ribosomes_busy)
         active_translation = min(mrna.copy_number, available_ribosomes)
-        
+
+        if active_translation <= 0:
+            return 0
+
+        self._ribosomes_busy += active_translation
+        self._mark_ribosomes_busy(active_translation)
+
         rate = mrna.translation_rate * active_translation * dt
         new_proteins = np.random.poisson(rate)
-        
+
         if new_proteins > 0:
             # Consume resources
             self.metabolites['ATP'] -= new_proteins * 200
@@ -381,11 +417,14 @@ class IntracellularModel:
         """
         Advance intracellular state by one time step
         """
+        # 0. Free the ribosome pool for this step
+        self._release_ribosomes()
+
         # 1. Transcription (DNA -> mRNA)
         for gene_name in self.genes.keys():
             self.transcribe(gene_name, dt)
-        
-        # 2. Translation (mRNA -> Protein)
+
+        # 2. Translation (mRNA -> Protein) — competes for the shared pool
         for mrna_name in list(self.mrnas.keys()):
             self.translate(mrna_name, dt)
         
@@ -406,6 +445,8 @@ class IntracellularModel:
             'protein_species': len(self.proteins),
             'total_proteins': sum(p.copy_number for p in self.proteins.values()),
             'ribosomes': len(self.ribosomes),
+            'ribosome_pool': self.num_ribosomes,
+            'ribosomes_busy': self._ribosomes_busy,
             'atp': self.metabolites['ATP'],
             'glucose': self.metabolites['glucose'],
         }

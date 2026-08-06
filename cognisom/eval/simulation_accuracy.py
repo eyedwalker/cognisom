@@ -38,6 +38,7 @@ class BenchmarkComparison:
     r_squared: float = 0.0
     mean_percent_error: float = 0.0
     passed: bool = False
+    ran: bool = False                # True only if real simulated values were produced
     tolerance: float = 20.0          # Percent error tolerance
     notes: str = ""
 
@@ -47,9 +48,10 @@ class AccuracyReport:
     """Comprehensive accuracy evaluation report."""
     timestamp: float = 0.0
     simulation_version: str = ""
-    benchmarks_evaluated: int = 0
+    benchmarks_evaluated: int = 0    # Benchmarks that actually ran
     benchmarks_passed: int = 0
     benchmarks_failed: int = 0
+    benchmarks_not_evaluated: int = 0  # Unverified source or simulation unavailable
     overall_mae: float = 0.0
     overall_correlation: float = 0.0
     comparisons: List[BenchmarkComparison] = field(default_factory=list)
@@ -69,6 +71,10 @@ class AccuracyReport:
 
     @property
     def overall_grade(self) -> str:
+        # No benchmark actually ran, so there is nothing to grade. Returning a
+        # letter here would assert an accuracy the run never measured.
+        if self.benchmarks_evaluated == 0:
+            return "N/A"
         if self.pass_rate >= 0.9:
             return "A"
         elif self.pass_rate >= 0.8:
@@ -86,11 +92,16 @@ class AccuracyReport:
             f"=" * 50,
             f"Benchmarks: {self.benchmarks_passed}/{self.benchmarks_evaluated} passed "
             f"({self.pass_rate * 100:.0f}%)",
+            f"Not evaluated: {self.benchmarks_not_evaluated}",
             f"Overall MAE: {self.overall_mae:.4f}",
             f"Overall Correlation: {self.overall_correlation:.3f}",
             "",
             "Category Scores:",
         ]
+
+        if self.benchmarks_evaluated == 0:
+            lines.insert(2,
+                "  (no benchmark produced simulated values — nothing was measured)")
         for cat, score in sorted(self.category_scores.items()):
             lines.append(f"  {cat}: {score:.1f}%")
 
@@ -117,6 +128,7 @@ class AccuracyReport:
             "simulation_version": self.simulation_version,
             "benchmarks_evaluated": self.benchmarks_evaluated,
             "benchmarks_passed": self.benchmarks_passed,
+            "benchmarks_not_evaluated": self.benchmarks_not_evaluated,
             "pass_rate": self.pass_rate,
             "overall_grade": self.overall_grade,
             "overall_mae": self.overall_mae,
@@ -177,6 +189,13 @@ class SimulationEvaluator:
         for benchmark in self._benchmarks:
             comparison = self._evaluate_benchmark(benchmark, engine, tolerance)
             report.comparisons.append(comparison)
+
+            # Benchmarks that never produced real simulated values are reported
+            # but excluded from pass rate, metrics, and category scores.
+            if not comparison.ran:
+                report.benchmarks_not_evaluated += 1
+                continue
+
             report.benchmarks_evaluated += 1
 
             if comparison.passed:
@@ -263,6 +282,8 @@ class SimulationEvaluator:
             simulated_values=list(simulated),
             time_points=list(time_points) if time_points else [],
             tolerance=tolerance,
+            # Caller supplied real simulated values.
+            ran=True,
         )
 
         # Calculate metrics
@@ -298,12 +319,24 @@ class SimulationEvaluator:
         log.info("Loaded %d benchmarks", len(self._benchmarks))
 
     def _get_builtin_benchmarks(self) -> List[Dict]:
-        """Return built-in benchmark definitions."""
+        """Return built-in benchmark definitions.
+
+        WARNING: these are placeholder shapes, not validated reference data. The
+        original table carried fabricated sequential PMIDs (PMID:12345678,
+        PMID:23456789, ...) which do not identify real publications. Every entry
+        is therefore marked ``verified: False`` and is skipped by the evaluator
+        rather than counted toward a pass rate.
+
+        To use this evaluator for real validation, replace an entry's data with
+        digitised values from a named publication or dataset, set a real
+        ``source``, and set ``verified: True``.
+        """
         return [
             # Tumor growth benchmarks
             {
                 "name": "LNCaP Growth Curve",
-                "source": "PMID:12345678",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "tumor_growth",
                 "metric": "cell_count",
                 "data_points": [
@@ -316,6 +349,7 @@ class SimulationEvaluator:
             {
                 "name": "PC3 Doubling Time",
                 "source": "ATCC",
+                "verified": False,
                 "category": "tumor_growth",
                 "metric": "doubling_time",
                 "expected_value": 24.0,  # hours
@@ -324,7 +358,8 @@ class SimulationEvaluator:
             },
             {
                 "name": "AR+ Cell Fraction",
-                "source": "PMID:23456789",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "tumor_growth",
                 "metric": "ar_positive_fraction",
                 "data_points": [
@@ -335,7 +370,8 @@ class SimulationEvaluator:
             # Immune response benchmarks
             {
                 "name": "T-cell Infiltration",
-                "source": "PMID:34567890",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "immune",
                 "metric": "tcd8_count",
                 "data_points": [
@@ -345,7 +381,8 @@ class SimulationEvaluator:
             },
             {
                 "name": "Cytokine Dynamics (IL-6)",
-                "source": "PMID:45678901",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "immune",
                 "metric": "il6_concentration",
                 "data_points": [
@@ -356,7 +393,8 @@ class SimulationEvaluator:
             # Drug response benchmarks
             {
                 "name": "Enzalutamide Response",
-                "source": "PMID:56789012",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "drug_response",
                 "metric": "viability",
                 "data_points": [
@@ -369,7 +407,8 @@ class SimulationEvaluator:
             # Metabolic benchmarks
             {
                 "name": "Oxygen Consumption",
-                "source": "PMID:67890123",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "metabolic",
                 "metric": "oxygen_rate",
                 "data_points": [
@@ -379,7 +418,8 @@ class SimulationEvaluator:
             },
             {
                 "name": "Lactate Production",
-                "source": "PMID:78901234",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "metabolic",
                 "metric": "lactate_rate",
                 "data_points": [
@@ -390,7 +430,8 @@ class SimulationEvaluator:
             # Spatial benchmarks
             {
                 "name": "Tumor Spheroid Diameter",
-                "source": "PMID:89012345",
+                "source": "UNVERIFIED — citation required",
+                "verified": False,
                 "category": "spatial",
                 "metric": "spheroid_diameter",
                 "data_points": [
@@ -417,26 +458,42 @@ class SimulationEvaluator:
 
         data_points = benchmark.get("data_points", [])
         if not data_points:
-            comparison.notes = "No data points"
-            comparison.passed = True
+            # Nothing to compare against — report it, but do not call it a pass.
+            comparison.notes = "NOT EVALUATED — benchmark has no data points"
+            comparison.ran = False
+            comparison.passed = False
             return comparison
 
         # Extract observed values
         comparison.time_points = [p[0] for p in data_points]
         comparison.observed_values = [p[1] for p in data_points]
 
-        # Run simulation or use fallback
+        # A benchmark whose citation has not been verified cannot support an
+        # accuracy claim, so it is reported but never counted as passing.
+        if not benchmark.get("verified", False):
+            comparison.ran = False
+            comparison.passed = False
+            comparison.notes = (
+                "NOT EVALUATED — benchmark source is unverified "
+                f"({benchmark.get('source', 'no source')}). Supply a real "
+                "citation and dataset before using this for validation."
+            )
+            return comparison
+
+        # Run the simulation. If it cannot run, the benchmark is reported as
+        # not-evaluated. Fabricating 'simulated' values from the observed values
+        # would manufacture agreement and is never acceptable here.
         try:
             comparison.simulated_values = self._run_simulation(
                 benchmark, engine
             )
+            comparison.ran = True
         except Exception as e:
             log.warning("Simulation failed for %s: %s", comparison.benchmark_name, e)
-            # Use approximate values for testing
-            comparison.simulated_values = [
-                v * (1 + np.random.uniform(-0.15, 0.15))
-                for v in comparison.observed_values
-            ]
+            comparison.ran = False
+            comparison.passed = False
+            comparison.notes = f"NOT EVALUATED — simulation failed: {e}"
+            return comparison
 
         # Calculate metrics
         if comparison.observed_values and comparison.simulated_values:
@@ -454,11 +511,17 @@ class SimulationEvaluator:
         return comparison
 
     def _run_simulation(self, benchmark: Dict, engine) -> List[float]:
-        """Run simulation for a benchmark."""
+        """Run simulation for a benchmark.
+
+        Raises if no engine is supplied. There is deliberately no synthetic
+        fallback: deriving 'simulated' values from the observed values would
+        guarantee agreement and produce a meaningless passing grade.
+        """
         if engine is None:
-            # Return approximate values
-            data_points = benchmark.get("data_points", [])
-            return [p[1] * (1 + np.random.uniform(-0.1, 0.1)) for p in data_points]
+            raise ValueError(
+                "No simulation engine supplied — cannot produce simulated values. "
+                "Pass a SimulationEngine to evaluate_against_benchmarks()."
+            )
 
         # Configure and run simulation
         sim_config = benchmark.get("sim_config", {})

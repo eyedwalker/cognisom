@@ -126,11 +126,41 @@ class TestSimulationAccuracy:
         from cognisom.eval.simulation_accuracy import SimulationEvaluator
         evaluator = SimulationEvaluator()
 
-        # Empty results - still generates a report with grade
         sim_results = {}
         report = evaluator.evaluate_against_benchmarks(sim_results)
         assert hasattr(report, "overall_grade")
-        assert report.overall_grade in ["A", "B", "C", "D", "F"]
+        assert report.overall_grade in ["A", "B", "C", "D", "F", "N/A"]
+
+    def test_unrunnable_benchmarks_are_not_graded(self):
+        """A run that produced no simulated values must not report a letter grade.
+
+        The built-in benchmarks are unverified placeholders, so with no engine
+        nothing can legitimately be measured. Previously the evaluator filled in
+        `observed * (1 +/- noise)` as the "simulated" values, which guaranteed a
+        passing grade of "A" from data it had never simulated.
+        """
+        from cognisom.eval.simulation_accuracy import SimulationEvaluator
+        evaluator = SimulationEvaluator()
+
+        report = evaluator.evaluate_against_benchmarks(engine=None)
+
+        assert report.benchmarks_evaluated == 0
+        assert report.benchmarks_passed == 0
+        assert report.benchmarks_not_evaluated > 0
+        assert report.overall_grade == "N/A"
+        # No fabricated values anywhere in the report.
+        assert all(not c.simulated_values for c in report.comparisons)
+
+    def test_no_builtin_benchmark_claims_verification(self):
+        """Built-in benchmarks are placeholders and must not be marked verified."""
+        from cognisom.eval.simulation_accuracy import SimulationEvaluator
+        evaluator = SimulationEvaluator()
+
+        for benchmark in evaluator._benchmarks:
+            assert not benchmark.get("verified", False), (
+                f"{benchmark.get('name')} claims verification; "
+                "supply a real citation before setting verified=True"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════
