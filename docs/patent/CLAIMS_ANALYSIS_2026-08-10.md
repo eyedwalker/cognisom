@@ -272,7 +272,7 @@ One application family, with Claim 1 as the lead independent claim because it is
 | — | Hybrid solver hysteresis partitioner | Narrow, CPU-only | Do not recite "coupled" or "GPU" |
 | — | Batched GPU SSA, spatial RD, event bus | Trade secret / no claim | — |
 
-**Highest-leverage work before filing**, in order: (a) the one-line exhaustion cache fix, which promotes Claim 7 from unenabled to Tier 1 for a few hours of work; (b) severing `_predict_protein_change`; (c) resolving the duplicate package trees; (d) wiring a real ESM scorer once so Stage C is enabled.
+**Highest-leverage work before filing**, in order: (a) the one-line exhaustion cache fix, which promotes Claim 7 from unenabled to Tier 1 for a few hours of work; (b) severing `_predict_protein_change`; (c) resolving the duplicate package trees; (d) wiring a real ESM scorer once so Stage C is enabled; (e) the test-suite items in §8, which are cheap and make the enablement evidence reproducible by a third party in one command.
 
 Trade-secret-better-than-patent, unchanged from `SCOPING.md:312-317` and extended: all hand-chosen constants (role multipliers 4.0/2.5/1.5, the 0.85 ceiling, TIL 0.5 / PD-L1 0.25 / 20 µm, ECM 0.9/0.8/0.05/0.4, exhaustion threshold 5 and ×0.1, sympathetic 0.7). None are fitted to data; the docstrings are generally candid about this, which is the right posture but makes them poor claim limitations.
 
@@ -286,4 +286,36 @@ Every §-cited line was read in the working tree at `10dab36`. The three finding
 2. **Exhaustion never reaches the kill computation** — `grep -n "active_tcr_match" modules/immune_module.py`. Writes occur only at `:331` (recognition) and `:477`/`:612` (clear). `_target_kill_probability:561` reads `match.is_exhausted` off that snapshot.
 3. **Stage C never runs** — `grep -rn "set_esm_scorer" --include=*.py .` returns the definition and docstrings only; no production caller. `modules/molecular_module.py:93` is `self.esm_scorer = None`.
 
-Test reproduction: `pip install numpy matplotlib scipy plotly psutil pytest`, then `python3 -m pytest tests/ -q` over the 19 patent-evidence files → 296 passed, 1 failed (the 19.8×/20× threshold), 1 skipped (opt-in ESM).
+Test reproduction: `pip install numpy matplotlib scipy plotly psutil pytest`, then `python3 -m pytest tests/ -q` over the 19 patent-evidence files → 296 passed, 1 failed (the 19.8×/20× threshold), 1 skipped (opt-in ESM). Note that running `pytest tests/` over the *whole* directory does not terminate — see §8.
+
+---
+
+## 8. Test-infrastructure findings
+
+An attempt to run the entire `tests/` directory in one pass was killed at 15 minutes. Bisecting it produced two findings that bear on the filing.
+
+### 8.1 `test_smoldyn_solver.py` makes the full suite unrunnable
+
+Three of its test classes each exceed 45 seconds and were terminated (`TestReactions`, `TestIntegration`, `TestSmoldynSolver`); a single test in `TestBrownianMotion` takes 28 seconds. This is not a deadlock, it is the CPU fallback being pathologically slow — consistent with the solver passing `n = self.n_max` (the whole particle buffer) as the particle count, so a nominally small system scans the full allocation every step.
+
+The consequence for the filing is narrow but worth stating: the spatial reaction–diffusion subsystem (Invention E in `SCOPING.md:175-188`) is not merely un-accelerated, it is **effectively unvalidated in CI** — nobody can run its tests to completion as part of a normal suite run. That reinforces `SCOPING.md`'s existing "not a strong patent candidate, trade secret at best" grading rather than changing it. It does not touch any Tier 1 or Tier 2 claim, all of which live in test files that complete in under three seconds combined.
+
+### 8.2 The nine `test_registry.py` failures are misattributed in `RESUME.md`
+
+`RESUME.md` lists as housekeeping: *"Delete or shim the duplicate `cognisom/engine/` and `cognisom/modules/` package tree (causes the 9 pre-existing `test_registry` failures)."* That diagnosis is wrong, so the planned cleanup will not fix them.
+
+The actual cause is a registration-key collision:
+
+```
+DuplicateRegistrationError: 'virus' already registered in entities registry.
+  Existing: <class 'cognisom.library.models.Virus'>
+  New:      <class 'cognisom.plugins.examples.virus_plugin.VirusEntity'>
+```
+
+The built-in library model and the example plugin both claim the key `virus`. And the failure is **import-order dependent** — `pytest tests/test_registry.py` alone gives 9 failed / 33 passed, while `pytest tests/test_ode_solver.py tests/test_registry.py` gives 0 registry failures, because whichever module imports first wins the key.
+
+This matters for §112 in a small way: a test suite whose pass/fail outcome depends on file ordering is weak enablement evidence. It is cheap to fix (namespace the plugin key, or make the example plugin's registration idempotent), and it should be fixed rather than carried, since the duplicate-package-tree cleanup in `RESUME.md` will otherwise be done and the failures will remain.
+
+### 8.3 Remaining failures, all outside the patent surface
+
+`test_ode_solver.py::test_cell_heterogeneity` (the pre-existing parameter-noise CV failure `RESUME.md` already notes), `test_ode_solver.py::test_get_species`, and `test_validation.py::test_benchmark_categories`. None touch any claimed mechanism.
