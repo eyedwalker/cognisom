@@ -292,4 +292,8 @@ class AuthManager:
             if "admin" in self._users:
                 self._users["admin"].must_change_password = True
                 self._save_users()
-            log.info("Created default admin account (username: admin, password: Admin1234!)")
+            log.info(
+                "Created default admin account (username: admin). "
+                "Password must be changed on first login; it is deliberately "
+                "not logged."
+            )

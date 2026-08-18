@@ -221,6 +221,7 @@ def test_vcf_non_coding_rows_are_silently_dropped():
 # End-to-end: VCF -> simulation -> kill event with provenance
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow  # ~8 min: runs the full closed loop end to end
 def test_vcf_round_trip_drives_closed_loop_with_provenance():
     """Patent-evidence anchor: a real VCF, parsed and pushed through
     the cognisom pipeline, produces at least one CELL_KILLED_BY_TCELL

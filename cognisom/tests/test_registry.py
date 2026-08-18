@@ -474,18 +474,28 @@ class TestVirusPlugin:
         assert True
 
     def test_virus_entity_registered(self):
-        """Test that VirusEntity is registered."""
+        """Test that VirusEntity is registered.
+
+        Asserts the plugin's own namespaced key rather than "virus", which is
+        owned by the built-in cognisom.library.models.Virus. Checking the
+        built-in name passed even when the plugin had registered nothing, and
+        was order-dependent on whichever test imported the library first.
+        """
         import cognisom.plugins.examples.virus_plugin
         from cognisom.library.models import entity_registry
 
-        assert "virus" in entity_registry
+        assert "example_virus" in entity_registry
 
     def test_virus_prim_registered(self):
-        """Test that BioVirusParticle is registered."""
+        """Test that BioVirusParticle is registered.
+
+        Namespaced key, for the same reason as test_virus_entity_registered:
+        "bio_virus_particle" belongs to the built-in cognisom.biousd.schema.
+        """
         import cognisom.plugins.examples.virus_plugin
         from cognisom.biousd.schema import prim_registry
 
-        assert "bio_virus_particle" in prim_registry
+        assert "example_bio_virus_particle" in prim_registry
 
     def test_virus_module_registered(self):
         """Test that VirusModule is registered."""

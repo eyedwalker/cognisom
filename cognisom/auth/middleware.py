@@ -12,9 +12,12 @@ The auth backend is selected based on environment variables:
 from __future__ import annotations
 
 import functools
+import logging
 import os
 from pathlib import Path
 from typing import Optional
+
+log = logging.getLogger(__name__)
 
 # ── Shared auth instances ────────────────────────────────────────────
 
@@ -788,20 +791,26 @@ def streamlit_page_gate(page_name: str = "", required_tier: str = ""):
     if user.role == UserRole.ADMIN:
         return user
 
-    # DEV MODE: bypass all tier checks for local development
-    # Set COGNISOM_DEV_MODE=true in .env to enable
+    # DEV MODE: bypass all tier checks for local development.
+    # Refuses to engage when Cognito is configured, so that setting
+    # COGNISOM_DEV_MODE in a deployed environment cannot open the app up.
     if os.environ.get("COGNISOM_DEV_MODE", "").lower() in ("true", "1", "yes"):
-        return user
-
-    # Cognito users bypass org tier checks (they authenticated via AWS Cognito)
-    # They get full access since they're using enterprise authentication
-    if is_cognito_enabled():
-        cognito_token = st.session_state.get("cognito_access_token")
-        if cognito_token:
-            # User authenticated via Cognito - grant full access
+        if is_cognito_enabled():
+            log.warning(
+                "COGNISOM_DEV_MODE is set but Cognito is configured; "
+                "ignoring dev-mode bypass and enforcing tier checks."
+            )
+        else:
             return user
 
-    # Check org tier for page access (local auth only)
+    # NOTE: authenticating via Cognito previously returned `user` here
+    # unconditionally, which granted every signed-in account access to every
+    # page -- including those that start GPU instances and submit HealthOmics
+    # runs. Cognito proves *identity*; it says nothing about entitlement.
+    # Authorization is now decided by org tier below for local and Cognito
+    # users alike.
+
+    # Check org tier for page access
     org_mgr = _get_org_manager()
     org = org_mgr.get_org(user.org_id) if user.org_id else None
 
@@ -810,7 +819,18 @@ def streamlit_page_gate(page_name: str = "", required_tier: str = ""):
         st.stop()
         return None
 
-    allowed_pages = org_mgr.get_page_access(user.org_id)
+    allowed_pages = set(org_mgr.get_page_access(user.org_id))
+
+    # Cognito-authenticated accounts are provisioned onto the FREE plan by
+    # default (see _ensure_cognito_user_org), which grants three pages.
+    # Before the bypass above was removed that never mattered, because every
+    # Cognito user was waved straight through. Granting them the INSTITUTION
+    # baseline keeps the clinical journey working for existing accounts while
+    # still gating the ENTERPRISE-only pages that spend AWS money.
+    if is_cognito_enabled() and st.session_state.get("cognito_access_token"):
+        from .organization import TIER_PAGE_ACCESS, SubscriptionTier
+        allowed_pages |= set(TIER_PAGE_ACCESS[SubscriptionTier.INSTITUTION])
+
     if effective_page not in allowed_pages:
         tier_name = org.plan.value.title()
         st.error(

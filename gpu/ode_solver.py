@@ -471,6 +471,22 @@ class BatchedODEIntegrator:
         )
         return self._cell_params
 
+    def _param_dict(self) -> Dict[str, Any]:
+        """
+        Parameters for rhs_func/jacobian_func evaluation.
+
+        When per-cell parameters are set, each value is an (n_cells,) column
+        rather than a scalar. Both rhs and jacobian index params by name and
+        combine them with (n_cells,)-shaped species slices, so the columns
+        broadcast without any change to model definitions.
+        """
+        if self._cell_params is None:
+            return self.system.parameters
+        return {
+            name: self._cell_params[:, i]
+            for i, name in enumerate(self.system.parameters)
+        }
+
     def integrate(
         self,
         t_span: Tuple[float, float],
@@ -644,7 +660,7 @@ class BatchedODEIntegrator:
 
         y = self._state.y
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._param_dict()
 
         def residual(y_new_flat):
             y_new = y_new_flat.reshape(y.shape)
@@ -677,7 +693,7 @@ class BatchedODEIntegrator:
         y = cp.asarray(self._state.y)
         t = self._state.t
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._param_dict()
 
         # RK4 stages (vectorized across cells)
         k1 = cp.asarray(self.system.rhs_func(t, cp.asnumpy(y), params))
@@ -697,7 +713,7 @@ class BatchedODEIntegrator:
         y = self._state.y
         t = self._state.t
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._param_dict()
 
         k1 = self.system.rhs_func(t, y, params)
         k2 = self.system.rhs_func(t + dt/2, y + dt/2 * k1, params)

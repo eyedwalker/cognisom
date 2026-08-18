@@ -24,10 +24,21 @@ RUN apt-get update && \
         libxrender1 libxext6 libsm6 && \
     rm -rf /var/lib/apt/lists/*
 
-# Python dependencies
+# Python dependencies.
+# Kept as its own RUN so a failure here fails the build. Previously this was
+# chained with `... || true`, which swallowed errors from the requirements
+# install itself, not just the optional package that followed it.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir rdkit-pypi 2>/dev/null || true
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Genuinely optional: rdkit wheels are unavailable on some platforms.
+RUN pip install --no-cache-dir rdkit-pypi \
+    || echo "WARNING: rdkit-pypi unavailable; cheminformatics features disabled"
+
+# Bake MHCflurry model weights into the image (~600 MB). Without this the
+# first prediction would download them at runtime, or silently fall back to
+# the position-weight-matrix scorer.
+RUN mhcflurry-downloads fetch models_class1_presentation
 
 # Application code
 COPY . .

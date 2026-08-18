@@ -22,8 +22,16 @@ References:
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+
+class MHCflurryUnavailableError(RuntimeError):
+    """
+    Raised when MHCflurry cannot be loaded and the approximate PWM fallback
+    has not been explicitly opted into via COGNISOM_ALLOW_PWM_FALLBACK.
+    """
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +52,44 @@ def is_mhcflurry_available() -> bool:
         _available = True
         logger.info("MHCflurry loaded: %d supported alleles",
                      len(_predictor.supported_alleles))
-    except ImportError:
-        logger.info("MHCflurry not installed (pip install mhcflurry)")
+    except ImportError as e:
         _available = False
+        _fail_or_warn(
+            f"MHCflurry is not importable ({e}). Note that mhcflurry 2.0.6 "
+            f"requires Python <= 3.12; it imports the stdlib `pipes` module, "
+            f"which was removed in 3.13."
+        )
     except Exception as e:
-        logger.warning("MHCflurry failed to load: %s", e)
         _available = False
+        _fail_or_warn(f"MHCflurry failed to load: {e}")
 
     return _available
+
+
+def _fail_or_warn(message: str) -> None:
+    """
+    Refuse to silently downgrade to the PWM scorer.
+
+    The fallback's scoring is quantised to a handful of IC50 values and its
+    best achievable score (52.8 nM) is above the 50 nM strong-binder
+    threshold, so strong_binder_count is structurally always zero. That is
+    acceptable for a local demo and not acceptable for anything presented as
+    a prediction, so enabling it has to be a deliberate act.
+    """
+    if os.environ.get("COGNISOM_ALLOW_PWM_FALLBACK", "").lower() in ("1", "true", "yes"):
+        logger.warning(
+            "%s -- falling back to the position-weight-matrix scorer because "
+            "COGNISOM_ALLOW_PWM_FALLBACK is set. Affinities are approximate "
+            "and no peptide will be reported as a strong binder.", message
+        )
+        return
+    raise MHCflurryUnavailableError(
+        f"{message}\n\n"
+        f"Install it with `pip install mhcflurry==2.0.6` followed by "
+        f"`mhcflurry-downloads fetch models_class1_presentation`.\n"
+        f"To run anyway with the approximate PWM scorer, set "
+        f"COGNISOM_ALLOW_PWM_FALLBACK=1 -- results are not publication grade."
+    )
 
 
 def reset_availability():

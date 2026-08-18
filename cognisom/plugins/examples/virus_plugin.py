@@ -129,9 +129,12 @@ class VirusEntity(BioEntity):
         self.tropism = props.get("tropism", [])
 
 
-# Register the virus entity type
+# Register the virus entity type.
+# Namespaced as "example_virus" rather than "virus": the built-in
+# cognisom.library.models.Virus owns "virus", and a third-party plugin
+# claiming it raises DuplicateRegistrationError at import time.
 entity_registry.register_class(
-    "virus",
+    "example_virus",
     VirusEntity,
     version="1.0.0",
     tags=["plugin", "example", "pathogen"],
@@ -163,7 +166,9 @@ class BioPayloadCarrierAPI:
     payload_mass_kda: float = 0.0
 
 
-@register_prim("bio_virus_particle", version="1.0.0")
+# Namespaced for the same reason as the entity above: cognisom.biousd.schema
+# ships a built-in BioVirusParticle under "bio_virus_particle".
+@register_prim("example_bio_virus_particle", version="1.0.0")
 @dataclass
 class BioVirusParticle(BioUnit):
     """

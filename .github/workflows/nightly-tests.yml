@@ -1,0 +1,28 @@
+name: Nightly Full Test Suite
+
+# The push-triggered gate in deploy.yml runs `-m "not slow"` so it stays fast
+# enough to block a deploy. This job runs everything, including the ~8 min
+# end-to-end VCF closed-loop test, and reports failures without gating.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 07:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run full suite (both trees, including slow tests)
+        run: python -m pytest --tb=short -q --durations=20

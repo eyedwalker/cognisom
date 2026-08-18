@@ -98,7 +98,15 @@ class TestSmoldynSystem:
 
         # Check reactions
         assert len(system.reactions) >= 1
-        binding_rxn = next(r for r in system.reactions if r.name == "bind")
+        # Bare next() raising StopIteration inside a generator context surfaces
+        # as an opaque "generator raised StopIteration"; assert on the lookup
+        # instead so a renamed reaction names itself in the failure.
+        binding_rxn = next(
+            (r for r in system.reactions if r.name == "A_B_binding"), None
+        )
+        assert binding_rxn is not None, (
+            f"no 'A_B_binding' reaction; found {[r.name for r in system.reactions]}"
+        )
         assert binding_rxn.reactants == ["A", "B"]
         assert binding_rxn.products == ["C"]
 
@@ -231,8 +239,18 @@ class TestSmoldynSolver:
         assert solver.particles.n_alive >= 0
         assert solver.particles.n_alive <= solver.n_max
 
+    @pytest.mark.slow  # >120s: see note below
     def test_multiple_steps(self):
-        """Test multiple simulation steps."""
+        """Test multiple simulation steps.
+
+        Slow because the CPU bimolecular-reaction path in
+        ``SmoldynSolver._step_cpu`` is an O(n^2) pure-Python pair loop
+        (gpu/smoldyn_solver.py:968-990). With 1000 particles over 100 steps
+        that is ~50M interpreted iterations, each doing a numpy call on a
+        3-vector. Vectorising it (or using a neighbour grid / cKDTree) would
+        make this a fast test and speed up every CPU-mode simulation; until
+        then it runs in the nightly lane only.
+        """
         from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
@@ -252,6 +270,7 @@ class TestSmoldynSolver:
         # System should still be valid
         assert solver.particles.n_alive >= 0
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_boundary_conditions_reflective(self):
         """Test reflective boundary conditions."""
         from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
@@ -299,6 +318,7 @@ class TestSmoldynSolver:
 class TestBrownianMotion:
     """Tests for Brownian motion implementation."""
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_mean_squared_displacement(self):
         """Test MSD follows 6Dt for 3D diffusion."""
         from gpu.smoldyn_solver import (
@@ -416,6 +436,7 @@ class TestReactions:
         assert abs(final_count - expected) / expected < 0.50, \
             f"Final count {final_count} differs from expected {expected:.0f}"
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_bimolecular_binding(self):
         """Test second-order binding reaction."""
         from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
@@ -644,6 +665,7 @@ class TestPhysicsRegistration:
 class TestIntegration:
     """Integration tests combining multiple components."""
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_enzyme_kinetics_simulation(self):
         """Test full enzyme kinetics simulation."""
         from modules.smoldyn_module import SmoldynModule
@@ -665,6 +687,7 @@ class TestIntegration:
         # Simulation should have run
         assert state['total_steps'] == 1000
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_spatial_distribution(self):
         """Test spatial distribution analysis."""
         from modules.smoldyn_module import SmoldynModule

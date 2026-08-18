@@ -2,6 +2,15 @@
 .gitignore
 .env
 .env.*
+
+# Credentials. These are gitignored, so CI images are clean, but a LOCAL
+# `docker build` / `make docker` sees the working tree and would otherwise
+# bake them into a layer that gets pushed to ECR.
+*.pem
+*.key
+*.p12
+cognisom.txt
+secrets/
 __pycache__
 *.pyc
 *.pyo
@@ -24,3 +33,10 @@ infrastructure/
 *.tfstate.backup
 linkedin_articles/
 funding/
+
+# Large local artifacts that only bloat the build context.
+PhysiCell/
+*.mov
+*.mp4
+tests/
+cognisom/tests/

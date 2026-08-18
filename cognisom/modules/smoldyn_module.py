@@ -348,8 +348,12 @@ class SmoldynModule(SimulationModule):
                 size=(count, 3)
             ).astype(np.float32)
 
-        # Add to particle system
-        self.solver.add_particles(species_idx, positions)
+        # Add to particle system. The solver takes the species *name* and
+        # resolves the index itself; passing species_idx here made
+        # get_species_index() look up an int in a list of names and raise
+        # "ValueError: 0 is not in list". The lookup above is retained as an
+        # early, clearer validation of the species name.
+        self.solver.add_particles(species_name, positions)
 
         log.debug(f"Added {count} particles of species {species_name}")
 
