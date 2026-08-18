@@ -30,11 +30,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        # Covers BOTH suites (testpaths in pytest.ini). No `|| true`: a failing
-        # test now blocks the deploy, which is the point of `needs: test`.
-        # No `-x`: one early failure used to abort the run before 8 of 18 files
-        # had executed. `-m "not slow"` skips the ~8 min end-to-end test, which
-        # runs in the nightly job below.
+        # Runs the root `tests/` suite (testpaths in pytest.ini), which carries
+        # the 2026 upgrade coverage the old `cognisom/tests/` path skipped.
+        # No `|| true`: a failing test now blocks the deploy, which is the
+        # point of `needs: test`. No `-x`: one early failure used to abort the
+        # run before 8 of 18 files had executed. `-m "not slow"` defers the
+        # long integration tests to nightly-tests.yml.
         run: python -m pytest -m "not slow" --tb=short -q
 
   # ── Build & Deploy ─────────────────────────────────────────
