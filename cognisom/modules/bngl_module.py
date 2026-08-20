@@ -38,8 +38,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 log = logging.getLogger(__name__)
 
@@ -363,7 +363,7 @@ class BNGLModule(SimulationModule):
 def register_bngl_module():
     """Register BNGL module in the module registry."""
     try:
-        from modules import module_registry
+        from cognisom.modules import module_registry
         module_registry.register('bngl')(BNGLModule)
         log.debug("BNGLModule registered in module registry")
     except ImportError:

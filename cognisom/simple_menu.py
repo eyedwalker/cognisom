@@ -6,8 +6,8 @@ Simple Text Menu
 Text-based menu that works in terminal.
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, ImmuneModule, VascularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, ImmuneModule, VascularModule
 
 def show_menu():
     """Show main menu"""

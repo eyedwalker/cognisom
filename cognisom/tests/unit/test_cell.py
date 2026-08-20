@@ -10,7 +10,7 @@ from pathlib import Path
 # Add engine to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from engine.py.cell import Cell, CellState
+from cognisom.engine.py.cell import Cell, CellState
 
 
 def test_cell_creation():

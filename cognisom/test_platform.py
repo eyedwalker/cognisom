@@ -15,8 +15,8 @@ print()
 print("TEST 1: Core Modules")
 print("-" * 70)
 
-from core import SimulationEngine, SimulationConfig
-from modules import (MolecularModule, CellularModule, ImmuneModule,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule,
                     EpigeneticModule, CircadianModule, MorphogenModule)
 
@@ -112,7 +112,7 @@ print()
 print("TEST 5: Performance Optimizations")
 print("-" * 70)
 
-from core.performance import SpatialIndex, VectorizedOperations
+from cognisom.core.performance import SpatialIndex, VectorizedOperations
 import numpy as np
 
 # Test spatial index

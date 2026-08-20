@@ -23,8 +23,8 @@ import time
 import sys
 sys.path.insert(0, '..')
 
-from core import SimulationEngine, SimulationConfig
-from modules import (MolecularModule, CellularModule, ImmuneModule,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule,
                     EpigeneticModule, CircadianModule, MorphogenModule)
 from scenarios import *

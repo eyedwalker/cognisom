@@ -54,20 +54,20 @@ except Exception:
 
 # ── Imports of the patent-pipeline modules ───────────────────────────
 
-from core import SimulationConfig, SimulationEngine
-from core.event_bus import EventTypes
-from engine.py.immune.sympathetic import sympathetic_state
-from engine.py.immune.tcr_repertoire import ExhaustionState
-from engine.py.molecular.esm_stability import StubESMStabilityScorer
-from engine.py.molecular.peptidome import (
+from cognisom.core import SimulationConfig, SimulationEngine
+from cognisom.core.event_bus import EventTypes
+from cognisom.engine.py.immune.sympathetic import sympathetic_state
+from cognisom.engine.py.immune.tcr_repertoire import ExhaustionState
+from cognisom.engine.py.molecular.esm_stability import StubESMStabilityScorer
+from cognisom.engine.py.molecular.peptidome import (
     generate_frameshift_peptides,
     generate_fusion_peptides,
     generate_neoantigen_peptides,
 )
-from engine.py.molecular.protein_domains import domain_at_codon
-from modules.cellular_module import CellularModule
-from modules.immune_module import ImmuneModule
-from modules.molecular_module import MolecularModule
+from cognisom.engine.py.molecular.protein_domains import domain_at_codon
+from cognisom.modules.cellular_module import CellularModule
+from cognisom.modules.immune_module import ImmuneModule
+from cognisom.modules.molecular_module import MolecularModule
 
 
 # ── Sidebar: scenario selection ──────────────────────────────────────

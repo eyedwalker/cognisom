@@ -234,8 +234,8 @@ The simulation was performed using the cognisom platform with the following conf
 
 # Test
 if __name__ == '__main__':
-    from core import SimulationEngine, SimulationConfig
-    from modules import CellularModule, ImmuneModule
+    from cognisom.core import SimulationEngine, SimulationConfig
+    from cognisom.modules import CellularModule, ImmuneModule
     
     print("=" * 70)
     print("Publication Export System Test")

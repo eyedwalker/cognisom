@@ -17,11 +17,45 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
+from cognisom.engine.py.immune.mhc_loading import MHCLoader, MHCPresentation
+from cognisom.engine.py.molecular.peptidome import (
+    Peptide,
+    generate_neoantigen_peptides,
+)
+
+
+# Default patient HLA-I alleles for the simulation. Same three-allele
+# panel used by the neoantigen vaccine pipeline (HLA-A/B/C). Override
+# via module config 'hla_alleles'.
+DEFAULT_HLA_ALLELES = ("HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02")
+
+
+# Oncogenes known to drive intrinsic PD-L1 expression (Type III TME
+# in Teng et al. 2015). The per-cell baseline is how much PD-L1
+# expression each oncogene contributes when the cell carries an
+# oncogenic flag for that gene. Multiple matching oncogenes stack
+# additively, clamped at 1.0.
+# Sources: Spranger 2015 (PI3K/AKT); Casey 2016 (MYC); Akbay 2013
+# (EGFR mutant NSCLC drives PD-L1 via ERK/MAPK).
+_INTRINSIC_PDL1_INDUCERS = {
+    "PIK3CA": 0.35,
+    "MYC": 0.30,
+    "EGFR": 0.40,
+}
+
+
+def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
+    """Sum the intrinsic PD-L1 contributions of any matching oncogenes,
+    clamped to [0, 1]. ``oncogenes`` is an iterable of gene names."""
+    if not oncogenes:
+        return 0.0
+    total = sum(_INTRINSIC_PDL1_INDUCERS.get(g, 0.0) for g in oncogenes)
+    return float(max(0.0, min(1.0, total)))
 
 
 @dataclass
@@ -33,17 +67,44 @@ class CellState:
     phase: str  # 'G1', 'S', 'G2', 'M'
     age: float = 0.0
     alive: bool = True
-    
+
     # Metabolism
     oxygen: float = 0.21
     glucose: float = 5.0
     atp: float = 1000.0
     lactate: float = 0.0
-    
+
     # Cancer properties
     mhc1_expression: float = 1.0
     mutations: List[str] = None
-    
+
+    # PD-L1 surface expression in [0, 1]. Two induction modes:
+    #   * adaptive (Type I TME, Teng et al. 2015): bumped by
+    #     IFN-gamma signalling from activated T cells in the
+    #     vicinity (the immune module increments this on
+    #     IMMUNE_ACTIVATED).
+    #   * intrinsic (Type III TME): bumped at transformation time
+    #     for cancer cells carrying oncogenes known to constitutively
+    #     induce PD-L1 (PIK3CA, MYC, EGFR per the cancer-immunology
+    #     literature -- Spranger / Pardoll).
+    # See engine/py/immune/tme_classifier.py for how this gets read.
+    pdl1_expression: float = 0.0
+
+    # Local desmoplastic stroma / fibrotic ECM density in [0, 1]
+    # (Upgrade 6). Cancer cells deposit ECM proportional to their
+    # age + cell-type baseline; T-cell motility + detection radius
+    # are attenuated by the ECM density sampled at their position
+    # (see engine/py/spatial/ecm_barrier.py). High-ECM tumors
+    # exclude TILs even when neoantigens are displayed -- the
+    # "cold but mutated" PDAC phenotype.
+    local_ecm_density: float = 0.0
+
+    # Closed-loop neoantigen presentation (Upgrade 2). Populated when
+    # MUTATION_OCCURRED fires for this cell; each entry carries the
+    # peptide + HLA allele + binding affinity for downstream TCR-pMHC
+    # matching. Empty for cells without displayed neoantigens.
+    mhc1_displayed_peptides: List[MHCPresentation] = field(default_factory=list)
+
     def __post_init__(self):
         if self.mutations is None:
             self.mutations = []
@@ -74,21 +135,60 @@ class CellularModule(SimulationModule):
     
     def __init__(self, config: Dict = None):
         super().__init__(config)
-        
+
         # Cell population
         self.cells: Dict[int, CellState] = {}
         self.next_cell_id = 0
-        
+
         # Parameters
         self.division_time_normal = config.get('division_time_normal', 24.0)  # hours
         self.division_time_cancer = config.get('division_time_cancer', 12.0)  # hours
         self.glucose_consumption_normal = config.get('glucose_consumption', 0.2)
         self.glucose_consumption_cancer = config.get('glucose_consumption_cancer', 0.5)
-        
+
+        # ECM / desmoplasia dynamics (Upgrade 6). Cancer cells deposit
+        # local stromal ECM proportional to ``ecm_deposition_rate``
+        # (units: per-hour fraction). Anti-fibrotic therapy degrades
+        # ECM at ``ecm_degradation_rate`` when ``anti_fibrotic_active``
+        # is True. Defaults model a moderately fibrotic tumor; PDAC-
+        # like configs can set the rate ~5-10x higher.
+        self.ecm_deposition_rate = float(
+            config.get('ecm_deposition_rate', 0.05)
+        )
+        self.ecm_degradation_rate = float(
+            config.get('ecm_degradation_rate', 0.10)
+        )
+        self.anti_fibrotic_active = bool(
+            config.get('anti_fibrotic_active', False)
+        )
+        # Cancer cells start with this baseline ECM at spawn time,
+        # matching the lecture's "PDAC tumors arrive with 80% stroma"
+        # observation. Override per cancer-type preset.
+        self.cancer_baseline_ecm = float(
+            config.get('cancer_baseline_ecm', 0.0)
+        )
+
+        # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
+        # neoantigen predictor uses; auto-picks up MHCflurry when
+        # available, otherwise PWM fallback.
+        self.hla_alleles: List[str] = list(
+            config.get('hla_alleles', DEFAULT_HLA_ALLELES)
+        )
+        self.max_displayed_per_mutation = int(
+            config.get('max_displayed_per_mutation', 5)
+        )
+        self._mhc_loader: Optional[MHCLoader] = None
+
+        # Linked molecular module supplies WT protein sequences for
+        # neoantigen peptide generation (set via set_molecular_module).
+        self.molecular_module = None
+
         # Statistics
         self.total_divisions = 0
         self.total_deaths = 0
         self.total_transformations = 0
+        self.total_peptides_generated = 0
+        self.total_peptides_presented = 0
     
     def initialize(self):
         """Initialize cellular system"""
@@ -113,37 +213,74 @@ class CellularModule(SimulationModule):
             x = 120 + np.random.uniform(-15, 15)
             y = 120 + np.random.uniform(-15, 15)
             z = 50 + np.random.uniform(-5, 5)
-            
+
             cell_id = self.add_cell(position=[x, y, z], cell_type='cancer')
             self.cells[cell_id].mutations = ['KRAS_G12D']
             self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
+            # KRAS alone does not drive intrinsic PD-L1, so this stays
+            # at 0; PIK3CA/MYC/EGFR mutations would bump it here via
+            # _intrinsic_pdl1_for_oncogenes.
         
+        # Initialize MHC loader (Upgrade 2). Construction reaches into
+        # NeoantigenPredictor which instantiates a GeneProteinMapper;
+        # this preseeds from BUILTIN_PROTEINS and does not touch the
+        # network. Doing it here keeps the per-cell update path cheap.
+        self._mhc_loader = MHCLoader()
+
         # Subscribe to events
         self.subscribe(EventTypes.EXOSOME_UPTAKEN, self.on_exosome_uptaken)
         self.subscribe(EventTypes.CANCER_KILLED, self.on_cancer_killed)
-        
+        self.subscribe(EventTypes.MUTATION_OCCURRED, self.on_mutation_occurred)
+
         print(f"    ✓ {n_normal} normal cells")
         print(f"    ✓ {n_cancer} cancer cells")
+        print(f"    ✓ MHC-I display: {len(self.hla_alleles)} HLA alleles "
+              f"({', '.join(self.hla_alleles)})")
     
     def add_cell(self, position, cell_type='normal'):
         """Add new cell"""
         cell_id = self.next_cell_id
         self.next_cell_id += 1
-        
+
         cell = CellState(
             cell_id=cell_id,
             position=np.array(position, dtype=np.float32),
             cell_type=cell_type,
             phase='G1'
         )
-        
+        # Seed cancer cells with the configured stromal baseline (e.g.,
+        # PDAC presets arrive with 0.5-0.7 already laid down; soft-tissue
+        # tumors closer to 0.0).
+        if cell_type == 'cancer' and self.cancer_baseline_ecm > 0.0:
+            cell.local_ecm_density = float(self.cancer_baseline_ecm)
+
         self.cells[cell_id] = cell
         return cell_id
-    
+
     def remove_cell(self, cell_id: int):
         """Remove cell"""
         if cell_id in self.cells:
             del self.cells[cell_id]
+
+    def ecm_density_at(
+        self,
+        position,
+        sample_radius_um: float = 30.0,
+    ) -> float:
+        """Sample the local ECM density at a 3D position.
+
+        Returns the mean ``local_ecm_density`` of cancer cells within
+        ``sample_radius_um`` of ``position``. Used by the immune module
+        to gate T-cell motility + detection radius (Upgrade 6 ECM
+        barrier). Result is clamped to [0, 1]; positions outside any
+        tumor return 0.0.
+        """
+        from cognisom.engine.py.spatial.ecm_barrier import ecm_density_at
+        cancers = [
+            c for c in self.cells.values()
+            if c.cell_type == 'cancer' and c.alive
+        ]
+        return ecm_density_at(position, cancers, sample_radius_um)
     
     def update(self, dt: float):
         """Update all cells"""
@@ -156,9 +293,24 @@ class CellularModule(SimulationModule):
             
             # Age
             cell.age += dt
-            
+
             # Metabolism
             self._update_metabolism(cell, dt)
+
+            # ECM dynamics (Upgrade 6). Cancer cells continuously
+            # remodel their local stroma; anti-fibrotic therapy
+            # degrades ECM uniformly when active.
+            if cell.cell_type == 'cancer':
+                if self.anti_fibrotic_active:
+                    cell.local_ecm_density = max(
+                        0.0,
+                        cell.local_ecm_density - self.ecm_degradation_rate * dt,
+                    )
+                else:
+                    cell.local_ecm_density = min(
+                        1.0,
+                        cell.local_ecm_density + self.ecm_deposition_rate * dt,
+                    )
             
             # Check for division
             division_time = (self.division_time_cancer if cell.cell_type == 'cancer' 
@@ -297,26 +449,152 @@ class CellularModule(SimulationModule):
             'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0
         }
     
+    def set_molecular_module(self, molecular_module):
+        """Link to molecular module for reference protein lookups.
+
+        Required for the MUTATION_OCCURRED -> PEPTIDE_GENERATED ->
+        PEPTIDE_PRESENTED chain (Upgrade 2): the molecular module owns
+        the canonical WT protein sequence; the cellular module owns
+        per-cell MHC-I display state.
+        """
+        self.molecular_module = molecular_module
+
     # Event handlers
     def on_exosome_uptaken(self, data):
-        """Handle exosome uptake - check for transformation"""
+        """Handle exosome uptake.
+
+        Oncogenic cargo can transform a normal recipient (30% probability).
+        On transformation, cargo mutations are written into the recipient's
+        CellGenomeView as sparse deltas BEFORE the cell-type flip, so
+        daughter cells inherit the transmitted mutation through
+        CellGenomeView.fork() (Claim 4 architecture) and the
+        MUTATION_OCCURRED chain engages for the recipient (Claim 1 chain).
+        """
         cell_id = data['cell_id']
-        
+
         if cell_id in self.cells and data['cargo']['oncogenic']:
-            # Oncogenic cargo can transform cell
             if self.cells[cell_id].cell_type == 'normal':
                 if np.random.random() < 0.3:  # 30% chance
+                    cargo_mutations = data.get('cargo', {}).get('mutations', [])
+                    if self.molecular_module is not None:
+                        for gene_name, mutation_label in cargo_mutations:
+                            self.molecular_module.introduce_mutation(
+                                cell_id, gene_name, mutation_label
+                            )
                     self.transform_cell(cell_id)
-    
+
     def on_cancer_killed(self, data):
         """Handle cancer cell killed by immune system"""
         cell_id = data['cell_id']
         self._kill_cell(cell_id, cause='immune_killed')
 
+    def on_mutation_occurred(self, data):
+        """Generate neoantigen peptides and load them onto MHC-I.
+
+        Closed-loop neoantigen presentation, stage 1 -> 2 (Upgrade 2):
+            MUTATION_OCCURRED  ->  PEPTIDE_GENERATED  ->  PEPTIDE_PRESENTED
+
+        Required event fields:
+            cell_id (int), gene (str), mutation (str), aa_change (str)
+            optional: impact_score, oncogenic
+
+        Skips silently when:
+            * the cell is not tracked here,
+            * no aa_change is present (synonymous / nonsense mutations
+              do not produce a canonical missense neoantigen),
+            * the linked molecular module cannot supply a WT protein,
+            * aa_change is not parseable as "WTposMUT" (e.g., "G12D").
+        """
+        cell_id = data.get('cell_id')
+        gene = data.get('gene')
+        mutation_label = data.get('mutation')
+        aa_change = data.get('aa_change')
+
+        if cell_id not in self.cells or self.molecular_module is None:
+            return
+
+        # Intrinsic PD-L1 induction (Type III TME mechanism): some
+        # oncogenes constitutively up-regulate PD-L1 via downstream
+        # signalling independent of TIL pressure. Fire this as soon as
+        # the mutation lands, regardless of whether we go on to
+        # generate a presentable neoantigen.
+        if gene and data.get('oncogenic') and gene in _INTRINSIC_PDL1_INDUCERS:
+            cell = self.cells[cell_id]
+            cell.pdl1_expression = float(min(
+                1.0,
+                cell.pdl1_expression + _INTRINSIC_PDL1_INDUCERS[gene],
+            ))
+
+        if not gene or not aa_change:
+            return
+
+        # Parse "G12D" -> ("G", 12, "D"). Reject anything not matching
+        # the simple missense pattern; nonsense / frameshift / start-loss
+        # paths are handled by separate event types in future work.
+        wt_aa, pos_str, mut_aa = aa_change[:1], aa_change[1:-1], aa_change[-1:]
+        if not (wt_aa.isalpha() and mut_aa.isalpha() and pos_str.isdigit()):
+            return
+        mut_position_1based = int(pos_str)
+
+        wt_protein = self.molecular_module.get_reference_protein(gene)
+        if not wt_protein or mut_position_1based < 1 or mut_position_1based > len(wt_protein):
+            return
+        # Defensive: skip silently if the declared WT residue does not
+        # match the reference protein at this position (rather than
+        # raising, which would propagate to the event bus).
+        if wt_protein[mut_position_1based - 1] != wt_aa:
+            return
+
+        peptides: List[Peptide] = generate_neoantigen_peptides(
+            wild_type_protein=wt_protein,
+            mutant_position_1based=mut_position_1based,
+            wild_type_aa=wt_aa,
+            mutant_aa=mut_aa,
+            source_gene=gene,
+            mutation_label=mutation_label or aa_change,
+        )
+        if not peptides:
+            return
+
+        self.total_peptides_generated += len(peptides)
+        self.emit_event(EventTypes.PEPTIDE_GENERATED, {
+            'cell_id': cell_id,
+            'gene': gene,
+            'mutation': mutation_label,
+            'aa_change': aa_change,
+            'n_peptides': len(peptides),
+            'peptide_sequences': [p.sequence for p in peptides],
+        })
+
+        # Score against the patient HLA panel; drop non-binders. Keep up
+        # to max_displayed_per_mutation strongest binders (by IC50) for
+        # downstream TCR matching.
+        presentations = self._mhc_loader.score_all(peptides, self.hla_alleles)
+        if not presentations:
+            return
+        presentations.sort(key=lambda p: p.ic50_nm)
+        kept = presentations[:self.max_displayed_per_mutation]
+
+        cell = self.cells[cell_id]
+        cell.mhc1_displayed_peptides.extend(kept)
+        self.total_peptides_presented += len(kept)
+
+        for pres in kept:
+            self.emit_event(EventTypes.PEPTIDE_PRESENTED, {
+                'cell_id': cell_id,
+                'gene': gene,
+                'mutation': mutation_label,
+                'peptide': pres.peptide.sequence,
+                'hla_allele': pres.hla_allele,
+                'ic50_nm': pres.ic50_nm,
+                'binding_level': pres.binding_level,
+                'presentation_score': pres.presentation_score,
+            })
+
 
 # Test
 if __name__ == '__main__':
-    from core import SimulationEngine, SimulationConfig
+    from cognisom.core import SimulationEngine, SimulationConfig
     
     print("=" * 70)
     print("Cellular Module Test")

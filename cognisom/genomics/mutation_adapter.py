@@ -37,7 +37,7 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from engine.py.molecular.nucleic_acids import Gene
+from cognisom.engine.py.molecular.nucleic_acids import Gene
 
 
 # Regex to parse HGVS protein change notation: e.g. "p.G12D", "G12D",

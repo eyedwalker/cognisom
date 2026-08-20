@@ -38,8 +38,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 log = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class HybridModule(SimulationModule):
 
     def initialize(self):
         """Initialize hybrid solver."""
-        from gpu.hybrid_solver import HybridSolver, HybridSystem
+        from cognisom.gpu.hybrid_solver import HybridSolver, HybridSystem
 
         log.info(f"Initializing HybridModule: system={self.system_name}, "
                  f"n_cells={self.n_cells}, threshold={self.threshold}")
@@ -358,7 +358,7 @@ class HybridModule(SimulationModule):
 def register_hybrid_module():
     """Register Hybrid module in the module registry."""
     try:
-        from modules import module_registry
+        from cognisom.modules import module_registry
         module_registry.register('hybrid')(HybridModule)
         log.debug("HybridModule registered in module registry")
     except ImportError:

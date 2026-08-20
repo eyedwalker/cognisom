@@ -8,8 +8,8 @@ Static visualizations that work in Google Colab.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, ImmuneModule, VascularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, ImmuneModule, VascularModule
 
 
 def run_and_visualize(duration=24.0):

@@ -211,8 +211,8 @@ class PlatformLauncher:
         print()
         
         from api.publisher import Publisher
-        from core import SimulationEngine, SimulationConfig
-        from modules import CellularModule, ImmuneModule
+        from cognisom.core import SimulationEngine, SimulationConfig
+        from cognisom.modules import CellularModule, ImmuneModule
         
         print("Running quick simulation...")
         engine = SimulationEngine(SimulationConfig(dt=0.01, duration=1.0))

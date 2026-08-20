@@ -1423,7 +1423,7 @@ with tab_ode:
             with st.spinner("Running ODE simulation..."):
                 try:
                     sys.path.insert(0, str(Path(_project_root) / "cognisom"))
-                    from gpu.ode_solver import BatchedODEIntegrator, ODESystem
+                    from cognisom.gpu.ode_solver import BatchedODEIntegrator, ODESystem
 
                     # Create system
                     system = ODESystem.gene_expression_2species()
@@ -1527,7 +1527,7 @@ with tab_smoldyn:
             with st.spinner("Running Smoldyn simulation..."):
                 try:
                     sys.path.insert(0, str(Path(_project_root) / "cognisom"))
-                    from gpu.smoldyn_solver import (
+                    from cognisom.gpu.smoldyn_solver import (
                         SmoldynSolver, SmoldynSystem, SmoldynSpecies,
                         SmoldynCompartment, BoundaryType
                     )
@@ -1655,7 +1655,7 @@ with tab_hybrid:
             with st.spinner("Running Hybrid ODE/SSA simulation..."):
                 try:
                     sys.path.insert(0, str(Path(_project_root) / "cognisom"))
-                    from gpu.hybrid_solver import HybridSolver, HybridSystem
+                    from cognisom.gpu.hybrid_solver import HybridSolver, HybridSystem
 
                     # Create system
                     if hybrid_system == "Toggle Switch":
@@ -1880,7 +1880,7 @@ with tab_imaging:
             with st.spinner("Running imaging pipeline..."):
                 try:
                     sys.path.insert(0, str(Path(_project_root) / "cognisom"))
-                    from imaging import CellSegmenter, GPUImageProcessor
+                    from cognisom.imaging import CellSegmenter, GPUImageProcessor
 
                     # Create test image with cell-like objects
                     np.random.seed(42)
@@ -2010,7 +2010,7 @@ with tab_docs:
     ### ODE Solver
 
     ```python
-    from gpu.ode_solver import BatchedODEIntegrator, ODESystem
+    from cognisom.gpu.ode_solver import BatchedODEIntegrator, ODESystem
 
     system = ODESystem.gene_expression_2species()
     solver = BatchedODEIntegrator(system, n_cells=10000, method='rk45')
@@ -2020,7 +2020,7 @@ with tab_docs:
     ### Smoldyn Solver
 
     ```python
-    from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem, SmoldynSpecies
+    from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem, SmoldynSpecies
 
     species = [SmoldynSpecies(name='A', diffusion_coeff=1.0)]
     system = SmoldynSystem(species=species, reactions=[], compartment=compartment)
@@ -2032,7 +2032,7 @@ with tab_docs:
     ### Hybrid Solver
 
     ```python
-    from gpu.hybrid_solver import HybridSolver, HybridSystem
+    from cognisom.gpu.hybrid_solver import HybridSolver, HybridSystem
 
     system = HybridSystem.gene_regulatory_network()
     solver = HybridSolver(system, n_cells=5000, threshold=100)
@@ -2054,7 +2054,7 @@ with tab_docs:
     ### Imaging Pipeline
 
     ```python
-    from imaging import CellSegmenter, MeshGenerator, GPUImageProcessor
+    from cognisom.imaging import CellSegmenter, MeshGenerator, GPUImageProcessor
 
     proc = GPUImageProcessor()
     blurred = proc.gaussian_blur(image, sigma=2.0)

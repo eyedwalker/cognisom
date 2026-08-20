@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from engine.py.intracellular import IntracellularModel
+from cognisom.engine.py.intracellular import IntracellularModel
 
 print("=" * 70)
 print("🔬 Testing Stochastic Simulation")

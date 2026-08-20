@@ -38,8 +38,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class SmoldynModule(SimulationModule):
 
     def initialize(self):
         """Initialize Smoldyn solver and particle system."""
-        from gpu.smoldyn_solver import (
+        from cognisom.gpu.smoldyn_solver import (
             SmoldynSolver,
             SmoldynSystem,
             SmoldynCompartment,
@@ -524,7 +524,7 @@ class SmoldynModule(SimulationModule):
 def register_smoldyn_module():
     """Register Smoldyn module in the module registry."""
     try:
-        from modules import module_registry
+        from cognisom.modules import module_registry
         module_registry.register('smoldyn')(SmoldynModule)
         log.debug("SmoldynModule registered in module registry")
     except ImportError:

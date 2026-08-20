@@ -24,8 +24,8 @@ from matplotlib.patches import Circle, FancyArrowPatch
 from mpl_toolkits.mplot3d.art3d import Line3D
 import matplotlib.patches as mpatches
 
-from engine.py.molecular.nucleic_acids import Gene
-from engine.py.molecular.exosomes import Exosome, ExosomeSystem
+from cognisom.engine.py.molecular.nucleic_acids import Gene
+from cognisom.engine.py.molecular.exosomes import Exosome, ExosomeSystem
 
 
 # ============================================

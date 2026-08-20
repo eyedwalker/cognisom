@@ -29,8 +29,8 @@ def test_basic_simulation():
     """Test 1: Basic cell growth and division"""
     print_section("TEST 1: Basic Cell Growth & Division")
     
-    from engine.py.cell import Cell
-    from engine.py.simulation import Simulation
+    from cognisom.engine.py.cell import Cell
+    from cognisom.engine.py.simulation import Simulation
     
     print("Creating a single cell...")
     cell = Cell()
@@ -63,7 +63,7 @@ def test_intracellular():
     """Test 2: Detailed intracellular dynamics"""
     print_section("TEST 2: Detailed Intracellular Dynamics")
     
-    from engine.py.intracellular import IntracellularModel
+    from cognisom.engine.py.intracellular import IntracellularModel
     
     print("Creating cell with detailed internals...")
     cell = IntracellularModel()
@@ -286,8 +286,8 @@ def test_visualization():
         print("✗ matplotlib not installed")
         return False
     
-    from engine.py.intracellular import IntracellularModel
-    from engine.py.visualize import CellVisualizer
+    from cognisom.engine.py.intracellular import IntracellularModel
+    from cognisom.engine.py.visualize import CellVisualizer
     
     print("\nCreating cell and visualizer...")
     cell = IntracellularModel()

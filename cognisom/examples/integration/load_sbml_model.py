@@ -220,7 +220,7 @@ print()
 print("Example integration code:")
 print("-" * 70)
 print("""
-from engine.py.intracellular import IntracellularModel, Gene
+from cognisom.engine.py.intracellular import IntracellularModel, Gene
 
 # Create cell
 cell = IntracellularModel()
