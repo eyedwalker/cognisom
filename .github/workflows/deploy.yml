@@ -17,7 +17,13 @@ on:
         default: false
 
 env:
-  AWS_REGION: us-east-1
+  # us-west-2, matching where the platform actually runs. The ECR repo was
+  # the last thing left in us-east-1 after the Cognito move (#4); pushing
+  # the image to a region with none of the infrastructure in it meant every
+  # rollout pulled cross-region for no reason. The us-east-1 repo is left in
+  # place -- it holds the image history, including what production ran
+  # before this changed.
+  AWS_REGION: us-west-2
   ECR_REPOSITORY: cognisom
 
 jobs:
@@ -144,7 +150,7 @@ jobs:
       #   aws ssm send-command --region us-west-2 \
       #     --instance-ids i-045606a6ff1b09070 \
       #     --document-name AWS-RunShellScript \
-      #     --parameters 'commands=["cd /home/ec2-user/cognisom && ./deploy.sh"]'
+      #     --parameters 'commands=["bash /opt/cognisom/bin/deploy-apps-server.sh --pull <sha>"]'
       #
       # Restoring an automated deploy means either standing up the ECS stack
       # that infrastructure/terraform/ecs.tf already describes, or replacing
