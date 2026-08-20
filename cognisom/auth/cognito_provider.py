@@ -67,6 +67,27 @@ class CognitoTokens:
     token_type: str = "Bearer"
 
 
+@dataclass
+class CognitoChallenge:
+    """A pending authentication challenge that must be answered to sign in.
+
+    Cognito answers ``initiate_auth`` with a challenge instead of tokens when
+    the sign-in cannot complete yet -- an admin-created account that must set
+    its own password, or an account with MFA enabled. ``session`` is the only
+    way to answer it, and it is single-use: each ``respond_to_auth_challenge``
+    returns a fresh one if further steps remain.
+
+    This previously had nowhere to live. ``authenticate`` recognised both
+    challenges and then dropped the session on the floor, returning a bare
+    message, so neither could ever be answered -- an ``admin-create-user``
+    account could not finish logging in at all, and enabling MFA locked the
+    account out of the dashboard the same way.
+    """
+    name: str
+    session: str
+    username: str
+
+
 class CognitoAuthProvider:
     """AWS Cognito authentication provider.
 
@@ -76,7 +97,11 @@ class CognitoAuthProvider:
     Usage::
 
         provider = CognitoAuthProvider()
-        tokens, user = provider.authenticate("user@example.com", "password")
+        tokens, user, msg, challenge = provider.authenticate("me@lab.org", "pw")
+        if challenge and challenge.name == "NEW_PASSWORD_REQUIRED":
+            tokens, user, msg, challenge = provider.respond_to_new_password_challenge(
+                challenge, "a-new-password"
+            )
         user = provider.validate_token(tokens.access_token)
     """
 
@@ -117,17 +142,45 @@ class CognitoAuthProvider:
 
     # ── Authentication ────────────────────────────────────────────────
 
+    @staticmethod
+    def _tokens_from(auth_result: dict) -> CognitoTokens:
+        """Build a CognitoTokens from an AuthenticationResult payload."""
+        return CognitoTokens(
+            access_token=auth_result["AccessToken"],
+            id_token=auth_result["IdToken"],
+            refresh_token=auth_result.get("RefreshToken", ""),
+            expires_at=time.time() + auth_result["ExpiresIn"],
+            token_type=auth_result.get("TokenType", "Bearer"),
+        )
+
+    def _challenge_from(self, response: dict, typed_username: str) -> CognitoChallenge:
+        """Build a CognitoChallenge from a challenge response."""
+        params = response.get("ChallengeParameters") or {}
+        return CognitoChallenge(
+            name=response["ChallengeName"],
+            session=response.get("Session", ""),
+            # Cognito echoes back the identifier it expects in the challenge
+            # response. For accounts created with admin-create-user that is
+            # the immutable sub, not the email that was typed, and answering
+            # with the wrong one fails.
+            username=params.get("USER_ID_FOR_SRP") or typed_username,
+        )
+
     def authenticate(
         self,
         username: str,
         password: str,
-    ) -> Tuple[Optional[CognitoTokens], Optional[User], str]:
+    ) -> Tuple[Optional[CognitoTokens], Optional[User], str, Optional[CognitoChallenge]]:
         """Authenticate a user with username/password.
 
-        Returns (tokens, user, message).
+        Returns (tokens, user, message, challenge). When Cognito cannot
+        complete the sign-in yet it returns no tokens and a `challenge` the
+        caller must answer -- `respond_to_new_password_challenge` for
+        NEW_PASSWORD_REQUIRED, `respond_to_mfa_challenge` for the MFA ones.
+        A failed login returns no tokens and no challenge.
         """
         if not self._enabled:
-            return None, None, "Cognito authentication not configured"
+            return None, None, "Cognito authentication not configured", None
 
         try:
             auth_params = {
@@ -145,47 +198,107 @@ class CognitoAuthProvider:
                 AuthParameters=auth_params,
             )
 
-            # Check for MFA challenge
+            # Cognito answers with a challenge instead of tokens when the
+            # sign-in cannot complete yet. The session travels with it -- it
+            # is the only way to answer, so it must reach the caller.
             if "ChallengeName" in response:
-                challenge = response["ChallengeName"]
-                if challenge == "NEW_PASSWORD_REQUIRED":
-                    return None, None, "Password change required"
-                elif challenge in ("SMS_MFA", "SOFTWARE_TOKEN_MFA"):
-                    # MFA required - return session for challenge response
-                    return None, None, f"MFA required: {challenge}"
+                challenge = self._challenge_from(response, username)
+                if challenge.name == "NEW_PASSWORD_REQUIRED":
+                    msg = "You must set a new password before signing in."
+                elif challenge.name in ("SMS_MFA", "SOFTWARE_TOKEN_MFA"):
+                    msg = f"MFA required: {challenge.name}"
                 else:
-                    return None, None, f"Authentication challenge: {challenge}"
+                    msg = f"Authentication challenge: {challenge.name}"
+                return None, None, msg, challenge
 
-            # Extract tokens
-            auth_result = response["AuthenticationResult"]
-            tokens = CognitoTokens(
-                access_token=auth_result["AccessToken"],
-                id_token=auth_result["IdToken"],
-                refresh_token=auth_result.get("RefreshToken", ""),
-                expires_at=time.time() + auth_result["ExpiresIn"],
-                token_type=auth_result.get("TokenType", "Bearer"),
-            )
+            tokens = self._tokens_from(response["AuthenticationResult"])
 
             # Get user details
             user = self.get_user(tokens.access_token)
-            return tokens, user, "Authentication successful"
+            return tokens, user, "Authentication successful", None
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             if error_code == "NotAuthorizedException":
-                return None, None, "Invalid username or password"
+                return None, None, "Invalid username or password", None
             elif error_code == "UserNotFoundException":
-                return None, None, "Invalid username or password"
+                return None, None, "Invalid username or password", None
             elif error_code == "UserNotConfirmedException":
-                return None, None, "Account not verified. Check your email."
+                return None, None, "Account not verified. Check your email.", None
             elif error_code == "PasswordResetRequiredException":
-                return None, None, "Password reset required"
+                return None, None, "Password reset required", None
             else:
                 log.error("Cognito auth error: %s - %s", error_code, e)
-                return None, None, f"Authentication failed: {error_code}"
+                return None, None, f"Authentication failed: {error_code}", None
         except Exception as e:
             log.error("Cognito auth exception: %s", e)
-            return None, None, "Authentication failed"
+            return None, None, "Authentication failed", None
+
+    def respond_to_new_password_challenge(
+        self,
+        challenge: CognitoChallenge,
+        new_password: str,
+    ) -> Tuple[Optional[CognitoTokens], Optional[User], str, Optional[CognitoChallenge]]:
+        """Answer a NEW_PASSWORD_REQUIRED challenge and finish signing in.
+
+        This is the step every ``admin-create-user`` account must complete:
+        Cognito puts such accounts in FORCE_CHANGE_PASSWORD and refuses to
+        issue tokens until the user replaces the temporary password. Without
+        it the only route in was the hosted UI.
+
+        Returns (tokens, user, message, challenge) -- the trailing challenge
+        is populated on the rare pool configurations that stack another step
+        (MFA setup) behind the password change.
+        """
+        if not self._enabled:
+            return None, None, "Cognito authentication not configured", None
+
+        try:
+            challenge_responses = {
+                "USERNAME": challenge.username,
+                "NEW_PASSWORD": new_password,
+            }
+
+            secret_hash = self._get_secret_hash(challenge.username)
+            if secret_hash:
+                challenge_responses["SECRET_HASH"] = secret_hash
+
+            response = self._client.respond_to_auth_challenge(
+                ClientId=self._config["client_id"],
+                ChallengeName="NEW_PASSWORD_REQUIRED",
+                Session=challenge.session,
+                ChallengeResponses=challenge_responses,
+            )
+
+            # A pool can stack a further step behind the password change.
+            if "ChallengeName" in response:
+                nxt = self._challenge_from(response, challenge.username)
+                return None, None, f"Additional step required: {nxt.name}", nxt
+
+            tokens = self._tokens_from(response["AuthenticationResult"])
+            user = self.get_user(tokens.access_token)
+            return tokens, user, "Password set. You are signed in.", None
+
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "InvalidPasswordException":
+                # Carries the pool's own policy text, which is more useful
+                # than a generic message.
+                return None, None, e.response["Error"].get(
+                    "Message", "Password does not meet requirements"
+                ), None
+            if error_code in ("NotAuthorizedException", "ExpiredCodeException"):
+                # The session is single-use and short-lived; the user has to
+                # start again from the login form with the temporary password.
+                return None, None, (
+                    "That sign-in attempt expired. Log in again with your "
+                    "temporary password to set a new one."
+                ), None
+            log.error("New-password challenge error: %s - %s", error_code, e)
+            return None, None, f"Could not set password: {error_code}", None
+        except Exception as e:
+            log.error("New-password challenge exception: %s", e)
+            return None, None, "Could not set password", None
 
     def respond_to_mfa_challenge(
         self,
@@ -193,13 +306,13 @@ class CognitoAuthProvider:
         session: str,
         mfa_code: str,
         challenge_name: str = "SOFTWARE_TOKEN_MFA",
-    ) -> Tuple[Optional[CognitoTokens], Optional[User], str]:
+    ) -> Tuple[Optional[CognitoTokens], Optional[User], str, Optional[CognitoChallenge]]:
         """Respond to MFA challenge.
 
-        Returns (tokens, user, message).
+        Returns (tokens, user, message, challenge).
         """
         if not self._enabled:
-            return None, None, "Cognito authentication not configured"
+            return None, None, "Cognito authentication not configured", None
 
         try:
             challenge_responses = {
@@ -222,23 +335,16 @@ class CognitoAuthProvider:
                 ChallengeResponses=challenge_responses,
             )
 
-            auth_result = response["AuthenticationResult"]
-            tokens = CognitoTokens(
-                access_token=auth_result["AccessToken"],
-                id_token=auth_result["IdToken"],
-                refresh_token=auth_result.get("RefreshToken", ""),
-                expires_at=time.time() + auth_result["ExpiresIn"],
-            )
-
+            tokens = self._tokens_from(response["AuthenticationResult"])
             user = self.get_user(tokens.access_token)
-            return tokens, user, "MFA verification successful"
+            return tokens, user, "MFA verification successful", None
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
-            return None, None, f"MFA verification failed: {error_code}"
+            return None, None, f"MFA verification failed: {error_code}", None
         except Exception as e:
             log.error("MFA challenge exception: %s", e)
-            return None, None, "MFA verification failed"
+            return None, None, "MFA verification failed", None
 
     def refresh_tokens(self, refresh_token: str) -> Tuple[Optional[CognitoTokens], str]:
         """Refresh authentication tokens.

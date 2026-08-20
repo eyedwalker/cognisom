@@ -408,9 +408,100 @@ def _streamlit_local_login():
             st.error(msg)
 
 
+def _store_cognito_session(tokens, user) -> None:
+    """Persist a completed Cognito sign-in into the Streamlit session."""
+    import streamlit as st
+
+    st.session_state["cognito_access_token"] = tokens.access_token
+    st.session_state["cognito_refresh_token"] = tokens.refresh_token
+    st.session_state["cognito_token_expires"] = tokens.expires_at
+    st.session_state["username"] = user.username
+    st.session_state.pop("cognito_pending_challenge", None)
+
+
+def _streamlit_cognito_challenge(cognito, challenge):
+    """Answer a pending Cognito challenge.
+
+    Sign-in does not always finish in one step. An account created with
+    admin-create-user lands in FORCE_CHANGE_PASSWORD and Cognito refuses to
+    issue tokens until a new password replaces the temporary one; an account
+    with MFA enabled needs a code. Until this form existed the challenge was
+    a dead end -- the login form reported "Password change required" and gave
+    no way to supply one, so such accounts could only get in via the hosted UI.
+    """
+    import streamlit as st
+
+    if challenge.name == "NEW_PASSWORD_REQUIRED":
+        st.markdown("### Set a new password")
+        st.info(
+            "This account was created with a temporary password. "
+            "Choose a new one to finish signing in."
+        )
+        with st.form("cognito_new_password_form"):
+            new_password = st.text_input("New password", type="password")
+            confirm = st.text_input("Confirm new password", type="password")
+            submitted = st.form_submit_button("Set password and sign in", type="primary")
+
+        if submitted:
+            if not new_password or not confirm:
+                st.error("Enter the new password twice.")
+            elif new_password != confirm:
+                st.error("Those passwords do not match.")
+            else:
+                tokens, user, msg, nxt = cognito.respond_to_new_password_challenge(
+                    challenge, new_password
+                )
+                if tokens and user:
+                    _store_cognito_session(tokens, user)
+                    st.rerun()
+                elif nxt:
+                    st.session_state["cognito_pending_challenge"] = nxt
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    elif challenge.name in ("SMS_MFA", "SOFTWARE_TOKEN_MFA"):
+        st.markdown("### Enter your verification code")
+        with st.form("cognito_mfa_form"):
+            code = st.text_input("Authentication code")
+            submitted = st.form_submit_button("Verify", type="primary")
+
+        if submitted and code:
+            tokens, user, msg, _nxt = cognito.respond_to_mfa_challenge(
+                challenge.username, challenge.session, code, challenge.name
+            )
+            if tokens and user:
+                _store_cognito_session(tokens, user)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    else:
+        st.error(
+            f"This account needs a sign-in step the dashboard cannot handle "
+            f"({challenge.name}). Use the hosted login page instead."
+        )
+        if cognito.hosted_ui_url:
+            st.link_button("Open hosted login", cognito.hosted_ui_url)
+
+    # The Cognito session is single-use, so a failed attempt cannot be retried
+    # from here -- starting over reissues one from the login form.
+    if st.button("Start over"):
+        st.session_state.pop("cognito_pending_challenge", None)
+        st.rerun()
+
+
 def _streamlit_cognito_login(cognito):
     """Cognito login form."""
     import streamlit as st
+
+    # A challenge from a previous submit takes over the form entirely: the
+    # password has already been accepted, so re-showing the login fields
+    # would just invite the user to type it again.
+    pending = st.session_state.get("cognito_pending_challenge")
+    if pending is not None:
+        _streamlit_cognito_challenge(cognito, pending)
+        return
 
     # Inject autocomplete attributes for browser autofill
     st.markdown("""
@@ -445,12 +536,12 @@ def _streamlit_cognito_login(cognito):
         submitted = st.form_submit_button("Log in", type="primary")
 
     if submitted and email and password:
-        tokens, user, msg = cognito.authenticate(email, password)
+        tokens, user, msg, challenge = cognito.authenticate(email, password)
         if tokens and user:
-            st.session_state["cognito_access_token"] = tokens.access_token
-            st.session_state["cognito_refresh_token"] = tokens.refresh_token
-            st.session_state["cognito_token_expires"] = tokens.expires_at
-            st.session_state["username"] = user.username
+            _store_cognito_session(tokens, user)
+            st.rerun()
+        elif challenge is not None:
+            st.session_state["cognito_pending_challenge"] = challenge
             st.rerun()
         else:
             st.error(msg)
@@ -595,6 +686,8 @@ def _streamlit_cognito_reset_confirm(cognito):
             st.session_state.pop("cognito_access_token", None)
             st.session_state.pop("cognito_refresh_token", None)
             st.session_state.pop("cognito_token_expires", None)
+            # A challenge session from before the reset is dead too.
+            st.session_state.pop("cognito_pending_challenge", None)
             st.session_state.pop("session_id", None)
             st.session_state.pop("username", None)
             st.success("Password reset! You can now log in.")
