@@ -30,7 +30,7 @@ mkdir -p /app/data/auth \
 # Start Flask API with gunicorn in background
 echo "[1/2] Starting Flask API on port 5000..."
 cd /app
-gunicorn api.rest_server:app \
+gunicorn cognisom.api.rest_server:app \
     --bind 0.0.0.0:5000 \
     --workers 2 \
     --timeout 120 \

@@ -101,7 +101,7 @@ class BNGLModule(SimulationModule):
 
     def initialize(self):
         """Initialize BNGL model and expand rules."""
-        from bngl import BNGLParser, BNGLModel, RuleExpander
+        from cognisom.bngl import BNGLParser, BNGLModel, RuleExpander
 
         log.info(f"Initializing BNGLModule: model={self.model_spec}, "
                  f"method={self.method}, max_species={self.max_species}")

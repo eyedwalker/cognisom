@@ -27,7 +27,7 @@ from cognisom.core import SimulationEngine, SimulationConfig
 from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule,
                     EpigeneticModule, CircadianModule, MorphogenModule)
-from scenarios import *
+from cognisom.scenarios import *
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(32).hex())

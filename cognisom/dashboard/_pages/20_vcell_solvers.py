@@ -1795,7 +1795,7 @@ end reaction rules"""
     with col_viz:
         if load_bngl:
             try:
-                from bngl import BNGLModel, BNGLParser
+                from cognisom.bngl import BNGLModel, BNGLParser
 
                 if "Simple Receptor" in bngl_model:
                     model = BNGLModel.simple_receptor()
@@ -2038,7 +2038,7 @@ with tab_docs:
     ### BNGL Parser
 
     ```python
-    from bngl import BNGLModel, BNGLParser
+    from cognisom.bngl import BNGLModel, BNGLParser
 
     model = BNGLModel.egfr_signaling()
     # or
