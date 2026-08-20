@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cognisom"
+version = "0.9.0"
+description = "Personalized molecular digital twin platform for cancer immunotherapy simulation"
+readme = "README.md"
+# Upper bound is real, not cautious: mhcflurry 2.0.6 imports the stdlib
+# `pipes` module, removed in 3.13. CI and the production image are 3.11.
+requires-python = ">=3.10,<3.13"
+
+# Runtime dependencies are declared in requirements.txt, which the Docker
+# build installs directly. They are intentionally not duplicated here: two
+# manifests that can disagree is the problem this file exists to reduce.
+
+[project.urls]
+Homepage = "https://cognisom.com"
+
+[tool.setuptools.packages.find]
+# Only the `cognisom` package is installable. The identically-named
+# top-level directories (core/, gpu/, modules/, engine/, ...) are the
+# duplicate tree being collapsed; they are deliberately NOT packaged, so an
+# installed environment can only resolve one copy of each module.
+include = ["cognisom*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "*.yaml", "*.yml", "*.usda", "*.bngl", "*.toml"]
+
+# ── Plugin discovery ────────────────────────────────────────────────
+# core/registry.py's discover_plugins() reads these entry points. Without a
+# pyproject.toml no entry point could exist, so the plugin system it
+# implements was unreachable.
+[project.entry-points."cognisom.modules"]
+virus = "cognisom.plugins.examples.virus_plugin"
+
+# Test configuration lives in pytest.ini so a single file owns it.
