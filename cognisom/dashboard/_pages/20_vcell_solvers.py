@@ -1422,7 +1422,6 @@ with tab_ode:
         if run_ode:
             with st.spinner("Running ODE simulation..."):
                 try:
-                    sys.path.insert(0, str(Path(_project_root) / "cognisom"))
                     from cognisom.gpu.ode_solver import BatchedODEIntegrator, ODESystem
 
                     # Create system
@@ -1526,7 +1525,6 @@ with tab_smoldyn:
         if run_smoldyn:
             with st.spinner("Running Smoldyn simulation..."):
                 try:
-                    sys.path.insert(0, str(Path(_project_root) / "cognisom"))
                     from cognisom.gpu.smoldyn_solver import (
                         SmoldynSolver, SmoldynSystem, SmoldynSpecies,
                         SmoldynCompartment, BoundaryType
@@ -1654,7 +1652,6 @@ with tab_hybrid:
         if run_hybrid:
             with st.spinner("Running Hybrid ODE/SSA simulation..."):
                 try:
-                    sys.path.insert(0, str(Path(_project_root) / "cognisom"))
                     from cognisom.gpu.hybrid_solver import HybridSolver, HybridSystem
 
                     # Create system
@@ -1798,7 +1795,6 @@ end reaction rules"""
     with col_viz:
         if load_bngl:
             try:
-                sys.path.insert(0, str(Path(_project_root) / "cognisom"))
                 from bngl import BNGLModel, BNGLParser
 
                 if "Simple Receptor" in bngl_model:
@@ -1879,7 +1875,6 @@ with tab_imaging:
         if run_imaging:
             with st.spinner("Running imaging pipeline..."):
                 try:
-                    sys.path.insert(0, str(Path(_project_root) / "cognisom"))
                     from cognisom.imaging import CellSegmenter, GPUImageProcessor
 
                     # Create test image with cell-like objects
