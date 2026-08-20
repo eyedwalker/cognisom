@@ -36,9 +36,16 @@ RUN pip install --no-cache-dir rdkit-pypi \
     || echo "WARNING: rdkit-pypi unavailable; cheminformatics features disabled"
 
 # Bake MHCflurry model weights into the image (~600 MB). Without this the
-# first prediction would download them at runtime, or silently fall back to
-# the position-weight-matrix scorer.
-RUN mhcflurry-downloads fetch models_class1_presentation
+# first prediction would download them at runtime, or fail closed.
+#
+# MHCFLURRY_DATA_DIR is set explicitly, and matters: this RUN executes as
+# root, while the container runs as the unprivileged `cognisom` user (below).
+# Left to the default of ~/.local/share/mhcflurry the weights would land in
+# /root and be invisible at runtime, so every prediction would raise. The
+# directory is world-readable so any runtime user can load the models.
+ENV MHCFLURRY_DATA_DIR=/opt/mhcflurry
+RUN mhcflurry-downloads fetch models_class1_presentation \
+    && chmod -R a+rX /opt/mhcflurry
 
 # Application code
 COPY . .
@@ -60,6 +67,21 @@ RUN mkdir -p data/auth \
 RUN groupadd -r cognisom && useradd -r -g cognisom -d /app cognisom && \
     chown -R cognisom:cognisom /app
 USER cognisom
+
+# Fail the build, not production, if the shipped image cannot actually
+# predict. Runs AS the unprivileged runtime user, so it verifies the thing
+# that matters: that MHCflurry's weights are readable from the account the
+# container runs under, and that the Flask app imports at the module path
+# entrypoint.sh hands to gunicorn.
+RUN python -c "\
+from mhcflurry import Class1PresentationPredictor; \
+p = Class1PresentationPredictor.load(); \
+assert p.supported_alleles, 'MHCflurry loaded but exposes no alleles'; \
+print('MHCflurry OK:', len(p.supported_alleles), 'alleles')" \
+ && python -c "\
+import cognisom.api.rest_server as a; \
+assert hasattr(a, 'app'), 'gunicorn target cognisom.api.rest_server:app missing'; \
+print('Flask app OK')"
 
 # Expose both services
 EXPOSE 5000 8501
