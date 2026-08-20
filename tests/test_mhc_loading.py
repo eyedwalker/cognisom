@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import pytest
 
-from engine.py.immune.mhc_loading import (
+from cognisom.engine.py.immune.mhc_loading import (
     MHCLoader,
     MHCPresentation,
     _canonical_allele,
 )
-from engine.py.molecular.peptidome import Peptide
+from cognisom.engine.py.molecular.peptidome import Peptide
 
 
 def _wt_peptide(seq: str, cleav: float = 0.9) -> Peptide:

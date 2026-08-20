@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine.py.molecular.peptidome import (
+from cognisom.engine.py.molecular.peptidome import (
     DEFAULT_LENGTHS,
     Peptide,
     generate_neoantigen_peptides,

@@ -39,12 +39,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from engine.py.immune.tme_classifier import (
+from cognisom.engine.py.immune.tme_classifier import (
     DEFAULT_ECM_EXCLUDED_THRESHOLD,
     TMEType,
     classify_tme,
 )
-from engine.py.spatial.ecm_barrier import (
+from cognisom.engine.py.spatial.ecm_barrier import (
     MIN_RETAINED_FRACTION,
     detection_attenuation,
     ecm_density_at,
@@ -116,9 +116,9 @@ def test_detection_attenuation_monotone_in_ecm():
 # ---------------------------------------------------------------------------
 
 def _build_cellular_module(**config):
-    from core import SimulationConfig, SimulationEngine
-    from modules.cellular_module import CellularModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     cfg = {
         "n_normal_cells": 0,
@@ -279,10 +279,10 @@ def test_high_ecm_drops_til_count_to_zero():
     """A T cell next to a high-ECM tumor (with displayed neoantigens)
     should fail to detect: effective detection radius is near zero,
     no recognition fires, no TIL bump on cancer cell."""
-    from core import SimulationConfig, SimulationEngine
-    from modules.cellular_module import CellularModule
-    from modules.immune_module import ImmuneModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.immune_module import ImmuneModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     np.random.seed(0)
     engine = SimulationEngine(SimulationConfig(
@@ -341,10 +341,10 @@ def test_anti_fibrotic_restores_til_infiltration():
     """Same setup as above but with anti_fibrotic_active=True and a
     fast degradation rate. ECM drops over the run; the T cell ends
     up able to detect and engage."""
-    from core import SimulationConfig, SimulationEngine
-    from modules.cellular_module import CellularModule
-    from modules.immune_module import ImmuneModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.immune_module import ImmuneModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     np.random.seed(0)
     engine = SimulationEngine(SimulationConfig(
