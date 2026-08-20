@@ -42,7 +42,7 @@ def get_cognito_config() -> dict:
         "client_id": os.environ.get("COGNITO_CLIENT_ID", ""),
         "client_secret": os.environ.get("COGNITO_CLIENT_SECRET", ""),
         "domain": os.environ.get("COGNITO_DOMAIN", ""),
-        "region": os.environ.get("AWS_REGION", "us-east-1"),
+        "region": os.environ.get("AWS_REGION", "us-west-2"),
     }
 
 
