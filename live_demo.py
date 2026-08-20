@@ -16,7 +16,7 @@ Press Ctrl+C to stop.
 import sys
 sys.path.insert(0, '.')
 
-from engine.py.live_visualizer import create_live_simulation
+from cognisom.engine.py.live_visualizer import create_live_simulation
 
 if __name__ == '__main__':
     print("=" * 60)

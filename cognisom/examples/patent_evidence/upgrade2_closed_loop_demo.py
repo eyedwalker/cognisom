@@ -65,11 +65,11 @@ try:  # Best-effort: silence keras progress bars too
 except Exception:
     pass
 
-from core import SimulationConfig, SimulationEngine
-from core.event_bus import EventTypes
-from modules.cellular_module import CellularModule
-from modules.immune_module import ImmuneModule
-from modules.molecular_module import MolecularModule
+from cognisom.core import SimulationConfig, SimulationEngine
+from cognisom.core.event_bus import EventTypes
+from cognisom.modules.cellular_module import CellularModule
+from cognisom.modules.immune_module import ImmuneModule
+from cognisom.modules.molecular_module import MolecularModule
 
 
 # Canonical driver mutations to exercise. Each entry is

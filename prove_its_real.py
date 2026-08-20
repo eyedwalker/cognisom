@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from engine.py.intracellular import IntracellularModel
+from cognisom.engine.py.intracellular import IntracellularModel
 
 print("=" * 70)
 print("🔬 PROVING THESE ARE REAL SIMULATIONS")

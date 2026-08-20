@@ -37,9 +37,9 @@ if REPO_ROOT not in sys.path:
 
 import numpy as np
 
-from core import SimulationEngine, SimulationConfig
-from core.event_bus import EventTypes
-from modules.molecular_module import MolecularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.core.event_bus import EventTypes
+from cognisom.modules.molecular_module import MolecularModule
 
 
 def banner(title: str) -> None:
