@@ -50,6 +50,21 @@ jobs:
         if: steps.mhcflurry-cache.outputs.cache-hit != 'true'
         run: mhcflurry-downloads fetch models_class1_presentation
 
+      # Assert the REAL predictor is usable before running the suite. Without
+      # this the suite still passes when MHCflurry is unusable -- conftest.py
+      # falls back to the PWM approximation by design -- and `-q` suppresses
+      # the report header that says so, so a green run looked identical either
+      # way. That is how a missing tensorflow dependency reached the image
+      # build undetected.
+      - name: Verify MHCflurry is usable (not the PWM fallback)
+        run: |
+          python -c "
+          from mhcflurry import Class1PresentationPredictor
+          p = Class1PresentationPredictor.load()
+          assert p.supported_alleles, 'loaded but no alleles'
+          print(f'MHCflurry usable: {len(p.supported_alleles)} alleles')
+          "
+
       - name: Run tests
         # Runs the root `tests/` suite (testpaths in pytest.ini), which carries
         # the 2026 upgrade coverage the old `cognisom/tests/` path skipped.

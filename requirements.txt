@@ -75,6 +75,13 @@ warp-lang>=1.0.0
 # Requires Python <= 3.12: mhcflurry 2.0.6 imports the stdlib `pipes` module,
 # which was removed in 3.13. CI and the production image are both 3.11.
 mhcflurry==2.0.6
+# MHCflurry's class1 predictors run on TensorFlow and it is NOT pulled in by
+# `pip install mhcflurry`. Without it the package imports and its weights
+# download, but Class1PresentationPredictor.load() dies inside
+# configure_tensorflow() with ModuleNotFoundError -- i.e. it looks installed
+# and silently is not usable. tensorflow-cpu, not tensorflow: the production
+# image is CPU-only by design and the CUDA wheels add gigabytes.
+tensorflow-cpu>=2.12,<2.17
 #
 # Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
 # default; the real path requires transformers + torch.
