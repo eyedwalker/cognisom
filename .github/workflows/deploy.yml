@@ -3,6 +3,12 @@ name: Test, Build & Deploy
 on:
   push:
     branches: [main]
+  # Run the test job on pull requests too. Without this the gate only fires
+  # after a merge has already landed on main, so it cannot block a bad merge
+  # -- which is most of the value of having a gate. The deploy job below is
+  # guarded on github.event_name != 'pull_request', so PRs test but never ship.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       enable_gpu:
@@ -42,6 +48,9 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     needs: test
+    # Pull requests run the test job only. Never build or deploy from a PR:
+    # the workflow holds production AWS credentials and force-deploys ECS.
+    if: github.event_name != 'pull_request'
     environment: production
 
     permissions:
