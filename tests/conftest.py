@@ -19,16 +19,25 @@ from __future__ import annotations
 import os
 
 
-def _mhcflurry_importable() -> bool:
+def _mhcflurry_usable() -> bool:
+    """Whether MHCflurry can actually predict, not merely be imported.
+
+    The package installing and the ~600 MB model weights being present are
+    separate facts: `pip install mhcflurry` succeeds on its own, and
+    Class1PresentationPredictor.load() then fails with "Missing MHCflurry
+    downloadable file". Checking only importability reported the real scorer
+    as active on a machine that could not run it.
+    """
     try:
-        import mhcflurry  # noqa: F401
+        from mhcflurry import Class1PresentationPredictor
+        Class1PresentationPredictor.load()
         return True
     except Exception:
         return False
 
 
 def pytest_configure(config):
-    if _mhcflurry_importable():
+    if _mhcflurry_usable():
         config.stash["cognisom_binding_scorer"] = "mhcflurry"
         return
 
@@ -41,7 +50,9 @@ def pytest_report_header(config):
     if scorer == "mhcflurry":
         return "binding scorer: MHCflurry (real predictor)"
     return (
-        "binding scorer: PWM FALLBACK -- MHCflurry is not importable here, so "
-        "affinity-dependent assertions exercise the approximation, not the "
-        "shipped predictor. Note mhcflurry 2.0.6 requires Python <= 3.12."
+        "binding scorer: PWM FALLBACK -- MHCflurry is not usable here (not "
+        "installed, or installed without its model weights), so affinity-"
+        "dependent assertions exercise the approximation, not the shipped "
+        "predictor. mhcflurry 2.0.6 requires Python <= 3.12, and its weights "
+        "come from `mhcflurry-downloads fetch models_class1_presentation`."
     )

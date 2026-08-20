@@ -35,6 +35,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Installing mhcflurry and having its ~600 MB model weights are separate
+      # facts. Without the weights Class1PresentationPredictor.load() fails and
+      # the suite silently drops to the PWM approximation -- so CI would not be
+      # testing the predictor that ships. Cached to keep the gate fast.
+      - name: Cache MHCflurry models
+        id: mhcflurry-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/mhcflurry
+          key: mhcflurry-models-2.0.6-class1-presentation
+
+      - name: Fetch MHCflurry models
+        if: steps.mhcflurry-cache.outputs.cache-hit != 'true'
+        run: mhcflurry-downloads fetch models_class1_presentation
+
       - name: Run tests
         # Runs the root `tests/` suite (testpaths in pytest.ini), which carries
         # the 2026 upgrade coverage the old `cognisom/tests/` path skipped.
