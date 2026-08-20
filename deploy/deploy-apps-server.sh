@@ -22,7 +22,15 @@ set -euo pipefail
 #      AWS_DEFAULT_REGION -- so both are set. Launching without these vars
 #      disables Cognito entirely and silently falls back to local file auth.
 #
-# Usage: bash deploy/deploy-apps-server.sh [--build] [--no-restart]
+# Usage: bash deploy/deploy-apps-server.sh [--pull <sha>] [--build] [--no-restart]
+#
+#   --pull <sha>  fetch the image CI already built and pushed to ECR. This is
+#                 the normal path: CI builds on every push to main, and that
+#                 image has passed the in-image checks (MHCflurry loads as the
+#                 runtime user, gunicorn's target imports). Prefer it.
+#   --build       build locally instead. Note the checkout at
+#                 /home/ec2-user/cognisom drifts from main, so a local build
+#                 there can quietly produce an older image than you expect.
 # ═══════════════════════════════════════════════════════════════
 
 CONTAINER="cognisom-dashboard"
@@ -38,15 +46,29 @@ COGNITO_POOL="us-west-2_6lEXWY7IU"
 COGNITO_CLIENT="v4ir490b43m86qatdijfec90t"
 COGNITO_DOMAIN_NAME="cognisom-production-auth"
 
+ECR_REGISTRY="780457123717.dkr.ecr.us-west-2.amazonaws.com/cognisom"
+ECR_REGION="us-west-2"
+
 DO_BUILD=false
 DO_RESTART=true
-for arg in "$@"; do
-  case $arg in
-    --build)      DO_BUILD=true ;;
-    --no-restart) DO_RESTART=false ;;
-    *) echo "Unknown arg: $arg"; exit 1 ;;
+PULL_SHA=""
+while [ $# -gt 0 ]; do
+  case $1 in
+    --pull)       PULL_SHA="${2:-}"; [ -n "$PULL_SHA" ] || { echo "--pull needs an image tag"; exit 1; }; shift 2 ;;
+    --build)      DO_BUILD=true; shift ;;
+    --no-restart) DO_RESTART=false; shift ;;
+    *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
+
+# Written as an `if` rather than an `&&` chain on purpose: under `set -e` a
+# chain like `[ -n "$x" ] && [ ... ] && { exit 1; }` survives only because a
+# failure *before* the final && is exempt from -e. That is too subtle to rest
+# a deploy on.
+if [ -n "$PULL_SHA" ] && [ "$DO_BUILD" = true ]; then
+  echo "ERROR: --pull and --build are mutually exclusive."
+  exit 1
+fi
 
 info() { echo "[INFO] $1"; }
 ok()   { echo "[OK]   $1"; }
@@ -61,6 +83,15 @@ chown -R "${RUNTIME_UID}:${RUNTIME_GID}" "$DATA_DIR" "$EXPORTS_DIR"
 ok "Volumes owned by ${RUNTIME_UID}:${RUNTIME_GID}"
 
 # ─── 2. Image ────────────────────────────────────────────────
+if [ -n "$PULL_SHA" ]; then
+  info "Pulling $PULL_SHA from ECR ($ECR_REGION)..."
+  aws ecr get-login-password --region "$ECR_REGION" \
+    | docker login --username AWS --password-stdin "$ECR_REGISTRY" >/dev/null
+  docker pull "$ECR_REGISTRY:$PULL_SHA"
+  docker tag "$ECR_REGISTRY:$PULL_SHA" "$IMAGE"
+  ok "Pulled and tagged as $IMAGE"
+fi
+
 if [ "$DO_BUILD" = true ]; then
   info "Building $IMAGE from $(git rev-parse --short HEAD 2>/dev/null || echo 'working tree')..."
   docker build -f Dockerfile.prod \
@@ -70,7 +101,10 @@ if [ "$DO_BUILD" = true ]; then
   ok "Image built"
 fi
 
-docker image inspect "$IMAGE" >/dev/null 2>&1 || { echo "ERROR: $IMAGE not present. Re-run with --build."; exit 1; }
+docker image inspect "$IMAGE" >/dev/null 2>&1 || {
+  echo "ERROR: $IMAGE not present. Re-run with --pull <sha> (normal) or --build."
+  exit 1
+}
 
 # ─── 3. Pre-flight: can the runtime user actually write? ─────
 # Checked before tearing down the healthy container, so a permissions problem
