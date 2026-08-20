@@ -35,15 +35,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from engine.py.immune.mhc_loading import MHCPresentation
-from engine.py.immune.tcell_kill import kill_outcome, kill_probability
-from engine.py.immune.tcr_repertoire import (
+from cognisom.engine.py.immune.mhc_loading import MHCPresentation
+from cognisom.engine.py.immune.tcell_kill import kill_outcome, kill_probability
+from cognisom.engine.py.immune.tcr_repertoire import (
     EXHAUSTED_KILL_MULTIPLIER,
     EXHAUSTION_ENCOUNTER_THRESHOLD,
     ExhaustionState,
     TCRRepertoire,
 )
-from engine.py.molecular.peptidome import Peptide
+from cognisom.engine.py.molecular.peptidome import Peptide
 
 
 # ---------------------------------------------------------------------------
@@ -249,11 +249,11 @@ def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
     point a TCELL_EXHAUSTED event must appear on the bus AND the
     per-encounter kill probability computed for that clone must drop
     by approximately the EXHAUSTED_KILL_MULTIPLIER ratio."""
-    from core import SimulationConfig, SimulationEngine
-    from core.event_bus import EventTypes
-    from modules.cellular_module import CellularModule
-    from modules.immune_module import ImmuneModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.core.event_bus import EventTypes
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.immune_module import ImmuneModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     np.random.seed(0)
     engine = SimulationEngine(SimulationConfig(

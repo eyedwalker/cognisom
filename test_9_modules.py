@@ -6,8 +6,8 @@ Test All Modules Including Circadian and Morphogens
 Complete integration test with 9 modules.
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import (MolecularModule, CellularModule, ImmuneModule,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule,
                     EpigeneticModule, CircadianModule, MorphogenModule)
 

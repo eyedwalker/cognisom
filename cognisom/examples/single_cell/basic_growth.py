@@ -19,8 +19,8 @@ from pathlib import Path
 # Add engine to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from engine.py.cell import Cell
-from engine.py.simulation import Simulation
+from cognisom.engine.py.cell import Cell
+from cognisom.engine.py.simulation import Simulation
 
 
 def main():

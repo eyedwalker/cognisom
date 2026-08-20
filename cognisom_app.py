@@ -10,8 +10,8 @@ Usage:
 """
 
 import sys
-from core import SimulationEngine, SimulationConfig
-from ui import MenuSystem
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.ui import MenuSystem
 
 
 class CognisomApp:
@@ -32,7 +32,7 @@ class CognisomApp:
         self.menu.engine = self.engine
         
         # Register available modules
-        from modules import (MolecularModule, CellularModule, ImmuneModule, 
+        from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule, 
                            VascularModule, LymphaticModule, SpatialModule)
         
         if self.config.modules_enabled.get('molecular', True):

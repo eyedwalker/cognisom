@@ -19,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-from engine.py.membrane.receptors import (
+from cognisom.engine.py.membrane.receptors import (
     ReceptorSystem,
     EGFReceptor,
     InsulinReceptor,

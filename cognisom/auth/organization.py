@@ -55,9 +55,20 @@ TIER_PAGE_ACCESS: Dict[SubscriptionTier, List[str]] = {
         "13_organization",
         "14_entity_library",
         "18_external_databases",  # UniProt, KEGG, ChEMBL integrations
+        # Clinical twin pipeline — the core product journey.
+        "26_genomic_twin",
+        "27_cell_states",
+        "28_digital_twin",
+        "29_molecular_viewer",
+        "30_spatial_tissue",
+        "31_neoantigen_vaccine",
+        "33_clinical_report",
+        "37_mad_agent",
+        "39_pipeline_guide",
     ],
     SubscriptionTier.ENTERPRISE: [
         "app",
+        "0_home",
         "1_ingestion",
         "2_discovery",
         "3_simulation",
@@ -78,7 +89,32 @@ TIER_PAGE_ACCESS: Dict[SubscriptionTier, List[str]] = {
         "18_external_databases",  # UniProt, KEGG, ChEMBL integrations
         "19_prostate_metastasis", # Prostate cancer metastasis model
         "20_vcell_solvers",       # VCell-parity simulation solvers
-        "21_universe_scale",      # Universe-scale visualization
+        "21_tissue_scale",        # Multi-GPU tissue-scale simulation
+        "22_researcher",
+        "23_paper_studio",
+        "24_data_pipeline",
+        "25_diapedesis",
+        # Clinical twin pipeline (also granted to INSTITUTION above)
+        "26_genomic_twin",
+        "27_cell_states",
+        "28_digital_twin",
+        "29_molecular_viewer",
+        "30_spatial_tissue",
+        "31_neoantigen_vaccine",
+        "33_clinical_report",
+        "34_pathway_editor",
+        "36_validation_demo",
+        "37_mad_agent",
+        "39_pipeline_guide",
+        # Pages that spend AWS money (start GPU instances, submit HealthOmics
+        # / Parabricks runs). Enterprise only, deliberately.
+        "32_parabricks",
+        "35_orchestrator",
+        "38_real_patient",
+        "40_gpu_status",
+        # Internal. Not part of any customer tier; reachable only by ADMIN,
+        # which short-circuits this map entirely.
+        # "41_investors", "42_patent_pipeline"
     ],
 }
 

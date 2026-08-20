@@ -18,8 +18,8 @@ if _root not in sys.path:
 
 import pytest
 
-from engine.py.molecular.nucleic_acids import Gene
-from engine.py.molecular.mutation_effect import MutationEffectClassifier
+from cognisom.engine.py.molecular.nucleic_acids import Gene
+from cognisom.engine.py.molecular.mutation_effect import MutationEffectClassifier
 
 
 # Real KRAS CDS prefix (correct biology, codon 12 = GGT)

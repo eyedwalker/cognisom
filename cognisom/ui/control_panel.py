@@ -347,8 +347,8 @@ if __name__ == '__main__':
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     
-    from core import SimulationEngine, SimulationConfig
-    from modules import CellularModule, ImmuneModule, VascularModule
+    from cognisom.core import SimulationEngine, SimulationConfig
+    from cognisom.modules import CellularModule, ImmuneModule, VascularModule
     
     print("Starting GUI Control Panel...")
     

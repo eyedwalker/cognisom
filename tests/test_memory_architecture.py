@@ -28,8 +28,8 @@ import pytest
 # fail the suite -- this is a benchmark, not a hard correctness gate.
 psutil = pytest.importorskip("psutil")
 
-from engine.py.molecular.reference_genome import build_default_reference_genome
-from engine.py.molecular.sequence_view import CellGenomeView
+from cognisom.engine.py.molecular.reference_genome import build_default_reference_genome
+from cognisom.engine.py.molecular.sequence_view import CellGenomeView
 
 
 def _rss_mb() -> float:
@@ -138,7 +138,7 @@ def _build_large_synthetic_genome(n_genes: int, gene_length: int):
     """Build a synthetic ReferenceGenome with n_genes genes each of
     length `gene_length`. Used to show the architecture's asymptotic
     advantage at human-exome scale."""
-    from engine.py.molecular.reference_genome import ReferenceGenome, GeneMetadata
+    from cognisom.engine.py.molecular.reference_genome import ReferenceGenome, GeneMetadata
     g = ReferenceGenome()
     # Use a long ACGT cycle so the sequence is non-trivial but cheap to
     # construct.

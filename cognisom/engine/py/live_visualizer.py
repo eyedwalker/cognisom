@@ -331,9 +331,9 @@ def create_live_simulation(duration_hours=2.0, dt=0.01, interval_ms=50):
     interval_ms : int
         Animation update interval in milliseconds
     """
-    from engine.py.simulation import Simulation
-    from engine.py.spatial.grid import SpatialGrid, GridConfig
-    from engine.py.cell import Cell
+    from cognisom.engine.py.simulation import Simulation
+    from cognisom.engine.py.spatial.grid import SpatialGrid, GridConfig
+    from cognisom.engine.py.cell import Cell
     
     print("🎬 Starting live cellular simulation...")
     print(f"Duration: {duration_hours} hours")

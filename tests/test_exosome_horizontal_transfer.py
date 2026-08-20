@@ -22,10 +22,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from core import SimulationEngine, SimulationConfig
-from core.event_bus import EventTypes
-from modules.cellular_module import CellularModule
-from modules.molecular_module import MolecularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.core.event_bus import EventTypes
+from cognisom.modules.cellular_module import CellularModule
+from cognisom.modules.molecular_module import MolecularModule
 
 
 def _build_engine() -> SimulationEngine:

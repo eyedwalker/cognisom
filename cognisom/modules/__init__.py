@@ -51,13 +51,17 @@ from .cell_mechanics_module import CellMechanicsModule
 
 # ── Module Registry ──────────────────────────────────────────────────
 
-# Create the module registry
-# Note: base_class is None because some legacy modules use relative imports
-# which causes Python to see them as different classes. The modules all
-# inherit from SimulationModule in practice.
+# Create the module registry.
+# Validation was previously disabled because the duplicate source tree meant
+# `core.module_base.SimulationModule` and `cognisom.core.module_base.
+# SimulationModule` were two distinct classes, so a module inheriting from one
+# failed an isinstance check against the other. With the tree collapsed there
+# is exactly one SimulationModule, and this assertion passing is the check
+# that the merge is actually complete -- if a second copy ever reappears,
+# registration fails loudly instead of silently accepting both.
 module_registry = Registry(
     name="modules",
-    base_class=None,  # Disable strict validation for legacy compatibility
+    base_class=SimulationModule,
     allow_override=False,
 )
 registry_manager.add_registry("modules", module_registry)

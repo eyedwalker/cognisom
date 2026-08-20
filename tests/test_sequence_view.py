@@ -22,12 +22,12 @@ if _root not in sys.path:
 
 import pytest
 
-from engine.py.molecular.reference_genome import (
+from cognisom.engine.py.molecular.reference_genome import (
     ReferenceGenome,
     SubstitutionDelta,
     build_default_reference_genome,
 )
-from engine.py.molecular.sequence_view import (
+from cognisom.engine.py.molecular.sequence_view import (
     CellGenomeView,
     materialize_naive,
 )

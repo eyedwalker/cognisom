@@ -19,8 +19,8 @@ sys.path.insert(0, '..')
 import numpy as np
 from typing import Dict, List, Any, Tuple
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 
 class SpatialField:
@@ -259,7 +259,7 @@ class SpatialModule(SimulationModule):
 
 # Test
 if __name__ == '__main__':
-    from core import SimulationEngine, SimulationConfig
+    from cognisom.core import SimulationEngine, SimulationConfig
     
     print("=" * 70)
     print("Spatial Module Test")

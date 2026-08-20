@@ -37,8 +37,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class ODEModule(SimulationModule):
 
     def initialize(self):
         """Initialize ODE solver and state."""
-        from gpu.ode_solver import (
+        from cognisom.gpu.ode_solver import (
             BatchedODEIntegrator,
             ODESystem,
             ODEState,
@@ -386,7 +386,7 @@ class ODEModule(SimulationModule):
 def register_ode_module():
     """Register ODE module in the module registry."""
     try:
-        from modules import module_registry
+        from cognisom.modules import module_registry
         module_registry.register('ode')(ODEModule)
         log.debug("ODEModule registered in module registry")
     except ImportError:

@@ -21,8 +21,8 @@ import numpy as np
 # Add engine to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from engine.py.intracellular import IntracellularModel
-from engine.py.visualize import CellVisualizer
+from cognisom.engine.py.intracellular import IntracellularModel
+from cognisom.engine.py.visualize import CellVisualizer
 
 
 def main():

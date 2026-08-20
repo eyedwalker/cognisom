@@ -9,8 +9,8 @@ Simulate low oxygen environment.
 import sys
 sys.path.insert(0, '..')
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, VascularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, VascularModule
 
 
 def run_hypoxia_scenario():

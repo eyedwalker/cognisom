@@ -16,6 +16,10 @@ cellxgene-census>=1.0.0
 # Testing
 pytest>=7.3.0
 pytest-cov>=4.1.0
+# Hung tests otherwise block the whole run indefinitely. pytest-timeout
+# was removed in commit 57a1cbb to unblock CI; the timeout in pytest.ini
+# is the safer version of that fix.
+pytest-timeout>=2.1.0
 
 # Development
 jupyter>=1.0.0
@@ -61,14 +65,16 @@ warp-lang>=1.0.0
 # risk flagged in docs/patent/MAD_INTEGRATION_AUDIT.md (two parallel
 # installations loading different model versions).
 #
-# Production note: as of 2026-05-16 the production container does NOT
-# install MHCflurry (PWM fallback is active). To enable the published
-# MHCflurry path in prod, uncomment the line below AND add
-# ``RUN mhcflurry-downloads fetch`` to the Dockerfile to bake the model
-# weights into the image (~600 MB; first-run-without-cache is otherwise
-# slow). The PWM fallback is correct for the patent claim; MHCflurry is
-# the production-grade upgrade.
-# mhcflurry==2.0.6
+# Production note: MHCflurry is now installed in the production image, and
+# Dockerfile.prod runs ``mhcflurry-downloads fetch`` to bake the model weights
+# in (~600 MB). Before this, prod silently ran the PWM fallback, whose scoring
+# is quantised to a handful of IC50 values and whose best achievable score
+# (52.8 nM) sits above the 50 nM "strong binder" threshold -- so
+# strong_binder_count was structurally always zero.
+#
+# Requires Python <= 3.12: mhcflurry 2.0.6 imports the stdlib `pipes` module,
+# which was removed in 3.13. CI and the production image are both 3.11.
+mhcflurry==2.0.6
 #
 # Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
 # default; the real path requires transformers + torch.

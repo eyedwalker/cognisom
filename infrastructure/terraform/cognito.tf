@@ -115,7 +115,10 @@ resource "aws_cognito_user_pool" "main" {
 
   # Admin create user config
   admin_create_user_config {
-    allow_admin_create_user_only = false
+    # Open self-registration let anyone create an account on a pool whose
+    # users reach pages that start GPU instances and submit HealthOmics runs.
+    # Accounts are now provisioned by an administrator.
+    allow_admin_create_user_only = true
 
     invite_message_template {
       email_subject = "Welcome to Cognisom"
