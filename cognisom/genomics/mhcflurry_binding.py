@@ -38,13 +38,26 @@ logger = logging.getLogger(__name__)
 # Lazy-loaded predictor (MHCflurry models are ~500 MB)
 _predictor = None
 _available = None
+# Why the load failed, kept so that the refusal below survives repeat calls.
+_failure_message = None
 
 
 def is_mhcflurry_available() -> bool:
     """Check if MHCflurry is installed and models are downloaded."""
-    global _available, _predictor
-    if _available is not None:
-        return _available
+    global _available, _predictor, _failure_message
+
+    if _available is True:
+        return True
+
+    # A previous call already failed. Re-run the decision rather than
+    # returning a cached False: _fail_or_warn raises unless the operator
+    # has opted into the PWM scorer, and caching the False made the very
+    # first call the only one that ever refused -- every later call in the
+    # same process returned False silently, which is exactly the silent
+    # downgrade this guard exists to prevent.
+    if _failure_message is not None:
+        _fail_or_warn(_failure_message)
+        return False
 
     try:
         from mhcflurry import Class1PresentationPredictor
@@ -53,17 +66,19 @@ def is_mhcflurry_available() -> bool:
         logger.info("MHCflurry loaded: %d supported alleles",
                      len(_predictor.supported_alleles))
     except ImportError as e:
-        _available = False
-        _fail_or_warn(
+        _failure_message = (
             f"MHCflurry is not importable ({e}). Note that mhcflurry 2.0.6 "
             f"requires Python <= 3.12; it imports the stdlib `pipes` module, "
             f"which was removed in 3.13."
         )
-    except Exception as e:
+        _fail_or_warn(_failure_message)
         _available = False
-        _fail_or_warn(f"MHCflurry failed to load: {e}")
+    except Exception as e:
+        _failure_message = f"MHCflurry failed to load: {e}"
+        _fail_or_warn(_failure_message)
+        _available = False
 
-    return _available
+    return bool(_available)
 
 
 def _fail_or_warn(message: str) -> None:
@@ -92,11 +107,38 @@ def _fail_or_warn(message: str) -> None:
     )
 
 
+# Canonical scorer names. Reports, model cards and provenance records all
+# describe the same run, so they must not each invent their own spelling.
+MHCFLURRY_SCORER = "mhcflurry-2.0.6"
+PWM_SCORER = "pwm-fallback"
+NO_SCORER = "unavailable"
+
+
+def active_scorer_name() -> str:
+    """Which scorer will actually run, determined without raising.
+
+    Provenance records, model cards and agent `model_versions` blocks used
+    to hardcode "pwm-v1" regardless of what ran. That is wrong in both
+    directions: it mislabels a real MHCflurry run in production, and an
+    audit record that misstates the model is worse than one that omits it.
+    Call this instead of naming a scorer inline.
+    """
+    try:
+        if is_mhcflurry_available():
+            return MHCFLURRY_SCORER
+    except MHCflurryUnavailableError:
+        # Not installed and the PWM fallback has not been opted into, so
+        # no scorer is usable at all.
+        return NO_SCORER
+    return PWM_SCORER
+
+
 def reset_availability():
     """Reset cached availability check (useful after installing models)."""
-    global _available, _predictor
+    global _available, _predictor, _failure_message
     _available = None
     _predictor = None
+    _failure_message = None
 
 
 def get_predictor():

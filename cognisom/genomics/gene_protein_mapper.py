@@ -36,6 +36,26 @@ class ProteinInfo:
             return self.sequence
         return self.sequence[:30] + "..." + self.sequence[-30:]
 
+    @property
+    def is_partial(self) -> bool:
+        """True when the stored sequence is shorter than the real protein.
+
+        ``length`` is the true canonical length; ``sequence`` is what we
+        actually hold. Several built-in entries are excerpts, so residue
+        numbering beyond ``len(sequence)`` cannot be resolved and any
+        mutation there must be refused rather than guessed at.
+        """
+        return len(self.sequence) < self.length
+
+    @property
+    def coverage(self) -> float:
+        """Fraction of the real protein this sequence covers (0.0-1.0)."""
+        return (len(self.sequence) / self.length) if self.length else 0.0
+
+    def covers_position(self, pos: int) -> bool:
+        """True when residue `pos` (1-based) is present in the sequence."""
+        return 1 <= pos <= len(self.sequence)
+
 
 # Built-in sequences for key prostate cancer proteins
 # These allow the platform to work without network access
@@ -58,12 +78,21 @@ BUILTIN_PROTEINS: Dict[str, ProteinInfo] = {
         gene="TP53",
         uniprot_id="P04637",
         protein_name="Cellular tumor antigen p53",
+        # Complete canonical P04637 (393 aa). The previous value here was a
+        # 302-residue chimera: it carried the correct N-terminus and then a
+        # spliced block that repeated RVCACPGRDRRTEEENL and dropped the DNA
+        # -binding core. That put the wrong residue under every p53 hotspot
+        # the pipeline actually mutates -- I at 175 and C at 248, where the
+        # real protein has R -- so "TP53 R175H" and "TP53 R248W" silently
+        # produced peptides built on a residue p53 does not have.
         sequence=(
-            "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPG"
-            "PDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYPQGLNGTVNLPGRNSFEV"
-            "RVCACPGRDRRTEEENLHKTTGIDSFLHSGAKLKPEFGLKNVLKLETPIGKELIPMRAEL"
-            "DTTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGQMNRRPILTIITLEDSSGKLLGRNS"
-            "FEVRVCACPGRDRRTEEENLRKKGQVLKEIREGQRFREEMFQHLHKTYAKELLRIEDSPT"
+            "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDP"
+            "GPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHS"
+            "GTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVR"
+            "RCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTI"
+            "HYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLR"
+            "KKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEAL"
+            "ELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD"
         ),
         length=393,
         function="Tumor suppressor; activates DNA repair, cell cycle arrest, apoptosis",
@@ -182,19 +211,31 @@ class GeneProteinMapper:
         mut_aa = match.group(3)
 
         # Validate position
-        if pos < 1 or pos > len(protein.sequence):
-            logger.warning(f"Position {pos} out of range for {protein.gene} "
-                         f"(length {len(protein.sequence)})")
+        if not protein.covers_position(pos):
+            detail = (
+                f"sequence covers {len(protein.sequence)} of {protein.length} "
+                f"residues ({protein.coverage:.0%})"
+                if protein.is_partial else f"length {len(protein.sequence)}"
+            )
+            logger.warning(
+                "Position %d out of range for %s (%s)",
+                pos, protein.gene, detail,
+            )
             return None
 
-        # Validate wild-type amino acid
+        # Validate wild-type amino acid. A mismatch means the residue
+        # numbering does not line up with this sequence, so applying the
+        # substitution would edit a different residue than the variant
+        # describes and return a protein that does not exist. Refuse.
         idx = pos - 1  # Convert to 0-indexed
-        if idx < len(protein.sequence) and protein.sequence[idx] != wt_aa:
+        if protein.sequence[idx] != wt_aa:
             logger.warning(
-                f"Expected {wt_aa} at position {pos} in {protein.gene}, "
-                f"found {protein.sequence[idx]}"
+                "Refusing %s%d%s on %s: reference has %s at position %d, "
+                "not %s. The mutation does not match this sequence.",
+                wt_aa, pos, mut_aa, protein.gene,
+                protein.sequence[idx], pos, wt_aa,
             )
-            # Continue anyway — reference sequences may differ
+            return None
 
         # Apply mutation
         seq_list = list(protein.sequence)

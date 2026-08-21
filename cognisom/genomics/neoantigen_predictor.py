@@ -89,6 +89,12 @@ class Neoantigen:
     vaccine_priority: int = 0       # 1=highest priority
     include_in_vaccine: bool = False
 
+    # Which scorer produced binding_affinity_nm. Travels with the record so
+    # a PWM estimate is never mistaken downstream for a neural-network
+    # prediction -- the PWM is quantised to a handful of IC50 values and
+    # its best achievable score sits above the 50 nM strong-binder cut.
+    binding_method: str = "unknown"
+
     def to_dict(self) -> Dict:
         """Serialize to JSON-safe dict."""
         return {
@@ -107,9 +113,63 @@ class Neoantigen:
             "foreignness": round(self.foreignness, 2),
             "vaccine_priority": self.vaccine_priority,
             "include_in_vaccine": self.include_in_vaccine,
+            "binding_method": self.binding_method,
             "all_allele_scores": {
                 k: round(v, 1) for k, v in self.all_allele_scores.items()
             },
+        }
+
+
+@dataclass
+class PredictionDiagnostics:
+    """Why variants did not yield neoantigens.
+
+    Every one of these was previously a bare ``continue``. An empty
+    neoantigen list is ambiguous on its own -- "this tumor has no
+    presentable mutations" and "we could not evaluate these mutations"
+    look identical, and only the first is a biological finding. These
+    counters make the difference legible.
+    """
+    variants_considered: int = 0
+    variants_yielding_peptides: int = 0
+
+    skipped_no_gene: int = 0
+    skipped_no_protein_sequence: int = 0
+    skipped_no_protein_change: int = 0
+    # Frameshift, nonsense, splice and complex changes: the substitution
+    # regex only matches simple missense.
+    skipped_not_missense: int = 0
+    # Residue lies past the end of a truncated reference sequence.
+    skipped_position_not_covered: int = 0
+    # Reference has a different residue than the variant claims, so the
+    # numbering does not correspond to this sequence.
+    skipped_wildtype_mismatch: int = 0
+
+    genes_with_partial_reference: List[str] = field(default_factory=list)
+    mismatch_details: List[str] = field(default_factory=list)
+
+    @property
+    def total_skipped(self) -> int:
+        return (self.skipped_no_gene + self.skipped_no_protein_sequence
+                + self.skipped_no_protein_change + self.skipped_not_missense
+                + self.skipped_position_not_covered
+                + self.skipped_wildtype_mismatch)
+
+    def to_dict(self) -> Dict:
+        return {
+            "variants_considered": self.variants_considered,
+            "variants_yielding_peptides": self.variants_yielding_peptides,
+            "total_skipped": self.total_skipped,
+            "skipped_no_gene": self.skipped_no_gene,
+            "skipped_no_protein_sequence": self.skipped_no_protein_sequence,
+            "skipped_no_protein_change": self.skipped_no_protein_change,
+            "skipped_not_missense": self.skipped_not_missense,
+            "skipped_position_not_covered": self.skipped_position_not_covered,
+            "skipped_wildtype_mismatch": self.skipped_wildtype_mismatch,
+            "genes_with_partial_reference": sorted(
+                set(self.genes_with_partial_reference)
+            ),
+            "mismatch_details": self.mismatch_details,
         }
 
 
@@ -138,6 +198,7 @@ class NeoantigenPredictor:
         # Records which scorer actually produced the affinities, so callers
         # and reports can distinguish a real prediction from a PWM estimate.
         self._binding_method: str = "unknown"
+        self.diagnostics = PredictionDiagnostics()
 
     @property
     def binding_method(self) -> str:
@@ -173,30 +234,74 @@ class NeoantigenPredictor:
             peptide_lengths = [8, 9, 10, 11]
 
         all_neoantigens: List[Neoantigen] = []
+        diag = PredictionDiagnostics()
+        self.diagnostics = diag
 
         for variant in cancer_mutations:
+            diag.variants_considered += 1
+
             gene = variant.gene
             if not gene:
+                diag.skipped_no_gene += 1
                 continue
 
             protein = affected_proteins.get(gene)
             if not protein or not protein.sequence:
+                diag.skipped_no_protein_sequence += 1
                 continue
 
             mutation_str = variant.protein_change
             if not mutation_str:
+                diag.skipped_no_protein_change += 1
                 continue
 
             # Parse mutation
             clean_mut = mutation_str.replace("p.", "").strip()
             match = re.match(r"([A-Z])(\d+)([A-Z])", clean_mut)
             if not match:
-                # Skip frameshifts, nonsense for now (could extend later)
+                # Frameshift, nonsense, splice, complex. These can be real
+                # neoantigen sources -- frameshifts especially -- but the
+                # substitution path cannot represent them, so they are
+                # counted rather than dropped.
+                diag.skipped_not_missense += 1
                 continue
 
             wt_aa = match.group(1)
             pos = int(match.group(2))  # 1-indexed
             mut_aa = match.group(3)
+
+            if getattr(protein, "is_partial", False):
+                diag.genes_with_partial_reference.append(gene)
+
+            # The residue must actually exist in the reference we hold.
+            # Several built-in sequences are excerpts, and a window past
+            # their end silently produced zero peptides.
+            if not protein.covers_position(pos):
+                diag.skipped_position_not_covered += 1
+                logger.warning(
+                    "%s %s: residue %d is beyond the %d aa reference held "
+                    "for %s (true length %d). No peptides generated.",
+                    gene, clean_mut, pos, len(protein.sequence), gene,
+                    protein.length,
+                )
+                continue
+
+            # The reference residue must match what the variant claims.
+            # Otherwise the numbering does not correspond to this sequence
+            # and every peptide built here would carry a substitution at a
+            # residue the protein does not have.
+            observed = protein.sequence[pos - 1]
+            if observed != wt_aa:
+                diag.skipped_wildtype_mismatch += 1
+                detail = (
+                    f"{gene} {clean_mut}: reference has {observed} at "
+                    f"position {pos}, not {wt_aa}"
+                )
+                diag.mismatch_details.append(detail)
+                logger.warning("%s. No peptides generated.", detail)
+                continue
+
+            before = len(all_neoantigens)
 
             # Generate mutant and WT peptides around the mutation site
             for pep_len in peptide_lengths:
@@ -255,8 +360,12 @@ class NeoantigenPredictor:
                         binding_level=level,
                         agretopicity=agretopicity,
                         foreignness=foreignness,
+                        binding_method=self._binding_method,
                     )
                     all_neoantigens.append(neo)
+
+            if len(all_neoantigens) > before:
+                diag.variants_yielding_peptides += 1
 
         # Sort by binding affinity (lower = better)
         all_neoantigens.sort(key=lambda n: n.binding_affinity_nm)
@@ -287,8 +396,22 @@ class NeoantigenPredictor:
         logger.info(
             f"Predicted {len(unique)} neoantigens: "
             f"{n_strong} strong, {n_weak} weak binders, "
-            f"{n_vaccine} vaccine candidates"
+            f"{n_vaccine} vaccine candidates "
+            f"[scorer={self._binding_method}]"
         )
+        if diag.total_skipped:
+            logger.warning(
+                "%d of %d variants yielded no peptides "
+                "(not_missense=%d, position_not_covered=%d, "
+                "wildtype_mismatch=%d, no_protein_sequence=%d, "
+                "no_protein_change=%d, no_gene=%d). These are coverage "
+                "gaps, not evidence of a low neoantigen burden.",
+                diag.total_skipped, diag.variants_considered,
+                diag.skipped_not_missense, diag.skipped_position_not_covered,
+                diag.skipped_wildtype_mismatch,
+                diag.skipped_no_protein_sequence,
+                diag.skipped_no_protein_change, diag.skipped_no_gene,
+            )
         return unique
 
     def _generate_peptides(

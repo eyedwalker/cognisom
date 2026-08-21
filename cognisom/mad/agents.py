@@ -165,11 +165,30 @@ class GenomicsAgent(MADAgent):
                     ann = oncokb.annotate_mutation(gene, pchange)
                     oncokb_annotations[gene] = ann
                     if ann.is_actionable:
+                        # Name the evidence after the source that actually
+                        # produced it. When OncoKB is unreachable the client
+                        # answers from an offline gene-level table that never
+                        # looks at the protein change -- labelling that
+                        # "OncoKB: BRCA2 p.E1143fs" put a curated guess into
+                        # the evidence chain and the FDA audit hash wearing a
+                        # database lookup's name.
+                        if ann.is_fallback:
+                            source_name = f"Built-in KB (gene-level): {gene}"
+                            source_id = f"builtin-kb:{gene}"
+                            claim_prefix = (
+                                f"{gene} (gene-level, offline table; not "
+                                f"specific to {pchange})"
+                            )
+                        else:
+                            source_name = f"OncoKB: {gene} {pchange}"
+                            source_id = f"oncokb:{gene}:{pchange}"
+                            claim_prefix = f"{gene} {pchange}"
+
                         evidence.append(EvidenceItem(
                             source_type="guideline",
-                            source_name=f"OncoKB: {gene} {pchange}",
-                            source_id=f"oncokb:{gene}:{pchange}",
-                            claim=f"{gene} {pchange}: {ann.oncogenic} "
+                            source_name=source_name,
+                            source_id=source_id,
+                            claim=f"{claim_prefix}: {ann.oncogenic} "
                                   f"(Level {ann.highest_sensitive_level}). "
                                   f"Drugs: {', '.join(ann.drugs)}",
                             strength=_oncokb_level_to_strength(
@@ -180,9 +199,16 @@ class GenomicsAgent(MADAgent):
                                 "mutation_effect": ann.mutation_effect,
                                 "level": ann.highest_sensitive_level,
                                 "drugs": ann.drugs,
+                                "source": ann.source,
+                                "matched_protein_change": ann.matched_protein_change,
                             },
                         ))
-                        confidence += 0.02  # Small boost per actionable variant
+                        # Confidence rises only for evidence keyed on the
+                        # actual variant. A gene-level guess repeated across
+                        # ten variants in one gene was adding 0.2 of
+                        # confidence for what is really a single assertion.
+                        if not ann.is_fallback:
+                            confidence += 0.02
         except Exception as e:
             logger.debug("OncoKB enrichment skipped: %s", e)
 
@@ -681,8 +707,14 @@ class ImmuneAgent(MADAgent):
             model_versions={
                 "cell_state_classifier": "cognisom-v1",
                 "hla_typer": "cognisom-v1",
-                "neoantigen_predictor": "pwm-v1",
-                "iedb_concordance": "75%",
+                # Read the scorer that actually ran rather than asserting
+                # one. Hardcoding "pwm-v1" mislabelled every production run,
+                # where MHCflurry is installed and does run.
+                #
+                # The former "iedb_concordance": "75%" entry is dropped: it
+                # was a fixed string, not a measurement of this run or of
+                # anything reproducible in the repo.
+                "neoantigen_predictor": _active_neoantigen_scorer(),
             },
         )
 
@@ -836,6 +868,19 @@ class ClinicalAgent(MADAgent):
 
 
 # --- Helpers ---
+
+def _active_neoantigen_scorer() -> str:
+    """Name the MHC-binding scorer this process will actually use.
+
+    Never raises: a provenance block must still be produced even when no
+    scorer is usable, and "unavailable" is itself the honest answer.
+    """
+    try:
+        from ..genomics.mhcflurry_binding import active_scorer_name
+        return active_scorer_name()
+    except Exception:  # pragma: no cover - import-time environment issues
+        return "unknown"
+
 
 def _deduplicate_evidence(items: List[EvidenceItem]) -> List[EvidenceItem]:
     """Remove duplicate evidence items by source_id."""

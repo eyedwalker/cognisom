@@ -218,11 +218,71 @@ MAD_BOARD_CARD = ModelCard(
 )
 
 
+MHCFLURRY_PREDICTOR_CARD = ModelCard(
+    name="Neoantigen Predictor",
+    version="mhcflurry-2.0.6",
+    purpose="Predict peptide-MHC binding affinity for neoantigen vaccine candidate selection",
+    model_type="neural-network-ensemble",
+    intended_population="Patients with somatic missense mutations in cancer driver genes",
+    training_data_equivalent=(
+        "MHCflurry 2.0 class1 presentation predictor, trained on mass-spectrometry "
+        "eluted-ligand and affinity measurement data curated from IEDB. Model weights "
+        "are the published `models_class1_presentation` release, fetched at image build."
+    ),
+    reference_trials=["NCT03897881"],
+    validation_dataset="As published for MHCflurry 2.0 (O'Donnell et al.)",
+    validation_metrics={
+        # Deliberately not restating the PWM card's IEDB panel numbers: those
+        # were measured against the position-weight matrix and say nothing
+        # about this predictor. No in-repo benchmark reproduces MHCflurry's
+        # published metrics, so none is claimed here.
+        "in_repo_validation": 0.0,
+    },
+    validation_citation=(
+        "O'Donnell, Rubinsteyn & Laserson, Cell Systems 11:42-48 (2020) "
+        "(PMID: 32711842). Not independently revalidated in this repository."
+    ),
+    processing_speed="~seconds per patient (CPU)",
+    known_limitations=[
+        "Published metrics are not reproduced by any test in this repository",
+        "Does not model proteasomal cleavage or TAP transport beyond the "
+        "presentation predictor's own processing model",
+        "Agretopicity scoring is simplified (ratio-based, not structural)",
+        "HLA alleles are supplied by HLATyper, which returns a population "
+        "profile unless a BAM is typed",
+    ],
+    failure_modes=[
+        "Alleles outside MHCflurry's supported set",
+        "Non-standard amino acids in peptide sequences",
+        "Peptide lengths outside the trained range",
+    ],
+    regulatory_classification="Research Use Only",
+)
+
+
+def get_neoantigen_predictor_card() -> ModelCard:
+    """Return the card for the scorer actually in effect.
+
+    A model card describes the model that ran. Returning the
+    position-weight-matrix card unconditionally documented the wrong
+    model in production, where MHCflurry is installed and used -- and a
+    card that misdescribes the deployed model is worse than no card,
+    because it is relied upon as a record.
+    """
+    try:
+        from ..genomics.mhcflurry_binding import MHCFLURRY_SCORER, active_scorer_name
+        if active_scorer_name() == MHCFLURRY_SCORER:
+            return MHCFLURRY_PREDICTOR_CARD
+    except Exception:  # pragma: no cover - import-time environment issues
+        pass
+    return NEOANTIGEN_PREDICTOR_CARD
+
+
 def get_all_model_cards() -> Dict[str, ModelCard]:
     """Return all model cards indexed by component name."""
     return {
         "treatment_simulator": TREATMENT_SIMULATOR_CARD,
-        "neoantigen_predictor": NEOANTIGEN_PREDICTOR_CARD,
+        "neoantigen_predictor": get_neoantigen_predictor_card(),
         "cell_state_classifier": CELL_STATE_CLASSIFIER_CARD,
         "mad_board": MAD_BOARD_CARD,
     }
