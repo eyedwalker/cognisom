@@ -17,11 +17,18 @@ Two failures of that kind were live:
      that the reference had C, then applied the substitution anyway.
 
   2. Positions past the end of a truncated reference produced an empty
-     peptide window and no message. AR is held as 173 of 919 residues,
+     peptide window and no message. AR was held as 173 of 919 residues,
      so AR T877A -- a headline driver for this platform's demo patient
      -- contributed nothing and reported nothing.
 
-These tests pin the residues, and pin the refusals.
+Both are fixed: the bundled reference proteome carries all 37 driver
+genes at full length, and AR's numbering offset is declared so calls
+reported in the 919-aa literature convention resolve against the 920-aa
+canonical sequence.
+
+These tests pin the residues, pin the refusals, and pin the batching that
+keeps a real neural-network scorer affordable now that most variants
+actually yield peptides.
 """
 from __future__ import annotations
 
@@ -327,6 +334,61 @@ def test_binding_method_travels_with_each_neoantigen():
         assert neo.binding_method == predictor.binding_method
         assert neo.binding_method in ("mhcflurry-2.0.6", "pwm-fallback")
         assert neo.to_dict()["binding_method"] == neo.binding_method
+
+
+def test_binding_is_scored_in_batches_not_one_pair_at_a_time(monkeypatch):
+    """MHCflurry per-invocation overhead dwarfs the marginal peptide.
+
+    The scoring loop asks for one peptide-allele pair at a time, which was
+    fine only while the PWM fallback -- pure arithmetic -- was what ran
+    locally. With a real reference proteome most variants now yield
+    peptides, and against MHCflurry the same loop took long enough to blow
+    a 120s CI timeout on eight tests. Pairs are warmed in one batched call
+    per variant; this asserts the single-pair path is not used at all.
+    """
+    from types import SimpleNamespace
+
+    from cognisom.genomics import mhcflurry_binding as mb
+
+    calls = {"batch": 0, "single": 0, "pairs": 0}
+
+    def fake_batch(peptides, alleles):
+        calls["batch"] += 1
+        calls["pairs"] += len(peptides)
+        return [SimpleNamespace(affinity_nm=120.0, method="mhcflurry")
+                for _ in peptides]
+
+    def fake_single(peptide, allele):
+        calls["single"] += 1
+        return SimpleNamespace(affinity_nm=120.0, method="mhcflurry")
+
+    monkeypatch.setattr(mb, "is_mhcflurry_available", lambda: True)
+    monkeypatch.setattr(mb, "predict_binding_batch", fake_batch)
+    monkeypatch.setattr(mb, "predict_binding", fake_single)
+
+    variants = [_variant("TP53", "p.R248W"), _variant("AR", "p.T877A")]
+    proteins = {g: BUILTIN_PROTEINS[g] for g in ("TP53", "AR")}
+
+    predictor = NeoantigenPredictor()
+    result = predictor.predict(
+        cancer_mutations=variants, affected_proteins=proteins,
+        hla_alleles=["HLA-A*02:01", "HLA-B*07:02", "HLA-C*07:01"],
+    )
+
+    assert result
+    assert calls["single"] == 0, (
+        f"{calls['single']} peptide-at-a-time calls; batching was bypassed"
+    )
+    # Exactly one warm-up for the whole run -- not one per variant, and
+    # emphatically not one per peptide-allele pair.
+    assert calls["batch"] == 1
+    assert calls["pairs"] > 50, "batch looks too small to be the real work"
+
+
+def test_the_batch_cache_does_not_leak_between_predictors():
+    """A stale affinity is worse than a slow one."""
+    a, b = NeoantigenPredictor(), NeoantigenPredictor()
+    assert a._binding_cache is not b._binding_cache
 
 
 def test_diagnostics_serialize():

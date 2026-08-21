@@ -24,7 +24,7 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLA_BINDING_PROPERTIES
@@ -199,6 +199,55 @@ class NeoantigenPredictor:
         # and reports can distinguish a real prediction from a PWM estimate.
         self._binding_method: str = "unknown"
         self.diagnostics = PredictionDiagnostics()
+        # (peptide, allele) -> IC50, filled by one batched call per run.
+        self._binding_cache: Dict[Tuple[str, str], float] = {}
+
+    def _warm_binding_cache(self, peptides: Sequence[str],
+                            hla_alleles: Sequence[str]) -> None:
+        """Score every peptide-allele pair up front, in one call.
+
+        MHCflurry is a neural network: the per-invocation overhead dwarfs
+        the marginal cost of another peptide, so scoring pairs one at a
+        time is the difference between seconds and many minutes. The
+        scoring loop below asks for one pair at a time, which was
+        tolerable only while the PWM fallback -- pure arithmetic -- was
+        what ran. Once a real reference proteome made most variants yield
+        peptides, and MHCflurry was the scorer, the same loop took long
+        enough to blow a 120s test timeout.
+
+        Failures here are not fatal: a miss just falls through to the
+        single-peptide path, which reports its own errors.
+        """
+        pairs = [(p, a) for p in dict.fromkeys(peptides) for a in hla_alleles
+                 if (p, a) not in self._binding_cache]
+        if not pairs:
+            return
+
+        from .mhcflurry_binding import (
+            MHCflurryUnavailableError,
+            is_mhcflurry_available,
+            predict_binding_batch,
+        )
+        if not is_mhcflurry_available():
+            # PWM path is cheap; no benefit to batching, and this keeps
+            # the fallback's per-peptide warnings intact.
+            return
+
+        try:
+            results = predict_binding_batch([p for p, _ in pairs],
+                                            [a for _, a in pairs])
+        except MHCflurryUnavailableError:
+            raise
+        except Exception as e:
+            logger.warning(
+                "Batch binding prediction failed (%s); falling back to "
+                "per-peptide scoring.", e,
+            )
+            return
+
+        for (peptide, allele), result in zip(pairs, results):
+            self._binding_cache[(peptide, allele)] = result.affinity_nm
+        self._binding_method = "mhcflurry-2.0.6"
 
     @property
     def binding_method(self) -> str:
@@ -234,6 +283,8 @@ class NeoantigenPredictor:
             peptide_lengths = [8, 9, 10, 11]
 
         all_neoantigens: List[Neoantigen] = []
+        # (gene, mutation, protein_change, windows) awaiting scoring.
+        pending: List[Tuple[str, str, str, List]] = []
         diag = PredictionDiagnostics()
         self.diagnostics = diag
 
@@ -305,15 +356,32 @@ class NeoantigenPredictor:
                 logger.warning("%s. No peptides generated.", detail)
                 continue
 
+            # Generate mutant and WT peptides around the mutation site.
+            # Nothing is scored yet: every peptide in the whole run is
+            # collected first so the binding predictions can be made in a
+            # single batched call -- see _warm_binding_cache.
+            windows = [
+                (pep_len, self._generate_peptides(
+                    protein.sequence, protein.resolve_position(pos),
+                    wt_aa, mut_aa, pep_len))
+                for pep_len in peptide_lengths
+            ]
+            pending.append((gene, clean_mut, mutation_str, windows))
+
+        # One batched prediction for the entire run.
+        self._warm_binding_cache(
+            [peptide
+             for _, _, _, windows in pending
+             for _, peps in windows
+             for triple in peps
+             for peptide in triple[:2]],
+            hla_alleles,
+        )
+
+        for gene, clean_mut, mutation_str, windows in pending:
             before = len(all_neoantigens)
 
-            # Generate mutant and WT peptides around the mutation site
-            for pep_len in peptide_lengths:
-                peptides = self._generate_peptides(
-                    protein.sequence, protein.resolve_position(pos),
-                    wt_aa, mut_aa, pep_len
-                )
-
+            for pep_len, peptides in windows:
                 for mut_pep, wt_pep, mut_pos_in_pep in peptides:
                     # Score binding to each HLA allele
                     allele_scores = {}
@@ -477,6 +545,10 @@ class NeoantigenPredictor:
         Returns:
             Predicted IC50 in nanomolar (lower = stronger binding).
         """
+        cached = self._binding_cache.get((peptide, hla_allele))
+        if cached is not None:
+            return cached
+
         # Try MHCflurry first (production-grade).
         # MHCflurryUnavailableError is deliberately NOT caught: it means the
         # real predictor is missing and the operator has not opted in to the
