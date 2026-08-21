@@ -84,23 +84,35 @@ def test_tp53_hotspot_mutations_now_apply_to_the_right_residue():
 
 # ── Partial-reference bookkeeping ───────────────────────────────────
 
-def test_partial_builtins_declare_themselves_partial():
-    """The excerpts must be distinguishable from complete sequences."""
-    for gene in ("AR", "PTEN", "BRCA2", "SPOP"):
-        protein = BUILTIN_PROTEINS[gene]
-        assert protein.is_partial is True
-        assert len(protein.sequence) < protein.length
-        assert 0.0 < protein.coverage < 1.0
+#: Canonical Swiss-Prot lengths, as an independent check that the bundled
+#: FASTA holds the sequence it claims to.
+CANONICAL_LENGTHS = {
+    "AR": 920, "TP53": 393, "PTEN": 403, "BRCA2": 3418, "SPOP": 374,
+    "KRAS": 189, "BRAF": 766, "EGFR": 1210, "PIK3CA": 1068, "ATM": 3056,
+}
 
 
-def test_covers_position_tracks_the_held_sequence_not_the_true_length():
+def test_the_reference_proteome_is_complete():
+    """These were excerpts: AR held 173 of 919, BRCA2 119 of 3418."""
+    assert len(BUILTIN_PROTEINS) >= 35
+
+    for gene, protein in BUILTIN_PROTEINS.items():
+        assert protein.is_partial is False, f"{gene} is still truncated"
+        assert protein.coverage == 1.0
+        assert protein.uniprot_id, f"{gene} has no accession"
+
+
+@pytest.mark.parametrize("gene,length", sorted(CANONICAL_LENGTHS.items()))
+def test_sequences_match_their_canonical_length(gene, length):
+    assert len(BUILTIN_PROTEINS[gene].sequence) == length
+
+
+def test_covers_position_spans_the_whole_protein():
     ar = BUILTIN_PROTEINS["AR"]
-    assert ar.length == 919
-    assert ar.covers_position(100) is True
-    assert ar.covers_position(len(ar.sequence)) is True
-    assert ar.covers_position(len(ar.sequence) + 1) is False
-    assert ar.covers_position(877) is False  # AR T877A
+    assert ar.covers_position(1) is True
+    assert ar.covers_position(877) is True      # AR T877A, once unreachable
     assert ar.covers_position(0) is False
+    assert ar.covers_position(len(ar.sequence) + 1) is False
 
 
 # ── apply_mutation must refuse, not guess ───────────────────────────
@@ -118,11 +130,62 @@ def test_apply_mutation_refuses_on_wildtype_mismatch():
     assert mapper.apply_mutation(protein, "A5W").sequence == "MAAAWAAAAA"
 
 
-def test_apply_mutation_refuses_positions_beyond_a_truncated_reference():
+def test_apply_mutation_refuses_positions_past_the_end_of_the_protein():
     mapper = GeneProteinMapper()
     ar = mapper.get_protein("AR")
-    assert mapper.apply_mutation(ar, "T877A") is None
-    assert mapper.apply_mutation(ar, "L702H") is None
+    assert mapper.apply_mutation(ar, "T9999A") is None
+
+
+# ── Residue numbering ───────────────────────────────────────────────
+
+#: Documented AR ligand-binding-domain mutations, in the 919-aa numbering
+#: the androgen-receptor literature uses. UniProt P10275 canonical is 920
+#: aa because the exon-1 polyglutamine tract is polymorphic, so every one
+#: of these sits one residue later in the canonical sequence.
+AR_HOTSPOTS = [("L", 701), ("V", 715), ("W", 741), ("H", 874),
+               ("F", 876), ("T", 877), ("M", 895), ("R", 629)]
+
+
+@pytest.mark.parametrize("residue,pos", AR_HOTSPOTS)
+def test_ar_numbering_offset_resolves_documented_hotspots(residue, pos):
+    """All eight match at +1 and none at 0 -- that is what makes it a
+    gene-level fact rather than a per-variant guess."""
+    ar = BUILTIN_PROTEINS["AR"]
+    assert ar.numbering_offset == 1
+    assert ar.residue_at(pos) == residue
+
+
+def test_genes_without_a_declared_offset_use_straight_numbering():
+    for gene in ("TP53", "KRAS", "BRAF", "PTEN"):
+        assert BUILTIN_PROTEINS[gene].numbering_offset == 0
+
+    # And their hotspots resolve without any shift.
+    assert BUILTIN_PROTEINS["TP53"].residue_at(248) == "R"
+    assert BUILTIN_PROTEINS["KRAS"].residue_at(12) == "G"
+    assert BUILTIN_PROTEINS["BRAF"].residue_at(600) == "V"
+
+
+def test_ar_hotspot_mutations_now_apply():
+    """Every one of these was refused when AR was a 173-residue excerpt."""
+    mapper = GeneProteinMapper()
+    ar = mapper.get_protein("AR")
+
+    mutant = mapper.apply_mutation(ar, "T877A")
+    assert mutant is not None
+    # The offset means the edit lands at canonical 878, not 877.
+    assert mutant.sequence[877] == "A"
+    assert ar.sequence[877] == "T"
+
+    for mutation in ("W741L", "L701H", "H874Y", "F876L"):
+        assert mapper.apply_mutation(ar, mutation) is not None, mutation
+
+
+def test_a_genuine_residue_mismatch_is_still_refused():
+    """The offset must not become a licence to shift until something fits."""
+    mapper = GeneProteinMapper()
+    ar = mapper.get_protein("AR")
+    # There is no Cys at 877 under any offset in this window.
+    assert mapper.apply_mutation(ar, "C877A") is None
 
 
 # ── Prediction diagnostics ──────────────────────────────────────────
@@ -138,13 +201,35 @@ def _variant(gene: str, protein_change: str) -> Variant:
 HLA = ["HLA-A*02:01"]
 
 
-def test_position_beyond_reference_is_counted_not_dropped():
+def test_ar_t877a_now_produces_neoantigens():
+    """The headline prostate driver, which used to yield zero silently."""
     predictor = NeoantigenPredictor()
-    ar = BUILTIN_PROTEINS["AR"]
 
     result = predictor.predict(
         cancer_mutations=[_variant("AR", "p.T877A")],
-        affected_proteins={"AR": ar},
+        affected_proteins={"AR": BUILTIN_PROTEINS["AR"]},
+        hla_alleles=HLA,
+    )
+
+    assert result, "AR T877A produced no neoantigens"
+    diag = predictor.diagnostics
+    assert diag.variants_yielding_peptides == 1
+    assert diag.total_skipped == 0
+
+    # Every peptide carries the substitution, and its wild-type
+    # counterpart carries the original threonine.
+    for neo in result:
+        offset = neo.mutation_position_in_peptide
+        assert neo.peptide[offset] == "A"
+        assert neo.wild_type_peptide[offset] == "T"
+
+
+def test_position_beyond_the_protein_is_counted_not_dropped():
+    predictor = NeoantigenPredictor()
+
+    result = predictor.predict(
+        cancer_mutations=[_variant("AR", "p.T9999A")],
+        affected_proteins={"AR": BUILTIN_PROTEINS["AR"]},
         hla_alleles=HLA,
     )
 
@@ -154,7 +239,6 @@ def test_position_beyond_reference_is_counted_not_dropped():
     assert diag.variants_yielding_peptides == 0
     assert diag.skipped_position_not_covered == 1
     assert diag.total_skipped == 1
-    assert "AR" in diag.genes_with_partial_reference
 
 
 def test_wildtype_mismatch_is_counted_with_detail():
@@ -212,7 +296,7 @@ def test_a_valid_missense_variant_still_produces_neoantigens():
 def test_diagnostics_are_reset_between_runs():
     predictor = NeoantigenPredictor()
     predictor.predict(
-        cancer_mutations=[_variant("AR", "p.T877A")],
+        cancer_mutations=[_variant("AR", "p.T9999A")],
         affected_proteins={"AR": BUILTIN_PROTEINS["AR"]},
         hla_alleles=HLA,
     )

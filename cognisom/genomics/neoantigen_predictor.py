@@ -290,8 +290,12 @@ class NeoantigenPredictor:
             # Otherwise the numbering does not correspond to this sequence
             # and every peptide built here would carry a substitution at a
             # residue the protein does not have.
-            observed = protein.sequence[pos - 1]
-            if observed != wt_aa:
+            #
+            # `residue_at` applies the gene's numbering offset, so a call
+            # reported in a different isoform's numbering (AR is the live
+            # case) resolves instead of being refused.
+            observed = protein.residue_at(pos)
+            if observed is None or observed != wt_aa:
                 diag.skipped_wildtype_mismatch += 1
                 detail = (
                     f"{gene} {clean_mut}: reference has {observed} at "
@@ -306,7 +310,8 @@ class NeoantigenPredictor:
             # Generate mutant and WT peptides around the mutation site
             for pep_len in peptide_lengths:
                 peptides = self._generate_peptides(
-                    protein.sequence, pos, wt_aa, mut_aa, pep_len
+                    protein.sequence, protein.resolve_position(pos),
+                    wt_aa, mut_aa, pep_len
                 )
 
                 for mut_pep, wt_pep, mut_pos_in_pep in peptides:
