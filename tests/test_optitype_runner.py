@@ -91,3 +91,37 @@ class TestPairedFastqMount:
 
         with pytest.raises(RuntimeError, match="120s ceiling"):
             _run_optitype_docker(str(r1), str(tmp_path))
+
+
+class TestContainerInvocation:
+    """The image reference and command shape the runner depends on."""
+
+    def test_image_is_the_bioconda_build(self):
+        # fred2/optitype stops at release-v1.3.1; :1.3.5 there is a 404.
+        assert "biocontainers" in optitype_hla.OPTITYPE_IMAGE
+        assert "1.3.5" in optitype_hla.OPTITYPE_IMAGE
+
+    def test_pipeline_script_named_explicitly(self, tmp_path, monkeypatch):
+        """The image entrypoint is a conda wrapper, not OptiTypePipeline.py."""
+        r1 = tmp_path / "s_R1.fastq.gz"
+        r1.write_bytes(b"")
+        seen = {}
+
+        def fake_run(cmd, **kwargs):
+            seen["cmd"] = cmd
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        out = tmp_path / "out"
+        out.mkdir()
+        (out / "s_result.tsv").write_text("")
+
+        _run_optitype_docker(str(r1), str(out))
+        cmd = seen["cmd"]
+
+        # The command word must immediately follow the image reference.
+        assert cmd[cmd.index(optitype_hla.OPTITYPE_IMAGE) + 1] == "OptiTypePipeline.py"
+        # And OptiType needs its config to locate razers3.
+        assert cmd[cmd.index("-c") + 1] == optitype_hla.OPTITYPE_CONFIG
+        # Results must not land root-owned on the host.
+        assert "--user" in cmd

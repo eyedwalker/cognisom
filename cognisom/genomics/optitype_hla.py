@@ -18,7 +18,7 @@ Falls back to population-frequency assignment if OptiType is not installed.
 
 Requirements (for production):
   - conda install -c bioconda optitype
-  - OR docker pull fred2/optitype:1.3.5
+  - OR docker pull quay.io/biocontainers/optitype:1.3.5--hdfd78af_3
 
 References:
   Szolek et al., Bioinformatics 2014
@@ -43,6 +43,16 @@ logger = logging.getLogger(__name__)
 #: HLA-region extraction. Six hours is generous for WES on a few cores;
 #: override with COGNISOM_OPTITYPE_TIMEOUT (seconds) for larger inputs.
 DEFAULT_OPTITYPE_TIMEOUT = 6 * 60 * 60
+
+#: OptiType container image.
+#:
+#: This was `fred2/optitype:1.3.5`, a tag that does not exist: that
+#: repository stops at `release-v1.3.1`, so every containerised run failed
+#: on `manifest unknown`. The bioconda build is where 1.3.5 actually ships.
+OPTITYPE_IMAGE = "quay.io/biocontainers/optitype:1.3.5--hdfd78af_3"
+
+#: OptiType refuses to start without a config file naming the razers3 binary.
+OPTITYPE_CONFIG = "/usr/local/bin/config.ini"
 
 
 def optitype_timeout() -> int:
@@ -81,7 +91,7 @@ def is_optitype_available() -> bool:
     # Check Docker
     try:
         result = subprocess.run(
-            ["docker", "images", "fred2/optitype", "--format", "{{.ID}}"],
+            ["docker", "images", "-q", OPTITYPE_IMAGE],
             capture_output=True, text=True, timeout=5,
         )
         return bool(result.stdout.strip())
@@ -136,7 +146,7 @@ def type_hla_from_bam(
     else:
         raise RuntimeError(
             "OptiType not available. Install via: conda install -c bioconda optitype "
-            "OR: docker pull fred2/optitype:1.3.5"
+            f"OR: docker pull {OPTITYPE_IMAGE}"
         )
 
     # Step 3: Parse results
@@ -235,20 +245,15 @@ def _run_optitype_native(
 def _run_optitype_docker(
     fastq_path: str, output_dir: str, fastq_r2: str = None,
 ) -> str:
-    """Run OptiType via Docker container."""
-    fastq_dir = os.path.dirname(os.path.abspath(fastq_path))
-    fastq_name = os.path.basename(fastq_path)
+    """Run OptiType via Docker container.
 
-    cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{fastq_dir}:/data:ro",
-        "-v", f"{output_dir}:/out",
-        "fred2/optitype:1.3.5",
-        "-i", f"/data/{fastq_name}",
-        "--dna",
-        "-o", "/out",
-        "-v",
-    ]
+    The image is a bioconda build whose entrypoint is a conda activation
+    wrapper, so the pipeline script has to be named explicitly as the
+    command rather than assumed to be the entrypoint.
+    """
+    fastq_dir = os.path.dirname(os.path.abspath(fastq_path))
+    inputs = [f"/data/{os.path.basename(fastq_path)}"]
+
     if fastq_r2:
         r2_dir = os.path.dirname(os.path.abspath(fastq_r2))
         if r2_dir != fastq_dir:
@@ -257,8 +262,23 @@ def _run_optitype_docker(
                 f"is mounted into the container. R1 is in {fastq_dir}, "
                 f"R2 in {r2_dir}."
             )
-        r2_name = os.path.basename(fastq_r2)
-        cmd.insert(-4, f"/data/{r2_name}")
+        inputs.append(f"/data/{os.path.basename(fastq_r2)}")
+
+    cmd = [
+        "docker", "run", "--rm",
+        # Without this the results land root-owned on the host.
+        "--user", f"{os.getuid()}:{os.getgid()}",
+        "-e", "HOME=/tmp",
+        "-v", f"{fastq_dir}:/data:ro",
+        "-v", f"{os.path.abspath(output_dir)}:/out",
+        OPTITYPE_IMAGE,
+        "OptiTypePipeline.py",
+        "-i", *inputs,
+        "--dna",
+        "-o", "/out",
+        "-c", OPTITYPE_CONFIG,
+        "-v",
+    ]
 
     timeout = optitype_timeout()
     try:
@@ -311,7 +331,7 @@ def get_hla_typing_status() -> Dict[str, bool]:
     """Check status of HLA typing tools."""
     return {
         "optitype_native": is_optitype_available(),
-        "optitype_docker": _check_docker_image("fred2/optitype"),
+        "optitype_docker": _check_docker_image(OPTITYPE_IMAGE),
         "samtools": _check_command("samtools"),
     }
 
