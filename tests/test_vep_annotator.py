@@ -281,3 +281,112 @@ def test_live_vep_agrees_with_the_bundled_proteome():
         assert protein.residue_at(int(pos)) == wt, (
             f"{v.gene} {v.protein_change}: proteome disagrees with VEP"
         )
+
+
+# ── Backend selection ───────────────────────────────────────────────
+
+def fake_cache(tmp_path, assembly="GRCh38", release="116"):
+    """A cache directory shaped the way VEP lays one out."""
+    d = tmp_path / "vep" / "homo_sapiens" / f"{release}_{assembly}"
+    d.mkdir(parents=True)
+    return str(tmp_path / "vep")
+
+
+def test_an_unknown_backend_is_rejected():
+    with pytest.raises(ValueError, match="Unknown backend"):
+        VEPAnnotator(backend="netmhc")
+
+
+def test_a_cache_is_detected_only_for_the_matching_assembly(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+    cache = fake_cache(tmp_path, assembly="GRCh38")
+
+    assert VEPAnnotator("GRCh38", cache_dir=cache).local_cache_available()
+    # A GRCh37 run must not silently read the GRCh38 cache.
+    assert not VEPAnnotator("GRCh37", cache_dir=cache).local_cache_available()
+
+
+def test_no_docker_means_no_local_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    cache = fake_cache(tmp_path)
+    assert not VEPAnnotator(cache_dir=cache).local_cache_available()
+
+
+def test_local_backend_says_what_is_missing(tmp_path):
+    annotator = VEPAnnotator(backend="local", cache_dir=str(tmp_path / "nope"))
+    with pytest.raises(VEPUnavailableError, match="no usable cache"):
+        annotator.resolve_backend()
+
+
+def test_auto_prefers_local_over_remote(tmp_path, monkeypatch):
+    """A present cache beats the network even when remote is permitted."""
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+    annotator = VEPAnnotator(backend="auto", allow_remote=True,
+                             cache_dir=fake_cache(tmp_path))
+    assert annotator.resolve_backend() == "local"
+
+
+def test_auto_falls_back_to_rest_only_when_permitted(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    missing = str(tmp_path / "nope")
+
+    assert VEPAnnotator(backend="auto", allow_remote=True,
+                        cache_dir=missing).resolve_backend() == "rest"
+
+    with pytest.raises(VEPUnavailableError, match="patient data"):
+        VEPAnnotator(backend="auto", cache_dir=missing).resolve_backend()
+
+
+def test_local_backend_runs_vep_strictly_offline(tmp_path, monkeypatch):
+    """--offline is load-bearing: without it VEP falls back to database
+    mode on a cache miss, which is slow and goes off-machine -- the two
+    things choosing the local backend is meant to rule out."""
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+    cache = fake_cache(tmp_path)
+    captured = {}
+
+    class Result:
+        returncode = 0
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        workdir = next(a.split(":")[0] for a in cmd
+                       if a.endswith(":/work"))
+        (Path(workdir) / "out.json").write_text(
+            '{"input": "7 140753336 . A T . . .", '
+            '"transcript_consequences": [{"transcript_id": "ENST00000646891", '
+            '"gene_symbol": "BRAF", "consequence_terms": ["missense_variant"], '
+            '"amino_acids": "V/E", "protein_end": 600, '
+            '"mane_select": "NM_004333.6", "swissprot": ["P15056.266"]}]}\n'
+        )
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    annotator = VEPAnnotator(backend="local", cache_dir=cache)
+    v = variant()
+    annotator.annotate([v])
+
+    cmd = captured["cmd"]
+    assert "--offline" in cmd and "--cache" in cmd
+    assert "--network" in cmd and cmd[cmd.index("--network") + 1] == "none"
+    assert "--mane" in cmd and "--uniprot" in cmd
+    assert f"{cache}:/cache:ro" in cmd          # cache mounted read-only
+    assert annotator.stats.backend == "vep-offline"
+    # And the shared parsing path still picks MANE.
+    assert v.protein_change == "p.V600E"
+    assert v.info["SWISSPROT"] == "P15056"
+
+
+def test_a_failing_vep_run_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+
+    class Result:
+        returncode = 1
+        stderr = "ERROR: cache not found"
+
+    monkeypatch.setattr("subprocess.run", lambda cmd, **kw: Result())
+    annotator = VEPAnnotator(backend="local", cache_dir=fake_cache(tmp_path))
+    with pytest.raises(VEPUnavailableError, match="cache not found"):
+        annotator.annotate([variant()])

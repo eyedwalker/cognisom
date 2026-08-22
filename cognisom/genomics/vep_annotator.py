@@ -45,9 +45,15 @@ locally (the offline cache, via Docker) for anything clinical.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence
 
 import requests
@@ -67,6 +73,16 @@ REST_HOSTS = {
 BATCH_SIZE = 200
 REQUEST_PAUSE_SEC = 0.2
 
+#: Official VEP image. Pinned: VEP's output fields move between releases,
+#: and the cache is release-matched -- a floating tag silently pairs a new
+#: binary with an old cache.
+VEP_IMAGE = os.environ.get("COGNISOM_VEP_IMAGE", "ensemblorg/ensembl-vep:release_116.0")
+
+#: Where the offline cache lives. On apps-server this is a dedicated EBS
+#: volume; see deploy notes.
+DEFAULT_CACHE_DIR = os.environ.get("COGNISOM_VEP_CACHE", "/data/vep")
+
+
 #: Three-letter to one-letter, for HGVS protein notation.
 AA3_TO_1 = {
     "Ala": "A", "Arg": "R", "Asn": "N", "Asp": "D", "Cys": "C",
@@ -75,6 +91,14 @@ AA3_TO_1 = {
     "Ser": "S", "Thr": "T", "Trp": "W", "Tyr": "Y", "Val": "V",
     "Ter": "*",
 }
+
+
+_REMOTE_REFUSAL = (
+    "The Ensembl REST service receives variant coordinates, which is "
+    "acceptable for cell lines and public cohorts and is not acceptable for "
+    "identifiable patient data. Pass allow_remote=True to use it, or point "
+    "backend='local' at an offline cache, which never leaves the host."
+)
 
 
 class VEPUnavailableError(RuntimeError):
@@ -126,18 +150,85 @@ class VEPAnnotator:
 
     def __init__(self, assembly: str = "GRCh38",
                  allow_remote: bool = False,
-                 timeout: int = 120,
+                 backend: str = "auto",
+                 cache_dir: Optional[str] = None,
+                 timeout: int = 600,
                  session: Optional[requests.Session] = None):
+        """
+        Args:
+            assembly: GRCh38 or GRCh37.
+            allow_remote: Permit the Ensembl REST backend, which sends
+                variant coordinates off-machine. Not for patient data.
+            backend: "local" runs VEP against an offline cache via Docker
+                and never leaves the host; "rest" uses Ensembl's service;
+                "auto" prefers local when a usable cache is present and
+                falls back to REST only if allow_remote is set.
+            cache_dir: Offline cache location for the local backend.
+            timeout: Seconds. VEP against a cold cache is slow.
+        """
         if assembly not in REST_HOSTS:
             raise ValueError(
                 f"Unsupported assembly {assembly!r}; expected one of "
                 f"{sorted(REST_HOSTS)}"
             )
+        if backend not in ("auto", "local", "rest"):
+            raise ValueError(
+                f"Unknown backend {backend!r}; expected auto, local or rest"
+            )
         self.assembly = assembly
         self.allow_remote = allow_remote
+        self.requested_backend = backend
+        self.cache_dir = cache_dir or DEFAULT_CACHE_DIR
         self.timeout = timeout
         self._session = session or requests.Session()
-        self.stats = AnnotationStats(assembly=assembly, backend="ensembl-rest")
+        self.stats = AnnotationStats(assembly=assembly, backend="unresolved")
+
+    # ── Backend resolution ─────────────────────────────────────────
+
+    def local_cache_available(self) -> bool:
+        """True when Docker and a release-matched cache are both present.
+
+        Checked rather than assumed: a missing cache makes VEP fall back
+        to database mode, which is slow and goes off-machine -- exactly
+        what choosing the local backend was meant to avoid.
+        """
+        if shutil.which("docker") is None:
+            return False
+        species_dir = Path(self.cache_dir) / "homo_sapiens"
+        if not species_dir.is_dir():
+            return False
+        return any(child.name.endswith(f"_{self.assembly}")
+                   for child in species_dir.iterdir() if child.is_dir())
+
+    def resolve_backend(self) -> str:
+        """Decide which backend to use, or say why neither is usable."""
+        if self.requested_backend == "local":
+            if not self.local_cache_available():
+                raise VEPUnavailableError(
+                    f"Local VEP was requested but no usable cache was found. "
+                    f"Expected {self.cache_dir}/homo_sapiens/<release>_"
+                    f"{self.assembly}/ and a working docker binary."
+                )
+            return "local"
+
+        if self.requested_backend == "rest":
+            if not self.allow_remote:
+                raise VEPUnavailableError(_REMOTE_REFUSAL)
+            return "rest"
+
+        # auto
+        if self.local_cache_available():
+            return "local"
+        if self.allow_remote:
+            logger.info(
+                "No local VEP cache at %s; using the Ensembl REST service.",
+                self.cache_dir,
+            )
+            return "rest"
+        raise VEPUnavailableError(
+            f"No local VEP cache at {self.cache_dir} and the remote backend "
+            f"is not enabled. {_REMOTE_REFUSAL}"
+        )
 
     # ── Public API ─────────────────────────────────────────────────
 
@@ -149,18 +240,11 @@ class VEPAnnotator:
         if not variants:
             return list(variants)
 
-        if not self.allow_remote:
-            raise VEPUnavailableError(
-                "VEP annotation was requested but the remote backend is not "
-                "enabled. The Ensembl REST service receives variant "
-                "coordinates, which is acceptable for cell lines and public "
-                "cohorts and not for identifiable patient data. Pass "
-                "allow_remote=True to use it, or run VEP locally against an "
-                "offline cache for clinical work."
-            )
-
-        self.stats = AnnotationStats(assembly=self.assembly,
-                                     backend="ensembl-rest")
+        backend = self.resolve_backend()
+        self.stats = AnnotationStats(
+            assembly=self.assembly,
+            backend="ensembl-rest" if backend == "rest" else "vep-offline",
+        )
         by_key: Dict[str, Variant] = {}
         payload: List[str] = []
         for variant in variants:
@@ -173,8 +257,9 @@ class VEPAnnotator:
         self.stats.variants_submitted = len(payload)
         returned = 0
 
+        fetch = self._post if backend == "rest" else self._run_local
         for chunk in _chunks(payload, BATCH_SIZE):
-            for record in self._post(chunk):
+            for record in fetch(chunk):
                 returned += 1
                 variant = by_key.get(record.get("input", ""))
                 if variant is not None:
@@ -231,6 +316,77 @@ class VEPAnnotator:
         if isinstance(body, dict) and "error" in body:
             raise VEPUnavailableError(f"VEP error: {body['error'][:200]}")
         return body if isinstance(body, list) else []
+
+    def _run_local(self, variants: List[str]) -> List[Dict]:
+        """Run VEP in a container against the offline cache.
+
+        Output is JSON with the same shape the REST service returns --
+        same `transcript_consequences` records, same field names -- so
+        transcript selection and everything downstream is shared between
+        the backends rather than reimplemented per backend.
+
+        `--offline` is not optional here. Without it VEP silently falls
+        back to database mode on a cache miss, which is slow and sends
+        queries off-machine: the two properties choosing the local
+        backend was meant to guarantee against.
+        """
+        with tempfile.TemporaryDirectory(prefix="cognisom-vep-") as workdir:
+            work = Path(workdir)
+            (work / "in.vcf").write_text(
+                "\n".join(_region_to_vcf_line(v) for v in variants) + "\n"
+            )
+
+            command = [
+                "docker", "run", "--rm",
+                "-v", f"{self.cache_dir}:/cache:ro",
+                "-v", f"{work}:/work",
+                "--network", "none",          # offline means offline
+                VEP_IMAGE, "vep",
+                "--offline", "--cache", "--dir_cache", "/cache",
+                "--assembly", self.assembly,
+                "--mane", "--uniprot", "--canonical", "--hgvs",
+                "--json", "--no_stats", "--force_overwrite",
+                "--input_file", "/work/in.vcf",
+                "--output_file", "/work/out.json",
+            ]
+
+            try:
+                result = subprocess.run(
+                    command, capture_output=True, text=True,
+                    timeout=self.timeout,
+                )
+            except FileNotFoundError as e:
+                raise VEPUnavailableError(f"docker not runnable: {e}") from e
+            except subprocess.TimeoutExpired as e:
+                raise VEPUnavailableError(
+                    f"VEP timed out after {self.timeout}s on "
+                    f"{len(variants)} variants"
+                ) from e
+
+            if result.returncode != 0:
+                raise VEPUnavailableError(
+                    f"VEP exited {result.returncode}: "
+                    f"{(result.stderr or '').strip()[:300]}"
+                )
+
+            output = work / "out.json"
+            if not output.exists():
+                raise VEPUnavailableError(
+                    "VEP produced no output file; stderr: "
+                    f"{(result.stderr or '').strip()[:300]}"
+                )
+
+            # VEP writes JSON Lines, one object per variant.
+            records = []
+            for line in output.read_text().splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    logger.warning("Skipping unparseable VEP output line")
+            return records
 
     def _apply(self, variant: Variant, record: Dict) -> None:
         consequences = record.get("transcript_consequences") or []
@@ -297,6 +453,11 @@ class VEPAnnotator:
                 if predicate(consequence):
                     return consequence
         return None
+
+
+def _region_to_vcf_line(region: str) -> str:
+    """`7 140753336 . A T . . .` is already VCF column order."""
+    return "\t".join(region.split())
 
 
 def _protein_change(consequence: Dict) -> Optional[str]:
