@@ -344,6 +344,9 @@ def _parse_optitype_result(tsv_path: str) -> List[str]:
 
         if not alleles:
             continue
+
+        _warn_on_dropout_signature(alleles, row, index, header)
+
         if absent:
             # Not fatal, but every peptide restricted to a locus that did
             # not type is one this patient will never be offered.
@@ -355,6 +358,51 @@ def _parse_optitype_result(tsv_path: str) -> List[str]:
         return alleles
 
     raise RuntimeError(f"Could not parse OptiType result: {tsv_path}")
+
+
+def _warn_on_dropout_signature(
+    alleles: List[str], row: List[str],
+    index: Dict[str, int], header: List[str],
+) -> None:
+    """Flag a typing that looks like allelic dropout rather than biology.
+
+    OptiType solves for the smallest allele set explaining the reads, so
+    thin coverage collapses a heterozygous locus onto a single allele. The
+    result is a confident-looking homozygous call, and every neoantigen
+    restricted to the missing allele simply never appears.
+
+    HLA is the most polymorphic region in the genome, so homozygosity at
+    all three class-I loci at once is rare in reality and common when
+    coverage is short. On SRR7890874 at 8M read pairs, OptiType called
+    A*29:02/29:02, B*45:01/45:01 and C*06:02/06:02 off 245 reads; the
+    published type for that line is B*08:01,45:01 and C*06:02,07:01, so
+    two of the three homozygous calls were dropout.
+    """
+    homozygous = [
+        locus for locus in ("A", "B", "C")
+        if len({a for a in alleles if a.startswith(f"HLA-{locus}*")}) == 1
+        and sum(a.startswith(f"HLA-{locus}*") for a in alleles) == 2
+    ]
+    reads = None
+    if "Reads" in header:
+        try:
+            reads = float(row[header.index("Reads")])
+        except (ValueError, IndexError):
+            pass
+
+    support = f"{reads:.0f} reads" if reads is not None else "unknown support"
+    if len(homozygous) == 3:
+        logger.warning(
+            "OptiType called all three class-I loci homozygous from %s. "
+            "That is rare biologically and is the signature of allelic "
+            "dropout: neoantigens restricted to any missed allele cannot "
+            "be predicted. Re-run with more reads before trusting this.",
+            support,
+        )
+    elif homozygous:
+        logger.info(
+            "Homozygous at HLA-%s from %s.", "/".join(homozygous), support,
+        )
 
 
 def get_hla_typing_status() -> Dict[str, bool]:

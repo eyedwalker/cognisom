@@ -192,3 +192,38 @@ class TestResultParsing:
         text = "\tA1\tA2\tReads\n0\tA*02:01\tA*03:01\t9\n"
         with pytest.raises(RuntimeError, match="missing columns"):
             optitype_hla._parse_optitype_result(self._write(tmp_path, text))
+
+
+class TestDropoutSignature:
+    """All three class-I loci homozygous is usually thin coverage, not biology."""
+
+    def _write(self, tmp_path, text):
+        f = tmp_path / "d_result.tsv"
+        f.write_text(text)
+        return str(f)
+
+    def test_all_homozygous_is_flagged(self, tmp_path, caplog):
+        """Exactly the call OptiType made on SRR7890874 at 8M read pairs.
+
+        Two of those three homozygous calls disagreed with the published
+        type for the line, so the warning is load-bearing.
+        """
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+            "0\tA*29:02\tA*29:02\tB*45:01\tB*45:01\tC*06:02\tC*06:02\t245.0\t245.0\n"
+        )
+        with caplog.at_level("WARNING"):
+            optitype_hla._parse_optitype_result(self._write(tmp_path, text))
+
+        assert "dropout" in caplog.text
+        assert "245 reads" in caplog.text
+
+    def test_heterozygous_typing_is_not_flagged(self, tmp_path, caplog):
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+            "0\tA*29:02\tA*29:02\tB*08:01\tB*45:01\tC*06:02\tC*07:01\t900\t900\n"
+        )
+        with caplog.at_level("WARNING"):
+            optitype_hla._parse_optitype_result(self._write(tmp_path, text))
+
+        assert "dropout" not in caplog.text
