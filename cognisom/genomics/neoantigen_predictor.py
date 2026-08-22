@@ -245,9 +245,33 @@ class NeoantigenPredictor:
             )
             return
 
+        if len(results) != len(pairs):
+            logger.warning(
+                "Batch scorer returned %d results for %d pairs; discarding "
+                "the batch rather than pairing peptides with other "
+                "peptides' affinities.", len(results), len(pairs),
+            )
+            return
+
+        methods = set()
         for (peptide, allele), result in zip(pairs, results):
             self._binding_cache[(peptide, allele)] = result.affinity_nm
-        self._binding_method = "mhcflurry-2.0.6"
+            methods.add(getattr(result, "method", "unknown"))
+
+        # Report the scorer that actually produced these numbers, not the
+        # one that was asked for. The batch path can fall back per allele,
+        # and labelling that mhcflurry is how PWM affinities came to be
+        # reported as neural-network predictions.
+        if methods == {"mhcflurry"}:
+            self._binding_method = "mhcflurry-2.0.6"
+        elif "mhcflurry" in methods:
+            self._binding_method = "mixed-mhcflurry-pwm"
+            logger.warning(
+                "Some peptides fell back to the PWM approximation; "
+                "affinities in this run are not uniformly comparable."
+            )
+        else:
+            self._binding_method = "pwm-fallback"
 
     @property
     def binding_method(self) -> str:
