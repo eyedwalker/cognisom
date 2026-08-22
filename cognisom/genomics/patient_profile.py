@@ -15,7 +15,9 @@ from typing import Any, Dict, List, Optional
 
 from .vcf_parser import Variant, VCFParser
 from .vep_annotator import VEPAnnotator
-from .variant_annotator import VariantAnnotator, PROSTATE_CANCER_DRIVERS
+from .variant_annotator import (
+    VariantAnnotator, PROSTATE_CANCER_DRIVERS, DEFAULT_EXOME_MB,
+)
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLATyper
 from .neoantigen_predictor import NeoantigenPredictor, Neoantigen
@@ -47,10 +49,11 @@ class PatientProfile:
 
     # Biomarkers
     tumor_mutational_burden: float = 0.0  # Variants per megabase
-    # False when the callset carries no functional annotation, in which
-    # case `tumor_mutational_burden` is 0.0 because nothing could be
-    # counted -- not because the tumor is quiet.
-    tmb_is_estimable: bool = True
+    # Each entry is a reason `tumor_mutational_burden` cannot be read as a
+    # real mutations-per-megabase figure. Non-empty means the number is
+    # uninterpretable -- not that the tumor is quiet, and not that it is
+    # hypermutated.
+    tmb_caveats: List[str] = field(default_factory=list)
     msi_status: str = "unknown"  # MSI-H, MSS, unknown
     hla_alleles: Optional[List[str]] = None
 
@@ -89,9 +92,20 @@ class PatientProfile:
     variant_summary: Dict[str, Any] = field(default_factory=dict)
 
     @property
+    def tmb_is_estimable(self) -> bool:
+        """Whether `tumor_mutational_burden` means anything at all."""
+        return not self.tmb_caveats
+
+    @property
     def is_tmb_high(self) -> bool:
-        """TMB ≥ 10 mutations/Mb is considered high."""
-        return self.tumor_mutational_burden >= 10.0
+        """TMB ≥ 10 mutations/Mb is considered high.
+
+        Gated on estimability. An unestimable TMB must not read as
+        "TMB-low", and an unfiltered callset's inflated TMB must not read
+        as "TMB-high": both route a patient on a number that was never
+        measured.
+        """
+        return self.tmb_is_estimable and self.tumor_mutational_burden >= 10.0
 
     @property
     def has_dna_repair_defect(self) -> bool:
@@ -240,6 +254,7 @@ class PatientProfile:
             "affected_genes": self.affected_genes,
             "tumor_mutational_burden": self.tumor_mutational_burden,
             "tmb_is_estimable": self.tmb_is_estimable,
+            "tmb_caveats": list(self.tmb_caveats),
             "msi_status": self.msi_status,
             "tmb_high": self.is_tmb_high,
             "dna_repair_defect": self.has_dna_repair_defect,
@@ -308,7 +323,8 @@ class PatientProfileBuilder:
     """
 
     def __init__(self, cancer_type: str = "prostate",
-                 vep_annotator: Optional["VEPAnnotator"] = None):
+                 vep_annotator: Optional["VEPAnnotator"] = None,
+                 assay_callable_mb: Optional[float] = None):
         """
         Args:
             cancer_type: Drives the driver-gene panel.
@@ -319,6 +335,13 @@ class PatientProfileBuilder:
                 protein changes and therefore no neoantigens. VEP fills
                 them from the MANE Select transcript, whose numbering
                 matches the bundled reference proteome.
+            assay_callable_mb: Megabases of callable territory the assay
+                actually covers. TMB is a density, so the denominator has
+                to describe the same territory the numerator was counted
+                over. A VCF cannot report this -- a driver-gene panel and
+                a whole exome look identical from the inside -- so leaving
+                it undeclared marks TMB unestimable rather than silently
+                dividing a panel's mutation count by a whole exome.
         """
         self.parser = VCFParser()
         self.annotator = VariantAnnotator(cancer_type=cancer_type)
@@ -327,6 +350,7 @@ class PatientProfileBuilder:
         self.hla_typer = HLATyper()
         self.neoantigen_predictor = NeoantigenPredictor()
         self.cancer_type = cancer_type
+        self.assay_callable_mb = assay_callable_mb
         self.vep_stats: Dict[str, Any] = {}
 
     def from_vcf_file(self, vcf_path: str,
@@ -428,24 +452,41 @@ class PatientProfileBuilder:
         driver_genes = sorted(set(v.gene for v in drivers if v.gene))
         proteins = self.mapper.get_proteins_for_genes(driver_genes)
 
-        # Compute biomarkers over the tumor-specific set, not everything:
-        # TMB is defined as somatic mutations per megabase.
-        tmb = self.annotator.compute_tmb(tumor_variants)
+        # TMB is a density: somatic coding mutations per callable megabase.
+        # Three separate things have to hold before the quotient means
+        # anything, and each fails silently on its own.
+        tmb_caveats: List[str] = []
+
+        if self.annotator.variants_with_consequence == 0:
+            tmb_caveats.append(
+                "no variant in this callset carries a functional annotation, "
+                "so no coding mutations can be counted (annotate with VEP or "
+                "SnpEff first)"
+            )
+        if not self.parser.filters_applied:
+            tmb_caveats.append(
+                "this callset has not been through FilterMutectCalls, so the "
+                "numerator is dominated by artifacts rather than mutations"
+            )
+        if self.assay_callable_mb is None:
+            tmb_caveats.append(
+                "the assay's callable footprint was not declared, so the "
+                "denominator does not necessarily describe the territory the "
+                "numerator was counted over"
+            )
+
+        tmb = self.annotator.compute_tmb(
+            tumor_variants,
+            exome_size_mb=self.assay_callable_mb or DEFAULT_EXOME_MB,
+        )
+
         msi = self.annotator.classify_msi(tumor_variants)
 
-        # TMB counts coding mutations, so it is only meaningful when
-        # something in the callset says which mutations are coding. On a
-        # raw VCF nothing does, and the result is 0.0 -- indistinguishable
-        # from a genuinely quiet tumor, and read downstream as
-        # "TMB-low, not an immunotherapy candidate".
-        tmb_is_estimable = self.annotator.variants_with_consequence > 0
-        if not tmb_is_estimable:
+        if tmb_caveats:
             logger.warning(
-                "TMB is not estimable for %s: no variant in this callset "
-                "carries a functional annotation, so no coding mutations "
-                "can be counted. The reported TMB of %.1f means 'unknown', "
-                "not 'low'. Annotate the VCF with VEP or SnpEff first.",
-                patient_id, tmb,
+                "TMB is not estimable for %s: %s. The reported value of %.1f "
+                "means 'unknown' -- neither 'low' nor 'high'.",
+                patient_id, "; ".join(tmb_caveats), tmb,
             )
 
         # HLA typing. Prefer real typing from a normal BAM when one is
@@ -491,7 +532,7 @@ class PatientProfileBuilder:
             affected_genes=affected_genes,
             affected_proteins=proteins,
             tumor_mutational_burden=tmb,
-            tmb_is_estimable=tmb_is_estimable,
+            tmb_caveats=tmb_caveats,
             msi_status=msi,
             hla_alleles=hla_alleles,
             predicted_neoantigens=neoantigens,

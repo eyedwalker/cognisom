@@ -51,6 +51,19 @@ TUMOR_NORMAL_VCF = "\n".join([
     "GT:AD:DP\t0/1:25,25:50\t0/1:50,50:100",
 ])
 
+FILTERED_TUMOR_NORMAL_VCF = "\n".join([
+    "##fileformat=VCFv4.2",
+    "##source=Mutect2",
+    "##normal_sample=N",
+    "##tumor_sample=T",
+    "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tN\tT",
+    # Same somatic driver, but this callset has been through
+    # FilterMutectCalls, so the FILTER column carries a verdict.
+    "chr12\t25398284\t.\tC\tA\t.\tPASS\t"
+    "GENE=KRAS;CONSEQUENCE=missense;AA_CHANGE=p.G12V;TLOD=40.0;NLOD=9.0;NALOD=2.0\t"
+    "GT:AD:DP\t0/0:50,0:50\t0/1:60,40:100",
+])
+
 SINGLE_SAMPLE_VCF = "\n".join([
     "##fileformat=VCFv4.2",
     "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE",
@@ -167,11 +180,59 @@ def test_unannotated_callset_reports_tmb_as_not_estimable():
     assert profile.to_dict()["tmb_is_estimable"] is False
 
 
-def test_annotated_callset_reports_tmb_as_estimable():
+def _caveats(profile):
+    return " | ".join(profile.tmb_caveats)
+
+
+def test_annotated_callset_clears_the_annotation_caveat():
     """The synthetic corpus carries CONSEQUENCE/AA_CHANGE, so it does."""
     profile = PatientProfileBuilder().from_vcf_text(TUMOR_NORMAL_VCF, "p1")
 
+    assert "functional annotation" not in _caveats(profile)
+
+
+def test_unfiltered_callset_makes_tmb_unestimable():
+    """Raw Mutect2 output is mostly artifacts, so the numerator is not real.
+
+    The full SEQC2 callset makes the scale of this concrete: 95,853 calls
+    survive LOD thresholds alone, which over a 30 Mb exome is ~3,200
+    mut/Mb -- an order of magnitude past any POLE hypermutator.
+    """
+    profile = PatientProfileBuilder(assay_callable_mb=30.0).from_vcf_text(
+        TUMOR_NORMAL_VCF, "p1"
+    )
+
+    assert profile.tmb_is_estimable is False
+    assert "FilterMutectCalls" in _caveats(profile)
+
+
+def test_undeclared_assay_footprint_makes_tmb_unestimable():
+    """A gene panel and a whole exome are indistinguishable from inside a VCF."""
+    profile = PatientProfileBuilder().from_vcf_text(
+        FILTERED_TUMOR_NORMAL_VCF, "p1"
+    )
+
+    assert profile.tmb_is_estimable is False
+    assert "callable footprint" in _caveats(profile)
+
+
+def test_tmb_estimable_when_every_precondition_holds():
+    profile = PatientProfileBuilder(assay_callable_mb=30.0).from_vcf_text(
+        FILTERED_TUMOR_NORMAL_VCF, "p1"
+    )
+
+    assert profile.tmb_caveats == []
     assert profile.tmb_is_estimable is True
+
+
+def test_unestimable_tmb_never_reads_as_high():
+    """An uninterpretable number must not route a patient onto ICI."""
+    profile = PatientProfileBuilder().from_vcf_text(TUMOR_NORMAL_VCF, "p1")
+    # Force a value that would otherwise clear the TMB-high threshold.
+    profile.tumor_mutational_burden = 3195.1
+
+    assert profile.tmb_is_estimable is False
+    assert profile.is_tmb_high is False
 
 
 @pytest.mark.skipif(not SEQC2_VCF.exists(), reason="SEQC2 demo VCF not present")

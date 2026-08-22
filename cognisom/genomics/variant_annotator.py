@@ -337,6 +337,12 @@ ALL_CANCER_DRIVERS = {**PROSTATE_CANCER_DRIVERS, **PAN_CANCER_DRIVERS}
 CANCER_DRIVER_GENES = set(ALL_CANCER_DRIVERS.keys())
 
 
+#: Nominal callable footprint of a whole-exome capture kit, in megabases.
+#: A fallback only -- real assays differ, and a gene panel differs by
+#: two orders of magnitude.
+DEFAULT_EXOME_MB = 30.0
+
+
 class VariantAnnotator:
     """Annotate variants with gene information and cancer relevance.
 
@@ -603,12 +609,19 @@ class VariantAnnotator:
         return dict(self.driver_db)
 
     def compute_tmb(self, variants: List[Variant],
-                    exome_size_mb: float = 30.0) -> float:
+                    exome_size_mb: float = DEFAULT_EXOME_MB) -> float:
         """Compute Tumor Mutational Burden (mutations per megabase).
+
+        The caller owns the denominator. This counts coding variants in
+        whatever it is handed and divides, so passing a gene-panel
+        callset with a whole-exome denominator yields a number that is
+        wrong in both directions at once. `PatientProfileBuilder` tracks
+        whether the footprint was actually declared.
 
         Args:
             variants: List of coding variants.
-            exome_size_mb: Size of the captured exome in megabases.
+            exome_size_mb: Callable megabases the variants were counted
+                over -- the assay's footprint, not a constant.
 
         Returns:
             TMB value (variants/Mb). >10 is considered TMB-high.
