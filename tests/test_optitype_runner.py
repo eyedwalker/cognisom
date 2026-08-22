@@ -125,3 +125,70 @@ class TestContainerInvocation:
         assert cmd[cmd.index("-c") + 1] == optitype_hla.OPTITYPE_CONFIG
         # Results must not land root-owned on the host.
         assert "--user" in cmd
+
+
+class TestResultParsing:
+    """Locating allele columns by name, not by position."""
+
+    # Verbatim from OptiType 1.3.5 on SRR7890874 (HCC1395BL, 8M read pairs).
+    REAL_RESULT = (
+        "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+        "0\tA*29:02\tA*29:02\tB*45:01\tB*45:01\tC*06:02\tC*06:02\t245.0\t245.0\n"
+    )
+
+    def _write(self, tmp_path, text):
+        f = tmp_path / "r_result.tsv"
+        f.write_text(text)
+        return str(f)
+
+    def test_all_six_alleles_survive(self, tmp_path):
+        """The row index used to be consumed as an allele, dropping C2."""
+        alleles = optitype_hla._parse_optitype_result(
+            self._write(tmp_path, self.REAL_RESULT)
+        )
+
+        assert alleles == [
+            "HLA-A*29:02", "HLA-A*29:02",
+            "HLA-B*45:01", "HLA-B*45:01",
+            "HLA-C*06:02", "HLA-C*06:02",
+        ]
+        # Both HLA-C copies, not one.
+        assert sum(a.startswith("HLA-C") for a in alleles) == 2
+
+    def test_heterozygous_typing(self, tmp_path):
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+            "0\tA*02:01\tA*03:01\tB*07:02\tB*44:02\tC*05:01\tC*07:02\t9\t9\n"
+        )
+        assert optitype_hla._parse_optitype_result(self._write(tmp_path, text)) == [
+            "HLA-A*02:01", "HLA-A*03:01",
+            "HLA-B*07:02", "HLA-B*44:02",
+            "HLA-C*05:01", "HLA-C*07:02",
+        ]
+
+    def test_column_reordering_is_tolerated(self, tmp_path):
+        text = (
+            "\tC1\tC2\tA1\tA2\tB1\tB2\tReads\n"
+            "0\tC*05:01\tC*07:02\tA*02:01\tA*03:01\tB*07:02\tB*44:02\t9\n"
+        )
+        # Returned in canonical A, B, C order regardless of file order.
+        assert optitype_hla._parse_optitype_result(self._write(tmp_path, text))[0] \
+            == "HLA-A*02:01"
+
+    def test_uncalled_locus_is_reported(self, tmp_path, caplog):
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\n"
+            "0\tA*02:01\tA*03:01\tB*07:02\tB*44:02\tC*05:01\t\t9\n"
+        )
+        with caplog.at_level("WARNING"):
+            alleles = optitype_hla._parse_optitype_result(
+                self._write(tmp_path, text)
+            )
+
+        assert len(alleles) == 5
+        assert "C2" in caplog.text
+
+    def test_missing_columns_rejected(self, tmp_path):
+        text = "\tA1\tA2\tReads\n0\tA*02:01\tA*03:01\t9\n"
+        with pytest.raises(RuntimeError, match="missing columns"):
+            optitype_hla._parse_optitype_result(self._write(tmp_path, text))

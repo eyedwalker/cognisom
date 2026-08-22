@@ -54,6 +54,9 @@ OPTITYPE_IMAGE = "quay.io/biocontainers/optitype:1.3.5--hdfd78af_3"
 #: OptiType refuses to start without a config file naming the razers3 binary.
 OPTITYPE_CONFIG = "/usr/local/bin/config.ini"
 
+#: The six allele columns of an OptiType result frame, in output order.
+HLA_RESULT_COLUMNS = ("A1", "A2", "B1", "B2", "C1", "C2")
+
 
 def optitype_timeout() -> int:
     """Resolve the OptiType wall-clock ceiling, honouring the env override."""
@@ -300,29 +303,56 @@ def _run_optitype_docker(
 
 
 def _parse_optitype_result(tsv_path: str) -> List[str]:
-    """Parse OptiType result TSV into HLA allele list.
+    """Parse OptiType result TSV into an HLA allele list.
 
-    OptiType output format (TSV):
-        A1      A2      B1      B2      C1      C2      Reads   Objective
-        A*02:01 A*03:01 B*07:02 B*44:02 C*05:01 C*07:02 1234    567.89
+    OptiType writes a pandas frame, so the first column is an unnamed row
+    index and the header line starts with an empty field::
+
+            A1      A2      B1      B2      C1      C2      Reads   Objective
+        0   A*29:02 A*29:02 B*45:01 B*45:01 C*06:02 C*06:02 245.0   245.0
+
+    Columns are located by name rather than position. Slicing the first
+    six fields off the split row instead consumed the index as an allele
+    and dropped C2, so every typing silently returned five alleles and
+    every neoantigen restricted to the second HLA-C allele disappeared.
     """
     with open(tsv_path) as f:
-        lines = f.readlines()
+        rows = [line.rstrip("\n").split("\t") for line in f if line.strip()]
 
-    # Find the data line (skip header)
-    for line in lines:
-        if line.startswith("\t") or line[0].isdigit():
-            parts = line.strip().split("\t")
-            # First 6 columns are alleles
-            alleles = []
-            for i, part in enumerate(parts[:6]):
-                part = part.strip()
-                if part and "*" in part:
-                    if not part.startswith("HLA-"):
-                        part = f"HLA-{part}"
-                    alleles.append(part)
-            if len(alleles) >= 4:
-                return alleles
+    if len(rows) < 2:
+        raise RuntimeError(f"OptiType result has no data rows: {tsv_path}")
+
+    header = [c.strip() for c in rows[0]]
+    missing = [c for c in HLA_RESULT_COLUMNS if c not in header]
+    if missing:
+        raise RuntimeError(
+            f"OptiType result is missing columns {missing}: {tsv_path}"
+        )
+    index = {name: header.index(name) for name in HLA_RESULT_COLUMNS}
+
+    for row in rows[1:]:
+        alleles, absent = [], []
+        for name in HLA_RESULT_COLUMNS:
+            i = index[name]
+            value = row[i].strip() if i < len(row) else ""
+            if value and "*" in value:
+                alleles.append(
+                    value if value.startswith("HLA-") else f"HLA-{value}"
+                )
+            else:
+                absent.append(name)
+
+        if not alleles:
+            continue
+        if absent:
+            # Not fatal, but every peptide restricted to a locus that did
+            # not type is one this patient will never be offered.
+            logger.warning(
+                "OptiType did not call %s; typing is incomplete and "
+                "neoantigens restricted to those alleles cannot be "
+                "predicted.", ", ".join(absent),
+            )
+        return alleles
 
     raise RuntimeError(f"Could not parse OptiType result: {tsv_path}")
 
