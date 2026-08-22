@@ -235,3 +235,80 @@ def test_different_regimens_give_different_noise():
     b = sim._simulate_tumor_dynamics(
         0.6, {"name": "Pembrolizumab", "effect_onset_days": 14}, twin, 30)
     assert a != b
+
+
+# ── HLA typing from reads ───────────────────────────────────────────
+
+def test_fastq_typing_is_reported_as_patient_specific(monkeypatch):
+    """OptiType output is the patient's genotype, unlike the default."""
+    from cognisom.genomics import optitype_hla
+
+    monkeypatch.setattr(optitype_hla, "is_optitype_available", lambda: True)
+    monkeypatch.setattr(
+        optitype_hla, "type_hla_from_fastq",
+        lambda r1, r2=None, sample_id="s", **kw: [
+            "HLA-A*02:01", "HLA-A*11:01", "HLA-B*15:01",
+            "HLA-B*40:01", "HLA-C*03:03", "HLA-C*03:04",
+        ],
+    )
+
+    typer = HLATyper()
+    alleles = typer.type_from_fastq("normal_R1.fastq.gz", "normal_R2.fastq.gz",
+                                    sample_id="HCC1395BL")
+
+    assert typer.typing_method == HLATyper.METHOD_OPTITYPE
+    assert typer.is_patient_specific is True
+    assert "HLA-A*11:01" in alleles
+
+
+def test_missing_optitype_falls_back_and_says_so(monkeypatch):
+    from cognisom.genomics import optitype_hla
+    monkeypatch.setattr(optitype_hla, "is_optitype_available", lambda: False)
+
+    typer = HLATyper()
+    alleles = typer.type_from_fastq("r1.fastq.gz")
+
+    assert typer.typing_method == HLATyper.METHOD_POPULATION_DEFAULT
+    assert typer.is_patient_specific is False
+    assert len(alleles) == 6
+
+
+def test_a_failing_optitype_run_does_not_masquerade_as_typing(monkeypatch):
+    """A crash must not leave the result looking patient-specific."""
+    from cognisom.genomics import optitype_hla
+
+    def boom(*a, **kw):
+        raise RuntimeError("razers3 died")
+
+    monkeypatch.setattr(optitype_hla, "is_optitype_available", lambda: True)
+    monkeypatch.setattr(optitype_hla, "type_hla_from_fastq", boom)
+
+    typer = HLATyper()
+    typer.type_from_fastq("r1.fastq.gz")
+    assert typer.is_patient_specific is False
+
+
+def test_the_builder_accepts_reads_and_records_the_method(monkeypatch):
+    from cognisom.genomics import optitype_hla
+    from cognisom.genomics.patient_profile import PatientProfileBuilder
+    from cognisom.genomics.synthetic_vcf import SYNTHETIC_PROSTATE_VCF
+    from cognisom.genomics import gene_protein_mapper as gpm
+
+    gpm.GeneProteinMapper._fetch_from_uniprot = lambda self, gene: None
+    monkeypatch.setattr(optitype_hla, "is_optitype_available", lambda: True)
+    monkeypatch.setattr(
+        optitype_hla, "type_hla_from_fastq",
+        lambda r1, r2=None, sample_id="s", **kw: [
+            "HLA-A*02:01", "HLA-A*11:01", "HLA-B*15:01",
+            "HLA-B*40:01", "HLA-C*03:03", "HLA-C*03:04",
+        ],
+    )
+
+    profile = PatientProfileBuilder().from_vcf_text(
+        SYNTHETIC_PROSTATE_VCF, "reads-test",
+        normal_fastq=("n_R1.fastq.gz", "n_R2.fastq.gz"),
+    )
+
+    assert profile.hla_typing_method == HLATyper.METHOD_OPTITYPE
+    assert profile.hla_is_patient_specific is True
+    assert "HLA-A*11:01" in profile.hla_alleles

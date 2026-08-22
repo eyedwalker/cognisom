@@ -331,7 +331,8 @@ class PatientProfileBuilder:
 
     def from_vcf_file(self, vcf_path: str,
                       patient_id: str = "anonymous",
-                      normal_bam_path: Optional[str] = None) -> PatientProfile:
+                      normal_bam_path: Optional[str] = None,
+                      normal_fastq: Optional[Any] = None) -> PatientProfile:
         """Build profile from a VCF file.
 
         Args:
@@ -342,20 +343,31 @@ class PatientProfileBuilder:
             normal_bam_path: Optional germline/normal BAM. When given, HLA
                 alleles are typed from it with OptiType instead of falling
                 back to a population profile.
+            normal_fastq: Optional germline/normal reads -- a path, or an
+                (R1, R2) pair. FASTQ is OptiType's native input, so a BAM
+                is not required; the BAM path merely pre-filters chr6.
+                Use the NORMAL sample: HLA type is the patient's genotype,
+                and typing off tumour reads can drop an allele lost to
+                HLA LOH, silently removing every neoantigen restricted
+                to it.
         """
         variants = self.parser.parse_file(vcf_path)
-        return self._build_profile(variants, patient_id, normal_bam_path)
+        return self._build_profile(variants, patient_id, normal_bam_path,
+                                   normal_fastq)
 
     def from_vcf_text(self, vcf_text: str,
                       patient_id: str = "anonymous",
-                      normal_bam_path: Optional[str] = None) -> PatientProfile:
+                      normal_bam_path: Optional[str] = None,
+                      normal_fastq: Optional[Any] = None) -> PatientProfile:
         """Build profile from VCF text content."""
         variants = self.parser.parse_text(vcf_text)
-        return self._build_profile(variants, patient_id, normal_bam_path)
+        return self._build_profile(variants, patient_id, normal_bam_path,
+                                   normal_fastq)
 
     def _build_profile(self, variants: List[Variant],
                        patient_id: str,
-                       normal_bam_path: Optional[str] = None) -> PatientProfile:
+                       normal_bam_path: Optional[str] = None,
+                       normal_fastq: Optional[Any] = None) -> PatientProfile:
         """Build complete profile from parsed variants."""
         # External annotation first, so the built-in annotator sees real
         # consequences rather than an unannotated callset. Failures are
@@ -443,6 +455,12 @@ class PatientProfileBuilder:
         if normal_bam_path:
             hla_alleles = self.hla_typer.type_from_bam(
                 normal_bam_path, sample_id=patient_id
+            )
+        elif normal_fastq:
+            r1, r2 = (normal_fastq if isinstance(normal_fastq, (tuple, list))
+                      else (normal_fastq, None))
+            hla_alleles = self.hla_typer.type_from_fastq(
+                r1, r2, sample_id=patient_id
             )
         else:
             hla_alleles = self.hla_typer.type_from_variants(

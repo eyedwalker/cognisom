@@ -271,6 +271,54 @@ class HLATyper:
         alleles = self._assign_default_alleles()
         return self._record(self.METHOD_POPULATION_DEFAULT, alleles)
 
+    def type_from_fastq(
+        self,
+        fastq_r1: str,
+        fastq_r2: Optional[str] = None,
+        sample_id: str = "anonymous",
+    ) -> List[str]:
+        """Type HLA alleles from raw reads using OptiType.
+
+        FASTQ is OptiType's native input -- it runs its own alignment
+        against the HLA reference, then an ILP solver over the resulting
+        coverage. `type_from_bam` exists only to pre-filter chr6:29-34Mb
+        first, which is faster when a BAM happens to be around; it is not
+        a requirement, and reads are the more common thing to have.
+
+        Use the NORMAL/germline sample. HLA type is the patient's
+        genotype, and a tumour can carry HLA loss of heterozygosity --
+        typing off tumour reads can drop an allele the patient actually
+        has, which then silently removes every neoantigen restricted to
+        it.
+
+        Args:
+            fastq_r1: Read 1 FASTQ (gzipped is fine).
+            fastq_r2: Read 2 FASTQ for paired-end data.
+            sample_id: Patient/sample identifier.
+
+        Returns:
+            Six HLA-I alleles at 4-digit resolution.
+        """
+        try:
+            from .optitype_hla import type_hla_from_fastq, is_optitype_available
+            if is_optitype_available():
+                alleles = type_hla_from_fastq(fastq_r1, fastq_r2, sample_id)
+                logger.info("OptiType HLA typing for %s: %s", sample_id, alleles)
+                return self._record(self.METHOD_OPTITYPE, alleles)
+            logger.warning(
+                "OptiType is not installed, so %s was NOT typed from its "
+                "reads. Falling back to the fixed population profile.",
+                sample_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "OptiType failed for %s (%s), so this sample was NOT typed. "
+                "Falling back to the fixed population profile.", sample_id, e,
+            )
+
+        alleles = self._assign_default_alleles()
+        return self._record(self.METHOD_POPULATION_DEFAULT, alleles)
+
     def _infer_from_hla_variants(self, hla_variants: list) -> Tuple[List[str], bool]:
         """Attempt to infer HLA alleles from VCF variant annotations.
 
