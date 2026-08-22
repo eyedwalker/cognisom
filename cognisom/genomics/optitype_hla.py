@@ -295,11 +295,34 @@ def _run_optitype_docker(
             f"chr6:29-34Mb reads first."
         ) from exc
     if result.returncode != 0:
-        raise RuntimeError(f"OptiType Docker failed: {result.stderr}")
+        raise RuntimeError(_explain_docker_failure(result.stderr))
 
     for f in Path(output_dir).rglob("*_result.tsv"):
         return str(f)
     raise RuntimeError("OptiType Docker result file not found")
+
+
+def _explain_docker_failure(stderr: str) -> str:
+    """Turn OptiType's downstream symptom back into its actual cause.
+
+    razers3 holds the whole read set in memory, so on a large FASTQ it is
+    the first thing the OOM killer takes. OptiType does not check for
+    that: it proceeds to the next stage and fails opening the BAM razers3
+    never wrote, which reports as a missing file and sends the reader
+    looking for a path or permissions problem instead of memory.
+    """
+    if "_1.bam" in stderr and (
+        "Could not open alignment file" in stderr
+        or "Failed to open file" in stderr
+    ):
+        return (
+            "OptiType failed before typing: razers3 produced no alignment, "
+            "which on a large FASTQ usually means it was killed for memory "
+            "(it holds the full read set in RAM). Check `dmesg` for an "
+            "oom-kill naming razers3, and either run fewer reads or give "
+            "the host more memory.\n\n" + stderr
+        )
+    return f"OptiType Docker failed: {stderr}"
 
 
 def _parse_optitype_result(tsv_path: str) -> List[str]:

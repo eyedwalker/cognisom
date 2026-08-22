@@ -227,3 +227,26 @@ class TestDropoutSignature:
             optitype_hla._parse_optitype_result(self._write(tmp_path, text))
 
         assert "dropout" not in caplog.text
+
+
+class TestFailureExplanation:
+    """razers3 dying for memory surfaces as a missing BAM three stages later."""
+
+    OOM_STDERR = (
+        '[E::hts_open_format] Failed to open file '
+        '"/out/2026_08_22_23_32_36/2026_08_22_23_32_36_1.bam" : '
+        "No such file or directory\n"
+        "FileNotFoundError: [Errno 2] Could not open alignment file"
+    )
+
+    def test_missing_bam_points_at_memory(self):
+        msg = optitype_hla._explain_docker_failure(self.OOM_STDERR)
+        assert "razers3" in msg and "memory" in msg
+        assert "oom-kill" in msg
+        # The original text is preserved, not swallowed.
+        assert "hts_open_format" in msg
+
+    def test_unrelated_failure_passes_through(self):
+        msg = optitype_hla._explain_docker_failure("config.ini not found")
+        assert msg == "OptiType Docker failed: config.ini not found"
+        assert "razers3" not in msg
