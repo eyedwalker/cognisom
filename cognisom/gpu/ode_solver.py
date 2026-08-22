@@ -1,15 +1,31 @@
 """
-GPU-Accelerated Adaptive ODE Solver
-====================================
+Batched ODE Solver
+==================
 
-CVODE-style ODE solver with adaptive time-stepping for stiff and non-stiff
-systems. Solves batched ODEs across many cells in parallel on GPU.
+Solves the same ODE system across many cells at once, each cell with its
+own parameters.
 
-This module provides:
-- BDF (Backward Differentiation Formula) for stiff systems
-- Adams-Moulton for non-stiff systems
-- Adaptive step size control with PI controller
-- Batched solving for 10K+ cells simultaneously
+What is implemented, precisely:
+
+- ``method='rk45'`` — adaptive Dormand-Prince 5(4) with an embedded error
+  estimate and a PI step-size controller. Honours ``rtol``/``atol``, and
+  rejects and retries a step that misses them. Explicit, so it is the
+  right choice for non-stiff systems.
+- ``method='bdf'`` — backward Euler (BDF of order 1) with a fixed three
+  Newton iterations and a fixed step size. Suitable for stiff systems,
+  but it is *not* variable order and it does not adapt its step, so
+  ``rtol``/``atol`` do not constrain it.
+- ``method='adams'`` — Adams-Moulton is not implemented. Requesting it
+  logs a warning and runs the adaptive RK45 above.
+
+Batching note: all cells share one time step, and the RK45 error norm is
+taken over the whole batch. Cells advance together; there is no per-cell
+step size.
+
+GPU note: the CUDA path covers the BDF Newton iteration for the
+2-species gene-expression model only. Every other system, and all of
+RK45, runs in NumPy — the explicit stages call a NumPy ``rhs_func``, so
+a device round-trip per stage would cost more than it saved.
 
 VCell Parity Phase 1 - Foundation for hybrid ODE/SSA methods.
 
@@ -44,6 +60,7 @@ from .physics_interface import (
 )
 
 log = logging.getLogger(__name__)
+logger = log  # alias: both names are used in this module
 
 # ── CUDA Kernels for BDF Integration ─────────────────────────────────────
 
@@ -337,6 +354,53 @@ class ODESystem:
         )
 
 
+# ── Dormand-Prince 5(4) tableau ──────────────────────────────────────────
+#
+# Dormand & Prince, "A family of embedded Runge-Kutta formulae",
+# J Comput Appl Math 6:19-26 (1980). The pair shares stages between a
+# 5th-order and a 4th-order solution, so their difference is an error
+# estimate that costs nothing extra -- which is what makes step-size
+# control possible. The previous "rk45" was classical RK4: a single
+# solution, no embedded pair, and therefore no way to measure error.
+_DP_C = np.array([0.0, 1/5, 3/10, 4/5, 8/9, 1.0, 1.0])
+
+_DP_A = [
+    [],
+    [1/5],
+    [3/40, 9/40],
+    [44/45, -56/15, 32/9],
+    [19372/6561, -25360/2187, 64448/6561, -212/729],
+    [9017/3168, -355/33, 46732/5247, 49/176, -5103/18656],
+    [35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84],
+]
+
+# 5th-order weights (identical to the last A row: the method is FSAL).
+_DP_B5 = np.array([35/384, 0.0, 500/1113, 125/192, -2187/6784, 11/84, 0.0])
+
+# Difference between the 5th- and 4th-order weights, i.e. the error
+# estimator applied directly to the stage derivatives.
+_DP_E = np.array([
+    35/384 - 5179/57600,
+    0.0,
+    500/1113 - 7571/16695,
+    125/192 - 393/640,
+    -2187/6784 + 92097/339200,
+    11/84 - 187/2100,
+    -1/40,
+])
+
+# PI controller exponents. Standard Hairer & Wanner values for an order-5
+# pair: proportional term err^(-0.7/5), integral term err_prev^(0.4/5).
+# A pure I-controller (err^(-1/5) alone) oscillates on mildly stiff
+# problems; the PI form damps that.
+_PI_ALPHA = 0.7 / 5.0
+_PI_BETA = 0.4 / 5.0
+_STEP_SAFETY = 0.9
+_STEP_MIN_FACTOR = 0.2
+_STEP_MAX_FACTOR = 5.0
+_MAX_STEP_REJECTIONS = 12
+
+
 @dataclass
 class ODEState:
     """State container for batched ODE integration."""
@@ -348,6 +412,9 @@ class ODEState:
     n_rhs_evals: int = 0    # RHS evaluations
     n_jac_evals: int = 0    # Jacobian evaluations
     history: Optional[np.ndarray] = None  # Nordsieck array for multistep
+    n_rejected: int = 0     # steps rejected by the error controller
+    # Scaled error norm of the last accepted step, for the PI controller.
+    err_prev: float = 1.0
 
 
 @dataclass
@@ -515,9 +582,15 @@ class BatchedODEIntegrator:
         """
         t0, tf = t_span
 
-        # Initialize state
+        # Initialize state. float64 input is preserved rather than
+        # downcast: single precision puts a ~1e-7 floor under the
+        # solution, so tightening rtol below that bought nothing and the
+        # error actually grew again from round-off. float32 callers (the
+        # GPU BDF path) keep the dtype they passed.
+        y0 = np.asarray(y0)
+        state_dtype = np.float64 if y0.dtype == np.float64 else np.float32
         self._state = ODEState(
-            y=y0.astype(np.float32),
+            y=y0.astype(state_dtype),
             t=t0,
             dt=min(0.01, (tf - t0) / 100),  # Initial step size
             order=1,
@@ -541,6 +614,18 @@ class BatchedODEIntegrator:
 
         # Integration loop
         while self._state.t < tf and self._state.n_steps < max_steps:
+            # Never step past the end of the interval. The loop exits on
+            # `t >= tf` but nothing clamped the final step, so the solution
+            # was reported at whatever time the last step happened to land
+            # on. With a fixed small dt that was a small overshoot; once
+            # the step size adapts and can grow 5x per step it becomes
+            # large -- integrating dy/dt=-2y to t=2 actually stopped at
+            # t=2.26 and reported that as the answer.
+            remaining = tf - self._state.t
+            suggested_dt = self._state.dt
+            if suggested_dt > remaining:
+                self._state.dt = remaining
+
             # Take one step
             if self.method == 'bdf':
                 self._step_bdf()
@@ -548,6 +633,12 @@ class BatchedODEIntegrator:
                 self._step_adams()
             else:
                 self._step_rk45()
+
+            # Restore the controller's own suggestion if it was only
+            # clamped to fit the interval, so the clamp does not ratchet
+            # the step size down for the rest of the run.
+            if suggested_dt > remaining:
+                self._state.dt = max(self._state.dt, suggested_dt)
 
             # Store output at requested times
             while next_out_idx < len(t_out) and self._state.t >= t_out[next_out_idx]:
@@ -592,11 +683,43 @@ class BatchedODEIntegrator:
             self._step_bdf_cpu()
 
     def _step_bdf_gpu(self):
-        """GPU BDF step using CUDA kernels."""
+        """GPU BDF step using CUDA kernels.
+
+        The CUDA kernels here are hardcoded to the 2-species gene
+        expression model: ``_BDF_RHS_KERNEL`` reads ``y[base+0]`` and
+        ``y[base+1]`` only, and ``_BDF_NEWTON_KERNEL``'s solve is guarded
+        by ``if (n_species == 2)`` with no else branch. For any other
+        system the kernels wrote nothing and the step returned silently
+        having done *no integration at all* -- so, for example,
+        ``create_ode_solver('ar_signaling', method='bdf')`` on a GPU
+        produced a flat trajectory that looked like a converged steady
+        state. ``system.rhs_func`` is never consulted on this path.
+
+        Until the kernels carry a general LU solve, anything that is not
+        the 2-species model goes to the CPU BDF path, which does use
+        ``rhs_func`` and does integrate.
+        """
         import cupy as cp
 
-        y = cp.asarray(self._state.y)
+        if self.system.n_species != 2:
+            if not getattr(self, "_bdf_gpu_fallback_warned", False):
+                log.warning(
+                    "GPU BDF kernels only implement the 2-species model; "
+                    "this system has %d species (%s). Falling back to the "
+                    "CPU BDF path so the system is actually integrated.",
+                    self.system.n_species,
+                    ", ".join(self.system.species_names),
+                )
+                self._bdf_gpu_fallback_warned = True
+            self._step_bdf_cpu()
+            return
+
+        # The kernels are compiled against `float*`, so the state must be
+        # single precision here regardless of what the caller supplied.
+        y = cp.asarray(self._state.y, dtype=cp.float32)
         cell_params = cp.asarray(self._get_cell_params())
+        # The RHS kernel reads its rate constants from `cell_params`, not
+        # from this array -- it is passed only to satisfy the signature.
         params = cp.asarray(list(self.system.parameters.values()), dtype=np.float32)
 
         n_cells, n_species = y.shape
@@ -674,10 +797,27 @@ class BatchedODEIntegrator:
         self._state.n_rhs_evals += 10  # Approximate
 
     def _step_adams(self):
-        """Adams-Moulton (implicit) step for non-stiff systems."""
-        # For simplicity, use same implementation as BDF
-        # Full Adams-Moulton would use different coefficients
-        self._step_bdf()
+        """Adams-Moulton is not implemented; runs adaptive RK45 instead.
+
+        This used to call ``_step_bdf()``, which is backward Euler -- a
+        first-order *implicit* method. Requesting a non-stiff integrator
+        and silently receiving the stiff one is the wrong direction twice
+        over, and it was undocumented.
+
+        Adaptive Dormand-Prince is the closest honest substitute: it is
+        explicit, it is what a non-stiff problem wants, and it is error
+        controlled. The substitution is announced once per integrator so
+        it cannot pass unnoticed.
+        """
+        if not getattr(self, "_adams_warned", False):
+            logger.warning(
+                "method='adams': Adams-Moulton is not implemented. Using "
+                "adaptive Dormand-Prince RK45, which is also a non-stiff "
+                "method. Pass method='rk45' to select it directly, or "
+                "method='bdf' if the system is stiff."
+            )
+            self._adams_warned = True
+        self._step_rk45()
 
     def _step_rk45(self):
         """Explicit RK45 step."""
@@ -687,43 +827,101 @@ class BatchedODEIntegrator:
             self._step_rk45_cpu()
 
     def _step_rk45_gpu(self):
-        """GPU RK45 using CuPy vectorization."""
-        import cupy as cp
+        """RK45 step.
 
-        y = cp.asarray(self._state.y)
-        t = self._state.t
-        dt = self._state.dt
-        params = self._param_dict()
-
-        # RK4 stages (vectorized across cells)
-        k1 = cp.asarray(self.system.rhs_func(t, cp.asnumpy(y), params))
-        k2 = cp.asarray(self.system.rhs_func(t + dt/2, cp.asnumpy(y + dt/2 * k1), params))
-        k3 = cp.asarray(self.system.rhs_func(t + dt/2, cp.asnumpy(y + dt/2 * k2), params))
-        k4 = cp.asarray(self.system.rhs_func(t + dt, cp.asnumpy(y + dt * k3), params))
-
-        y_new = y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-
-        self._state.y = cp.asnumpy(y_new)
-        self._state.t += dt
-        self._state.n_steps += 1
-        self._state.n_rhs_evals += 4
+        There is no separate GPU path. ``system.rhs_func`` is a NumPy
+        callable, so the previous "GPU" implementation copied the state
+        device->host and back on *every* stage -- four full round-trips per
+        step, which made it slower than the CPU path while looking like an
+        acceleration. Running the explicit stages in NumPy is both faster
+        and honest. The GPU is used where it actually helps: the BDF
+        Newton kernels.
+        """
+        self._step_rk45_cpu()
 
     def _step_rk45_cpu(self):
-        """CPU RK45 step."""
-        y = self._state.y
-        t = self._state.t
-        dt = self._state.dt
+        """Adaptive Dormand-Prince 5(4) step with PI step-size control.
+
+        Computes a 5th-order solution and an embedded 4th-order solution
+        from the same stages. Their difference estimates the local error,
+        which is compared against ``atol + rtol*|y|``; the step is retried
+        with a smaller ``dt`` if it fails and ``dt`` grows when there is
+        headroom.
+
+        This replaces a fixed-step classical RK4 that ignored ``rtol`` and
+        ``atol`` entirely -- they were stored on the integrator and never
+        read, so requesting a tighter tolerance changed nothing about the
+        answer, and there was no error estimate to control a step size
+        with.
+
+        The error norm is taken over the whole batch, so all cells share
+        one time step. That is what the batched design requires: cells
+        advance together and a per-cell dt would desynchronise them.
+        """
         params = self._param_dict()
+        rhs = self.system.rhs_func
+        t = self._state.t
+        y = self._state.y
+        n_stages = len(_DP_C)
 
-        k1 = self.system.rhs_func(t, y, params)
-        k2 = self.system.rhs_func(t + dt/2, y + dt/2 * k1, params)
-        k3 = self.system.rhs_func(t + dt/2, y + dt/2 * k2, params)
-        k4 = self.system.rhs_func(t + dt, y + dt * k3, params)
+        dt = float(self._state.dt)
+        if dt <= 0.0:
+            raise ValueError(f"Step size must be positive, got {dt}")
 
-        self._state.y = y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-        self._state.t += dt
-        self._state.n_steps += 1
-        self._state.n_rhs_evals += 4
+        for _ in range(_MAX_STEP_REJECTIONS):
+            k = np.empty((n_stages,) + y.shape, dtype=np.float64)
+            k[0] = rhs(t, y, params)
+
+            for i in range(1, n_stages):
+                y_stage = y.astype(np.float64)
+                for j, a_ij in enumerate(_DP_A[i]):
+                    if a_ij:
+                        y_stage = y_stage + (dt * a_ij) * k[j]
+                k[i] = rhs(t + _DP_C[i] * dt, y_stage, params)
+
+            self._state.n_rhs_evals += n_stages
+
+            y_new = y.astype(np.float64) + dt * np.tensordot(_DP_B5, k, axes=(0, 0))
+            err_vec = dt * np.tensordot(_DP_E, k, axes=(0, 0))
+
+            # Componentwise tolerance, then an RMS norm over the batch.
+            scale = self.atol + self.rtol * np.maximum(np.abs(y), np.abs(y_new))
+            err_norm = float(np.sqrt(np.mean((err_vec / scale) ** 2)))
+
+            if not np.isfinite(err_norm):
+                # A blown-up stage: shrink hard rather than propagate NaN.
+                dt *= _STEP_MIN_FACTOR
+                self._state.n_rejected += 1
+                continue
+
+            if err_norm <= 1.0:
+                # Accept.
+                self._state.y = y_new.astype(y.dtype)
+                self._state.t = t + dt
+                self._state.n_steps += 1
+
+                factor = _STEP_SAFETY * (
+                    max(err_norm, 1e-10) ** -_PI_ALPHA
+                ) * (max(self._state.err_prev, 1e-10) ** _PI_BETA)
+                factor = min(_STEP_MAX_FACTOR, max(_STEP_MIN_FACTOR, factor))
+                self._state.dt = dt * factor
+                self._state.err_prev = max(err_norm, 1e-4)
+                return
+
+            # Reject: retry the same step with a smaller dt. A rejected
+            # step must not advance t -- that is the difference between
+            # error control and simply taking a wrong step anyway.
+            self._state.n_rejected += 1
+            factor = max(
+                _STEP_MIN_FACTOR, _STEP_SAFETY * err_norm ** -_PI_ALPHA
+            )
+            dt *= factor
+
+        raise RuntimeError(
+            f"RK45 could not meet rtol={self.rtol:g}/atol={self.atol:g} after "
+            f"{_MAX_STEP_REJECTIONS} step reductions (dt={dt:g}). The system "
+            f"is likely stiff -- use method='bdf'."
+        )
 
     def get_state(self) -> np.ndarray:
         """Get current state (n_cells, n_species)."""

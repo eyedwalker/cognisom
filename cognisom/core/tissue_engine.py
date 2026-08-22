@@ -54,12 +54,26 @@ class TissueSimulationEngine:
     distribution layers. Runs on real GPUs or CPU-simulated partitions.
     """
 
+    #: Index of cancer_epithelial in the archetype table.
+    _CANCER_TYPE_INDEX = 5
+    #: A cell must have this much ATP to commit to division.
+    _DIVISION_MIN_ATP = 0.3
+    #: Damage above this blocks division (checkpoint arrest).
+    _DIVISION_MAX_DAMAGE = 5.0
+    #: Default growth ceiling as a multiple of the initial population,
+    #: used when the config does not set max_cells_per_partition.
+    _GROWTH_HEADROOM = 4.0
+
     def __init__(self, config: TissueScaleConfig):
         self._config = config
         self._step_count: int = 0
         self._sim_time: float = 0.0
         self._wall_start: float = 0.0
         self._initialized: bool = False
+        # Seeded explicitly so a run is reproducible, and local so it does
+        # not disturb the global NumPy RNG.
+        self._rng = np.random.default_rng(getattr(config, "seed", 0) or 0)
+        self._division_capacity_warned = False
 
         # Components (initialized in .initialize())
         self._backend: Optional[MultiGPUBackend] = None
@@ -468,33 +482,121 @@ class TissueSimulationEngine:
             )
             alive[death_mask] = False
 
-            # Division check
-            for i in range(n_real):
-                if not alive[i]:
-                    continue
+            # ── Division ─────────────────────────────────────────
+            # Vectorised: the per-cell Python loop this replaces ran once
+            # per cell per step, which at the configured 1e6 cells is a
+            # million interpreter iterations every step.
+            #
+            # It also never actually divided anything. The loop reset
+            # div_timer to 0 and left a comment saying "Actual daughter
+            # cell creation happens in bulk below" -- there was no bulk
+            # below; the function ended. The tissue population was fixed
+            # for the entire run, so growth, clonal expansion and the
+            # tumour/immune ratio were all static.
+            is_cancer = (types == self._CANCER_TYPE_INDEX)
+            div_time = np.where(
+                is_cancer,
+                self._config.division_time_cancer_hr,
+                self._config.division_time_normal_hr,
+            )
+            atp = state[:, 2]
+            ready = (
+                alive
+                & (state[:, div_timer_col] >= div_time)
+                & (atp > self._DIVISION_MIN_ATP)
+                & (damage < self._DIVISION_MAX_DAMAGE)
+            )
+            dividing = np.flatnonzero(ready)
 
-                # Cancer cells divide faster
-                is_cancer = (types[i] == 5)  # cancer_epithelial index
-                div_time = (
-                    self._config.division_time_cancer_hr
-                    if is_cancer
-                    else self._config.division_time_normal_hr
+            # Bound total growth. The arrays are allocated to exactly the
+            # initial cell count, so growth means reallocating; this cap
+            # keeps a fast-dividing tumour from exhausting memory.
+            max_cells = getattr(
+                self._config, "max_cells_per_partition", None
+            ) or max(16, int(self._config.n_cells * self._GROWTH_HEADROOM))
+            room = max(0, max_cells - n_real)
+            if len(dividing) > room:
+                if not self._division_capacity_warned:
+                    log.warning(
+                        "Partition %d reached the growth cap of %d cells; "
+                        "%d divisions dropped this step. Raise n_cells or "
+                        "set max_cells_per_partition for more headroom.",
+                        gpu_id, max_cells, len(dividing) - room,
+                    )
+                    self._division_capacity_warned = True
+                dividing = dividing[:room]
+
+            # Parents reset their timer whether or not a daughter fit.
+            state[ready, div_timer_col] = 0.0
+
+            n_new = len(dividing)
+            if n_new:
+                # Slice to the real region: ghost cells sit immediately
+                # after it and are rebuilt by `update_ghosts` at the start
+                # of the next step's mechanics phase, so they are dropped
+                # here rather than shifted.
+                positions = self._backend.to_numpy(ca.positions)[:n_real]
+                radii = self._backend.to_numpy(ca.radii)[:n_real]
+                velocities = self._backend.to_numpy(ca.velocities)[:n_real]
+                cell_types = self._backend.to_numpy(ca.cell_types)[:n_real]
+
+                # Daughters are placed one radius away along a random
+                # unit vector, so the pair starts in contact rather than
+                # co-located -- perfectly overlapping cells produce an
+                # enormous repulsive force on the next mechanics substep.
+                directions = self._rng.normal(size=(n_new, 3))
+                directions /= np.maximum(
+                    np.linalg.norm(directions, axis=1, keepdims=True), 1e-12
                 )
 
-                if state[i, div_timer_col] >= div_time:
-                    # Check conditions: enough ATP, low damage
-                    if state[i, 2] > 0.3 and damage[i] < 5.0:
-                        state[i, div_timer_col] = 0.0  # Reset timer
-                        # Actual daughter cell creation happens in bulk below
+                # Volume splits between the two cells: r -> r * 2^(-1/3).
+                new_radii = radii[dividing] * (0.5 ** (1.0 / 3.0))
+                radii[dividing] = new_radii
 
-            # Write back
-            full_state = self._backend.to_numpy(ca.state)
-            full_state[:n_real] = state
-            ca.state = self._backend.to_device(full_state, gpu_id)
+                daughter_positions = (
+                    positions[dividing] + directions * new_radii[:, None]
+                ).astype(positions.dtype)
 
-            full_alive = self._backend.to_numpy(ca.alive)
-            full_alive[:n_real] = alive
-            ca.alive = self._backend.to_device(full_alive, gpu_id)
+                # Daughter inherits the parent's metabolic state, then
+                # starts its own cycle: timer and age at zero.
+                daughter_state = state[dividing].copy()
+                daughter_state[:, div_timer_col] = 0.0
+                daughter_state[:, age_col] = 0.0
+
+                ca.positions = self._backend.to_device(
+                    np.concatenate([positions, daughter_positions]), gpu_id)
+                ca.radii = self._backend.to_device(
+                    np.concatenate([radii, new_radii.astype(radii.dtype)]),
+                    gpu_id)
+                ca.velocities = self._backend.to_device(
+                    np.concatenate([velocities, velocities[dividing]]), gpu_id)
+                ca.cell_types = self._backend.to_device(
+                    np.concatenate([cell_types, cell_types[dividing]]), gpu_id)
+                ca.alive = self._backend.to_device(
+                    np.concatenate([alive, np.ones(n_new, dtype=alive.dtype)]),
+                    gpu_id)
+                ca.state = self._backend.to_device(
+                    np.concatenate([state, daughter_state.astype(state.dtype)]),
+                    gpu_id)
+
+                if ca.ode_state is not None:
+                    ode = self._backend.to_numpy(ca.ode_state)[:n_real]
+                    # Species are concentrations (intensive), so both
+                    # cells carry the parent's values.
+                    ca.ode_state = self._backend.to_device(
+                        np.concatenate([ode, ode[dividing]]), gpu_id)
+
+                ca.n_real = n_real + n_new
+                ca.n_ghost = 0
+            else:
+                # Write back
+                full_state = self._backend.to_numpy(ca.state)
+                full_state[:n_real] = state
+                ca.state = self._backend.to_device(full_state, gpu_id)
+
+                full_alive = self._backend.to_numpy(ca.alive)
+                full_alive[:n_real] = alive
+                ca.alive = self._backend.to_device(full_alive, gpu_id)
 
     def _generate_initial_cells(self) -> Tuple[np.ndarray, np.ndarray]:
         """Generate random initial cell positions and types.
@@ -505,8 +607,12 @@ class TissueSimulationEngine:
         cfg = self._config
         n = cfg.n_cells
 
-        # Random positions within tissue volume
-        positions = np.random.rand(n, 3).astype(np.float64)
+        # Random positions within tissue volume. Drawn from the engine's
+        # own seeded generator: `np.random.rand` gave a different starting
+        # tissue on every run -- different cell positions AND a different
+        # cancer/normal split -- so two runs of the same configuration
+        # were not comparable, and it mutated the global NumPy RNG.
+        positions = self._rng.random((n, 3)).astype(np.float64)
         positions[:, 0] *= cfg.tissue_size_um[0]
         positions[:, 1] *= cfg.tissue_size_um[1]
         positions[:, 2] *= cfg.tissue_size_um[2]
@@ -517,7 +623,7 @@ class TissueSimulationEngine:
         type_fractions = type_fractions / type_fractions.sum()  # Normalize
 
         cumulative = np.cumsum(type_fractions)
-        random_vals = np.random.rand(n)
+        random_vals = self._rng.random(n)
         cell_types = np.zeros(n, dtype=np.int32)
         for i, threshold in enumerate(cumulative):
             cell_types[random_vals > threshold] = i + 1

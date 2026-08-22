@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .vcf_parser import Variant, VCFParser
-from .variant_annotator import VariantAnnotator, PROSTATE_CANCER_DRIVERS
+from .vep_annotator import VEPAnnotator
+from .variant_annotator import (
+    VariantAnnotator, PROSTATE_CANCER_DRIVERS, DEFAULT_EXOME_MB,
+)
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLATyper
 from .neoantigen_predictor import NeoantigenPredictor, Neoantigen
@@ -46,19 +49,63 @@ class PatientProfile:
 
     # Biomarkers
     tumor_mutational_burden: float = 0.0  # Variants per megabase
+    # Each entry is a reason `tumor_mutational_burden` cannot be read as a
+    # real mutations-per-megabase figure. Non-empty means the number is
+    # uninterpretable -- not that the tumor is quiet, and not that it is
+    # hypermutated.
+    tmb_caveats: List[str] = field(default_factory=list)
     msi_status: str = "unknown"  # MSI-H, MSS, unknown
     hla_alleles: Optional[List[str]] = None
 
     # Neoantigen predictions
     predicted_neoantigens: List[Neoantigen] = field(default_factory=list)
 
+    # ── Provenance of the tumor/normal comparison ──────────────────
+    # Whether the callset actually had a matched normal to compare
+    # against. Without one, a somatic mutation and a rare inherited
+    # variant are indistinguishable, and neither TMB nor any neoantigen
+    # derived from this profile can be called tumor-specific.
+    has_matched_normal: bool = False
+    tumor_sample: Optional[str] = None
+    normal_sample: Optional[str] = None
+    somatic_status_counts: Dict[str, int] = field(default_factory=dict)
+    germline_variants_excluded: int = 0
+
+    # How the HLA alleles above were obtained. When this is not a
+    # patient-specific method the alleles are a population stand-in, and
+    # every "HLA-restricted" claim derived from them is unsupported.
+    hla_typing_method: str = "not-run"
+    hla_is_patient_specific: bool = False
+
+    #: What the external annotation stage did, empty if it did not run.
+    #: A raw callset with no VEP stage cannot yield protein changes, and
+    #: this is how a reader tells that apart from a quiet tumour.
+    vep_annotation: Dict[str, Any] = field(default_factory=dict)
+
+    # Why variants produced no neoantigens, and which scorer ran.
+    # An empty neoantigen list is otherwise ambiguous between "this
+    # tumor presents nothing" and "we could not evaluate it".
+    neoantigen_diagnostics: Dict[str, Any] = field(default_factory=dict)
+    binding_method: str = "unknown"
+
     # Summary
     variant_summary: Dict[str, Any] = field(default_factory=dict)
 
     @property
+    def tmb_is_estimable(self) -> bool:
+        """Whether `tumor_mutational_burden` means anything at all."""
+        return not self.tmb_caveats
+
+    @property
     def is_tmb_high(self) -> bool:
-        """TMB ≥ 10 mutations/Mb is considered high."""
-        return self.tumor_mutational_burden >= 10.0
+        """TMB ≥ 10 mutations/Mb is considered high.
+
+        Gated on estimability. An unestimable TMB must not read as
+        "TMB-low", and an unfiltered callset's inflated TMB must not read
+        as "TMB-high": both route a patient on a number that was never
+        measured.
+        """
+        return self.tmb_is_estimable and self.tumor_mutational_burden >= 10.0
 
     @property
     def has_dna_repair_defect(self) -> bool:
@@ -206,6 +253,8 @@ class PatientProfile:
             "n_drivers": len(self.cancer_driver_mutations),
             "affected_genes": self.affected_genes,
             "tumor_mutational_burden": self.tumor_mutational_burden,
+            "tmb_is_estimable": self.tmb_is_estimable,
+            "tmb_caveats": list(self.tmb_caveats),
             "msi_status": self.msi_status,
             "tmb_high": self.is_tmb_high,
             "dna_repair_defect": self.has_dna_repair_defect,
@@ -220,6 +269,20 @@ class PatientProfile:
             "driver_details": self.get_driver_details(),
             "therapy_recommendations": self.get_therapy_recommendations(),
             "variant_summary": self.variant_summary,
+            # Provenance. These say what the numbers above are actually
+            # based on: whether a germline comparison happened at all,
+            # what it excluded, which scorer produced the affinities, and
+            # what the pipeline could not evaluate.
+            "has_matched_normal": self.has_matched_normal,
+            "tumor_sample": self.tumor_sample,
+            "normal_sample": self.normal_sample,
+            "somatic_status_counts": self.somatic_status_counts,
+            "germline_variants_excluded": self.germline_variants_excluded,
+            "binding_method": self.binding_method,
+            "neoantigen_diagnostics": self.neoantigen_diagnostics,
+            "hla_typing_method": self.hla_typing_method,
+            "hla_is_patient_specific": self.hla_is_patient_specific,
+            "vep_annotation": self.vep_annotation,
         }
 
     def save(self, path: str):
@@ -259,35 +322,126 @@ class PatientProfileBuilder:
             print(f"  {rec['therapy_class']}: {rec['drugs']}")
     """
 
-    def __init__(self, cancer_type: str = "prostate"):
+    def __init__(self, cancer_type: str = "prostate",
+                 vep_annotator: Optional["VEPAnnotator"] = None,
+                 assay_callable_mb: Optional[float] = None):
+        """
+        Args:
+            cancer_type: Drives the driver-gene panel.
+            vep_annotator: Optional VEP stage, run before the built-in
+                annotator. Required for raw callsets: a protein
+                consequence cannot be derived from a coordinate alone, so
+                without it a VCF carrying no ANN/CSQ/AA_CHANGE yields no
+                protein changes and therefore no neoantigens. VEP fills
+                them from the MANE Select transcript, whose numbering
+                matches the bundled reference proteome.
+            assay_callable_mb: Megabases of callable territory the assay
+                actually covers. TMB is a density, so the denominator has
+                to describe the same territory the numerator was counted
+                over. A VCF cannot report this -- a driver-gene panel and
+                a whole exome look identical from the inside -- so leaving
+                it undeclared marks TMB unestimable rather than silently
+                dividing a panel's mutation count by a whole exome.
+        """
         self.parser = VCFParser()
         self.annotator = VariantAnnotator(cancer_type=cancer_type)
+        self.vep_annotator = vep_annotator
         self.mapper = GeneProteinMapper()
         self.hla_typer = HLATyper()
         self.neoantigen_predictor = NeoantigenPredictor()
         self.cancer_type = cancer_type
+        self.assay_callable_mb = assay_callable_mb
+        self.vep_stats: Dict[str, Any] = {}
 
     def from_vcf_file(self, vcf_path: str,
-                      patient_id: str = "anonymous") -> PatientProfile:
-        """Build profile from a VCF file."""
+                      patient_id: str = "anonymous",
+                      normal_bam_path: Optional[str] = None,
+                      normal_fastq: Optional[Any] = None) -> PatientProfile:
+        """Build profile from a VCF file.
+
+        Args:
+            vcf_path: Path to the VCF. A matched tumor/normal callset is
+                preferred; a tumor-only callset is accepted but cannot
+                support somatic claims.
+            patient_id: Patient identifier.
+            normal_bam_path: Optional germline/normal BAM. When given, HLA
+                alleles are typed from it with OptiType instead of falling
+                back to a population profile.
+            normal_fastq: Optional germline/normal reads -- a path, or an
+                (R1, R2) pair. FASTQ is OptiType's native input, so a BAM
+                is not required; the BAM path merely pre-filters chr6.
+                Use the NORMAL sample: HLA type is the patient's genotype,
+                and typing off tumour reads can drop an allele lost to
+                HLA LOH, silently removing every neoantigen restricted
+                to it.
+        """
         variants = self.parser.parse_file(vcf_path)
-        return self._build_profile(variants, patient_id)
+        return self._build_profile(variants, patient_id, normal_bam_path,
+                                   normal_fastq)
 
     def from_vcf_text(self, vcf_text: str,
-                      patient_id: str = "anonymous") -> PatientProfile:
+                      patient_id: str = "anonymous",
+                      normal_bam_path: Optional[str] = None,
+                      normal_fastq: Optional[Any] = None) -> PatientProfile:
         """Build profile from VCF text content."""
         variants = self.parser.parse_text(vcf_text)
-        return self._build_profile(variants, patient_id)
+        return self._build_profile(variants, patient_id, normal_bam_path,
+                                   normal_fastq)
 
     def _build_profile(self, variants: List[Variant],
-                       patient_id: str) -> PatientProfile:
+                       patient_id: str,
+                       normal_bam_path: Optional[str] = None,
+                       normal_fastq: Optional[Any] = None) -> PatientProfile:
         """Build complete profile from parsed variants."""
+        # External annotation first, so the built-in annotator sees real
+        # consequences rather than an unannotated callset. Failures are
+        # not swallowed: an un-annotated run and a genuinely quiet tumour
+        # must not produce the same output.
+        self.vep_stats = {}
+        if self.vep_annotator is not None:
+            self.vep_annotator.annotate(variants)
+            self.vep_stats = self.vep_annotator.stats.to_dict()
+            logger.info("VEP annotation: %s", self.vep_stats)
+
         # Annotate variants
         self.annotator.annotate(variants)
 
+        # ── Tumor vs germline ──────────────────────────────────────
+        # When the callset carries a matched normal, everything the
+        # normal also carries is inherited, not tumor biology. Counting
+        # it inflates TMB and, worse, feeds self antigens into vaccine
+        # design. When there is no normal the question is unanswerable,
+        # so the full set is carried forward and the profile records
+        # that the comparison did not happen.
+        has_matched_normal = self.parser.is_somatic_vcf
+        somatic_status_counts: Dict[str, int] = {}
+        for v in variants:
+            somatic_status_counts[v.somatic_status] = (
+                somatic_status_counts.get(v.somatic_status, 0) + 1
+            )
+
+        germline_excluded = 0
+        if has_matched_normal:
+            tumor_variants = self.parser.filter_somatic(variants)
+            germline_excluded = len(variants) - len(tumor_variants)
+            logger.info(
+                "Matched normal present (tumor=%s, normal=%s): %d of %d "
+                "variants are somatic; %d excluded as germline, artifact "
+                "or low-evidence.",
+                self.parser.tumor_sample, self.parser.normal_sample,
+                len(tumor_variants), len(variants), germline_excluded,
+            )
+        else:
+            tumor_variants = variants
+            logger.warning(
+                "No matched normal in this callset. Somatic and inherited "
+                "variants cannot be separated, so TMB and every neoantigen "
+                "below are tumor-ONLY estimates, not somatic calls."
+            )
+
         # Filter
-        coding = [v for v in variants if v.is_coding]
-        drivers = [v for v in variants if v.is_cancer_driver]
+        coding = [v for v in tumor_variants if v.is_coding]
+        drivers = [v for v in tumor_variants if v.is_cancer_driver]
 
         # Affected genes
         affected_genes = sorted(set(
@@ -298,14 +452,61 @@ class PatientProfileBuilder:
         driver_genes = sorted(set(v.gene for v in drivers if v.gene))
         proteins = self.mapper.get_proteins_for_genes(driver_genes)
 
-        # Compute biomarkers
-        tmb = self.annotator.compute_tmb(variants)
-        msi = self.annotator.classify_msi(variants)
+        # TMB is a density: somatic coding mutations per callable megabase.
+        # Three separate things have to hold before the quotient means
+        # anything, and each fails silently on its own.
+        tmb_caveats: List[str] = []
 
-        # HLA typing
-        hla_alleles = self.hla_typer.type_from_variants(
-            variants, patient_id=patient_id
+        if self.annotator.variants_with_consequence == 0:
+            tmb_caveats.append(
+                "no variant in this callset carries a functional annotation, "
+                "so no coding mutations can be counted (annotate with VEP or "
+                "SnpEff first)"
+            )
+        if not self.parser.filters_applied:
+            tmb_caveats.append(
+                "this callset has not been through FilterMutectCalls, so the "
+                "numerator is dominated by artifacts rather than mutations"
+            )
+        if self.assay_callable_mb is None:
+            tmb_caveats.append(
+                "the assay's callable footprint was not declared, so the "
+                "denominator does not necessarily describe the territory the "
+                "numerator was counted over"
+            )
+
+        tmb = self.annotator.compute_tmb(
+            tumor_variants,
+            exome_size_mb=self.assay_callable_mb or DEFAULT_EXOME_MB,
         )
+
+        msi = self.annotator.classify_msi(tumor_variants)
+
+        if tmb_caveats:
+            logger.warning(
+                "TMB is not estimable for %s: %s. The reported value of %.1f "
+                "means 'unknown' -- neither 'low' nor 'high'.",
+                patient_id, "; ".join(tmb_caveats), tmb,
+            )
+
+        # HLA typing. Prefer real typing from a normal BAM when one is
+        # supplied: OptiType is a complete implementation in this repo but
+        # `type_from_bam` had no callers anywhere, so the gold-standard
+        # path was unreachable and every patient got a population profile.
+        if normal_bam_path:
+            hla_alleles = self.hla_typer.type_from_bam(
+                normal_bam_path, sample_id=patient_id
+            )
+        elif normal_fastq:
+            r1, r2 = (normal_fastq if isinstance(normal_fastq, (tuple, list))
+                      else (normal_fastq, None))
+            hla_alleles = self.hla_typer.type_from_fastq(
+                r1, r2, sample_id=patient_id
+            )
+        else:
+            hla_alleles = self.hla_typer.type_from_variants(
+                variants, patient_id=patient_id
+            )
 
         # Neoantigen prediction
         neoantigens = []
@@ -331,10 +532,21 @@ class PatientProfileBuilder:
             affected_genes=affected_genes,
             affected_proteins=proteins,
             tumor_mutational_burden=tmb,
+            tmb_caveats=tmb_caveats,
             msi_status=msi,
             hla_alleles=hla_alleles,
             predicted_neoantigens=neoantigens,
             variant_summary=summary,
+            has_matched_normal=has_matched_normal,
+            tumor_sample=self.parser.tumor_sample,
+            normal_sample=self.parser.normal_sample,
+            somatic_status_counts=somatic_status_counts,
+            germline_variants_excluded=germline_excluded,
+            neoantigen_diagnostics=self.neoantigen_predictor.diagnostics.to_dict(),
+            binding_method=self.neoantigen_predictor.binding_method,
+            hla_typing_method=self.hla_typer.typing_method,
+            hla_is_patient_specific=self.hla_typer.is_patient_specific,
+            vep_annotation=self.vep_stats,
         )
 
         n_vaccine = len(profile.vaccine_neoantigens)

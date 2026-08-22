@@ -58,6 +58,31 @@ class OncoKBAnnotation:
     # Raw response
     raw: Dict[str, Any] = field(default_factory=dict)
 
+    # ── Provenance ─────────────────────────────────────────────────
+    # Which knowledge source produced this. "oncokb-api" is a live
+    # lookup keyed on the exact protein change; "builtin-kb" is the
+    # offline table below, which is gene-level only and ignores
+    # protein_change entirely. Downstream code mints evidence records
+    # and FDA audit hashes from these, so a curated guess must not be
+    # indistinguishable from a database hit.
+    source: str = "oncokb-api"
+    source_detail: str = ""
+
+    @property
+    def is_fallback(self) -> bool:
+        """True when this came from the offline table, not from OncoKB."""
+        return self.source != "oncokb-api"
+
+    @property
+    def matched_protein_change(self) -> bool:
+        """True when the annotation is specific to this exact variant.
+
+        The offline table branches on gene symbol alone, so every variant
+        in a gene gets the same verdict -- including variants that are
+        not oncogenic.
+        """
+        return not self.is_fallback
+
     @property
     def is_actionable(self) -> bool:
         return self.highest_sensitive_level != ""
@@ -265,6 +290,13 @@ class OncoKBClient:
             mutation_effect="Unknown",
             highest_sensitive_level="",
             highest_resistance_level="",
+            # Marked at construction so no branch below can forget it.
+            source="builtin-kb",
+            source_detail=(
+                "Offline gene-level table (NCCN Prostate Cancer v2.2024 and "
+                "published trials). Not an OncoKB lookup: this branches on "
+                "gene symbol only and does not consider the protein change."
+            ),
         )
 
         # BRCA1/2 — PARP inhibitors (Level 1)

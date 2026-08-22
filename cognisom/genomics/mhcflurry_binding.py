@@ -38,13 +38,26 @@ logger = logging.getLogger(__name__)
 # Lazy-loaded predictor (MHCflurry models are ~500 MB)
 _predictor = None
 _available = None
+# Why the load failed, kept so that the refusal below survives repeat calls.
+_failure_message = None
 
 
 def is_mhcflurry_available() -> bool:
     """Check if MHCflurry is installed and models are downloaded."""
-    global _available, _predictor
-    if _available is not None:
-        return _available
+    global _available, _predictor, _failure_message
+
+    if _available is True:
+        return True
+
+    # A previous call already failed. Re-run the decision rather than
+    # returning a cached False: _fail_or_warn raises unless the operator
+    # has opted into the PWM scorer, and caching the False made the very
+    # first call the only one that ever refused -- every later call in the
+    # same process returned False silently, which is exactly the silent
+    # downgrade this guard exists to prevent.
+    if _failure_message is not None:
+        _fail_or_warn(_failure_message)
+        return False
 
     try:
         from mhcflurry import Class1PresentationPredictor
@@ -53,17 +66,19 @@ def is_mhcflurry_available() -> bool:
         logger.info("MHCflurry loaded: %d supported alleles",
                      len(_predictor.supported_alleles))
     except ImportError as e:
-        _available = False
-        _fail_or_warn(
+        _failure_message = (
             f"MHCflurry is not importable ({e}). Note that mhcflurry 2.0.6 "
             f"requires Python <= 3.12; it imports the stdlib `pipes` module, "
             f"which was removed in 3.13."
         )
-    except Exception as e:
+        _fail_or_warn(_failure_message)
         _available = False
-        _fail_or_warn(f"MHCflurry failed to load: {e}")
+    except Exception as e:
+        _failure_message = f"MHCflurry failed to load: {e}"
+        _fail_or_warn(_failure_message)
+        _available = False
 
-    return _available
+    return bool(_available)
 
 
 def _fail_or_warn(message: str) -> None:
@@ -92,11 +107,38 @@ def _fail_or_warn(message: str) -> None:
     )
 
 
+# Canonical scorer names. Reports, model cards and provenance records all
+# describe the same run, so they must not each invent their own spelling.
+MHCFLURRY_SCORER = "mhcflurry-2.0.6"
+PWM_SCORER = "pwm-fallback"
+NO_SCORER = "unavailable"
+
+
+def active_scorer_name() -> str:
+    """Which scorer will actually run, determined without raising.
+
+    Provenance records, model cards and agent `model_versions` blocks used
+    to hardcode "pwm-v1" regardless of what ran. That is wrong in both
+    directions: it mislabels a real MHCflurry run in production, and an
+    audit record that misstates the model is worse than one that omits it.
+    Call this instead of naming a scorer inline.
+    """
+    try:
+        if is_mhcflurry_available():
+            return MHCFLURRY_SCORER
+    except MHCflurryUnavailableError:
+        # Not installed and the PWM fallback has not been opted into, so
+        # no scorer is usable at all.
+        return NO_SCORER
+    return PWM_SCORER
+
+
 def reset_availability():
     """Reset cached availability check (useful after installing models)."""
-    global _available, _predictor
+    global _available, _predictor, _failure_message
     _available = None
     _predictor = None
+    _failure_message = None
 
 
 def get_predictor():
@@ -283,53 +325,86 @@ def _predict_mhcflurry_batch(
     peptides: List[str],
     hla_alleles: List[str],
 ) -> List[BindingResult]:
-    """Batch prediction using MHCflurry (faster than individual calls)."""
+    """Batch prediction using MHCflurry.
+
+    Peptides are grouped by allele and each group submitted in one call.
+    That grouping is not an optimisation -- it is the only correct way to
+    call this API.
+
+    ``Class1PresentationPredictor.predict(peptides, alleles=[...])`` reads
+    ``alleles`` as *one individual's genotype*, and rejects more than six:
+
+        ValueError: When alleles is a list, it must have at most 6
+        elements. These alleles are taken to be a genotype for an
+        individual, and the strongest prediction across the alleles is
+        returned.
+
+    This function used to pass a parallel per-peptide allele list, which
+    is a different meaning entirely. It happened to work for six peptides
+    or fewer and raised for anything larger -- and the raise was caught,
+    logged at warning level, and silently answered with the PWM
+    approximation instead. Every caller therefore received PWM numbers
+    while `method` on the surviving results, and the predictor's own
+    `binding_method`, still said mhcflurry. A real patient never has six
+    or fewer peptides, so in practice the neural network was never used.
+
+    Results are matched back by peptide from the returned frame rather
+    than by row position, so a reordering upstream cannot pair a peptide
+    with another peptide's affinity.
+    """
     predictor = get_predictor()
-    normalized = [_normalize_allele(a) for a in hla_alleles]
+    results: List[Optional[BindingResult]] = [None] * len(peptides)
 
-    # Filter to supported alleles
-    valid_indices = []
-    valid_peptides = []
-    valid_alleles = []
-    results = [None] * len(peptides)
-
-    for i, (pep, allele) in enumerate(zip(peptides, normalized)):
-        if allele in predictor.supported_alleles and 8 <= len(pep) <= 14:
-            valid_indices.append(i)
-            valid_peptides.append(pep)
-            valid_alleles.append(allele)
+    # Group the indices we can actually score, by normalised allele.
+    by_allele: Dict[str, List[int]] = {}
+    for i, (pep, allele) in enumerate(zip(peptides, hla_alleles)):
+        normalized = _normalize_allele(allele)
+        if normalized in predictor.supported_alleles and 8 <= len(pep) <= 14:
+            by_allele.setdefault(normalized, []).append(i)
         else:
-            results[i] = _predict_pwm_fallback(pep, hla_alleles[i])
+            results[i] = _predict_pwm_fallback(pep, allele)
 
-    if valid_peptides:
+    for allele, indices in by_allele.items():
+        group = [peptides[i] for i in indices]
         try:
             df = predictor.predict(
-                peptides=valid_peptides,
-                alleles=valid_alleles,
+                peptides=list(dict.fromkeys(group)),   # unique, order kept
+                alleles=[allele],                      # a genotype of one
                 verbose=0,
             )
-
-            for idx, (_, row) in zip(valid_indices, df.iterrows()):
-                affinity = float(row.get("affinity", 5000))
-                results[idx] = BindingResult(
-                    peptide=valid_peptides[valid_indices.index(idx)],
-                    hla_allele=valid_alleles[valid_indices.index(idx)],
-                    affinity_nm=affinity,
-                    percentile_rank=float(row.get("affinity_percentile", 50)),
-                    presentation_score=float(row.get("presentation_score", 0)),
-                    is_strong_binder=affinity < 50,
-                    is_weak_binder=affinity < 500,
-                    method="mhcflurry",
-                )
         except Exception as e:
-            logger.warning("MHCflurry batch failed: %s", e)
-            for idx in valid_indices:
-                if results[idx] is None:
-                    results[idx] = _predict_pwm_fallback(
-                        peptides[idx], hla_alleles[idx]
-                    )
+            logger.warning(
+                "MHCflurry batch failed for %s over %d peptides (%s); these "
+                "fall back to the PWM approximation.", allele, len(group), e,
+            )
+            for i in indices:
+                results[i] = _predict_pwm_fallback(peptides[i], hla_alleles[i])
+            continue
 
-    return results
+        scored = {
+            str(row["peptide"]): row
+            for _, row in df.iterrows()
+            if "peptide" in df.columns
+        }
+        for i in indices:
+            row = scored.get(peptides[i])
+            if row is None:
+                results[i] = _predict_pwm_fallback(peptides[i], hla_alleles[i])
+                continue
+            affinity = float(row.get("affinity", 5000))
+            results[i] = BindingResult(
+                peptide=peptides[i],
+                hla_allele=hla_alleles[i],
+                affinity_nm=affinity,
+                percentile_rank=float(row.get("presentation_percentile", 50)),
+                presentation_score=float(row.get("presentation_score", 0)),
+                is_strong_binder=affinity < 50,
+                is_weak_binder=affinity < 500,
+                method="mhcflurry",
+            )
+
+    return [r if r is not None else _predict_pwm_fallback(p, a)
+            for r, p, a in zip(results, peptides, hla_alleles)]
 
 
 # --- PWM fallback ---

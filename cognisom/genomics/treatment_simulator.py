@@ -10,6 +10,7 @@ PARP inhibitors, and combination therapies based on the patient's
 genomic profile and immune landscape.
 """
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
@@ -435,8 +436,24 @@ class TreatmentSimulator:
         """Simulate tumor volume changes over time.
 
         Returns list of relative tumor volumes (1.0 = baseline).
+
+        The trajectory is deterministic given the regimen name: the same
+        patient and regimen must produce the same curve on every run, or
+        two viewings of one report disagree.
         """
-        np.random.seed(hash(profile.get("name", "")) % 2**31)
+        # `hash()` on a str is salted per interpreter process (PYTHONHASHSEED),
+        # so seeding from it produced a *different* trajectory every time the
+        # process restarted -- the one thing a seed exists to prevent. And
+        # np.random.seed() mutates the global RNG, so calling this reached
+        # out and changed unrelated draws elsewhere in the process.
+        # A stable digest plus a local Generator fixes both.
+        seed = int.from_bytes(
+            hashlib.sha256(
+                str(profile.get("name", "")).encode("utf-8")
+            ).digest()[:8],
+            "big",
+        )
+        rng = np.random.default_rng(seed)
 
         onset = profile.get("effect_onset_days", 14)
         volumes = [1.0]
@@ -464,7 +481,7 @@ class TreatmentSimulator:
             net_rate = growth_rate - treatment_factor
 
             # Add stochastic noise
-            noise = np.random.normal(0, 0.002)
+            noise = rng.normal(0, 0.002)
 
             volume *= (1.0 + net_rate + noise)
             volume = max(0.01, volume)  # Floor at 1% (not full eradication)

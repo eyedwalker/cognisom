@@ -16,11 +16,15 @@ Features:
 import sys
 sys.path.insert(0, '..')
 
+import logging
+
 import numpy as np
 from typing import Dict, List, Any, Tuple
 
 from cognisom.core.module_base import SimulationModule
 from cognisom.core.event_bus import EventTypes
+
+_log = logging.getLogger(__name__)
 
 
 class SpatialField:
@@ -55,31 +59,82 @@ class SpatialField:
         self.sources.clear()
         self.sinks.clear()
     
+    #: Stability limit for the explicit 3D 7-point Laplacian:
+    #: D*dt/dx^2 <= 1/6. Above it the scheme amplifies high-frequency
+    #: modes every step instead of damping them.
+    CFL_LIMIT_3D = 1.0 / 6.0
+    #: Fraction of the limit to actually run at.
+    CFL_SAFETY = 0.9
+    #: Cap on sub-steps per update, so a pathological diffusion number
+    #: degrades into a warning rather than an unbounded loop.
+    MAX_SUBSTEPS = 512
+
+    SECONDS_PER_HOUR = 3600.0
+
     def update(self, dt: float):
-        """Update field via diffusion"""
-        # Diffusion (explicit Euler)
-        # ∂C/∂t = D∇²C
-        
-        # Compute Laplacian
-        laplacian = self._compute_laplacian()
-        
-        # Apply sources
+        """Update field via diffusion.
+
+        ``dt`` is in HOURS (the simulation's time unit) while
+        ``diffusion_coeff`` is in um^2/s, so the conversion below is
+        required. It was missing: ``D * lap * dt / dx^2`` was evaluated
+        with mixed units, understating the transported amount 3600-fold.
+
+        The step is then sub-divided to satisfy the explicit-Euler
+        stability limit. Previously there was no check at all -- with the
+        oxygen field's D = 2000 um^2/s on a 10 um grid the diffusion
+        number is ~7200 against a limit of 1/6, so the scheme was
+        unconditionally unstable. It did not visibly blow up only because
+        ``np.maximum(concentration, 0)`` clipped the resulting oscillation
+        every step, which also silently destroys mass.
+        """
+        dt_seconds = dt * self.SECONDS_PER_HOUR
+        dx2 = self.resolution ** 2
+
+        # Sources and sinks act over the whole interval, once.
         for idx, rate in self.sources:
             if self._is_valid_index(idx):
                 self.concentration[idx] += rate * dt
-        
-        # Apply sinks
+
         for idx, rate in self.sinks:
             if self._is_valid_index(idx):
                 removal = min(rate * dt, self.concentration[idx])
                 self.concentration[idx] -= removal
-        
-        # Diffusion update
-        dC = self.diffusion_coeff * laplacian * dt / (self.resolution ** 2)
-        self.concentration += dC
-        
+
+        if self.diffusion_coeff <= 0 or dt_seconds <= 0:
+            np.maximum(self.concentration, 0, out=self.concentration)
+            return
+
+        diffusion_number = self.diffusion_coeff * dt_seconds / dx2
+        max_stable = self.CFL_LIMIT_3D * self.CFL_SAFETY
+
+        n_sub = max(1, int(np.ceil(diffusion_number / max_stable)))
+        coeff = diffusion_number / n_sub
+
+        if n_sub > self.MAX_SUBSTEPS:
+            _log.warning(
+                "Field '%s': D*dt/dx^2 = %.1f needs %d explicit sub-steps to "
+                "stay stable, above the cap of %d. Running %d stable "
+                "sub-steps instead, so the field is UNDER-DIFFUSED over this "
+                "interval (about %.1f%% of the transport applied). At this "
+                "diffusion number the field is effectively at steady state "
+                "within one step, so an implicit or steady-state solve is the "
+                "right method here, not explicit Euler.",
+                self.name, diffusion_number, n_sub, self.MAX_SUBSTEPS,
+                self.MAX_SUBSTEPS,
+                100.0 * self.MAX_SUBSTEPS * max_stable / diffusion_number,
+            )
+            n_sub = self.MAX_SUBSTEPS
+            # Each sub-step must still satisfy the stability limit --
+            # spreading an over-limit coefficient across capped sub-steps
+            # leaves every one of them unstable, which overflows to NaN
+            # rather than merely being inaccurate.
+            coeff = max_stable
+
+        for _ in range(n_sub):
+            self.concentration += coeff * self._compute_laplacian()
+
         # Non-negative
-        self.concentration = np.maximum(self.concentration, 0)
+        np.maximum(self.concentration, 0, out=self.concentration)
     
     def _compute_laplacian(self) -> np.ndarray:
         """Compute Laplacian using finite differences"""

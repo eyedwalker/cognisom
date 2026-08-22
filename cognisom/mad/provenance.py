@@ -16,6 +16,15 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
+def _resolve_neoantigen_scorer() -> str:
+    """Name the MHC-binding scorer in effect, without raising."""
+    try:
+        from ..genomics.mhcflurry_binding import active_scorer_name
+        return active_scorer_name()
+    except Exception:  # pragma: no cover - import-time environment issues
+        return "unknown"
+
+
 @dataclass
 class AnnotationSource:
     """A specific database or reference used during analysis."""
@@ -67,7 +76,10 @@ class DataProvenance:
     # Cognisom module versions
     module_versions: Dict[str, str] = field(default_factory=lambda: {
         "treatment_simulator": "v1.0",
-        "neoantigen_predictor": "pwm-v1.0",
+        # Resolved per run, not asserted. This record is hashed into the
+        # FDA audit trail, so naming a model that did not run is a
+        # falsified audit entry rather than a cosmetic error.
+        "neoantigen_predictor": _resolve_neoantigen_scorer(),
         "hla_typer": "v1.0",
         "cell_state_classifier": "marker-heuristic-v1.0",
         "patient_profile": "v1.0",

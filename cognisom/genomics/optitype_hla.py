@@ -10,13 +10,15 @@ OptiType:
   - >97% concordance with serological typing
   - Works on WGS, WES, or RNA-seq BAM/FASTQ
   - Identifies 6 HLA-I alleles (A, B, C × 2) at 4-digit resolution
-  - CPU-only, ~5 min per sample
+  - CPU-only. Runtime is dominated by razers3 read mapping and scales
+    with input size: minutes for a targeted HLA-region extraction,
+    but hours for whole-exome FASTQ on a few cores.
 
 Falls back to population-frequency assignment if OptiType is not installed.
 
 Requirements (for production):
   - conda install -c bioconda optitype
-  - OR docker pull fred2/optitype:1.3.5
+  - OR docker pull quay.io/biocontainers/optitype:1.3.5--hdfd78af_3
 
 References:
   Szolek et al., Bioinformatics 2014
@@ -34,6 +36,46 @@ from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+#: Wall-clock ceiling for a single OptiType run.
+#:
+#: razers3 read mapping dominates OptiType's runtime and scales with input
+#: size, so this has to accommodate whole-exome FASTQ rather than a small
+#: HLA-region extraction. Six hours is generous for WES on a few cores;
+#: override with COGNISOM_OPTITYPE_TIMEOUT (seconds) for larger inputs.
+DEFAULT_OPTITYPE_TIMEOUT = 6 * 60 * 60
+
+#: OptiType container image.
+#:
+#: This was `fred2/optitype:1.3.5`, a tag that does not exist: that
+#: repository stops at `release-v1.3.1`, so every containerised run failed
+#: on `manifest unknown`. The bioconda build is where 1.3.5 actually ships.
+OPTITYPE_IMAGE = "quay.io/biocontainers/optitype:1.3.5--hdfd78af_3"
+
+#: OptiType refuses to start without a config file naming the razers3 binary.
+OPTITYPE_CONFIG = "/usr/local/bin/config.ini"
+
+
+def optitype_timeout() -> int:
+    """Resolve the OptiType wall-clock ceiling, honouring the env override."""
+    raw = os.environ.get("COGNISOM_OPTITYPE_TIMEOUT")
+    if not raw:
+        return DEFAULT_OPTITYPE_TIMEOUT
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(
+            "COGNISOM_OPTITYPE_TIMEOUT=%r is not an integer; using %ds",
+            raw, DEFAULT_OPTITYPE_TIMEOUT,
+        )
+        return DEFAULT_OPTITYPE_TIMEOUT
+    if value <= 0:
+        logger.warning(
+            "COGNISOM_OPTITYPE_TIMEOUT=%d is not positive; using %ds",
+            value, DEFAULT_OPTITYPE_TIMEOUT,
+        )
+        return DEFAULT_OPTITYPE_TIMEOUT
+    return value
+
 
 def is_optitype_available() -> bool:
     """Check if OptiType is installed and executable."""
@@ -49,7 +91,7 @@ def is_optitype_available() -> bool:
     # Check Docker
     try:
         result = subprocess.run(
-            ["docker", "images", "fred2/optitype", "--format", "{{.ID}}"],
+            ["docker", "images", "-q", OPTITYPE_IMAGE],
             capture_output=True, text=True, timeout=5,
         )
         return bool(result.stdout.strip())
@@ -104,7 +146,7 @@ def type_hla_from_bam(
     else:
         raise RuntimeError(
             "OptiType not available. Install via: conda install -c bioconda optitype "
-            "OR: docker pull fred2/optitype:1.3.5"
+            f"OR: docker pull {OPTITYPE_IMAGE}"
         )
 
     # Step 3: Parse results
@@ -180,7 +222,17 @@ def _run_optitype_native(
     if fastq_r2:
         cmd.insert(3, fastq_r2)
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    timeout = optitype_timeout()
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"OptiType exceeded its {timeout}s ceiling. Raise "
+            f"COGNISOM_OPTITYPE_TIMEOUT, or reduce the input by extracting "
+            f"chr6:29-34Mb reads first."
+        ) from exc
     if result.returncode != 0:
         raise RuntimeError(f"OptiType failed: {result.stderr}")
 
@@ -193,25 +245,52 @@ def _run_optitype_native(
 def _run_optitype_docker(
     fastq_path: str, output_dir: str, fastq_r2: str = None,
 ) -> str:
-    """Run OptiType via Docker container."""
+    """Run OptiType via Docker container.
+
+    The image is a bioconda build whose entrypoint is a conda activation
+    wrapper, so the pipeline script has to be named explicitly as the
+    command rather than assumed to be the entrypoint.
+    """
     fastq_dir = os.path.dirname(os.path.abspath(fastq_path))
-    fastq_name = os.path.basename(fastq_path)
+    inputs = [f"/data/{os.path.basename(fastq_path)}"]
+
+    if fastq_r2:
+        r2_dir = os.path.dirname(os.path.abspath(fastq_r2))
+        if r2_dir != fastq_dir:
+            raise ValueError(
+                "Paired FASTQs must share a directory: only that one directory "
+                f"is mounted into the container. R1 is in {fastq_dir}, "
+                f"R2 in {r2_dir}."
+            )
+        inputs.append(f"/data/{os.path.basename(fastq_r2)}")
 
     cmd = [
         "docker", "run", "--rm",
+        # Without this the results land root-owned on the host.
+        "--user", f"{os.getuid()}:{os.getgid()}",
+        "-e", "HOME=/tmp",
         "-v", f"{fastq_dir}:/data:ro",
-        "-v", f"{output_dir}:/out",
-        "fred2/optitype:1.3.5",
-        "-i", f"/data/{fastq_name}",
+        "-v", f"{os.path.abspath(output_dir)}:/out",
+        OPTITYPE_IMAGE,
+        "OptiTypePipeline.py",
+        "-i", *inputs,
         "--dna",
         "-o", "/out",
+        "-c", OPTITYPE_CONFIG,
         "-v",
     ]
-    if fastq_r2:
-        r2_name = os.path.basename(fastq_r2)
-        cmd.insert(-4, f"/data/{r2_name}")
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    timeout = optitype_timeout()
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"OptiType exceeded its {timeout}s ceiling. Raise "
+            f"COGNISOM_OPTITYPE_TIMEOUT, or reduce the input by extracting "
+            f"chr6:29-34Mb reads first."
+        ) from exc
     if result.returncode != 0:
         raise RuntimeError(f"OptiType Docker failed: {result.stderr}")
 
@@ -252,7 +331,7 @@ def get_hla_typing_status() -> Dict[str, bool]:
     """Check status of HLA typing tools."""
     return {
         "optitype_native": is_optitype_available(),
-        "optitype_docker": _check_docker_image("fred2/optitype"),
+        "optitype_docker": _check_docker_image(OPTITYPE_IMAGE),
         "samtools": _check_command("samtools"),
     }
 

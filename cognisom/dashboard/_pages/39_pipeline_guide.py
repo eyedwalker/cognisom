@@ -626,7 +626,7 @@ steps_data = {
         "Non-Device CDS: evidence for clinician's independent review",
         "Medium risk (clinician-in-loop) × Medium consequence (therapy selection)",
         "Retrospective validation on SU2C (429 pts) + TCGA (494 pts) + GIAB benchmark",
-        "429-patient study complete: 100% biomarker concordance, TMB r=0.987",
+        "429-patient analytical study: TMB r=0.9998, HRD detection 100% sens/spec",
         "Model cards, audit trail, provenance tracking, 42 unit tests",
         "Pending formal review — evidence supports defined Context of Use",
     ],

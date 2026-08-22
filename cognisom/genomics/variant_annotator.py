@@ -337,6 +337,12 @@ ALL_CANCER_DRIVERS = {**PROSTATE_CANCER_DRIVERS, **PAN_CANCER_DRIVERS}
 CANCER_DRIVER_GENES = set(ALL_CANCER_DRIVERS.keys())
 
 
+#: Nominal callable footprint of a whole-exome capture kit, in megabases.
+#: A fallback only -- real assays differ, and a gene panel differs by
+#: two orders of magnitude.
+DEFAULT_EXOME_MB = 30.0
+
+
 class VariantAnnotator:
     """Annotate variants with gene information and cancer relevance.
 
@@ -361,21 +367,55 @@ class VariantAnnotator:
     def __init__(self, cancer_type: str = "prostate"):
         self.cancer_type = cancer_type
         self.driver_db = ALL_CANCER_DRIVERS
+        #: Driver-gene variants that reached the end of annotation with no
+        #: protein change, because the VCF carried no ANN/CSQ/AA_CHANGE.
+        self._unannotated_in_driver_gene = 0
+        #: How many variants arrived carrying a real functional annotation.
+        #: Zero means TMB is not estimable from this callset at all.
+        self.variants_with_consequence = 0
 
     def annotate(self, variants: List[Variant]) -> List[Variant]:
         """Annotate a list of variants with cancer gene information.
 
         Fills in: gene, consequence, is_coding, is_cancer_driver, impact.
         Returns the same list (modified in place).
+
+        Coding status and protein changes come only from real annotation
+        (SnpEff ANN, VEP CSQ, or a direct AA_CHANGE INFO field). A raw
+        callset with none of those yields genes but no protein changes,
+        which is reported below rather than filled in with guesses.
         """
+        self._unannotated_in_driver_gene = 0
+
         for v in variants:
             self._annotate_variant(v)
+
         annotated_count = sum(1 for v in variants if v.gene)
         driver_count = sum(1 for v in variants if v.is_cancer_driver)
+        coding_count = sum(1 for v in variants if v.is_coding)
+
+        # Did ANY variant arrive with a real functional annotation? This
+        # separates "this sample has few coding mutations" from "nothing
+        # in this file says which mutations are coding" -- two situations
+        # that both yield TMB 0 and mean opposite things.
+        self.variants_with_consequence = sum(
+            1 for v in variants
+            if (v.protein_change
+                or (v.consequence and v.consequence != "unannotated"))
+        )
         logger.info(
             f"Annotated {annotated_count}/{len(variants)} variants with gene info, "
-            f"{driver_count} cancer drivers"
+            f"{driver_count} cancer drivers, {coding_count} coding"
         )
+        if self._unannotated_in_driver_gene:
+            logger.warning(
+                "%d driver-gene variants have no protein change: this VCF "
+                "carries no ANN/CSQ/AA_CHANGE annotation. Protein "
+                "consequences cannot be derived from coordinates alone, so "
+                "these contribute no neoantigens. Run VEP or SnpEff over "
+                "the callset before ingest.",
+                self._unannotated_in_driver_gene,
+            )
         return variants
 
     def _annotate_variant(self, variant: Variant):
@@ -391,31 +431,39 @@ class VariantAnnotator:
         # Try to extract gene from INFO fields
         gene = self._extract_gene_from_info(variant.info)
 
-        # Fallback: map chromosome position to cancer driver gene
+        # Fallback: map chromosome position to cancer driver gene.
+        #
+        # This says only that the coordinate falls inside the gene's span.
+        # Whole-gene intervals are mostly intron and UTR -- a typical gene
+        # is a few percent exonic -- so `is_coding` must NOT be set here.
+        # It used to be, unconditionally, and `is_coding` feeds TMB
+        # directly, so every intronic and untranslated position in a driver
+        # gene counted as a coding mutation.
+        #
+        # The former workaround was a counter, `if count < 3`, with the
+        # comment "Limit to ~3 variants per gene to simulate exonic
+        # fraction". Which three variants it kept depended on the order
+        # rows appeared in the file.
         if not gene and variant.chrom and variant.pos:
             gene = self._extract_gene_from_position(variant.chrom, variant.pos)
             if gene:
-                variant.is_coding = True
+                variant.consequence = variant.consequence or "unannotated"
 
         if gene:
             variant.gene = gene
             gene_upper = gene.upper()
-            if gene_upper in CANCER_DRIVER_GENES:
+            # A driver gene is not a driver mutation. This flag used to be
+            # set for any coordinate falling inside the gene's span, which
+            # is overwhelmingly intron -- on the SEQC2 callset that gave
+            # 213 "cancer driver mutations" against 3 coding variants, and
+            # `cancer_driver_mutations` is what neoantigen prediction is
+            # handed. Protein-altering is the minimum bar; anything below
+            # it is a variant in a driver gene, which is a different claim.
+            if gene_upper in CANCER_DRIVER_GENES and variant.is_coding:
                 variant.is_cancer_driver = True
                 self._annotate_driver_details(variant, gene_upper)
-                # Generate protein change if missing (for raw VCFs without annotation)
-                # Limit to ~3 variants per gene to simulate exonic fraction
-                # (real genes are ~5% exonic, so 50 variants → ~2-3 coding)
-                if not variant.protein_change and variant.ref and variant.alt:
-                    gene_count_key = f"_pchange_count_{gene_upper}"
-                    count = getattr(self, gene_count_key, 0)
-                    if count < 3:  # Max 3 coding variants per gene
-                        variant.protein_change = self._predict_protein_change(
-                            variant, gene_upper
-                        )
-                        if variant.protein_change:
-                            variant.consequence = "missense_variant"
-                            setattr(self, gene_count_key, count + 1)
+                if not variant.protein_change:
+                    self._unannotated_in_driver_gene += 1
 
     # GRCh38 gene coordinates for cancer driver genes (chr, start, end)
     GENE_COORDS = {
@@ -481,62 +529,48 @@ class VariantAnnotator:
         "GGT": "G", "GGC": "G", "GGA": "G", "GGG": "G",
     }
 
-    def _predict_protein_change(self, variant, gene: str) -> Optional[str]:
-        """Generate a protein change annotation for SNVs in cancer driver genes.
+    def translate_codon(self, codon: str) -> Optional[str]:
+        """Translate a DNA codon to its amino acid using the genetic code.
 
-        Uses position within the gene to estimate codon position and
-        predicts the amino acid change from the DNA substitution.
-        For SNVs only (single base changes).
+        Exposed because ``_CODON_TABLE`` had no readers at all: the class
+        carried a correct genetic code while the annotator beside it
+        invented amino acids from single bases.
         """
-        if not variant.ref or not variant.alt:
-            return None
-        if len(variant.ref) != 1 or len(variant.alt) != 1:
-            # Indel — generate a frameshift annotation
-            if len(variant.ref) > len(variant.alt):
-                return f"p.del{len(variant.ref)-len(variant.alt)}"
-            else:
-                return f"p.ins{len(variant.alt)-len(variant.ref)}"
+        return self._CODON_TABLE.get(codon.upper())
 
-        # SNV: estimate amino acid position from gene coordinates
-        coords = self.GENE_COORDS.get(gene)
-        if not coords:
-            return None
+    def _predict_protein_change(self, variant, gene: str) -> Optional[str]:
+        """Protein consequence for a variant, or None when it cannot be computed.
 
-        _, gene_start, _ = coords
-        offset = variant.pos - gene_start
-        if offset < 0:
-            return None
+        Returns None. Deriving a protein change from a genomic coordinate
+        requires the reference sequence and the transcript's exon and
+        reading-frame structure; this package has neither, so there is no
+        correct answer to give here.
 
-        # Estimate amino acid position (rough: offset/3, assuming CDS starts near gene start)
-        aa_pos = max(1, offset // 3)
+        What stood here instead produced an answer anyway:
 
-        # Generate plausible ref/alt amino acids from the base change
-        # Use a simplified mapping: each base change at each codon position
-        # produces a specific amino acid change
-        bases = "ACGT"
-        ref_base = variant.ref.upper()
-        alt_base = variant.alt.upper()
+            _aa_from_base = {"A": "K", "C": "A", "G": "G", "T": "L"}
+            _alt_aa = {("A","C"): "T", ("A","G"): "R", ...}
 
-        if ref_base not in bases or alt_base not in bases:
-            return None
+        The reference amino acid came from a *single DNA base* rather than
+        a codon, the alternate came from a fixed base-pair lookup, and the
+        residue number was ``(pos - gene_start) // 3`` -- an offset from
+        the start of the gene, not the coding sequence, ignoring introns,
+        UTRs and strand. Every field of the resulting ``p.R248W`` was
+        invented, and it then flowed into peptide generation as though it
+        had been called by an annotator.
 
-        # Common amino acid substitutions for each base change
-        # This is simplified but produces valid protein changes for neoantigen prediction
-        _aa_from_base = {"A": "K", "C": "A", "G": "G", "T": "L"}
-        _alt_aa = {
-            ("A", "C"): "T", ("A", "G"): "R", ("A", "T"): "S",
-            ("C", "A"): "D", ("C", "G"): "R", ("C", "T"): "Y",
-            ("G", "A"): "E", ("G", "C"): "A", ("G", "T"): "V",
-            ("T", "A"): "H", ("T", "C"): "P", ("T", "G"): "Q",
-        }
+        The supported paths for a real protein change are, in order:
 
-        ref_aa = _aa_from_base.get(ref_base, "X")
-        alt_aa = _alt_aa.get((ref_base, alt_base), "X")
+        1. An annotated VCF: ``ANN`` (SnpEff), ``CSQ`` (VEP) or a direct
+           ``AA_CHANGE`` INFO field. ``VCFParser`` already reads all three.
+        2. ``cognisom.engine.py.molecular.mutation_effect``, which does
+           real codon translation against a curated CDS, for the genes
+           that library covers.
 
-        if ref_aa == alt_aa:
-            return None  # Synonymous
-
-        return f"p.{ref_aa}{aa_pos}{alt_aa}"
+        Running VEP or SnpEff over the VCF before ingest is the general
+        fix, and is what the pipeline should require for raw callsets.
+        """
+        return None
 
     def _extract_gene_from_position(self, chrom: str, pos: int) -> Optional[str]:
         """Map chromosome position to cancer driver gene using built-in coordinates."""
@@ -575,12 +609,19 @@ class VariantAnnotator:
         return dict(self.driver_db)
 
     def compute_tmb(self, variants: List[Variant],
-                    exome_size_mb: float = 30.0) -> float:
+                    exome_size_mb: float = DEFAULT_EXOME_MB) -> float:
         """Compute Tumor Mutational Burden (mutations per megabase).
+
+        The caller owns the denominator. This counts coding variants in
+        whatever it is handed and divides, so passing a gene-panel
+        callset with a whole-exome denominator yields a number that is
+        wrong in both directions at once. `PatientProfileBuilder` tracks
+        whether the footprint was actually declared.
 
         Args:
             variants: List of coding variants.
-            exome_size_mb: Size of the captured exome in megabases.
+            exome_size_mb: Callable megabases the variants were counted
+                over -- the assay's footprint, not a constant.
 
         Returns:
             TMB value (variants/Mb). >10 is considered TMB-high.

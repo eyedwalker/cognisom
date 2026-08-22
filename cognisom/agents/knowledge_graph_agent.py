@@ -139,8 +139,13 @@ class KnowledgeGraphAgent:
             ))
             return report
 
-        # Load all entities
-        entities = self._store.search(limit=10000)
+        # Load all entities. EntityStore.search returns (results, total);
+        # binding it to a single name made `entities` a 2-tuple, so
+        # entities_scanned reported 2 and the loop below raised
+        # AttributeError on the first iteration. The agent's factory wraps
+        # construction in `except Exception: return None`, so that crash
+        # was swallowed and no duplicate detection ever ran.
+        entities, _total = self._store.search(limit=10000)
         report.entities_scanned = len(entities)
 
         # Build index by name for duplicate detection
@@ -336,7 +341,7 @@ class KnowledgeGraphAgent:
             try:
                 if entity.entity_type.value == "gene":
                     # Link to proteins with matching gene source
-                    proteins = self._store.search(
+                    proteins, _ = self._store.search(
                         entity_type="protein",
                         limit=100
                     )
@@ -354,7 +359,7 @@ class KnowledgeGraphAgent:
                     # Link to gene with matching name
                     gene_source = getattr(entity, "gene_source", "")
                     if gene_source:
-                        genes = self._store.search(
+                        genes, _ = self._store.search(
                             query=gene_source,
                             entity_type="gene",
                             limit=5
