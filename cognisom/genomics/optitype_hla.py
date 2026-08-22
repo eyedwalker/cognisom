@@ -10,7 +10,9 @@ OptiType:
   - >97% concordance with serological typing
   - Works on WGS, WES, or RNA-seq BAM/FASTQ
   - Identifies 6 HLA-I alleles (A, B, C × 2) at 4-digit resolution
-  - CPU-only, ~5 min per sample
+  - CPU-only. Runtime is dominated by razers3 read mapping and scales
+    with input size: minutes for a targeted HLA-region extraction,
+    but hours for whole-exome FASTQ on a few cores.
 
 Falls back to population-frequency assignment if OptiType is not installed.
 
@@ -33,6 +35,36 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+#: Wall-clock ceiling for a single OptiType run.
+#:
+#: razers3 read mapping dominates OptiType's runtime and scales with input
+#: size, so this has to accommodate whole-exome FASTQ rather than a small
+#: HLA-region extraction. Six hours is generous for WES on a few cores;
+#: override with COGNISOM_OPTITYPE_TIMEOUT (seconds) for larger inputs.
+DEFAULT_OPTITYPE_TIMEOUT = 6 * 60 * 60
+
+
+def optitype_timeout() -> int:
+    """Resolve the OptiType wall-clock ceiling, honouring the env override."""
+    raw = os.environ.get("COGNISOM_OPTITYPE_TIMEOUT")
+    if not raw:
+        return DEFAULT_OPTITYPE_TIMEOUT
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(
+            "COGNISOM_OPTITYPE_TIMEOUT=%r is not an integer; using %ds",
+            raw, DEFAULT_OPTITYPE_TIMEOUT,
+        )
+        return DEFAULT_OPTITYPE_TIMEOUT
+    if value <= 0:
+        logger.warning(
+            "COGNISOM_OPTITYPE_TIMEOUT=%d is not positive; using %ds",
+            value, DEFAULT_OPTITYPE_TIMEOUT,
+        )
+        return DEFAULT_OPTITYPE_TIMEOUT
+    return value
 
 
 def is_optitype_available() -> bool:
@@ -180,7 +212,17 @@ def _run_optitype_native(
     if fastq_r2:
         cmd.insert(3, fastq_r2)
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    timeout = optitype_timeout()
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"OptiType exceeded its {timeout}s ceiling. Raise "
+            f"COGNISOM_OPTITYPE_TIMEOUT, or reduce the input by extracting "
+            f"chr6:29-34Mb reads first."
+        ) from exc
     if result.returncode != 0:
         raise RuntimeError(f"OptiType failed: {result.stderr}")
 
@@ -208,10 +250,27 @@ def _run_optitype_docker(
         "-v",
     ]
     if fastq_r2:
+        r2_dir = os.path.dirname(os.path.abspath(fastq_r2))
+        if r2_dir != fastq_dir:
+            raise ValueError(
+                "Paired FASTQs must share a directory: only that one directory "
+                f"is mounted into the container. R1 is in {fastq_dir}, "
+                f"R2 in {r2_dir}."
+            )
         r2_name = os.path.basename(fastq_r2)
         cmd.insert(-4, f"/data/{r2_name}")
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    timeout = optitype_timeout()
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"OptiType exceeded its {timeout}s ceiling. Raise "
+            f"COGNISOM_OPTITYPE_TIMEOUT, or reduce the input by extracting "
+            f"chr6:29-34Mb reads first."
+        ) from exc
     if result.returncode != 0:
         raise RuntimeError(f"OptiType Docker failed: {result.stderr}")
 
