@@ -446,7 +446,14 @@ class VariantAnnotator:
         if gene:
             variant.gene = gene
             gene_upper = gene.upper()
-            if gene_upper in CANCER_DRIVER_GENES:
+            # A driver gene is not a driver mutation. This flag used to be
+            # set for any coordinate falling inside the gene's span, which
+            # is overwhelmingly intron -- on the SEQC2 callset that gave
+            # 213 "cancer driver mutations" against 3 coding variants, and
+            # `cancer_driver_mutations` is what neoantigen prediction is
+            # handed. Protein-altering is the minimum bar; anything below
+            # it is a variant in a driver gene, which is a different claim.
+            if gene_upper in CANCER_DRIVER_GENES and variant.is_coding:
                 variant.is_cancer_driver = True
                 self._annotate_driver_details(variant, gene_upper)
                 if not variant.protein_change:

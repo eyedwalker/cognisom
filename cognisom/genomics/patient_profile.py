@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .vcf_parser import Variant, VCFParser
+from .vep_annotator import VEPAnnotator
 from .variant_annotator import VariantAnnotator, PROSTATE_CANCER_DRIVERS
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLATyper
@@ -72,6 +73,11 @@ class PatientProfile:
     # every "HLA-restricted" claim derived from them is unsupported.
     hla_typing_method: str = "not-run"
     hla_is_patient_specific: bool = False
+
+    #: What the external annotation stage did, empty if it did not run.
+    #: A raw callset with no VEP stage cannot yield protein changes, and
+    #: this is how a reader tells that apart from a quiet tumour.
+    vep_annotation: Dict[str, Any] = field(default_factory=dict)
 
     # Why variants produced no neoantigens, and which scorer ran.
     # An empty neoantigen list is otherwise ambiguous between "this
@@ -261,6 +267,7 @@ class PatientProfile:
             "neoantigen_diagnostics": self.neoantigen_diagnostics,
             "hla_typing_method": self.hla_typing_method,
             "hla_is_patient_specific": self.hla_is_patient_specific,
+            "vep_annotation": self.vep_annotation,
         }
 
     def save(self, path: str):
@@ -300,13 +307,27 @@ class PatientProfileBuilder:
             print(f"  {rec['therapy_class']}: {rec['drugs']}")
     """
 
-    def __init__(self, cancer_type: str = "prostate"):
+    def __init__(self, cancer_type: str = "prostate",
+                 vep_annotator: Optional["VEPAnnotator"] = None):
+        """
+        Args:
+            cancer_type: Drives the driver-gene panel.
+            vep_annotator: Optional VEP stage, run before the built-in
+                annotator. Required for raw callsets: a protein
+                consequence cannot be derived from a coordinate alone, so
+                without it a VCF carrying no ANN/CSQ/AA_CHANGE yields no
+                protein changes and therefore no neoantigens. VEP fills
+                them from the MANE Select transcript, whose numbering
+                matches the bundled reference proteome.
+        """
         self.parser = VCFParser()
         self.annotator = VariantAnnotator(cancer_type=cancer_type)
+        self.vep_annotator = vep_annotator
         self.mapper = GeneProteinMapper()
         self.hla_typer = HLATyper()
         self.neoantigen_predictor = NeoantigenPredictor()
         self.cancer_type = cancer_type
+        self.vep_stats: Dict[str, Any] = {}
 
     def from_vcf_file(self, vcf_path: str,
                       patient_id: str = "anonymous",
@@ -336,6 +357,16 @@ class PatientProfileBuilder:
                        patient_id: str,
                        normal_bam_path: Optional[str] = None) -> PatientProfile:
         """Build complete profile from parsed variants."""
+        # External annotation first, so the built-in annotator sees real
+        # consequences rather than an unannotated callset. Failures are
+        # not swallowed: an un-annotated run and a genuinely quiet tumour
+        # must not produce the same output.
+        self.vep_stats = {}
+        if self.vep_annotator is not None:
+            self.vep_annotator.annotate(variants)
+            self.vep_stats = self.vep_annotator.stats.to_dict()
+            logger.info("VEP annotation: %s", self.vep_stats)
+
         # Annotate variants
         self.annotator.annotate(variants)
 
@@ -456,6 +487,7 @@ class PatientProfileBuilder:
             binding_method=self.neoantigen_predictor.binding_method,
             hla_typing_method=self.hla_typer.typing_method,
             hla_is_patient_specific=self.hla_typer.is_patient_specific,
+            vep_annotation=self.vep_stats,
         )
 
         n_vaccine = len(profile.vaccine_neoantigens)
