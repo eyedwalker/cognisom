@@ -344,7 +344,13 @@ class VEPAnnotator:
                 VEP_IMAGE, "vep",
                 "--offline", "--cache", "--dir_cache", "/cache",
                 "--assembly", self.assembly,
-                "--mane", "--uniprot", "--canonical", "--hgvs",
+                # --symbol is required offline. The REST service returns
+                # gene_symbol without being asked; the cache does not, and
+                # a missing symbol means every annotated variant comes back
+                # with gene=None and is dropped downstream for having no
+                # gene. Verified against the real cache: without it,
+                # BRAF V600E annotates correctly and then has no gene.
+                "--symbol", "--mane", "--uniprot", "--canonical",
                 "--json", "--no_stats", "--force_overwrite",
                 "--input_file", "/work/in.vcf",
                 "--output_file", "/work/out.json",

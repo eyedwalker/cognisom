@@ -372,6 +372,9 @@ def test_local_backend_runs_vep_strictly_offline(tmp_path, monkeypatch):
     assert "--offline" in cmd and "--cache" in cmd
     assert "--network" in cmd and cmd[cmd.index("--network") + 1] == "none"
     assert "--mane" in cmd and "--uniprot" in cmd
+    # Required offline: the cache does not emit gene_symbol unasked, and
+    # a variant with no gene is dropped downstream.
+    assert "--symbol" in cmd
     assert f"{cache}:/cache:ro" in cmd          # cache mounted read-only
     assert annotator.stats.backend == "vep-offline"
     # And the shared parsing path still picks MANE.
