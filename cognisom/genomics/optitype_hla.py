@@ -57,6 +57,17 @@ OPTITYPE_CONFIG = "/usr/local/bin/config.ini"
 #: The six allele columns of an OptiType result frame, in output order.
 HLA_RESULT_COLUMNS = ("A1", "A2", "B1", "B2", "C1", "C2")
 
+#: Read support below which a typing should not be trusted.
+#:
+#: Calibrated on SRR7890874 (HCC1395BL): five independent 8M-read-pair
+#: chunks each yielded ~240 reads, and one of the five called a
+#: different second B allele than the other four -- the locus was not
+#: settled. Merging all five (1198 reads) gave a stable call whose top
+#: six enumerated solutions agreed exactly at A and C. 500 sits between
+#: the regime that moved and the one that did not; it is a heuristic,
+#: not a published threshold.
+LOW_SUPPORT_READS = 500
+
 
 def optitype_timeout() -> int:
     """Resolve the OptiType wall-clock ceiling, honouring the env override."""
@@ -414,13 +425,30 @@ def _warn_on_dropout_signature(
             pass
 
     support = f"{reads:.0f} reads" if reads is not None else "unknown support"
-    if len(homozygous) == 3:
+    thin = reads is None or reads < LOW_SUPPORT_READS
+
+    if len(homozygous) == 3 and thin:
         logger.warning(
             "OptiType called all three class-I loci homozygous from %s. "
-            "That is rare biologically and is the signature of allelic "
-            "dropout: neoantigens restricted to any missed allele cannot "
-            "be predicted. Re-run with more reads before trusting this.",
+            "That is rare biologically, and at this depth it is more likely "
+            "allelic dropout than homozygosity: neoantigens restricted to a "
+            "missed allele cannot be predicted. Re-run with more reads "
+            "before trusting this.",
             support,
+        )
+    elif len(homozygous) == 3:
+        logger.warning(
+            "OptiType called all three class-I loci homozygous from %s. "
+            "The support is adequate, so this is more likely real than "
+            "dropout, but it remains unusual -- confirm against an "
+            "independent typing before predicting neoantigens against it.",
+            support,
+        )
+    elif thin:
+        logger.warning(
+            "HLA typed from only %s. Below %d reads a locus can be called "
+            "homozygous when it is not, silently removing every neoantigen "
+            "restricted to the missing allele.", support, LOW_SUPPORT_READS,
         )
     elif homozygous:
         logger.info(

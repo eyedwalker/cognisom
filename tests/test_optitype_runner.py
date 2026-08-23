@@ -226,7 +226,36 @@ class TestDropoutSignature:
         with caplog.at_level("WARNING"):
             optitype_hla._parse_optitype_result(self._write(tmp_path, text))
 
-        assert "dropout" not in caplog.text
+        assert caplog.text == ""
+
+    def test_well_supported_homozygosity_is_not_called_dropout(
+        self, tmp_path, caplog,
+    ):
+        """The merged 40M-pair call: unusual, but 1198 reads back it."""
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+            "0\tA*29:02\tA*29:02\tB*45:01\tB*45:01\tC*06:02\tC*06:02"
+            "\t1198.0\t1198.0\n"
+        )
+        with caplog.at_level("WARNING"):
+            optitype_hla._parse_optitype_result(self._write(tmp_path, text))
+
+        assert "1198 reads" in caplog.text
+        assert "support is adequate" in caplog.text
+        # Advice to add reads would be stale at this depth.
+        assert "Re-run with more reads" not in caplog.text
+
+    def test_thin_support_is_flagged_even_when_heterozygous(
+        self, tmp_path, caplog,
+    ):
+        text = (
+            "\tA1\tA2\tB1\tB2\tC1\tC2\tReads\tObjective\n"
+            "0\tA*29:02\tA*29:02\tB*08:01\tB*45:01\tC*06:02\tC*07:01\t60\t60\n"
+        )
+        with caplog.at_level("WARNING"):
+            optitype_hla._parse_optitype_result(self._write(tmp_path, text))
+
+        assert "only 60 reads" in caplog.text
 
 
 class TestFailureExplanation:
