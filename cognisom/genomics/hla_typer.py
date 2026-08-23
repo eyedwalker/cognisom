@@ -18,6 +18,7 @@ References:
 """
 
 import logging
+from dataclasses import dataclass
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -65,6 +66,52 @@ COMMON_HLA_ALLELES: Dict[str, List[Tuple[str, float]]] = {
 }
 
 # Predefined HLA profiles for synthetic/demo patients
+@dataclass(frozen=True)
+class MeasuredTyping:
+    """An HLA type actually determined from a patient's reads.
+
+    Kept apart from SYNTHETIC_HLA_PROFILES so a measured type is never
+    reported as an invented one, or the reverse. The provenance travels
+    with the alleles because a typing is only as good as its support.
+    """
+
+    alleles: Tuple[str, ...]
+    source: str            # the reads it came from
+    reads: int             # OptiType read support behind the call
+    note: str = ""
+
+    def __post_init__(self):
+        if len(self.alleles) != 6:
+            raise ValueError(
+                f"A class-I typing has 6 alleles, got {len(self.alleles)}: "
+                f"{self.alleles}"
+            )
+
+
+#: HLA types measured from real reads, keyed by the patient/sample id the
+#: pipeline is run under.
+MEASURED_HLA_TYPINGS: Dict[str, MeasuredTyping] = {
+    "SEQC2": MeasuredTyping(
+        alleles=(
+            "HLA-A*29:02", "HLA-A*29:02",
+            "HLA-B*45:01", "HLA-B*45:01",
+            "HLA-C*06:02", "HLA-C*06:02",
+        ),
+        source="SRR7890874 (HCC1395BL, matched normal, WXS), 40M read pairs",
+        reads=1198,
+        note=(
+            "Typed with OptiType 1.3.5. Mapped in five 8M-pair chunks whose "
+            "razers3 alignments were merged, so all 40M pairs contribute. "
+            "The top six enumerated solutions agree exactly at A and C and "
+            "differ only in the second B allele across a 0.33% objective "
+            "spread. Note this disagrees with the type catalogued for the "
+            "tumour line (Cellosaurus CVCL_1249: B*08:01,45:01; "
+            "C*06:02,07:01) -- neither B*08:01 nor C*07:01 appears in any "
+            "enumerated solution, so the reads do not support them."
+        ),
+    ),
+}
+
 SYNTHETIC_HLA_PROFILES: Dict[str, List[str]] = {
     "COGNISOM-DEMO-001": [
         "HLA-A*02:01", "HLA-A*24:02",
@@ -191,6 +238,18 @@ class HLATyper:
         Returns:
             List of HLA allele strings, e.g. ["HLA-A*02:01", "HLA-A*24:02", ...]
         """
+        # A real typing for this sample beats anything invented.
+        measured = MEASURED_HLA_TYPINGS.get(patient_id)
+        if measured is not None:
+            logger.info(
+                "Using measured HLA type for %s from %s (%d reads): %s",
+                patient_id, measured.source, measured.reads,
+                list(measured.alleles),
+            )
+            return self._record(
+                self.METHOD_OPTITYPE, list(measured.alleles)
+            )
+
         # Check for predefined synthetic profiles
         if patient_id in SYNTHETIC_HLA_PROFILES:
             alleles = SYNTHETIC_HLA_PROFILES[patient_id]
