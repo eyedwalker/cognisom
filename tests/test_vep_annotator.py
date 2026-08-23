@@ -425,3 +425,43 @@ def test_work_directory_is_readable_by_the_vep_image(tmp_path, monkeypatch):
 
     # Either the directory is traversable by others, or we run as its owner.
     assert seen["mode"] & 0o005 or seen["uid_arg"].startswith(f"{os.getuid()}:")
+
+
+def test_offline_records_are_matched_despite_tab_separation(
+    tmp_path, monkeypatch,
+):
+    """Regression: the two backends echo different whitespace.
+
+    REST returns the space-separated region string it was given; the
+    offline CLI returns the tab-separated VCF line it read. Keying on the
+    raw string matched every REST record and no offline one, so a real
+    run annotated 0 of 1380 variants and reported 0 as missing.
+    """
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+    cache = fake_cache(tmp_path)
+
+    class Result:
+        returncode = 0
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        workdir = next(a.split(":")[0] for a in cmd if a.endswith(":/work"))
+        # Exactly what ensembl-vep writes: tabs, as read from the file.
+        (Path(workdir) / "out.json").write_text(
+            '{"input": "7\\t140753336\\t.\\tA\\tT\\t.\\t.\\t.", '
+            '"transcript_consequences": [{"transcript_id": "ENST00000646891", '
+            '"gene_symbol": "BRAF", "consequence_terms": ["missense_variant"], '
+            '"amino_acids": "V/E", "protein_end": 600, '
+            '"mane_select": "NM_004333.6", "swissprot": ["P15056.266"]}]}\n'
+        )
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    annotator = VEPAnnotator(backend="local", cache_dir=cache)
+    v = variant()
+    annotator.annotate([v])
+
+    assert annotator.stats.variants_annotated == 1
+    assert v.gene == "BRAF"
+    assert v.protein_change == "p.V600E"

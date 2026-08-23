@@ -261,7 +261,7 @@ class VEPAnnotator:
         for chunk in _chunks(payload, BATCH_SIZE):
             for record in fetch(chunk):
                 returned += 1
-                variant = by_key.get(record.get("input", ""))
+                variant = by_key.get(_normalise_input(record.get("input")))
                 if variant is not None:
                     self._apply(variant, record)
 
@@ -471,6 +471,20 @@ class VEPAnnotator:
 def _region_to_vcf_line(region: str) -> str:
     """`7 140753336 . A T . . .` is already VCF column order."""
     return "\t".join(region.split())
+
+
+def _normalise_input(value: Optional[str]) -> str:
+    """Reduce VEP's echoed input to the form used to key submissions.
+
+    The two backends echo different whitespace for the same variant. The
+    REST service returns the space-separated region string it was handed;
+    the offline CLI returns the tab-separated VCF line it read, because
+    that is literally the line in the file. Keying on the raw string
+    therefore matched every REST record and no offline record, which
+    surfaced as a run that annotated 0 of 1380 variants while reporting
+    none of them as missing.
+    """
+    return " ".join((value or "").split())
 
 
 def _protein_change(consequence: Dict) -> Optional[str]:
