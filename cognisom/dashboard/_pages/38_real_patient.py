@@ -153,24 +153,29 @@ with tab_run:
 
     if "Matched" in mode:
         # Demo data selector
+        # The keys below say "WES", but the objects behind them are a subset
+        # of the NIST *WGS* release (see validation/data_acquisition.py, whose
+        # fastq_urls for both samples point at .../Somatic/WGS/NIST/). The
+        # normal's read names carry SRR7890944, which NCBI SRA reports as
+        # LIBRARY_STRATEGY=WGS. Roughly 3x genome coverage, not 30x exome.
+        #
+        # The key names are load-bearing -- results/SEQC2-HCC1395-WES/ in S3
+        # is derived from them -- so they are left alone and the label is
+        # corrected instead. A "SEQC2 WGS" option used to sit here too; all
+        # four objects it named were absent from the bucket, so choosing it
+        # could only ever fail.
         demo = st.selectbox("Load Demo Data", [
             "(Custom — enter S3 paths below)",
-            "SEQC2 WES — HCC1395 breast cancer + matched normal (~12 GB, ~30 min)",
-            "SEQC2 WGS — HCC1395 breast cancer + matched normal (~400 GB, ~3.5 hrs)",
+            "SEQC2 — HCC1395 breast cancer + matched normal "
+            "(NIST WGS subset, ~3x, ~9.7 GB)",
         ], key="demo_data")
 
-        if "WES" in demo:
+        if "SEQC2" in demo:
             _t_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WES_R1.fastq.gz"
             _t_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WES_R2.fastq.gz"
             _n_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WES_R1.fastq.gz"
             _n_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WES_R2.fastq.gz"
             _pid = "SEQC2-HCC1395-WES"
-        elif "WGS" in demo:
-            _t_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WGS_R1.fastq.gz"
-            _t_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395_WGS_R2.fastq.gz"
-            _n_r1 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WGS_R1.fastq.gz"
-            _n_r2 = "s3://cognisom-genomics/fastq/SEQC2/HCC1395BL_WGS_R2.fastq.gz"
-            _pid = "SEQC2-HCC1395-WGS"
         else:
             _t_r1 = _t_r2 = _n_r1 = _n_r2 = ""
             _pid = ""

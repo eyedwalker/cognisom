@@ -18,6 +18,7 @@ References:
 """
 
 import logging
+from dataclasses import dataclass
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -65,6 +66,52 @@ COMMON_HLA_ALLELES: Dict[str, List[Tuple[str, float]]] = {
 }
 
 # Predefined HLA profiles for synthetic/demo patients
+@dataclass(frozen=True)
+class MeasuredTyping:
+    """An HLA type actually determined from a patient's reads.
+
+    Kept apart from SYNTHETIC_HLA_PROFILES so a measured type is never
+    reported as an invented one, or the reverse. The provenance travels
+    with the alleles because a typing is only as good as its support.
+    """
+
+    alleles: Tuple[str, ...]
+    source: str            # the reads it came from
+    reads: int             # OptiType read support behind the call
+    note: str = ""
+
+    def __post_init__(self):
+        if len(self.alleles) != 6:
+            raise ValueError(
+                f"A class-I typing has 6 alleles, got {len(self.alleles)}: "
+                f"{self.alleles}"
+            )
+
+
+#: HLA types measured from real reads, keyed by the patient/sample id the
+#: pipeline is run under.
+MEASURED_HLA_TYPINGS: Dict[str, MeasuredTyping] = {
+    "SEQC2": MeasuredTyping(
+        alleles=(
+            "HLA-A*29:02", "HLA-A*29:02",
+            "HLA-B*45:01", "HLA-B*45:01",
+            "HLA-C*06:02", "HLA-C*06:02",
+        ),
+        source="SRR7890874 (HCC1395BL, matched normal, WXS), 40M read pairs",
+        reads=1198,
+        note=(
+            "Typed with OptiType 1.3.5. Mapped in five 8M-pair chunks whose "
+            "razers3 alignments were merged, so all 40M pairs contribute. "
+            "The top six enumerated solutions agree exactly at A and C and "
+            "differ only in the second B allele across a 0.33% objective "
+            "spread. Note this disagrees with the type catalogued for the "
+            "tumour line (Cellosaurus CVCL_1249: B*08:01,45:01; "
+            "C*06:02,07:01) -- neither B*08:01 nor C*07:01 appears in any "
+            "enumerated solution, so the reads do not support them."
+        ),
+    ),
+}
+
 SYNTHETIC_HLA_PROFILES: Dict[str, List[str]] = {
     "COGNISOM-DEMO-001": [
         "HLA-A*02:01", "HLA-A*24:02",
@@ -137,6 +184,42 @@ class HLATyper:
         # ['HLA-A*02:01', 'HLA-A*24:02', 'HLA-B*07:02', ...]
     """
 
+    # How a set of alleles was arrived at. These differ enormously in
+    # what they justify: OPTITYPE is the patient's actual genotype, while
+    # POPULATION_DEFAULT is a fixed list identical for every patient. The
+    # return type is a plain list of strings, so without this the caller
+    # cannot tell them apart -- and a neoantigen "restricted by HLA-A*02:01"
+    # means nothing if the patient was never typed.
+    METHOD_OPTITYPE = "optitype"
+    METHOD_VCF_ANNOTATION = "vcf-hla-annotation"
+    METHOD_PREDEFINED = "predefined-profile"
+    METHOD_POPULATION_FREQUENCY = "population-frequency"
+    METHOD_POPULATION_DEFAULT = "population-default"
+
+    #: Methods that reflect this patient's own genotype.
+    PATIENT_SPECIFIC_METHODS = frozenset(
+        {METHOD_OPTITYPE, METHOD_VCF_ANNOTATION, METHOD_PREDEFINED}
+    )
+
+    @property
+    def typing_method(self) -> str:
+        """How the most recent typing call produced its alleles."""
+        return getattr(self, "_last_method", "not-run")
+
+    @property
+    def is_patient_specific(self) -> bool:
+        """True only when the last result reflects this patient's genotype.
+
+        False means the alleles are a population stand-in. Anything
+        downstream that reads as patient-specific -- HLA restriction, a
+        vaccine allele match -- is unsupported when this is False.
+        """
+        return self.typing_method in self.PATIENT_SPECIFIC_METHODS
+
+    def _record(self, method: str, alleles: List[str]) -> List[str]:
+        self._last_method = method
+        return alleles
+
     def type_from_variants(
         self,
         variants: list,
@@ -155,11 +238,23 @@ class HLATyper:
         Returns:
             List of HLA allele strings, e.g. ["HLA-A*02:01", "HLA-A*24:02", ...]
         """
+        # A real typing for this sample beats anything invented.
+        measured = MEASURED_HLA_TYPINGS.get(patient_id)
+        if measured is not None:
+            logger.info(
+                "Using measured HLA type for %s from %s (%d reads): %s",
+                patient_id, measured.source, measured.reads,
+                list(measured.alleles),
+            )
+            return self._record(
+                self.METHOD_OPTITYPE, list(measured.alleles)
+            )
+
         # Check for predefined synthetic profiles
         if patient_id in SYNTHETIC_HLA_PROFILES:
             alleles = SYNTHETIC_HLA_PROFILES[patient_id]
             logger.info(f"Using predefined HLA profile for {patient_id}: {alleles}")
-            return alleles
+            return self._record(self.METHOD_PREDEFINED, list(alleles))
 
         # Try to extract HLA info from VCF variants on chr6
         hla_variants = [
@@ -170,15 +265,31 @@ class HLATyper:
         ]
 
         if hla_variants:
-            alleles = self._infer_from_hla_variants(hla_variants)
+            alleles, from_annotation = self._infer_from_hla_variants(hla_variants)
             if len(alleles) >= 4:  # At least 2 loci typed
-                logger.info(f"Inferred HLA alleles from VCF: {alleles}")
-                return alleles
+                method = (self.METHOD_VCF_ANNOTATION if from_annotation
+                          else self.METHOD_POPULATION_FREQUENCY)
+                if from_annotation:
+                    logger.info("Read HLA alleles from VCF annotation: %s", alleles)
+                else:
+                    logger.warning(
+                        "No HLA_ALLELE annotation on the chr6 variants for %s. "
+                        "Substituting the most frequent population alleles per "
+                        "locus: %s. These are NOT this patient's alleles.",
+                        patient_id, alleles,
+                    )
+                return self._record(method, alleles)
 
         # Fallback: assign common population alleles
         alleles = self._assign_default_alleles()
-        logger.info(f"Using default HLA alleles for {patient_id}: {alleles}")
-        return alleles
+        logger.warning(
+            "No HLA typing data for %s. Using a fixed population profile "
+            "(%s), which is identical for every patient. Neoantigen HLA "
+            "restriction derived from these is not patient-specific -- type "
+            "from a normal BAM via type_from_bam() for real alleles.",
+            patient_id, alleles,
+        )
+        return self._record(self.METHOD_POPULATION_DEFAULT, alleles)
 
     def type_from_bam(
         self,
@@ -205,23 +316,85 @@ class HLATyper:
             if is_optitype_available():
                 alleles = type_hla_from_bam(bam_path, sample_id)
                 logger.info("OptiType HLA typing for %s: %s", sample_id, alleles)
-                return alleles
-            else:
-                logger.info("OptiType not available, using fallback for %s", sample_id)
+                return self._record(self.METHOD_OPTITYPE, alleles)
+            logger.warning(
+                "OptiType is not installed, so %s was NOT typed from its BAM. "
+                "Falling back to the fixed population profile.", sample_id,
+            )
         except Exception as e:
-            logger.warning("OptiType failed for %s: %s — using fallback", sample_id, e)
+            logger.warning(
+                "OptiType failed for %s (%s), so this sample was NOT typed. "
+                "Falling back to the fixed population profile.", sample_id, e,
+            )
 
-        return self._assign_default_alleles()
+        alleles = self._assign_default_alleles()
+        return self._record(self.METHOD_POPULATION_DEFAULT, alleles)
 
-    def _infer_from_hla_variants(self, hla_variants: list) -> List[str]:
+    def type_from_fastq(
+        self,
+        fastq_r1: str,
+        fastq_r2: Optional[str] = None,
+        sample_id: str = "anonymous",
+    ) -> List[str]:
+        """Type HLA alleles from raw reads using OptiType.
+
+        FASTQ is OptiType's native input -- it runs its own alignment
+        against the HLA reference, then an ILP solver over the resulting
+        coverage. `type_from_bam` exists only to pre-filter chr6:29-34Mb
+        first, which is faster when a BAM happens to be around; it is not
+        a requirement, and reads are the more common thing to have.
+
+        Use the NORMAL/germline sample. HLA type is the patient's
+        genotype, and a tumour can carry HLA loss of heterozygosity --
+        typing off tumour reads can drop an allele the patient actually
+        has, which then silently removes every neoantigen restricted to
+        it.
+
+        Args:
+            fastq_r1: Read 1 FASTQ (gzipped is fine).
+            fastq_r2: Read 2 FASTQ for paired-end data.
+            sample_id: Patient/sample identifier.
+
+        Returns:
+            Six HLA-I alleles at 4-digit resolution.
+        """
+        try:
+            from .optitype_hla import type_hla_from_fastq, is_optitype_available
+            if is_optitype_available():
+                alleles = type_hla_from_fastq(fastq_r1, fastq_r2, sample_id)
+                logger.info("OptiType HLA typing for %s: %s", sample_id, alleles)
+                return self._record(self.METHOD_OPTITYPE, alleles)
+            logger.warning(
+                "OptiType is not installed, so %s was NOT typed from its "
+                "reads. Falling back to the fixed population profile.",
+                sample_id,
+            )
+        except Exception as e:
+            logger.warning(
+                "OptiType failed for %s (%s), so this sample was NOT typed. "
+                "Falling back to the fixed population profile.", sample_id, e,
+            )
+
+        alleles = self._assign_default_alleles()
+        return self._record(self.METHOD_POPULATION_DEFAULT, alleles)
+
+    def _infer_from_hla_variants(self, hla_variants: list) -> Tuple[List[str], bool]:
         """Attempt to infer HLA alleles from VCF variant annotations.
 
         This is a simplified inference — clinical HLA typing requires
         specialized algorithms on raw reads. We extract what we can from
         the INFO field annotations.
+
+        Returns:
+            (alleles, from_annotation). ``from_annotation`` is True only if
+            at least one allele was actually read out of an ``HLA_ALLELE``
+            INFO field. When it is False the alleles are the most frequent
+            alleles for the locus in a reference population -- frequency,
+            not inference -- and the caller must not present them as typed.
         """
         alleles = []
         seen_loci = set()
+        from_annotation = False
 
         for v in hla_variants:
             gene = getattr(v, "gene", "")
@@ -240,6 +413,7 @@ class HLATyper:
 
             if allele_info and "*" in allele_info:
                 alleles.append(f"HLA-{allele_info}")
+                from_annotation = True
             else:
                 # Assign most common alleles for this locus
                 common = COMMON_HLA_ALLELES.get(locus, [])
@@ -248,7 +422,7 @@ class HLATyper:
                     alleles.append(f"HLA-{common[1][0]}")
                     seen_loci.add(locus)
 
-        return alleles
+        return alleles, from_annotation
 
     def _assign_default_alleles(self) -> List[str]:
         """Assign default HLA alleles based on population frequencies."""

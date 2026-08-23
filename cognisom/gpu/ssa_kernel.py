@@ -35,15 +35,81 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
+import math
+
 import numpy as np
 
 from .backend import get_backend
+
+
+def mass_action_propensities(species: np.ndarray, rates: np.ndarray,
+                             S: np.ndarray) -> np.ndarray:
+    """Stochastic mass-action propensities for every cell and reaction.
+
+    For a reaction consuming ``m`` copies of species ``s``, the number of
+    distinct reactant combinations available is ``C(X_s, m)``, so the
+    propensity carries a factor ``X(X-1)...(X-m+1)/m!`` -- not ``X``.
+
+    The previous code multiplied by the count exactly once per species
+    with negative stoichiometry, ignoring the magnitude: ``2A -> B`` was
+    computed as ``c*A`` rather than ``c*A(A-1)/2``. That is correct only
+    where every reactant stoichiometry is exactly -1, and silently wrong
+    for any dimerisation. It also let a reaction needing two molecules
+    fire when only one remained, since ``c*1 > 0``; ``C(1,2)`` is 0.
+
+    Args:
+        species: (n_cells, n_species) integer molecule counts.
+        rates:   (n_cells, n_reactions) stochastic rate constants.
+        S:       (n_reactions, n_species) stoichiometry matrix.
+
+    Returns:
+        (n_cells, n_reactions) float64 propensities.
+    """
+    n_reactions, n_species = S.shape
+    a = np.array(rates, dtype=np.float64, copy=True)
+
+    for r in range(n_reactions):
+        for s in range(n_species):
+            order = -int(S[r, s])
+            if order <= 0:
+                continue
+            counts = species[:, s].astype(np.float64)
+            term = np.ones_like(counts)
+            for k in range(order):
+                term *= np.maximum(counts - k, 0.0)
+            if order > 1:
+                term /= math.factorial(order)
+            a[:, r] *= term
+
+    return np.maximum(a, 0.0)
 
 log = logging.getLogger(__name__)
 
 # ── CUDA kernel source ────────────────────────────────────────────────
 
-_TAU_LEAP_KERNEL = r"""
+# Shared device code. Kept as one string so the two kernels below cannot
+# drift apart on the definition of a propensity.
+_PROPENSITY_DEVICE_SRC = r"""
+// Number of distinct ways to choose `order` molecules from `count`:
+// C(count, order) = count*(count-1)*...*(count-order+1) / order!
+//
+// This is the combinatorial factor in the stochastic mass-action
+// propensity. Multiplying by the raw count once per reactant species
+// (what this code did before) is correct only when every reactant
+// stoichiometry is -1, and it lets a reaction that consumes two
+// molecules fire when only one is left.
+__device__ __forceinline__ float combinations(int count, int order) {
+    if (order <= 1) return (order == 1) ? (float)count : 1.0f;
+    if (count < order) return 0.0f;
+    float num = 1.0f;
+    for (int k = 0; k < order; k++) num *= (float)(count - k);
+    float den = 1.0f;
+    for (int k = 2; k <= order; k++) den *= (float)k;
+    return num / den;
+}
+"""
+
+_TAU_LEAP_KERNEL = _PROPENSITY_DEVICE_SRC + r"""
 extern "C" __global__
 void tau_leap_step(
     int*         species,     // (n_cells, n_species) — copy numbers
@@ -99,33 +165,34 @@ void tau_leap_step(
 
     int base = cell * n_species;
 
-    for (int r = 0; r < n_reactions; r++) {
-        float propensity = rates[cell * n_reactions + r];
+    // A tau-leap holds the state fixed across the whole interval: every
+    // reaction's firing count must be drawn at the start-of-leap state.
+    // Applying each reaction's stoichiometry before evaluating the next
+    // reaction's propensity (as this did) makes the result depend on the
+    // order reactions are listed in.
+    int firings[64];  // max 64 reactions, matching the direct kernel
 
-        // Compute actual propensity based on current species counts
-        // (mass-action: rate * product of reactant counts)
-        float a = propensity;
+    for (int r = 0; r < n_reactions && r < 64; r++) {
+        float a = rates[cell * n_reactions + r];
+
+        // Stochastic mass-action: rate * prod C(count_s, order_s)
         for (int s = 0; s < n_species; s++) {
             int stoich = S[r * n_species + s];
             if (stoich < 0) {
-                // Reactant: propensity *= species_count
-                int count = species[base + s];
-                a *= (float)count;
+                a *= combinations(species[base + s], -stoich);
             }
         }
 
-        if (a <= 0.0f) continue;
+        firings[r] = (a > 0.0f) ? POISSON(a * dt) : 0;
+    }
 
-        float lambda = a * dt;
-        int firings = POISSON(lambda);
-
-        if (firings > 0) {
-            // Apply stoichiometry
-            for (int s = 0; s < n_species; s++) {
-                int delta = S[r * n_species + s] * firings;
-                int new_val = species[base + s] + delta;
-                species[base + s] = (new_val > 0) ? new_val : 0;
-            }
+    // Then apply every reaction's stoichiometry together.
+    for (int r = 0; r < n_reactions && r < 64; r++) {
+        if (firings[r] == 0) continue;
+        for (int s = 0; s < n_species; s++) {
+            int delta = S[r * n_species + s] * firings[r];
+            int new_val = species[base + s] + delta;
+            species[base + s] = (new_val > 0) ? new_val : 0;
         }
     }
 
@@ -137,14 +204,14 @@ void tau_leap_step(
 }
 """
 
-_DIRECT_SSA_KERNEL = r"""
+_DIRECT_SSA_KERNEL = _PROPENSITY_DEVICE_SRC + r"""
 extern "C" __global__
 void direct_ssa_step(
     int*         species,     // (n_cells, n_species)
     const int*   S,           // (n_reactions, n_species)
     const float* rates,       // (n_cells, n_reactions)
     float*       times,       // (n_cells,) — current sim time per cell
-    const float  t_end,       // target time
+    const float  dt,          // interval to advance EACH cell by
     unsigned long long* rng,  // (n_cells, 4)
     int n_cells,
     int n_species,
@@ -170,7 +237,12 @@ void direct_ssa_step(
     #define UNIFORM() ((NEXT() >> 11) * 0x1.0p-53)
 
     int base = cell * n_species;
+    // Each cell advances by dt from ITS OWN clock. The launch used to pass
+    // a single t_end = max(times) + dt for the whole grid, so any cell
+    // behind the leader integrated further than dt -- the further behind,
+    // the bigger the extra interval.
     float t = times[cell];
+    const float t_end = t + dt;
 
     for (int step = 0; step < max_steps && t < t_end; step++) {
         // Compute propensities
@@ -182,7 +254,7 @@ void direct_ssa_step(
             for (int s = 0; s < n_species; s++) {
                 int stoich = S[r * n_species + s];
                 if (stoich < 0) {
-                    a *= (float)species[base + s];
+                    a *= combinations(species[base + s], -stoich);
                 }
             }
             a_total += a;
@@ -195,8 +267,11 @@ void direct_ssa_step(
         double r1 = UNIFORM();
         if (r1 < 1e-15) r1 = 1e-15;
         float tau = (float)(-log(r1) / (double)a_total);
+        // The event lands outside the interval, so it has not happened
+        // yet: advance to the boundary and stop. Storing the overshot
+        // time let per-cell clocks drift apart run after run.
+        if (t + tau > t_end) { t = t_end; break; }
         t += tau;
-        if (t > t_end) break;
 
         // Select reaction
         double r2 = UNIFORM() * (double)a_total;
@@ -499,29 +574,34 @@ class BatchSSA:
         cp.cuda.Stream.null.synchronize()
 
     def _cpu_tau_leap(self, dt: float):
-        """Vectorized NumPy tau-leaping (all cells in parallel)."""
+        """Vectorized NumPy tau-leaping (all cells in parallel).
+
+        A tau-leap holds the state fixed across the leap: every reaction's
+        firing count is drawn from a propensity evaluated at the state at
+        the *start* of the interval, and all the stoichiometry is applied
+        together at the end.
+
+        The previous loop applied each reaction's stoichiometry before
+        computing the next reaction's propensity, so reaction ``r`` saw a
+        state that reactions ``0..r-1`` had already changed. That makes the
+        result depend on the order reactions happen to be listed in, and
+        biases it -- it is sequential operator splitting, not a tau-leap.
+        """
         species = self._backend.to_numpy(self._species)
         rates = self._backend.to_numpy(self._rates)
         S = self._backend.to_numpy(self._S)
 
-        for r in range(self._n_reactions):
-            # Compute propensity per cell
-            a = rates[:, r].copy()  # (n_cells,)
+        # All propensities at the common start-of-leap state.
+        a = mass_action_propensities(species, rates, S)
 
-            # Multiply by reactant counts (species with negative stoich)
-            for s in range(self._n_species):
-                if S[r, s] < 0:
-                    a *= species[:, s].astype(np.float32)
+        # All firing counts, still at that state.
+        firings = np.random.poisson(np.maximum(a * dt, 0.0)).astype(np.int64)
 
-            # Poisson sample
-            lam = np.maximum(a * dt, 0)
-            firings = np.random.poisson(lam).astype(np.int32)
-
-            # Apply stoichiometry
-            for s in range(self._n_species):
-                if S[r, s] != 0:
-                    species[:, s] += S[r, s] * firings
-                    np.clip(species[:, s], 0, None, out=species[:, s])
+        # Then apply every reaction's stoichiometry at once.
+        delta = firings @ S.astype(np.int64)      # (n_cells, n_species)
+        updated = species.astype(np.int64) + delta
+        np.clip(updated, 0, None, out=updated)
+        species[:] = updated.astype(species.dtype)
 
         self._species = self._backend.xp.asarray(species)
 
@@ -541,8 +621,6 @@ class BatchSSA:
         block = 256
         grid = (self._n_cells + block - 1) // block
 
-        t_end = self._times + dt
-
         self._ssa_kernel(
             (grid,), (block,),
             (
@@ -550,7 +628,7 @@ class BatchSSA:
                 self._S,
                 self._rates,
                 self._times,
-                np.float32(float(t_end.max())),
+                np.float32(dt),
                 self._rng,
                 np.int32(self._n_cells),
                 np.int32(self._n_species),
@@ -575,12 +653,11 @@ class BatchSSA:
                 if t >= t_end:
                     break
 
-                # Compute propensities
-                a = rates[cell].copy()
-                for r in range(self._n_reactions):
-                    for s in range(self._n_species):
-                        if S[r, s] < 0:
-                            a[r] *= species[cell, s]
+                # Compute propensities (with the combinatorial factor, so a
+                # reaction needing two molecules cannot fire on one).
+                a = mass_action_propensities(
+                    species[cell:cell + 1], rates[cell:cell + 1], S
+                )[0]
 
                 a_total = a.sum()
                 if a_total <= 0:
@@ -591,9 +668,16 @@ class BatchSSA:
                 if r1 < 1e-15:
                     r1 = 1e-15
                 tau = -np.log(r1) / a_total
-                t += tau
-                if t > t_end:
+                if t + tau > t_end:
+                    # The next event falls outside this interval, so it does
+                    # not happen yet. Standard SSA advances the clock to the
+                    # interval boundary and stops. Storing the overshot time
+                    # instead -- as this did -- let each cell's clock drift
+                    # past t_end by a different amount, so cells silently
+                    # desynchronised as the simulation ran.
+                    t = t_end
                     break
+                t += tau
 
                 # Select reaction
                 r2 = np.random.random() * a_total

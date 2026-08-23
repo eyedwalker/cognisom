@@ -202,17 +202,26 @@ class MCPRequestHandler:
             return {"error": str(e)}
 
     def _handle_analyze(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """Run full MAD Board analysis."""
-        from ..genomics.patient_profile import PatientProfile
+        """Run full MAD Board analysis.
+
+        This used to hand-roll the ingest pipeline and could never have
+        run: it imported ``generate_synthetic_vcf`` (the module exports
+        ``get_synthetic_vcf``), called ``parser.parse_vcf_text`` (the
+        method is ``parse_text``), passed ``hla_alleles`` into
+        ``predict``'s ``affected_proteins`` slot, and set
+        ``cancer_driver_mutations`` to *every* annotated variant rather
+        than the drivers. All four were masked by the blanket
+        ``except Exception: return {"error": str(e)}`` in ``call_tool``.
+
+        It now delegates to ``PatientProfileBuilder``, the same path the
+        dashboard uses, so the tumor/normal comparison, somatic filtering
+        and provenance fields apply here too instead of being reimplemented
+        and drifting.
+        """
         from ..genomics.twin_config import DigitalTwinConfig
         from ..genomics.treatment_simulator import TreatmentSimulator
-        from ..genomics.synthetic_vcf import generate_synthetic_vcf
-        from ..genomics.vcf_parser import VCFParser
-        from ..genomics.variant_annotator import VariantAnnotator
-        from ..genomics.gene_protein_mapper import GeneProteinMapper
-        from ..genomics.hla_typer import HLATyper
-        from ..genomics.neoantigen_predictor import NeoantigenPredictor
-        from ..genomics.cell_state_classifier import CellStateClassifier
+        from ..genomics.synthetic_vcf import get_synthetic_vcf
+        from ..genomics.patient_profile import PatientProfileBuilder
         from .board import BoardModerator
 
         patient_id = args.get("patient_id", "MCP-PATIENT")
@@ -220,31 +229,10 @@ class MCPRequestHandler:
         # Get or generate VCF
         vcf_text = args.get("vcf_text")
         if not vcf_text or args.get("use_synthetic"):
-            vcf_text = generate_synthetic_vcf()
+            vcf_text = get_synthetic_vcf()
 
-        # Run pipeline
-        parser = VCFParser()
-        variants = parser.parse_vcf_text(vcf_text)
-        annotator = VariantAnnotator()
-        annotated = annotator.annotate(variants)
-        mapper = GeneProteinMapper()
-        hla_typer = HLATyper()
-
-        profile = PatientProfile(
-            patient_id=patient_id,
-            variants=variants,
-            coding_variants=[v for v in variants if v.is_coding],
-            cancer_driver_mutations=annotated,
-            affected_genes=list({v.gene for v in annotated if v.gene}),
-            tumor_mutational_burden=len([v for v in variants if v.is_coding]) / 30.0,
-        )
-
-        hla_alleles = hla_typer.type_from_variants(variants, patient_id)
-        profile.hla_alleles = hla_alleles
-
-        predictor = NeoantigenPredictor()
-        neoantigens = predictor.predict(profile.cancer_driver_mutations, hla_alleles)
-        profile.predicted_neoantigens = neoantigens
+        builder = PatientProfileBuilder()
+        profile = builder.from_vcf_text(vcf_text, patient_id=patient_id)
 
         twin = DigitalTwinConfig.from_profile_only(profile)
 
@@ -267,7 +255,7 @@ class MCPRequestHandler:
         from ..genomics.patient_profile import PatientProfileBuilder
         from ..genomics.twin_config import DigitalTwinConfig
         from ..genomics.treatment_simulator import TreatmentSimulator, TREATMENT_PROFILES
-        from ..genomics.synthetic_vcf import generate_synthetic_vcf
+        from ..genomics.synthetic_vcf import get_synthetic_vcf
         from .explainability import explain_effectiveness
 
         patient_id = args.get("patient_id", "MCP-COMPARE")
@@ -276,7 +264,7 @@ class MCPRequestHandler:
         # Build patient context (from VCF or synthetic)
         vcf_text = args.get("vcf_text")
         if not vcf_text:
-            vcf_text = generate_synthetic_vcf()
+            vcf_text = get_synthetic_vcf()
 
         builder = PatientProfileBuilder()
         profile = builder.from_vcf_text(vcf_text, patient_id)

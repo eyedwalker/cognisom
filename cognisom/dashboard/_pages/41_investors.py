@@ -539,10 +539,13 @@ with v1:
 with v2:
     st.markdown("""
     <div class="inv-card" style="text-align: center;">
-        <div class="inv-stat-val">r=0.987</div>
-        <div class="inv-stat-label">TMB Correlation</div>
+        <div class="inv-stat-val">r=0.9998</div>
+        <div class="inv-stat-label">TMB Concordance</div>
         <div class="inv-card-text" style="margin-top: 0.5rem;">
-            100% biomarker concordance across the validation cohort.
+            Against the SU2C cohort's own reported TMB, across 427 patients.
+            HRD detection 100% sensitivity and specificity. Analytical
+            validation — agreement with the source dataset's annotations,
+            not prediction of patient outcomes.
         </div>
     </div>
     """, unsafe_allow_html=True)

@@ -27,7 +27,11 @@ include = ["cognisom*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.yaml", "*.yml", "*.usda", "*.bngl", "*.toml"]
+# .fasta ships genomics/data/reference_proteins.fasta, the bundled
+# reference proteome. Without it an installed package silently falls back
+# to a UniProt fetch per gene -- a network round trip on the neoantigen
+# path, and nothing at all when the network is unavailable.
+"*" = ["*.json", "*.yaml", "*.yml", "*.usda", "*.bngl", "*.toml", "*.fasta"]
 
 # ── Plugin discovery ────────────────────────────────────────────────
 # core/registry.py's discover_plugins() reads these entry points. Without a

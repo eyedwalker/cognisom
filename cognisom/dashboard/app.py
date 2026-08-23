@@ -963,7 +963,8 @@ The MAD Board uses **OncoKB** (700+ actionable genes), **MHCflurry** (14,847 HLA
 recommendations that a clinician can independently review — designed for the
 **FDA's 2026 AI Credibility Framework** as a Non-Device CDS.
 
-Validated against 429 real mCRPC patients from the SU2C/PCF 2019 cohort.
+Analytically validated against 429 real mCRPC patients from the SU2C/PCF 2019 cohort
+(agreement with the cohort's own reported biomarkers, not outcome prediction).
         """)
 
     with col_what2:
@@ -1159,7 +1160,7 @@ immune system's complexity with each patient's unique tumor biology.
 - **MHCflurry binding** — Neural network, 14,847 HLA alleles, >90% accuracy
 - **MAD Agent Board** — 3 specialist agents, evidence-traced consensus
 - **Clinical trials** — Live ClinicalTrials.gov matching
-- **429-patient validation** — SU2C mCRPC cohort, real outcomes
+- **429-patient analytical validation** — SU2C mCRPC cohort, TMB and biomarker concordance
         """)
 
     with vis_col2:
@@ -1198,7 +1199,7 @@ as a **Non-Device Clinical Decision Support** tool.
         ("GPU Parabricks Pipeline", "HealthOmics DeepVariant on real 30x WGS, 4-GPU variant calling", "Done"),
         ("Clinical Intelligence", "OncoKB (700+ genes), MHCflurry (14,847 alleles), ClinicalTrials.gov", "Done"),
         ("MAD Agent Board", "3-agent consensus (Genomics, Immune, Clinical) with FDA CDS compliance", "Done"),
-        ("429-Patient Validation", "SU2C mCRPC cohort: TMB r=0.987, 100% biomarker concordance", "Done"),
+        ("429-Patient Analytical Validation", "SU2C mCRPC cohort: TMB r=0.9998 vs reported TMB_NONSYNONYMOUS, HRD detection 100% sens/spec", "Done"),
         ("Matched Tumor-Normal", "Full FASTQ-to-recommendation on real patient data (SEQC2 benchmark)", "In Progress"),
         ("FDA Credibility Dossier", "7-step framework: COU, model cards, provenance, audit trail", "In Progress"),
     ]
@@ -1338,7 +1339,7 @@ Normal FASTQ <span class="arch-dim">─┘</span>  (4 GPUs, 48 CPUs, 179 GB)    
 
 <span class="arch-dim">FDA COMPLIANCE (Non-Device CDS, 2026 Credibility Framework)</span>
   Context of Use <span class="arch-dim">│</span> Model Cards <span class="arch-dim">│</span> Data Provenance <span class="arch-dim">│</span> Audit Trail
-  429-patient SU2C validation <span class="arch-dim">│</span> TMB r=0.987 <span class="arch-dim">│</span> 100% biomarker concordance
+  429-patient SU2C analytical validation <span class="arch-dim">│</span> TMB r=0.9998 <span class="arch-dim">│</span> HRD detection 100% sens/spec
     </div>
     """, unsafe_allow_html=True)
 

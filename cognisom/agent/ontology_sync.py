@@ -155,8 +155,9 @@ class OntologyAgent:
         t0 = time.time()
         report = AuditReport(timestamp=t0)
 
-        # Load all entities
-        entities = self._store.search(limit=10000)
+        # EntityStore.search returns (results, total). Unpacking it as a
+        # single value made every audit crash on the first entity.
+        entities, _total = self._store.search(limit=10000)
         report.entities_scanned = len(entities)
 
         for entity in entities:
@@ -453,7 +454,7 @@ class OntologyAgent:
         issues = []
 
         # Get all entity IDs
-        all_entities = self._store.search(limit=10000)
+        all_entities, _total = self._store.search(limit=10000)
         valid_ids = {e.entity_id for e in all_entities}
 
         # Check each entity's relationships

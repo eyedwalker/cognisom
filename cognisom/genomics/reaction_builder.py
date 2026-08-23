@@ -129,7 +129,17 @@ class EntityODESystem:
                         dydt[..., idx[ab]] += binding_flux - unbinding_flux
 
                 elif rxn.reaction_type == "michaelis_menten":
-                    # Enzyme activates product: d[P]/dt += Vmax*[E]*[S]/(Km+[S])
+                    # NOTE: this is saturating activation by the regulator,
+                    # d[P]/dt += Vmax*[A]/(Km+[A]) -- a Hill-1 term in the
+                    # ACTIVATOR concentration. It is not Michaelis-Menten:
+                    # there is no substrate in the expression and nothing is
+                    # consumed, so the reaction does not conserve mass. The
+                    # name is kept because it is persisted in stored
+                    # networks; the comment previously claimed the MM form
+                    # Vmax*[E]*[S]/(Km+[S]), which is not what runs.
+                    # Reactions are built from "activates" interactions,
+                    # where a saturating activation term is defensible --
+                    # but callers should not read this as enzyme kinetics.
                     enzyme = rxn.reactants[0]
                     product = rxn.products[0]
                     vmax = pp.get(rxn.parameters.get("vmax_key", ""), 2.0)
@@ -314,12 +324,8 @@ class ReactionNetworkBuilder:
             interactions = e.interacts_with if hasattr(e, "interacts_with") else []
 
             # Add degradation for this species
-            half_life = pp.get("half_life_hours", pp.get("half_life_min", 0))
-            if half_life and half_life > 0:
-                if "min" in str(pp.get("half_life_min", "")):
-                    k_deg = 0.693 / (half_life / 60.0)
-                else:
-                    k_deg = 0.693 / half_life
+            k_deg = degradation_rate_per_hour(pp)
+            if k_deg:
                 deg_key = f"k_deg_{e.name}"
                 system.parameters[deg_key] = k_deg
                 system.reactions.append(Reaction(
@@ -331,7 +337,7 @@ class ReactionNetworkBuilder:
             for inter in (interactions or []):
                 target = inter.get("target", "")
                 itype = inter.get("type", "")
-                kd = inter.get("kd_nm", inter.get("kd_um", 0))
+                kd = resolve_kd_nm(inter)
 
                 if target not in species_map:
                     continue  # Target not in our system
@@ -347,8 +353,11 @@ class ReactionNetworkBuilder:
 
                     k_on_key = f"k_on_{e.name}_{target}"
                     k_off_key = f"k_off_{e.name}_{target}"
-                    system.parameters[k_on_key] = 1.0 / max(0.01, kd)  # Approximate
-                    system.parameters[k_off_key] = 1.0
+                    # Derived as a pair so k_off/k_on reproduces the
+                    # declared Kd exactly (see rates_from_kd).
+                    k_on, k_off = rates_from_kd(kd)
+                    system.parameters[k_on_key] = k_on
+                    system.parameters[k_off_key] = k_off
 
                     system.reactions.append(Reaction(
                         f"{e.name}_{target}_binding", "binding",
@@ -390,26 +399,147 @@ class ReactionNetworkBuilder:
         return system
 
 
-def _get_binding_rate(entity, target_name: str, default_on: float = 100.0) -> float:
-    """Extract binding on-rate from entity interacts_with."""
+# ── Units and thermodynamic consistency ─────────────────────────────
+#
+# The entity library encodes units in key names (`kd_nm`, `kd_um`,
+# `half_life_hours`, `half_life_min`) with no parser, so every read site
+# has to do the conversion itself or silently import the wrong magnitude.
+# These helpers are that parser, in one place.
+#
+# The system's concentrations are nanomolar and its rates are per hour;
+# everything below returns those units.
+
+# Typical protein-protein association rate, 1e6 M^-1 s^-1, expressed in
+# nM^-1 h^-1:  1e6 * 3600 / 1e9 = 3.6. Association rates for folded
+# proteins cluster in the 1e5-1e7 M^-1 s^-1 band (Schreiber, Haran & Zhou,
+# "Fundamental aspects of protein-protein association kinetics", Chem Rev
+# 109:839-860, 2009), and this is the middle of it. It is used as the
+# reference k_on so that k_off can be *derived* rather than guessed.
+DEFAULT_K_ON_PER_NM_PER_HOUR = 3.6
+
+
+def resolve_kd_nm(interaction: Dict) -> Optional[float]:
+    """Read a dissociation constant out of an interaction, in nM.
+
+    Handles the unit-suffixed key variants the seed catalogs actually
+    use. The previous expression --
+    ``inter.get("kd_nm", inter.get("kd_um", 0))`` -- returned a
+    micromolar number unconverted whenever only ``kd_um`` was present,
+    understating Kd by 1000x. ``seed_checkpoints`` uses ``kd_um`` and
+    ``seed_data`` uses ``kd_nm``, so both paths are live.
+    """
+    if not interaction:
+        return None
+    for key, to_nm in (
+        ("kd_pm", 1e-3),
+        ("kd_nm", 1.0),
+        ("kd_um", 1e3),
+        ("kd_mm", 1e6),
+        ("kd_m", 1e9),
+    ):
+        value = interaction.get(key)
+        if value:
+            try:
+                kd = float(value) * to_nm
+            except (TypeError, ValueError):
+                continue
+            if kd > 0:
+                return kd
+    return None
+
+
+def resolve_half_life_hours(physics_params: Dict) -> Optional[float]:
+    """Read a half-life out of physics_params, in hours.
+
+    The previous test was ``if "min" in str(pp.get("half_life_min", ""))``,
+    which asks whether the substring "min" appears inside the *number*
+    (``str(30.0)`` is ``"30.0"``). It is never true, so every entity
+    carrying ``half_life_min`` had its minutes read as hours -- a 60x
+    understatement of every degradation rate derived from one.
+    """
+    if not physics_params:
+        return None
+    for key, to_hours in (
+        ("half_life_hours", 1.0),
+        ("half_life_h", 1.0),
+        ("half_life_min", 1.0 / 60.0),
+        ("half_life_minutes", 1.0 / 60.0),
+        ("half_life_sec", 1.0 / 3600.0),
+        ("half_life_seconds", 1.0 / 3600.0),
+        ("half_life_days", 24.0),
+    ):
+        value = physics_params.get(key)
+        if value:
+            try:
+                hours = float(value) * to_hours
+            except (TypeError, ValueError):
+                continue
+            if hours > 0:
+                return hours
+    return None
+
+
+def degradation_rate_per_hour(physics_params: Dict) -> Optional[float]:
+    """First-order degradation constant, ln(2)/t_half, in per-hour."""
+    half_life = resolve_half_life_hours(physics_params)
+    if half_life is None:
+        return None
+    return 0.6931471805599453 / half_life
+
+
+def rates_from_kd(kd_nm: float,
+                  k_on: float = DEFAULT_K_ON_PER_NM_PER_HOUR
+                  ) -> Tuple[float, float]:
+    """Split a Kd into an (on, off) pair that reproduces it exactly.
+
+    Kd is defined as k_off / k_on, so only one of the two is free once Kd
+    is fixed. Choosing both independently -- as the previous code did,
+    with ``k_on = 10/Kd`` and ``k_off = Kd`` -- makes the effective
+    dissociation constant ``k_off/k_on = Kd^2/10``. That is not the Kd the
+    entity declares, the error grows quadratically with Kd, and it breaks
+    detailed balance, so the network relaxes to the wrong equilibrium. At
+    the AR-DHT Kd of 0.1 nM it understates binding strength 1000-fold; at
+    the AR-FOXA1 Kd of 50 nM it overstates it 5-fold in the other
+    direction.
+
+    Fixing k_on at a physically typical association rate and deriving
+    k_off = k_on * Kd keeps equilibrium correct by construction, and
+    leaves only the kinetic timescale approximate.
+    """
+    return k_on, k_on * kd_nm
+
+
+def _find_interaction(entity, target_name: str,
+                      require_binding: bool = False) -> Optional[Dict]:
     if not entity or not hasattr(entity, "interacts_with"):
-        return default_on
+        return None
     for inter in (entity.interacts_with or []):
-        if inter.get("target", "") == target_name and inter.get("type") == "binds_to":
-            kd = inter.get("kd_nm", 0)
-            if kd and kd > 0:
-                # Approximate k_on from Kd: k_on ≈ 1/Kd (simplified)
-                return 1.0 / kd * 10.0  # Scale factor
-    return default_on
+        if inter.get("target", "") != target_name:
+            continue
+        if require_binding and inter.get("type") != "binds_to":
+            continue
+        return inter
+    return None
+
+
+def _get_binding_rate(entity, target_name: str, default_on: float = 100.0) -> float:
+    """Association rate for entity->target, in nM^-1 h^-1."""
+    inter = _find_interaction(entity, target_name, require_binding=True)
+    kd = resolve_kd_nm(inter) if inter else None
+    if kd is None:
+        return default_on
+    return rates_from_kd(kd)[0]
 
 
 def _get_unbinding_rate(entity, target_name: str, default_off: float = 10.0) -> float:
-    """Extract unbinding rate from entity interacts_with."""
-    if not entity or not hasattr(entity, "interacts_with"):
+    """Dissociation rate for entity->target, in h^-1.
+
+    Derived from the same Kd and the same reference k_on as
+    :func:`_get_binding_rate`, so the pair is thermodynamically
+    consistent.
+    """
+    inter = _find_interaction(entity, target_name)
+    kd = resolve_kd_nm(inter) if inter else None
+    if kd is None:
         return default_off
-    for inter in (entity.interacts_with or []):
-        if inter.get("target", "") == target_name:
-            kd = inter.get("kd_nm", 0)
-            if kd and kd > 0:
-                return kd  # k_off ∝ Kd
-    return default_off
+    return rates_from_kd(kd)[1]

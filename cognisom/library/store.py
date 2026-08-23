@@ -311,8 +311,44 @@ class EntityStore:
 
     # ── CRUD: Entities ───────────────────────────────────────────────
 
-    def add_entity(self, entity: BioEntity) -> bool:
-        """Insert a new entity. Returns True on success."""
+    def entity_exists(self, name: str, entity_type: str) -> bool:
+        """True when an active entity already has this name and type.
+
+        ``(name, entity_type)`` is the library's real identity key --
+        ``entity_id`` is a fresh UUID minted per insert, so it can never
+        collide and offers no protection at all.
+        """
+        cursor = self._execute(
+            "SELECT 1 FROM entities WHERE lower(name) = ? AND entity_type = ? "
+            "AND status = ? LIMIT 1",
+            (name.strip().lower(), entity_type, EntityStatus.ACTIVE.value),
+        )
+        return cursor.fetchone() is not None
+
+    def add_entity(self, entity: BioEntity, allow_duplicate: bool = False) -> bool:
+        """Insert a new entity. Returns True on success.
+
+        Refuses an insert that would create a second active entity with
+        the same name and type. Nothing enforced this before: `add_entity`
+        minted a fresh UUID and inserted unconditionally, and the
+        auto-seed guard only checked ``total == 0``, so any direct seeder
+        call duplicated the entire catalog. That is how the shipped
+        database reached five copies of all 141 entities.
+
+        Args:
+            entity: The entity to insert.
+            allow_duplicate: Insert even if the name/type pair is taken.
+                Only for callers that genuinely need homonyms.
+        """
+        if not allow_duplicate and self.entity_exists(
+            entity.name, entity.entity_type.value
+        ):
+            log.debug(
+                "Skipping duplicate %s '%s' (already present and active)",
+                entity.entity_type.value, entity.name,
+            )
+            return False
+
         data = entity.to_dict()
         try:
             cursor = self._execute(
@@ -450,19 +486,35 @@ class EntityStore:
 
     # ── Batch Operations ──────────────────────────────────────────────
 
-    def add_entities_batch(self, entities: List[BioEntity]) -> int:
+    def add_entities_batch(self, entities: List[BioEntity],
+                           allow_duplicate: bool = False) -> int:
         """Batch insert entities in a single transaction. Returns count inserted.
 
-        Skips entities that already exist (ON CONFLICT DO NOTHING for Postgres,
-        INSERT OR IGNORE for SQLite). Updates FTS index for SQLite.
+        Skips entities that already exist. The ON CONFLICT / INSERT OR
+        IGNORE clauses below key on ``entity_id``, which is a fresh UUID
+        per call and therefore never conflicts -- so they skipped nothing.
+        Identity is ``(name, entity_type)``, and that is what is checked
+        here, both against the database and within this batch.
         """
         if not entities:
             return 0
 
         inserted = 0
+        # Names claimed earlier in this same batch. Without this, a batch
+        # containing the same entity twice inserts it twice, since neither
+        # copy is committed while the other is checked.
+        seen_in_batch = set()
         try:
             cursor = self.conn.cursor()
             for entity in entities:
+                identity = (entity.name.strip().lower(), entity.entity_type.value)
+                if not allow_duplicate:
+                    if identity in seen_in_batch or self.entity_exists(*identity):
+                        log.debug("Batch: skipping duplicate %s '%s'",
+                                  identity[1], entity.name)
+                        continue
+                    seen_in_batch.add(identity)
+
                 data = entity.to_dict()
                 try:
                     if self._use_postgres:

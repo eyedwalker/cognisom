@@ -9,6 +9,7 @@ cache of key prostate cancer protein sequences.
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
@@ -30,79 +31,137 @@ class ProteinInfo:
     function: str = ""
     subcellular_location: str = ""
 
+    #: Added to a literature/VCF residue number to reach this sequence's
+    #: index. Non-zero only where the numbering convention in use differs
+    #: from the UniProt canonical isoform -- see NUMBERING_OFFSETS.
+    numbering_offset: int = 0
+
+    def resolve_position(self, pos: int) -> int:
+        """Map a reported residue number onto this sequence's numbering."""
+        return pos + self.numbering_offset
+
     @property
     def sequence_preview(self) -> str:
         if len(self.sequence) <= 60:
             return self.sequence
         return self.sequence[:30] + "..." + self.sequence[-30:]
 
+    @property
+    def is_partial(self) -> bool:
+        """True when the stored sequence is shorter than the real protein.
 
-# Built-in sequences for key prostate cancer proteins
-# These allow the platform to work without network access
-BUILTIN_PROTEINS: Dict[str, ProteinInfo] = {
-    "AR": ProteinInfo(
-        gene="AR",
-        uniprot_id="P10275",
-        protein_name="Androgen receptor",
-        sequence=(
-            "MEVQLGLGRVYPRPPSKTYRGAFQNLFQSVREVIQNPGPRHPEAASAAPPGASLLLLQQ"
-            "QQQQQQQQQQQQQQQQQQQQETSPRQQQQQQGEDGSPQAHRRGPTGYLVLDEEQQPSQPQ"
-            "SALECHPERGCVPEPGAAVAASKGLPQQLPAPPDEDDSAAPSTSRAPPDSSERA"
-            # Truncated for brevity — full 919 AA sequence loaded at runtime
-        ),
-        length=919,
-        function="Steroid hormone receptor; activated by testosterone and DHT",
-        subcellular_location="Nucleus",
-    ),
-    "TP53": ProteinInfo(
-        gene="TP53",
-        uniprot_id="P04637",
-        protein_name="Cellular tumor antigen p53",
-        sequence=(
-            "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPG"
-            "PDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYPQGLNGTVNLPGRNSFEV"
-            "RVCACPGRDRRTEEENLHKTTGIDSFLHSGAKLKPEFGLKNVLKLETPIGKELIPMRAEL"
-            "DTTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGQMNRRPILTIITLEDSSGKLLGRNS"
-            "FEVRVCACPGRDRRTEEENLRKKGQVLKEIREGQRFREEMFQHLHKTYAKELLRIEDSPT"
-        ),
-        length=393,
-        function="Tumor suppressor; activates DNA repair, cell cycle arrest, apoptosis",
-        subcellular_location="Nucleus, Cytoplasm",
-    ),
-    "PTEN": ProteinInfo(
-        gene="PTEN",
-        uniprot_id="P60484",
-        protein_name="Phosphatidylinositol 3,4,5-trisphosphate 3-phosphatase",
-        sequence=(
-            "MTAIIKEIVSRNKRRYQEDGFDLDLTYIYPNIIAMGFPAERLEGVYRNNIDDVVRFLDS"
-            "KHKNHYKIYNLCAERHYDTAKFNCRVAQYPFEDHNPPQLELIKPFCEDLDQWLSEDDNH"
-            "VAAIHCKAGKGRTGVMICAYLLHRGKFLKAQEALDFYGEVRTRDKKGVTIPSQRRYVYY"
-        ),
-        length=403,
-        function="Lipid phosphatase; negative regulator of PI3K/AKT pathway",
-        subcellular_location="Cytoplasm, Nucleus",
-    ),
-    "BRCA2": ProteinInfo(
-        gene="BRCA2",
-        uniprot_id="P51587",
-        protein_name="Breast cancer type 2 susceptibility protein",
-        sequence="MPIGSKERPTFFEIFKTRCNKADLGPISLNWFEELSSEAPPYNSEPAEESEHKNNNYEP"
-                 "NLFKTPQRKPSYNQLASTPIIFKEQIVPEFSNSIGYIESREFNETSADDGPVLRVSEKWV",
-        length=3418,
-        function="Homologous recombination DNA repair",
-        subcellular_location="Nucleus",
-    ),
-    "SPOP": ProteinInfo(
-        gene="SPOP",
-        uniprot_id="O43791",
-        protein_name="Speckle-type POZ protein",
-        sequence="MAGLWHLCFALVFAASGQCVAEEGDSFMIQPGDFSTLYELKEQHQQLFAEQLPFNQTFY"
-                 "ASFNKHVQPFRLTPNESLICIDPNDCESPHCKQSATCYSTLCREGQFGATCSLLCARSCY",
-        length=374,
-        function="E3 ubiquitin ligase substrate adaptor; degrades AR, ERG",
-        subcellular_location="Nucleus (speckles)",
-    ),
+        ``length`` is the true canonical length; ``sequence`` is what we
+        actually hold. Several built-in entries are excerpts, so residue
+        numbering beyond ``len(sequence)`` cannot be resolved and any
+        mutation there must be refused rather than guessed at.
+        """
+        return len(self.sequence) < self.length
+
+    @property
+    def coverage(self) -> float:
+        """Fraction of the real protein this sequence covers (0.0-1.0)."""
+        return (len(self.sequence) / self.length) if self.length else 0.0
+
+    def covers_position(self, pos: int) -> bool:
+        """True when residue `pos` (1-based, as reported) is present.
+
+        The reported position is bounds-checked as well as the resolved
+        one: a positive offset would otherwise rescue position 0, which
+        is not a residue number under any numbering convention.
+        """
+        if pos < 1:
+            return False
+        resolved = self.resolve_position(pos)
+        return 1 <= resolved <= len(self.sequence)
+
+    def residue_at(self, pos: int) -> Optional[str]:
+        """Residue at a reported position, after numbering resolution."""
+        if not self.covers_position(pos):
+            return None
+        return self.sequence[self.resolve_position(pos) - 1]
+
+
+# ── Reference proteome ───────────────────────────────────────────────
+#
+# Canonical human Swiss-Prot sequences for the curated driver gene set,
+# bundled as data/reference_proteins.fasta so the neoantigen path works
+# offline and reproducibly.
+#
+# What was here before was a hand-typed dict of five proteins, four of
+# them truncated -- AR held 173 of 919 residues, BRCA2 119 of 3418 -- and
+# TP53 was a 302-residue chimera carrying the wrong residue at both of
+# p53's best-known hotspots. Because `get_protein` checks this cache
+# *first*, those five shadowed the working UniProt fetch below, so the
+# five most clinically important genes were the only ones that never got
+# a real sequence.
+
+_DATA_DIR = Path(__file__).parent / "data"
+REFERENCE_FASTA = _DATA_DIR / "reference_proteins.fasta"
+
+# Residue numbering offsets, applied to a reported position to reach the
+# canonical sequence's index.
+#
+# AR: UniProt P10275 canonical is 920 aa, but the numbering used
+# throughout the androgen-receptor literature (and by the annotators that
+# emit these calls) corresponds to a 919-aa reference -- the
+# polyglutamine tract in exon 1 is polymorphic, so isoforms differ in
+# length upstream of the ligand-binding domain where every hotspot sits.
+# Verified against eight documented AR mutations, all of which match at
+# +1 and none at 0: L701, V715, W741, H874, F876, T877, M895, R629.
+#
+# This is a curated per-gene fact, deliberately not a per-variant search.
+# Searching for an offset that makes each variant's wild-type residue fit
+# is unreliable: for a common residue several offsets match, so it
+# invents agreement. When a gene is not listed here and the residue does
+# not match, the mutation is refused rather than shifted.
+NUMBERING_OFFSETS: Dict[str, int] = {
+    "AR": 1,
 }
+
+
+def _load_reference_proteome() -> Dict[str, ProteinInfo]:
+    """Parse the bundled FASTA into ProteinInfo records."""
+    proteins: Dict[str, ProteinInfo] = {}
+    if not REFERENCE_FASTA.exists():
+        logger.warning(
+            "Reference proteome not found at %s; every gene will require a "
+            "UniProt fetch.", REFERENCE_FASTA,
+        )
+        return proteins
+
+    gene = accession = name = None
+    chunks: List[str] = []
+
+    def flush():
+        if gene and chunks:
+            sequence = "".join(chunks)
+            proteins[gene] = ProteinInfo(
+                gene=gene,
+                uniprot_id=accession or "",
+                protein_name=name or gene,
+                sequence=sequence,
+                length=len(sequence),
+                numbering_offset=NUMBERING_OFFSETS.get(gene, 0),
+            )
+
+    for line in REFERENCE_FASTA.read_text().splitlines():
+        if line.startswith(">"):
+            flush()
+            header = line[1:]
+            fields, _, name = header.partition(" ")
+            parts = fields.split("|")
+            gene = parts[0]
+            accession = parts[1] if len(parts) > 1 else ""
+            chunks = []
+        elif line.strip():
+            chunks.append(line.strip())
+    flush()
+
+    logger.debug("Loaded %d reference proteins", len(proteins))
+    return proteins
+
+
+BUILTIN_PROTEINS: Dict[str, ProteinInfo] = _load_reference_proteome()
 
 
 class GeneProteinMapper:
@@ -182,19 +241,31 @@ class GeneProteinMapper:
         mut_aa = match.group(3)
 
         # Validate position
-        if pos < 1 or pos > len(protein.sequence):
-            logger.warning(f"Position {pos} out of range for {protein.gene} "
-                         f"(length {len(protein.sequence)})")
+        if not protein.covers_position(pos):
+            detail = (
+                f"sequence covers {len(protein.sequence)} of {protein.length} "
+                f"residues ({protein.coverage:.0%})"
+                if protein.is_partial else f"length {len(protein.sequence)}"
+            )
+            logger.warning(
+                "Position %d out of range for %s (%s)",
+                pos, protein.gene, detail,
+            )
             return None
 
-        # Validate wild-type amino acid
-        idx = pos - 1  # Convert to 0-indexed
-        if idx < len(protein.sequence) and protein.sequence[idx] != wt_aa:
+        # Validate wild-type amino acid. A mismatch means the residue
+        # numbering does not line up with this sequence, so applying the
+        # substitution would edit a different residue than the variant
+        # describes and return a protein that does not exist. Refuse.
+        idx = protein.resolve_position(pos) - 1  # 0-indexed, offset applied
+        if protein.sequence[idx] != wt_aa:
             logger.warning(
-                f"Expected {wt_aa} at position {pos} in {protein.gene}, "
-                f"found {protein.sequence[idx]}"
+                "Refusing %s%d%s on %s: reference has %s at position %d, "
+                "not %s. The mutation does not match this sequence.",
+                wt_aa, pos, mut_aa, protein.gene,
+                protein.sequence[idx], protein.resolve_position(pos), wt_aa,
             )
-            # Continue anyway — reference sequences may differ
+            return None
 
         # Apply mutation
         seq_list = list(protein.sequence)
