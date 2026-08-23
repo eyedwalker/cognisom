@@ -338,6 +338,13 @@ class VEPAnnotator:
 
             command = [
                 "docker", "run", "--rm",
+                # The image runs as its own uid 999, but the work directory
+                # is a private temp dir owned by whoever called us, mode
+                # 0700. Without this VEP cannot read the input file it was
+                # just handed, and reports it as missing. Running as the
+                # caller also keeps out.json owned correctly on the host.
+                "--user", f"{os.getuid()}:{os.getgid()}",
+                "-e", "HOME=/tmp",
                 "-v", f"{self.cache_dir}:/cache:ro",
                 "-v", f"{work}:/work",
                 "--network", "none",          # offline means offline

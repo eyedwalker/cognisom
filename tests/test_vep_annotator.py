@@ -376,6 +376,10 @@ def test_local_backend_runs_vep_strictly_offline(tmp_path, monkeypatch):
     # a variant with no gene is dropped downstream.
     assert "--symbol" in cmd
     assert f"{cache}:/cache:ro" in cmd          # cache mounted read-only
+    # The image runs as its own uid 999, while the work directory is a
+    # private temp dir owned by the caller at mode 0700. Without matching
+    # uids VEP cannot read the input it was handed and reports it missing.
+    assert cmd[cmd.index("--user") + 1] == f"{os.getuid()}:{os.getgid()}"
     assert annotator.stats.backend == "vep-offline"
     # And the shared parsing path still picks MANE.
     assert v.protein_change == "p.V600E"
@@ -393,3 +397,31 @@ def test_a_failing_vep_run_raises(tmp_path, monkeypatch):
     annotator = VEPAnnotator(backend="local", cache_dir=fake_cache(tmp_path))
     with pytest.raises(VEPUnavailableError, match="cache not found"):
         annotator.annotate([variant()])
+
+
+def test_work_directory_is_readable_by_the_vep_image(tmp_path, monkeypatch):
+    """Regression: a 0700 temp dir plus a uid-999 image is unreadable.
+
+    The failure surfaced as VEP reporting `/work/in.vcf` does not exist,
+    which reads as a mount or path problem rather than a permission one.
+    """
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/docker")
+    cache = fake_cache(tmp_path)
+    seen = {}
+
+    class Result:
+        returncode = 0
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        workdir = next(a.split(":")[0] for a in cmd if a.endswith(":/work"))
+        seen["mode"] = Path(workdir).stat().st_mode & 0o777
+        seen["uid_arg"] = cmd[cmd.index("--user") + 1]
+        (Path(workdir) / "out.json").write_text("")
+        return Result()
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    VEPAnnotator(backend="local", cache_dir=cache).annotate([variant()])
+
+    # Either the directory is traversable by others, or we run as its owner.
+    assert seen["mode"] & 0o005 or seen["uid_arg"].startswith(f"{os.getuid()}:")
