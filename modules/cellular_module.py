@@ -409,18 +409,40 @@ class CellularModule(SimulationModule):
         # Remove cell
         self.remove_cell(cell_id)
     
-    def transform_cell(self, cell_id: int):
-        """Transform normal cell to cancer"""
+    def transform_cell(self, cell_id: int, mutations=None):
+        """Transform a normal cell to cancer.
+
+        ``mutations`` is the list of ``(gene, label)`` pairs responsible
+        for the transformation, as written into the recipient's
+        CellGenomeView. The phenotype labels recorded on the cell are
+        derived from them.
+
+        This used to append the literal string ``'KRAS_G12D'`` no matter
+        what actually drove the transformation, so a cell transformed by
+        transferred BRAF V600E carried a genome delta for BRAF and a
+        phenotype label claiming KRAS. The genome layer was right and the
+        label contradicted it.
+
+        The default is kept for callers that transform without
+        attributing a specific mutation (spontaneous transformation),
+        which is the only way the legacy label is still produced.
+        """
         if cell_id not in self.cells:
             return
-        
+
         cell = self.cells[cell_id]
         if cell.cell_type != 'normal':
             return
-        
+
         # Transform
         cell.cell_type = 'cancer'
-        cell.mutations.append('KRAS_G12D')
+        if mutations:
+            for gene_name, mutation_label in mutations:
+                label = f'{gene_name}_{mutation_label}'
+                if label not in cell.mutations:
+                    cell.mutations.append(label)
+        else:
+            cell.mutations.append('KRAS_G12D')
         cell.mhc1_expression = 0.3
         
         # Emit event
@@ -481,7 +503,7 @@ class CellularModule(SimulationModule):
                             self.molecular_module.introduce_mutation(
                                 cell_id, gene_name, mutation_label
                             )
-                    self.transform_cell(cell_id)
+                    self.transform_cell(cell_id, mutations=cargo_mutations)
 
     def on_cancer_killed(self, data):
         """Handle cancer cell killed by immune system"""
