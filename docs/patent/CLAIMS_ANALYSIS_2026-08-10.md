@@ -5,6 +5,8 @@
 **Supersedes for scope purposes:** `docs/patent/SCOPING.md` (2026-05-10) and `docs/patent/DISCLOSURE_SOURCE.md`, both of which predate Upgrades 1–8.
 **Status:** engineering analysis, not legal advice. Every assertion below is cited to `file:line` and was checked against the code, not the markdown.
 
+> **Update 2026-09-02.** A remediation pass has since landed the fixes this document called for. Claim 7 is now enabled, Claim 1's evidence is an order of magnitude stronger than recorded below, and the largest disclosure liability is gone. Read §11 first — it supersedes the blocking notes in §3 and the liabilities in §5 that it lists as resolved.
+
 ---
 
 ## 0. Why this document exists
@@ -319,3 +321,93 @@ This matters for §112 in a small way: a test suite whose pass/fail outcome depe
 ### 8.3 Remaining failures, all outside the patent surface
 
 `test_ode_solver.py::test_cell_heterogeneity` (the pre-existing parameter-noise CV failure `RESUME.md` already notes), `test_ode_solver.py::test_get_species`, and `test_validation.py::test_benchmark_categories`. None touch any claimed mechanism.
+
+---
+
+## 11. Remediation pass — 2026-09-02
+
+Everything §6 listed as "blocking work" has been done, plus four defects found while doing it. This section records what changed and what it does to the filing shape. Commits `c7ffe17` through `ae219b8`.
+
+Suite state before: a full-directory run could not finish (killed at 15 minutes), and the patent-evidence subset was 296 passed / 1 failed / 1 skipped. After: **581 passed, 4 skipped, no failures, 12 seconds.**
+
+### 11.1 Claim 7 (exhaustion) is now enabled — promote to Tier 1
+
+The stale-snapshot defect described in §3 is fixed. `_target_kill_probability` no longer reads `is_exhausted` off the cached `TCRMatch`; `_live_is_exhausted` resolves the clone's state from the repertoire by TCR id, falling back to the snapshot only when the clone is unknown to it.
+
+The regression test drives a clone over the threshold without re-recognition, asserts as a *precondition* that the cached match still reports PRECURSOR, and then requires the kill probability to collapse anyway. It fails against the previous behaviour, so it pins the claim rather than merely exercising it.
+
+A claim reciting "gating checkpoint-blockade rescue on the precursor state within the simulation loop" is now supported by code and by a test that fails without it. **This was the highest-leverage item in §6 and it is done.**
+
+### 11.2 Claim 1's evidence was understated by more than an order of magnitude
+
+The memory benchmark's "naive deep-copy" baseline never copied anything. It built each cell's sequences as `genome.get_reference_sequence(name)[:] + "​"[:0]`, with a comment claiming this defeats interning. CPython returns the *same object* for a full slice of a str, and concatenating an empty string short-circuits to the original, so the result is literally `is` the reference sequence.
+
+Every "naive" cell therefore shared one sequence object per gene. The baseline was already performing the shared-storage optimisation the architecture under test claims to invent, and the measured ratio reflected little more than per-cell dict overhead.
+
+With a genuine copy, `tracemalloc` in place of psutil RSS, and the fixed-threshold assertion replaced by a measurement of how the advantage scales:
+
+| Genome | Naive | Views | Advantage |
+|---|---|---|---|
+| 10 genes × 3 kb | 14.7 MB | 0.5 MB | 28× |
+| 100 genes × 3 kb | 147.0 MB | 0.5 MB | 285× |
+
+View cost is flat while naive cost tracks genome size, so a 10× genome yields exactly a 10× larger advantage. That proportionality *is* the asymptotic claim (cost is O(deltas), not O(genome)), and it is now what the test asserts, rather than a constant factor at one arbitrary scale.
+
+Two instrument problems went with it: psutil was never a declared dependency, so on a stock checkout the import-skip silently disabled every benchmark in the file; and RSS noise was what put the old ratio at 19.8× against a 20× bar.
+
+**Consequence for drafting:** the numbers in §2 Claim 1 are superseded. Use 285× and the proportional-growth result.
+
+### 11.3 The fabrication liability is gone
+
+`_predict_protein_change` now abstains and logs why, instead of inventing HGVS from a four-entry base-to-amino-acid table. The VCF round-trip and mutation-adapter suites pass unchanged, which confirms they were always driven by genuine upstream annotations and never by the fabricator — so removing it costs the disclosure nothing and removes the contamination path into the simulation.
+
+Its call site also carried a throttle that limited fabrication to three variants per gene "to simulate exonic fraction", using counters stashed on the annotator instance and never reset. A reused annotator silently annotated fewer variants for every patient after the first. Both are gone, and a test pins the abstention and the statelessness.
+
+**Liability 1 in §5 is resolved.**
+
+### 11.4 Claim 3's mislabelling defect is fixed
+
+`transform_cell` took the transferred `(gene, label)` pairs and derives phenotype labels from them, instead of appending the literal `'KRAS_G12D'` whatever the cargo carried. The test stages a BRAF V600E transfer specifically so it can distinguish the two, and asserts every phenotype label is backed by a delta actually present in that cell's genome view.
+
+### 11.5 §8's test-infrastructure findings are resolved, and one was misdiagnosed
+
+**The Smoldyn hang** had two causes. `_step_cpu` iterated to `n_max`, the preallocated capacity, rather than the allocated high-water mark — for an O(n²) pass that is the difference between the particles present and 10¹⁰ dead-slot checks. Fixing that alone was not enough at 1000 particles × 500 steps, so the step is now array operations, with a Python loop only over candidate pairs already inside the binding radius. The file went from an indefinite hang to 30 passed in 5 seconds.
+
+That exposed three failures the hang had been masking, all pre-existing and all real: `get_particle_positions` built its mask as an int32 `alive` array, so `positions[mask]` was fancy indexing rather than boolean masking and returned one row per slot; `SmoldynModule.add_particles` passed a species *index* to a solver method that takes a *name*; and a test looked up a reaction by a name it does not have.
+
+**The registry failures were misattributed.** §8.2 recorded `RESUME.md` blaming the duplicate package tree; the diagnosis here — a `virus` key collision — was right, but incomplete. There were two collisions, not one: `virus` in the entity registry and `bio_virus_particle` in the prim registry, both claimed by the example plugin against built-ins registered at import. Both are namespaced to `example_*`. Registry tests now pass alone and in every ordering tried.
+
+`test_virus_entity_registered` also asserted `"virus" in entity_registry`, which passes on the built-in alone and so never tested that the plugin registered anything. It now asserts the plugin's own key and the class behind it.
+
+### 11.6 New finding: per-cell ODE parameters were a no-op on CPU
+
+Not in the original analysis. `set_cell_parameters` stores an `(n_cells, n_params)` array that only the CUDA kernels read. The CPU integrator passed the scalar parameter dict to `rhs_func`, so every cell integrated with identical rate constants and the call did nothing wherever no GPU is present — which is everywhere the tests run. A 100-cell population seeded with lognormal parameter noise finished with a coefficient of variation of 2.5e-07.
+
+`RESUME.md` recorded the failing test as a "parameter-noise CV" flake unrelated to the patent surface. It was reporting a real loss of function, and it matters to the portfolio: heterogeneity across a batched population of distinguishable cells is load-bearing for the batched-simulation story, and a reviewer testing it on CPU would have found uniform cells. Measured CV is now 0.62.
+
+### 11.7 What still stands from the original analysis
+
+Unchanged and still blocking:
+
+- **Stage C of the impact classifier (§3 Claim 6)** is still never invoked. `esm_scorer` still defaults to `None` and no production caller sets it. Claim Stages A+B; keep C in the specification.
+- **Indel/fusion generation (§3 Claim 8)** is still a library with no pipeline caller. Claim generation only.
+- **The hybrid solver (§4)** is unchanged: partitions are not coupled, partitioning is global rather than per-cell, and the CUDA kernels are compiled but never launched. Claim the hysteresis partitioning rule, on CPU, without reciting coupling or GPU.
+- **Duplicate package trees (§5 liability 6)** remain the significant open filing blocker. This pass had to navigate them repeatedly: `gpu/ode_solver.py`, `gpu/smoldyn_solver.py` and `modules/smoldyn_module.py` were byte-identical across both trees and are kept so, but `modules/immune_module.py` and `modules/cellular_module.py` had already diverged by 514 and 350 lines respectively, and the `cognisom/` copy of the immune module predates the exhaustion work entirely. Tests import whichever copy the module happens to name, so it must be unambiguous which tree the claims read on.
+- **Liabilities 2 through 5** in §5 are untouched: the eval harness that scores fabricated results against ground truth, the tautological HRD metric, the unreproducible headline validation number, and the mock distillation loop.
+
+### 11.8 Revised filing shape
+
+| # | Claim | Posture now | Change |
+|---|---|---|---|
+| 1 | Reference genome + per-cell delta + fork | **Lead independent** | Evidence corrected upward to 285×; benchmark now runs on a stock checkout |
+| 2 | VCF → peptide → pMHC → TCR → kill | **Independent** | Unchanged, file as is |
+| 3 | Exosome-borne genome-delta transfer | **Independent** | Mislabelling fixed; file as is |
+| 4 | ECM-excluded TME sub-classification | **Independent** | Unchanged, file as is |
+| 5 | State-gated kernel dispatch (diapedesis) | **Independent** | Unchanged |
+| 7 | Exhaustion as rescue-term suppression | **Promoted to independent** | Now enabled and regression-tested |
+| 6 | Three-axis impact classifier | Claim A+B now | Still blocked on wiring a real ESM scorer |
+| 8 | Indel/fusion peptide generation | Generation only | Still not wired to MHC scoring |
+| 9 | β2-adrenergic gating | **Dependent** on Claim 2 | Unchanged |
+| 10 | Batched null-space FBA | **Hold** | Unchanged |
+
+Remaining work before filing, in order: resolve the duplicate package trees; wire a real ESM scorer once so Stage C is enabled; sever or quarantine the `eval/simulation_accuracy.py` fabrication and the tautological HRD metric; reproduce or withdraw the public "TMB r=0.987" figure.
