@@ -411,3 +411,21 @@ Unchanged and still blocking:
 | 10 | Batched null-space FBA | **Hold** | Unchanged |
 
 Remaining work before filing, in order: resolve the duplicate package trees; wire a real ESM scorer once so Stage C is enabled; sever or quarantine the `eval/simulation_accuracy.py` fabrication and the tautological HRD metric; reproduce or withdraw the public "TMB r=0.987" figure.
+
+---
+
+## 12. Reconciliation with main — 2026-09-02
+
+This branch was written against `10dab36`. `main` advanced eight commits in the meantime, and merging changed three things in §11 that would otherwise mislead.
+
+**The duplicate package tree is resolved.** §5 liability 6 and §11.7 both named it the significant open filing blocker. `f3e927e` collapsed it: the top-level `modules/`, `gpu/`, `core/` and `plugins/` trees are gone and `cognisom/` is canonical. Claims now read on one unambiguous tree. That was the largest remaining structural obstacle and it is closed.
+
+**Two §11 findings were reached independently on main, and main's versions are better.** The per-cell ODE parameter defect (§11.6) is fixed there by `_param_dict()`, which routes all four step functions where this branch's `_cpu_params()` covered three. The memory-benchmark baseline defect (§11.2) was found there too, with the same root cause — `s[:] + ""` returns the identical object, so the "naive" baseline shared storage with the reference. Main's fix additionally measures live rather than peak allocation and asserts the copy property holds, so a future CPython optimising the copy away fails loudly instead of silently restoring the no-op.
+
+Both are recorded here as convergent findings rather than as this branch's contributions. The corrected magnitude in §11.2 stands: the advantage is ~285× at 100 genes and grows in proportion to genome size.
+
+**Still this branch's own, and still needed after the merge:** live exhaustion resolution (§11.1), the `VariantAnnotator` abstention (§11.3), `transform_cell` labelling (§11.4), and the Smoldyn vectorization (§11.5). Each was verified to fail without its fix on the merged tree.
+
+**Unchanged from §11.7:** Stage C is still never invoked, indel/fusion generation is still unwired, the hybrid solver still must not be recited as coupled or GPU-accelerated, and liabilities 2 through 5 in §5 are untouched.
+
+One new environment note for whoever reproduces the enablement runs: `tests/test_cognito_challenges.py` imports `boto3` and the pytest config references `pytest-timeout`, neither of which is in `requirements.txt`. A stock checkout cannot collect the suite without them.
