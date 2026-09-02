@@ -279,7 +279,12 @@ class SmoldynModule(SimulationModule):
             return np.zeros((0, 3), dtype=np.float32)
 
         particles = self.solver.particles
-        mask = particles.alive.copy()
+        # alive is int32 0/1. Indexing a float array with an integer
+        # array is fancy indexing, not boolean masking, so
+        # positions[alive] returned one row per slot -- picking
+        # positions[0] or positions[1] and yielding n_max rows instead
+        # of the alive particles. Cast to bool so this selects.
+        mask = particles.alive.astype(bool)
 
         if species_name is not None:
             species_idx = None
@@ -348,8 +353,13 @@ class SmoldynModule(SimulationModule):
                 size=(count, 3)
             ).astype(np.float32)
 
-        # Add to particle system
-        self.solver.add_particles(species_idx, positions)
+        # Add to particle system. SmoldynSolver.add_particles takes the
+        # species NAME and resolves the index itself; passing
+        # species_idx here made it call get_species_index(0), which
+        # raised "ValueError: 0 is not in list". The lookup above is
+        # retained because it validates the name and raises a clear
+        # KeyError for an unknown species.
+        self.solver.add_particles(species_name, positions)
 
         log.debug(f"Added {count} particles of species {species_name}")
 

@@ -631,6 +631,20 @@ class ParticleSystem:
         """Total number of alive particles."""
         return int(self._backend.xp.sum(self.alive))
 
+    @property
+    def n_allocated(self) -> int:
+        """High-water mark of allocated slots.
+
+        Slots at or beyond this index have never been handed out by
+        add_particles, so they carry species -1 and alive 0 and can be
+        skipped entirely. Iterating to ``n_max`` instead means walking
+        the whole preallocated capacity (100k slots by default) no
+        matter how few particles exist -- which for the O(n^2)
+        bimolecular pass is the difference between a loop over the
+        particles present and 10^10 iterations of dead-slot checks.
+        """
+        return self._next_free
+
 
 # ── Smoldyn Solver ───────────────────────────────────────────────────────
 
@@ -831,7 +845,9 @@ class SmoldynSolver:
         """GPU step using CUDA kernels."""
         import cupy as cp
 
-        n = self.n_max
+        # Only the allocated prefix, not the whole preallocated
+        # capacity -- see ParticleSystem.n_allocated.
+        n = self.particles.n_allocated
         block = 256
         grid = (n + block - 1) // block
 
@@ -875,7 +891,9 @@ class SmoldynSolver:
         """GPU bimolecular reactions with spatial hashing."""
         import cupy as cp
 
-        n = self.n_max
+        # Only the allocated prefix, not the whole preallocated
+        # capacity -- see ParticleSystem.n_allocated.
+        n = self.particles.n_allocated
         block = 256
         grid = (n + block - 1) // block
 
@@ -926,81 +944,119 @@ class SmoldynSolver:
         species = self._backend.to_numpy(self.particles.species)
         alive = self._backend.to_numpy(self.particles.alive)
 
-        n = self.n_max
+        # Only the allocated prefix, not the whole preallocated
+        # capacity -- see ParticleSystem.n_allocated. The
+        # bimolecular pass below is O(n^2), so iterating to
+        # n_max made a handful of particles cost 10^10 loop
+        # iterations and hung the test suite.
+        n = self.particles.n_allocated
         n_species = self.system.n_species
 
-        # 1. Brownian motion
-        for i in range(n):
-            if not alive[i]:
-                continue
-            sp = species[i]
-            D = self._diffusion[sp]
-            sigma = np.sqrt(2 * D * dt)
-            positions[i] += np.random.randn(3) * sigma
+        if n == 0:
+            return
 
-        # 2. Reflect boundaries
+        # This step used to be four nested Python loops over the whole
+        # particle buffer, with the bimolecular pass running i x j over
+        # every slot pair. At the 1000 particles / 500 steps the tests
+        # use, that is ~250M interpreter iterations and the suite could
+        # not finish. The passes below are the same physics expressed as
+        # array operations; only the pair search retains a Python loop,
+        # and it runs over candidate pairs already inside the binding
+        # radius rather than over all pairs.
+        pos = positions[:n]
+        sp_all = species[:n]
+        alive_mask = alive[:n] == 1
+
+        # Species index is used to look up per-species parameters, so
+        # clamp it into range first: unallocated or freed slots can hold
+        # the sentinel -1, and they are excluded by alive_mask anyway.
+        sp_safe = np.clip(sp_all, 0, n_species - 1)
+
+        # 1. Brownian motion
+        sigma = np.sqrt(2.0 * self._diffusion[sp_safe] * dt)
+        disp = np.random.randn(n, 3) * sigma[:, None]
+        pos += np.where(alive_mask[:, None], disp, 0.0)
+
+        # 2. Reflect boundaries. Applied to every slot: dead slots are
+        # not read downstream, and masking costs more than reflecting.
         b = self._bounds
-        for i in range(n):
-            if not alive[i]:
-                continue
-            for dim, (lo, hi) in enumerate([(b['x_min'], b['x_max']),
-                                            (b['y_min'], b['y_max']),
-                                            (b['z_min'], b['z_max'])]):
-                if positions[i, dim] < lo:
-                    positions[i, dim] = 2 * lo - positions[i, dim]
-                if positions[i, dim] > hi:
-                    positions[i, dim] = 2 * hi - positions[i, dim]
+        for dim, (lo, hi) in enumerate((
+            (b['x_min'], b['x_max']),
+            (b['y_min'], b['y_max']),
+            (b['z_min'], b['z_max']),
+        )):
+            col = pos[:, dim]
+            np.subtract(2.0 * lo, col, out=col, where=col < lo)
+            np.subtract(2.0 * hi, col, out=col, where=col > hi)
 
         # 3. Unimolecular reactions
-        for i in range(n):
-            if not alive[i]:
-                continue
-            sp = species[i]
-            rate = self._uni_rates[sp]
-            if rate > 0:
-                prob = 1 - np.exp(-rate * dt)
-                if np.random.rand() < prob:
-                    product = self._uni_products[sp]
-                    if product < 0:
-                        alive[i] = 0
-                    else:
-                        species[i] = product
+        rates = self._uni_rates[sp_safe]
+        prob = 1.0 - np.exp(-rates * dt)
+        fired = alive_mask & (rates > 0) & (np.random.rand(n) < prob)
+        if fired.any():
+            prod = self._uni_products[sp_safe]
+            died = fired & (prod < 0)
+            converted = fired & (prod >= 0)
+            alive[:n][died] = 0
+            species[:n][converted] = prod[converted]
+            alive_mask = alive[:n] == 1
 
-        # 4. Bimolecular reactions (O(n²) for CPU - simplified)
+        # 4. Bimolecular reactions.
+        #
+        # For each reaction the candidate pairs are found with a single
+        # broadcast distance computation over the two reactant sets,
+        # then consumed greedily so that no particle reacts twice. The
+        # i < j restriction preserves the original scan's behaviour, as
+        # does resolving candidates in (i, j) order.
         for r in range(self._n_bimol):
             sp1 = self._bimol_reactant1[r]
             sp2 = self._bimol_reactant2[r]
-            bind_r2 = self._bimol_bind_r[r] ** 2
+            bind_r2 = float(self._bimol_bind_r[r]) ** 2
 
-            for i in range(n):
-                if not alive[i] or species[i] != sp1:
+            idx1 = np.flatnonzero(alive_mask & (sp_all == sp1))
+            idx2 = np.flatnonzero(alive_mask & (sp_all == sp2))
+            if idx1.size == 0 or idx2.size == 0:
+                continue
+
+            delta = pos[idx1][:, None, :] - pos[idx2][None, :, :]
+            dist2 = np.einsum('ijk,ijk->ij', delta, delta)
+            close = (dist2 < bind_r2) & (idx1[:, None] < idx2[None, :])
+
+            ci, cj = np.nonzero(close)
+            if ci.size == 0:
+                continue
+
+            gi = idx1[ci]
+            gj = idx2[cj]
+            order = np.lexsort((gj, gi))
+
+            prod1 = self._bimol_product1[r]
+            prod2 = self._bimol_product2[r]
+            consumed = np.zeros(n, dtype=bool)
+
+            for k in order:
+                i = int(gi[k])
+                j = int(gj[k])
+                if consumed[i] or consumed[j]:
                     continue
-                for j in range(i + 1, n):
-                    if not alive[j] or species[j] != sp2:
-                        continue
+                consumed[i] = True
+                consumed[j] = True
 
-                    dist2 = np.sum((positions[i] - positions[j]) ** 2)
-                    if dist2 < bind_r2:
-                        # React
-                        alive[i] = 0
-                        alive[j] = 0
+                midpoint = (pos[i] + pos[j]) / 2.0
+                alive[i] = 0
+                alive[j] = 0
 
-                        prod1 = self._bimol_product1[r]
-                        prod2 = self._bimol_product2[r]
+                if prod1 >= 0:
+                    species[i] = prod1
+                    pos[i] = midpoint
+                    alive[i] = 1
 
-                        midpoint = (positions[i] + positions[j]) / 2
+                if prod2 >= 0:
+                    species[j] = prod2
+                    pos[j] = midpoint
+                    alive[j] = 1
 
-                        if prod1 >= 0:
-                            species[i] = prod1
-                            positions[i] = midpoint
-                            alive[i] = 1
-
-                        if prod2 >= 0:
-                            species[j] = prod2
-                            positions[j] = midpoint
-                            alive[j] = 1
-
-                        break
+            alive_mask = alive[:n] == 1
 
         # Write back
         xp = self._backend.xp

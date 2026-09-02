@@ -98,7 +98,12 @@ class TestSmoldynSystem:
 
         # Check reactions
         assert len(system.reactions) >= 1
-        binding_rxn = next(r for r in system.reactions if r.name == "bind")
+        # simple_binding() names this reaction "A_B_binding"; the test
+        # looked for "bind" and raised StopIteration. Select it by its
+        # role rather than by name so a rename does not break this.
+        binding_rxn = next(
+            r for r in system.reactions if r.reactants == ["A", "B"]
+        )
         assert binding_rxn.reactants == ["A", "B"]
         assert binding_rxn.products == ["C"]
 
