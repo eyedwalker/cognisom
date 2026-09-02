@@ -51,12 +51,12 @@ if str(REPO_ROOT) not in sys.path:
 
 from cognisom.genomics.synthetic_vcf import SYNTHETIC_PROSTATE_VCF
 from cognisom.genomics.vcf_parser import VCFParser, Variant
-from core import SimulationConfig, SimulationEngine
-from core.event_bus import EventTypes
-from engine.py.molecular.nucleic_acids import Gene
-from modules.cellular_module import CellularModule
-from modules.immune_module import ImmuneModule
-from modules.molecular_module import MolecularModule
+from cognisom.core import SimulationConfig, SimulationEngine
+from cognisom.core.event_bus import EventTypes
+from cognisom.engine.py.molecular.nucleic_acids import Gene
+from cognisom.modules.cellular_module import CellularModule
+from cognisom.modules.immune_module import ImmuneModule
+from cognisom.modules.molecular_module import MolecularModule
 
 
 # Genes the curated reference genome knows about. Variants outside
@@ -221,6 +221,7 @@ def test_vcf_non_coding_rows_are_silently_dropped():
 # End-to-end: VCF -> simulation -> kill event with provenance
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow  # ~8 min: runs the full closed loop end to end
 def test_vcf_round_trip_drives_closed_loop_with_provenance():
     """Patent-evidence anchor: a real VCF, parsed and pushed through
     the cognisom pipeline, produces at least one CELL_KILLED_BY_TCELL

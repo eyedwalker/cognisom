@@ -1,7 +1,13 @@
-name: Test, Build & Deploy
+name: Test, Build & Push
 
 on:
   push:
+    branches: [main]
+  # Run the test job on pull requests too. Without this the gate only fires
+  # after a merge has already landed on main, so it cannot block a bad merge
+  # -- which is most of the value of having a gate. The deploy job below is
+  # guarded on github.event_name != 'pull_request', so PRs test but never ship.
+  pull_request:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -11,7 +17,13 @@ on:
         default: false
 
 env:
-  AWS_REGION: us-east-1
+  # us-west-2, matching where the platform actually runs. The ECR repo was
+  # the last thing left in us-east-1 after the Cognito move (#4); pushing
+  # the image to a region with none of the infrastructure in it meant every
+  # rollout pulled cross-region for no reason. The us-east-1 repo is left in
+  # place -- it holds the image history, including what production ran
+  # before this changed.
+  AWS_REGION: us-west-2
   ECR_REPOSITORY: cognisom
 
 jobs:
@@ -29,13 +41,52 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Installing mhcflurry and having its ~600 MB model weights are separate
+      # facts. Without the weights Class1PresentationPredictor.load() fails and
+      # the suite silently drops to the PWM approximation -- so CI would not be
+      # testing the predictor that ships. Cached to keep the gate fast.
+      - name: Cache MHCflurry models
+        id: mhcflurry-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/mhcflurry
+          key: mhcflurry-models-2.0.6-class1-presentation
+
+      - name: Fetch MHCflurry models
+        if: steps.mhcflurry-cache.outputs.cache-hit != 'true'
+        run: mhcflurry-downloads fetch models_class1_presentation
+
+      # Assert the REAL predictor is usable before running the suite. Without
+      # this the suite still passes when MHCflurry is unusable -- conftest.py
+      # falls back to the PWM approximation by design -- and `-q` suppresses
+      # the report header that says so, so a green run looked identical either
+      # way. That is how a missing tensorflow dependency reached the image
+      # build undetected.
+      - name: Verify MHCflurry is usable (not the PWM fallback)
+        run: |
+          python -c "
+          from mhcflurry import Class1PresentationPredictor
+          p = Class1PresentationPredictor.load()
+          assert p.supported_alleles, 'loaded but no alleles'
+          print(f'MHCflurry usable: {len(p.supported_alleles)} alleles')
+          "
+
       - name: Run tests
-        run: python -m pytest cognisom/tests/ -v -x --tb=short || true  # Don't fail on tests for now
+        # Runs the root `tests/` suite (testpaths in pytest.ini), which carries
+        # the 2026 upgrade coverage the old `cognisom/tests/` path skipped.
+        # No `|| true`: a failing test now blocks the deploy, which is the
+        # point of `needs: test`. No `-x`: one early failure used to abort the
+        # run before 8 of 18 files had executed. `-m "not slow"` defers the
+        # long integration tests to nightly-tests.yml.
+        run: python -m pytest -m "not slow" --tb=short -q
 
   # ── Build & Deploy ─────────────────────────────────────────
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     needs: test
+    # Pull requests run the test job only. Never build or deploy from a PR:
+    # the workflow holds production AWS credentials and force-deploys ECS.
+    if: github.event_name != 'pull_request'
     environment: production
 
     permissions:
@@ -82,33 +133,33 @@ jobs:
             -t "$IMAGE:latest" .
           docker push "$IMAGE" --all-tags
 
-      - name: Deploy to ECS
+      # NOTE: the ECS deploy steps that used to live here were removed.
+      # They targeted cluster `cognisom-production-cluster` in us-east-1,
+      # which does not exist in any region -- so every push to main since
+      # 2026-05-19 failed at this step, and the old `|| true` on the test job
+      # hid the other half of the breakage. Production actually runs on the
+      # EC2 host `apps-server`, deployed over SSM by hand.
+      #
+      # This job now does the part that genuinely works and is genuinely
+      # useful: build the image, run the in-container smoke check (MHCflurry
+      # loads as the runtime user, gunicorn's target imports), and push a
+      # tagged, verified image to ECR. Rolling it out stays a deliberate act
+      # rather than a side effect of merging.
+      #
+      # To deploy the image this job just pushed:
+      #   aws ssm send-command --region us-west-2 \
+      #     --instance-ids i-045606a6ff1b09070 \
+      #     --document-name AWS-RunShellScript \
+      #     --parameters 'commands=["bash /opt/cognisom/bin/deploy-apps-server.sh --pull <sha>"]'
+      #
+      # Restoring an automated deploy means either standing up the ECS stack
+      # that infrastructure/terraform/ecs.tf already describes, or replacing
+      # these steps with the SSM rollout above -- a real decision, not a
+      # missing line.
+      - name: Report pushed image
         run: |
-          GPU="${{ github.event.inputs.enable_gpu || 'false' }}"
-          if [ "$GPU" = "true" ]; then
-            SERVICE="cognisom-production-gpu"
-          else
-            SERVICE="cognisom-production-cpu"
-          fi
-
-          aws ecs update-service \
-            --cluster cognisom-production-cluster \
-            --service "$SERVICE" \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Wait for deployment stability
-        run: |
-          GPU="${{ github.event.inputs.enable_gpu || 'false' }}"
-          if [ "$GPU" = "true" ]; then
-            SERVICE="cognisom-production-gpu"
-          else
-            SERVICE="cognisom-production-cpu"
-          fi
-
-          aws ecs wait services-stable \
-            --cluster cognisom-production-cluster \
-            --services "$SERVICE" \
-            --region ${{ env.AWS_REGION }}
-
-          echo "Deployment complete and stable."
+          echo "Image pushed to ECR:"
+          echo "  ${{ steps.ecr-login.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "  ...:latest"
+          echo ""
+          echo "NOT deployed. See the note in this workflow for the rollout command."

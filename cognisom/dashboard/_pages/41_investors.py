@@ -5,6 +5,9 @@ Investor Overview
 Password-protected investor data room for Cognisom Therapeutics.
 """
 
+import hmac
+import os
+
 import streamlit as st
 from cognisom.dashboard.page_config import safe_set_page_config
 
@@ -15,7 +18,10 @@ safe_set_page_config(
 )
 
 # ── Password Gate ──────────────────────────────────────────────────
-_INVESTOR_PASSWORD = "investinme2026"
+# Set COGNISOM_INVESTOR_CODE in the environment. When it is unset the data
+# room stays closed rather than falling back to a shared default, so an
+# unconfigured deploy cannot silently publish it.
+_INVESTOR_PASSWORD = os.environ.get("COGNISOM_INVESTOR_CODE", "")
 
 if not st.session_state.get("investor_auth"):
     st.markdown("""
@@ -45,7 +51,12 @@ if not st.session_state.get("investor_auth"):
             key="investor_pw_input",
         )
         if st.button("Enter", use_container_width=True, type="primary"):
-            if pwd == _INVESTOR_PASSWORD:
+            if not _INVESTOR_PASSWORD:
+                st.error(
+                    "The data room is not configured on this deployment. "
+                    "Set COGNISOM_INVESTOR_CODE to enable access."
+                )
+            elif hmac.compare_digest(pwd, _INVESTOR_PASSWORD):
                 st.session_state["investor_auth"] = True
                 st.rerun()
             else:

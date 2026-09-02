@@ -130,20 +130,9 @@ class VirusEntity(BioEntity):
 
 
 # Register the virus entity type.
-#
-# Registered as "example_virus", not "virus": cognisom.library.models
-# bootstraps a built-in Virus entity under "virus" at import time, so
-# claiming that key made importing this plugin raise
-# DuplicateRegistrationError. Because the collision only fires when the
-# built-in registry has already been bootstrapped, the failure was
-# import-order dependent -- tests/test_registry.py failed 9 tests when
-# run alone and passed when run after a module that pulled in
-# library.models first.
-#
-# An example plugin demonstrating extensibility should not squat a
-# built-in type name. A plugin that genuinely intends to replace a
-# built-in should say so via the registry's allow_override, rather than
-# racing it on import order.
+# Namespaced as "example_virus" rather than "virus": the built-in
+# cognisom.library.models.Virus owns "virus", and a third-party plugin
+# claiming it raises DuplicateRegistrationError at import time.
 entity_registry.register_class(
     "example_virus",
     VirusEntity,
@@ -177,9 +166,8 @@ class BioPayloadCarrierAPI:
     payload_mass_kda: float = 0.0
 
 
-# "example_bio_virus_particle", not "bio_virus_particle": the latter is
-# already claimed by cognisom.biousd.schema.BioVirusParticle. Same
-# import-order collision as the entity key above.
+# Namespaced for the same reason as the entity above: cognisom.biousd.schema
+# ships a built-in BioVirusParticle under "bio_virus_particle".
 @register_prim("example_bio_virus_particle", version="1.0.0")
 @dataclass
 class BioVirusParticle(BioUnit):

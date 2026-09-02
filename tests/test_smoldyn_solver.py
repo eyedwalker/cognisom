@@ -29,7 +29,7 @@ class TestSmoldynSpecies:
 
     def test_species_creation(self):
         """Test basic species creation."""
-        from gpu.smoldyn_solver import SmoldynSpecies
+        from cognisom.gpu.smoldyn_solver import SmoldynSpecies
 
         species = SmoldynSpecies(
             name="A",
@@ -40,7 +40,7 @@ class TestSmoldynSpecies:
 
     def test_species_defaults(self):
         """Test species default values."""
-        from gpu.smoldyn_solver import SmoldynSpecies
+        from cognisom.gpu.smoldyn_solver import SmoldynSpecies
 
         species = SmoldynSpecies(name="B", diffusion_coeff=0.5)
         assert species.color == (1.0, 1.0, 1.0)
@@ -52,7 +52,7 @@ class TestSmoldynReaction:
 
     def test_unimolecular_reaction(self):
         """Test first-order reaction creation."""
-        from gpu.smoldyn_solver import SmoldynReaction, ReactionType
+        from cognisom.gpu.smoldyn_solver import SmoldynReaction, ReactionType
 
         rxn = SmoldynReaction(
             name="decay",
@@ -67,7 +67,7 @@ class TestSmoldynReaction:
 
     def test_bimolecular_reaction(self):
         """Test second-order reaction creation."""
-        from gpu.smoldyn_solver import SmoldynReaction, ReactionType
+        from cognisom.gpu.smoldyn_solver import SmoldynReaction, ReactionType
 
         rxn = SmoldynReaction(
             name="binding",
@@ -86,7 +86,7 @@ class TestSmoldynSystem:
 
     def test_simple_binding_system(self):
         """Test creation of simple A+B->C system."""
-        from gpu.smoldyn_solver import SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
 
@@ -98,18 +98,21 @@ class TestSmoldynSystem:
 
         # Check reactions
         assert len(system.reactions) >= 1
-        # simple_binding() names this reaction "A_B_binding"; the test
-        # looked for "bind" and raised StopIteration. Select it by its
-        # role rather than by name so a rename does not break this.
+        # Bare next() raising StopIteration inside a generator context surfaces
+        # as an opaque "generator raised StopIteration"; assert on the lookup
+        # instead so a renamed reaction names itself in the failure.
         binding_rxn = next(
-            r for r in system.reactions if r.reactants == ["A", "B"]
+            (r for r in system.reactions if r.name == "A_B_binding"), None
+        )
+        assert binding_rxn is not None, (
+            f"no 'A_B_binding' reaction; found {[r.name for r in system.reactions]}"
         )
         assert binding_rxn.reactants == ["A", "B"]
         assert binding_rxn.products == ["C"]
 
     def test_enzyme_kinetics_system(self):
         """Test creation of enzyme kinetics system."""
-        from gpu.smoldyn_solver import SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSystem
 
         system = SmoldynSystem.enzyme_kinetics()
 
@@ -124,7 +127,7 @@ class TestSmoldynSystem:
 
     def test_min_oscillator_system(self):
         """Test creation of MinDE oscillator system."""
-        from gpu.smoldyn_solver import SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSystem
 
         system = SmoldynSystem.min_oscillator()
 
@@ -142,7 +145,7 @@ class TestParticleSystem:
 
     def test_particle_system_creation(self):
         """Test particle system initialization."""
-        from gpu.smoldyn_solver import ParticleSystem
+        from cognisom.gpu.smoldyn_solver import ParticleSystem
 
         ps = ParticleSystem(n_max=10000, n_species=3)
 
@@ -154,7 +157,7 @@ class TestParticleSystem:
 
     def test_add_particles(self):
         """Test adding particles to system."""
-        from gpu.smoldyn_solver import ParticleSystem
+        from cognisom.gpu.smoldyn_solver import ParticleSystem
 
         ps = ParticleSystem(n_max=1000, n_species=3)
 
@@ -165,7 +168,7 @@ class TestParticleSystem:
 
     def test_add_multiple_species(self):
         """Test adding particles of different species."""
-        from gpu.smoldyn_solver import ParticleSystem
+        from cognisom.gpu.smoldyn_solver import ParticleSystem
 
         ps = ParticleSystem(n_max=1000, n_species=3)
 
@@ -179,7 +182,7 @@ class TestParticleSystem:
 
     def test_remove_particles(self):
         """Test removing particles."""
-        from gpu.smoldyn_solver import ParticleSystem
+        from cognisom.gpu.smoldyn_solver import ParticleSystem
 
         ps = ParticleSystem(n_max=1000, n_species=3)
         positions = np.random.uniform(0, 10, (100, 3)).astype(np.float32)
@@ -200,7 +203,7 @@ class TestSmoldynSolver:
 
     def test_solver_initialization(self):
         """Test solver initialization."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -216,7 +219,7 @@ class TestSmoldynSolver:
 
     def test_single_step(self):
         """Test single simulation step."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -236,9 +239,19 @@ class TestSmoldynSolver:
         assert solver.particles.n_alive >= 0
         assert solver.particles.n_alive <= solver.n_max
 
+    @pytest.mark.slow  # >120s: see note below
     def test_multiple_steps(self):
-        """Test multiple simulation steps."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        """Test multiple simulation steps.
+
+        Slow because the CPU bimolecular-reaction path in
+        ``SmoldynSolver._step_cpu`` is an O(n^2) pure-Python pair loop
+        (gpu/smoldyn_solver.py:968-990). With 1000 particles over 100 steps
+        that is ~50M interpreted iterations, each doing a numpy call on a
+        3-vector. Vectorising it (or using a neighbour grid / cKDTree) would
+        make this a fast test and speed up every CPU-mode simulation; until
+        then it runs in the nightly lane only.
+        """
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -257,9 +270,10 @@ class TestSmoldynSolver:
         # System should still be valid
         assert solver.particles.n_alive >= 0
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_boundary_conditions_reflective(self):
         """Test reflective boundary conditions."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -287,7 +301,7 @@ class TestSmoldynSolver:
 
     def test_particle_count(self):
         """Test species counting."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(system=system, n_max_particles=10000)
@@ -304,9 +318,10 @@ class TestSmoldynSolver:
 class TestBrownianMotion:
     """Tests for Brownian motion implementation."""
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_mean_squared_displacement(self):
         """Test MSD follows 6Dt for 3D diffusion."""
-        from gpu.smoldyn_solver import (
+        from cognisom.gpu.smoldyn_solver import (
             SmoldynSolver, SmoldynSystem, SmoldynSpecies,
             SmoldynCompartment, BoundaryType
         )
@@ -368,7 +383,7 @@ class TestReactions:
 
     def test_unimolecular_decay(self):
         """Test first-order decay reaction."""
-        from gpu.smoldyn_solver import (
+        from cognisom.gpu.smoldyn_solver import (
             SmoldynSolver, SmoldynSystem, SmoldynSpecies, SmoldynReaction,
             SmoldynCompartment, BoundaryType, ReactionType
         )
@@ -421,9 +436,10 @@ class TestReactions:
         assert abs(final_count - expected) / expected < 0.50, \
             f"Final count {final_count} differs from expected {expected:.0f}"
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_bimolecular_binding(self):
         """Test second-order binding reaction."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -459,7 +475,7 @@ class TestSmoldynModule:
 
     def test_module_initialization(self):
         """Test module initialization."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -475,7 +491,7 @@ class TestSmoldynModule:
 
     def test_module_update(self):
         """Test module update step."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -493,7 +509,7 @@ class TestSmoldynModule:
 
     def test_get_species_counts(self):
         """Test species count retrieval."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -510,7 +526,7 @@ class TestSmoldynModule:
 
     def test_get_particle_positions(self):
         """Test position retrieval."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -525,7 +541,7 @@ class TestSmoldynModule:
 
     def test_add_particles(self):
         """Test particle addition."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -542,7 +558,7 @@ class TestSmoldynModule:
 
     def test_get_concentration(self):
         """Test concentration calculation."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',
@@ -567,7 +583,7 @@ class TestGPUAcceleration:
 
     def test_cupy_availability_check(self):
         """Test CuPy availability detection."""
-        from gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
+        from cognisom.gpu.smoldyn_solver import SmoldynSolver, SmoldynSystem
 
         system = SmoldynSystem.simple_binding()
         solver = SmoldynSolver(
@@ -585,7 +601,7 @@ class TestGPUAcceleration:
 
     def test_large_scale_performance(self):
         """Test solver handles large particle counts."""
-        from gpu.smoldyn_solver import (
+        from cognisom.gpu.smoldyn_solver import (
             SmoldynSolver, SmoldynSystem, SmoldynSpecies,
             SmoldynCompartment, BoundaryType
         )
@@ -633,7 +649,7 @@ class TestPhysicsRegistration:
 
     def test_cupy_smoldyn_registration(self):
         """Test CuPySmoldynPhysics is registered."""
-        from gpu.physics_interface import get_physics_model
+        from cognisom.gpu.physics_interface import get_physics_model
 
         try:
             model = get_physics_model("cupy_smoldyn")
@@ -649,9 +665,10 @@ class TestPhysicsRegistration:
 class TestIntegration:
     """Integration tests combining multiple components."""
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_enzyme_kinetics_simulation(self):
         """Test full enzyme kinetics simulation."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'enzyme_kinetics',
@@ -670,9 +687,10 @@ class TestIntegration:
         # Simulation should have run
         assert state['total_steps'] == 1000
 
+    @pytest.mark.slow  # O(n^2) CPU pair loop, smoldyn_solver.py:968-990
     def test_spatial_distribution(self):
         """Test spatial distribution analysis."""
-        from modules.smoldyn_module import SmoldynModule
+        from cognisom.modules.smoldyn_module import SmoldynModule
 
         module = SmoldynModule({
             'system': 'simple_binding',

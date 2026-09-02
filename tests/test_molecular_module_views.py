@@ -23,9 +23,9 @@ if _root not in sys.path:
 
 import pytest
 
-from modules.molecular_module import MolecularModule
-from engine.py.molecular.sequence_view import CellGenomeView
-from engine.py.molecular.reference_genome import ReferenceGenome
+from cognisom.modules.molecular_module import MolecularModule
+from cognisom.engine.py.molecular.sequence_view import CellGenomeView
+from cognisom.engine.py.molecular.reference_genome import ReferenceGenome
 
 
 @pytest.fixture

@@ -18,8 +18,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from engine.py.spatial import SpatialGrid
-from engine.py.spatial.grid import GridConfig
+from cognisom.engine.py.spatial import SpatialGrid
+from cognisom.engine.py.spatial.grid import GridConfig
 
 print("=" * 70)
 print("🧬 Oxygen Diffusion Simulation")

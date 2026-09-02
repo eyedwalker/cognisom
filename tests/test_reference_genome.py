@@ -16,7 +16,7 @@ if _root not in sys.path:
 
 import pytest
 
-from engine.py.molecular.reference_genome import (
+from cognisom.engine.py.molecular.reference_genome import (
     GeneMetadata,
     ReferenceGenome,
     SubstitutionDelta,

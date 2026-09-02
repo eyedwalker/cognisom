@@ -20,8 +20,8 @@ import numpy as np
 from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
-from core.module_base import SimulationModule
-from core.event_bus import EventTypes
+from cognisom.core.module_base import SimulationModule
+from cognisom.core.event_bus import EventTypes
 
 
 @dataclass
@@ -313,7 +313,7 @@ class EpigeneticModule(SimulationModule):
 
 # Test
 if __name__ == '__main__':
-    from core import SimulationEngine, SimulationConfig
+    from cognisom.core import SimulationEngine, SimulationConfig
     from cellular_module import CellularModule
     
     print("=" * 70)

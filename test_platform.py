@@ -15,8 +15,8 @@ print()
 print("TEST 1: Core Modules")
 print("-" * 70)
 
-from core import SimulationEngine, SimulationConfig
-from modules import (MolecularModule, CellularModule, ImmuneModule,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule,
                     EpigeneticModule, CircadianModule, MorphogenModule)
 
@@ -88,7 +88,7 @@ print()
 print("TEST 3: Scenarios")
 print("-" * 70)
 
-from scenarios import run_immunotherapy_scenario
+from cognisom.scenarios import run_immunotherapy_scenario
 
 print("Running immunotherapy scenario...")
 result = run_immunotherapy_scenario()
@@ -99,7 +99,7 @@ print()
 print("TEST 4: Publication System")
 print("-" * 70)
 
-from api.publisher import Publisher
+from cognisom.api.publisher import Publisher
 
 publisher = Publisher(engine)
 files = publisher.generate_all_formats('test_report')
@@ -112,7 +112,7 @@ print()
 print("TEST 5: Performance Optimizations")
 print("-" * 70)
 
-from core.performance import SpatialIndex, VectorizedOperations
+from cognisom.core.performance import SpatialIndex, VectorizedOperations
 import numpy as np
 
 # Test spatial index

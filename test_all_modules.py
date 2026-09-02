@@ -6,8 +6,8 @@ Test All 6 Modules
 Complete integration test of all modules working together.
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import (MolecularModule, CellularModule, ImmuneModule,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import (MolecularModule, CellularModule, ImmuneModule,
                     VascularModule, LymphaticModule, SpatialModule)
 
 print("=" * 70)

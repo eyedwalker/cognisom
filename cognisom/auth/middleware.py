@@ -12,9 +12,12 @@ The auth backend is selected based on environment variables:
 from __future__ import annotations
 
 import functools
+import logging
 import os
 from pathlib import Path
 from typing import Optional
+
+log = logging.getLogger(__name__)
 
 # ── Shared auth instances ────────────────────────────────────────────
 
@@ -405,9 +408,100 @@ def _streamlit_local_login():
             st.error(msg)
 
 
+def _store_cognito_session(tokens, user) -> None:
+    """Persist a completed Cognito sign-in into the Streamlit session."""
+    import streamlit as st
+
+    st.session_state["cognito_access_token"] = tokens.access_token
+    st.session_state["cognito_refresh_token"] = tokens.refresh_token
+    st.session_state["cognito_token_expires"] = tokens.expires_at
+    st.session_state["username"] = user.username
+    st.session_state.pop("cognito_pending_challenge", None)
+
+
+def _streamlit_cognito_challenge(cognito, challenge):
+    """Answer a pending Cognito challenge.
+
+    Sign-in does not always finish in one step. An account created with
+    admin-create-user lands in FORCE_CHANGE_PASSWORD and Cognito refuses to
+    issue tokens until a new password replaces the temporary one; an account
+    with MFA enabled needs a code. Until this form existed the challenge was
+    a dead end -- the login form reported "Password change required" and gave
+    no way to supply one, so such accounts could only get in via the hosted UI.
+    """
+    import streamlit as st
+
+    if challenge.name == "NEW_PASSWORD_REQUIRED":
+        st.markdown("### Set a new password")
+        st.info(
+            "This account was created with a temporary password. "
+            "Choose a new one to finish signing in."
+        )
+        with st.form("cognito_new_password_form"):
+            new_password = st.text_input("New password", type="password")
+            confirm = st.text_input("Confirm new password", type="password")
+            submitted = st.form_submit_button("Set password and sign in", type="primary")
+
+        if submitted:
+            if not new_password or not confirm:
+                st.error("Enter the new password twice.")
+            elif new_password != confirm:
+                st.error("Those passwords do not match.")
+            else:
+                tokens, user, msg, nxt = cognito.respond_to_new_password_challenge(
+                    challenge, new_password
+                )
+                if tokens and user:
+                    _store_cognito_session(tokens, user)
+                    st.rerun()
+                elif nxt:
+                    st.session_state["cognito_pending_challenge"] = nxt
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    elif challenge.name in ("SMS_MFA", "SOFTWARE_TOKEN_MFA"):
+        st.markdown("### Enter your verification code")
+        with st.form("cognito_mfa_form"):
+            code = st.text_input("Authentication code")
+            submitted = st.form_submit_button("Verify", type="primary")
+
+        if submitted and code:
+            tokens, user, msg, _nxt = cognito.respond_to_mfa_challenge(
+                challenge.username, challenge.session, code, challenge.name
+            )
+            if tokens and user:
+                _store_cognito_session(tokens, user)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    else:
+        st.error(
+            f"This account needs a sign-in step the dashboard cannot handle "
+            f"({challenge.name}). Use the hosted login page instead."
+        )
+        if cognito.hosted_ui_url:
+            st.link_button("Open hosted login", cognito.hosted_ui_url)
+
+    # The Cognito session is single-use, so a failed attempt cannot be retried
+    # from here -- starting over reissues one from the login form.
+    if st.button("Start over"):
+        st.session_state.pop("cognito_pending_challenge", None)
+        st.rerun()
+
+
 def _streamlit_cognito_login(cognito):
     """Cognito login form."""
     import streamlit as st
+
+    # A challenge from a previous submit takes over the form entirely: the
+    # password has already been accepted, so re-showing the login fields
+    # would just invite the user to type it again.
+    pending = st.session_state.get("cognito_pending_challenge")
+    if pending is not None:
+        _streamlit_cognito_challenge(cognito, pending)
+        return
 
     # Inject autocomplete attributes for browser autofill
     st.markdown("""
@@ -442,12 +536,12 @@ def _streamlit_cognito_login(cognito):
         submitted = st.form_submit_button("Log in", type="primary")
 
     if submitted and email and password:
-        tokens, user, msg = cognito.authenticate(email, password)
+        tokens, user, msg, challenge = cognito.authenticate(email, password)
         if tokens and user:
-            st.session_state["cognito_access_token"] = tokens.access_token
-            st.session_state["cognito_refresh_token"] = tokens.refresh_token
-            st.session_state["cognito_token_expires"] = tokens.expires_at
-            st.session_state["username"] = user.username
+            _store_cognito_session(tokens, user)
+            st.rerun()
+        elif challenge is not None:
+            st.session_state["cognito_pending_challenge"] = challenge
             st.rerun()
         else:
             st.error(msg)
@@ -592,6 +686,8 @@ def _streamlit_cognito_reset_confirm(cognito):
             st.session_state.pop("cognito_access_token", None)
             st.session_state.pop("cognito_refresh_token", None)
             st.session_state.pop("cognito_token_expires", None)
+            # A challenge session from before the reset is dead too.
+            st.session_state.pop("cognito_pending_challenge", None)
             st.session_state.pop("session_id", None)
             st.session_state.pop("username", None)
             st.success("Password reset! You can now log in.")
@@ -788,20 +884,26 @@ def streamlit_page_gate(page_name: str = "", required_tier: str = ""):
     if user.role == UserRole.ADMIN:
         return user
 
-    # DEV MODE: bypass all tier checks for local development
-    # Set COGNISOM_DEV_MODE=true in .env to enable
+    # DEV MODE: bypass all tier checks for local development.
+    # Refuses to engage when Cognito is configured, so that setting
+    # COGNISOM_DEV_MODE in a deployed environment cannot open the app up.
     if os.environ.get("COGNISOM_DEV_MODE", "").lower() in ("true", "1", "yes"):
-        return user
-
-    # Cognito users bypass org tier checks (they authenticated via AWS Cognito)
-    # They get full access since they're using enterprise authentication
-    if is_cognito_enabled():
-        cognito_token = st.session_state.get("cognito_access_token")
-        if cognito_token:
-            # User authenticated via Cognito - grant full access
+        if is_cognito_enabled():
+            log.warning(
+                "COGNISOM_DEV_MODE is set but Cognito is configured; "
+                "ignoring dev-mode bypass and enforcing tier checks."
+            )
+        else:
             return user
 
-    # Check org tier for page access (local auth only)
+    # NOTE: authenticating via Cognito previously returned `user` here
+    # unconditionally, which granted every signed-in account access to every
+    # page -- including those that start GPU instances and submit HealthOmics
+    # runs. Cognito proves *identity*; it says nothing about entitlement.
+    # Authorization is now decided by org tier below for local and Cognito
+    # users alike.
+
+    # Check org tier for page access
     org_mgr = _get_org_manager()
     org = org_mgr.get_org(user.org_id) if user.org_id else None
 
@@ -810,7 +912,18 @@ def streamlit_page_gate(page_name: str = "", required_tier: str = ""):
         st.stop()
         return None
 
-    allowed_pages = org_mgr.get_page_access(user.org_id)
+    allowed_pages = set(org_mgr.get_page_access(user.org_id))
+
+    # Cognito-authenticated accounts are provisioned onto the FREE plan by
+    # default (see _ensure_cognito_user_org), which grants three pages.
+    # Before the bypass above was removed that never mattered, because every
+    # Cognito user was waved straight through. Granting them the INSTITUTION
+    # baseline keeps the clinical journey working for existing accounts while
+    # still gating the ENTERPRISE-only pages that spend AWS money.
+    if is_cognito_enabled() and st.session_state.get("cognito_access_token"):
+        from .organization import TIER_PAGE_ACCESS, SubscriptionTier
+        allowed_pages |= set(TIER_PAGE_ACCESS[SubscriptionTier.INSTITUTION])
+
     if effective_page not in allowed_pages:
         tier_name = org.plan.value.title()
         st.error(

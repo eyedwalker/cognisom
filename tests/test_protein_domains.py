@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import pytest
 
-from engine.py.molecular.mutation_effect import MutationEffectClassifier
-from engine.py.molecular.protein_domains import (
+from cognisom.engine.py.molecular.mutation_effect import MutationEffectClassifier
+from cognisom.engine.py.molecular.protein_domains import (
     DOMAINS,
     ROLE_MULTIPLIER,
     ProteinDomain,
@@ -112,7 +112,7 @@ def test_expanded_panel_covers_20_plus_cancer_drivers():
     """Patent-claim breadth: the domain table covers a clinically
     meaningful panel of cancer driver genes, not just the three
     canonical hotspots used for the closed-loop demo."""
-    from engine.py.molecular.protein_domains import DOMAINS
+    from cognisom.engine.py.molecular.protein_domains import DOMAINS
     assert len(DOMAINS) >= 20, (
         f"expanded driver panel has only {len(DOMAINS)} genes; "
         "patent breadth claim expects >= 20"
@@ -168,7 +168,7 @@ def test_kras_g12d_impact_amplified_in_p_loop(clf):
     """KRAS G12D: BLOSUM(G,D)=-1 yields a modest base impact; the
     P-loop multiplier (4.0x, critical) must push it to the missense
     ceiling 0.85."""
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
     stage_a = clf.classify_substitution(KRAS_CDS, KRAS_G12_BASE_POS, "A")
     stage_b = clf.classify_substitution(
         KRAS_CDS, KRAS_G12_BASE_POS, "A", gene_name="KRAS",
@@ -185,7 +185,7 @@ def test_kras_g12d_impact_amplified_in_p_loop(clf):
 
 
 def test_braf_v600e_impact_amplified_in_activation_loop(clf):
-    from engine.py.molecular.reference_cds import BRAF_CDS
+    from cognisom.engine.py.molecular.reference_cds import BRAF_CDS
     stage_a = clf.classify_substitution(BRAF_CDS, BRAF_V600_BASE_POS, "A")
     stage_b = clf.classify_substitution(
         BRAF_CDS, BRAF_V600_BASE_POS, "A", gene_name="BRAF",
@@ -197,7 +197,7 @@ def test_braf_v600e_impact_amplified_in_activation_loop(clf):
 
 
 def test_tp53_r248w_impact_amplified_in_dbd(clf):
-    from engine.py.molecular.reference_cds import TP53_CDS
+    from cognisom.engine.py.molecular.reference_cds import TP53_CDS
     stage_a = clf.classify_substitution(TP53_CDS, TP53_R248_BASE_POS, "T")
     stage_b = clf.classify_substitution(
         TP53_CDS, TP53_R248_BASE_POS, "T", gene_name="TP53",
@@ -211,7 +211,7 @@ def test_tp53_r248w_impact_amplified_in_dbd(clf):
 def test_stage_a_path_unchanged_without_gene_name(clf):
     """The gene_name=None path must match the prior Stage A output
     bit-for-bit so existing callers do not silently change behaviour."""
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
     a = clf.classify_substitution(KRAS_CDS, KRAS_G12_BASE_POS, "A")
     a_explicit = clf.classify_substitution(
         KRAS_CDS, KRAS_G12_BASE_POS, "A", gene_name=None,
@@ -231,7 +231,7 @@ def test_missense_outside_any_domain_no_multiplier(clf):
     functional annotation in protein_domains._KRAS. Stage B must leave
     impact unchanged here.
     """
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
 
     # Sanity-check the curator's understanding: codon 20 must NOT be
     # in any annotated KRAS domain.
@@ -272,7 +272,7 @@ def test_amplified_impact_stops_at_missense_ceiling(clf):
     """Even the most radical critical-region missense should clamp at
     _MISSENSE_IMPACT_MAX (0.85). Verified for KRAS G12D where base
     impact ~0.51 and multiplier 4.0 would otherwise produce 2.04."""
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
     e = clf.classify_substitution(
         KRAS_CDS, KRAS_G12_BASE_POS, "A", gene_name="KRAS",
     )
@@ -282,7 +282,7 @@ def test_amplified_impact_stops_at_missense_ceiling(clf):
 def test_synonymous_path_unaffected_by_gene_name(clf):
     """Synonymous substitutions return impact=0 regardless of the
     domain -- there is no AA change to amplify."""
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
     # Find a synonymous third-base wobble in the P-loop region.
     for codon_1based in range(10, 18):
         codon_start = (codon_1based - 1) * 3
@@ -293,7 +293,7 @@ def test_synonymous_path_unaffected_by_gene_name(clf):
             if new_third == wt_codon[2]:
                 continue
             mut_codon = wt_codon[:2] + new_third
-            from engine.py.molecular.mutation_effect import _CODON_TABLE
+            from cognisom.engine.py.molecular.mutation_effect import _CODON_TABLE
             if _CODON_TABLE.get(wt_codon) == _CODON_TABLE.get(mut_codon):
                 e = clf.classify_substitution(
                     KRAS_CDS, codon_start + 2, new_third,
@@ -312,11 +312,11 @@ def test_synonymous_path_unaffected_by_gene_name(clf):
 def test_nonsense_path_unaffected_by_domain_multiplier(clf):
     """Nonsense mutations have their own impact scoring path; the
     Stage B multiplier must not amplify them."""
-    from engine.py.molecular.reference_cds import KRAS_CDS
+    from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
     # Find a position in the P-loop where the substitution yields a
     # premature stop. Codon 12 GGT -> TGT is C, not stop. We need a
     # codon like CAG -> TAG (Q->*) etc. Just scan to find one.
-    from engine.py.molecular.mutation_effect import _CODON_TABLE
+    from cognisom.engine.py.molecular.mutation_effect import _CODON_TABLE
     found = False
     for codon_1based in range(10, 18):
         codon_start = (codon_1based - 1) * 3

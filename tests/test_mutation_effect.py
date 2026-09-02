@@ -22,7 +22,7 @@ if _root not in sys.path:
 
 import pytest
 
-from engine.py.molecular.mutation_effect import (
+from cognisom.engine.py.molecular.mutation_effect import (
     MutationEffectClassifier,
     MutationEffect,
     blosum62,

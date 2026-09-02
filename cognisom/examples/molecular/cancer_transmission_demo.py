@@ -23,8 +23,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-from engine.py.molecular.nucleic_acids import Gene, RNA, NucleicAcidType
-from engine.py.molecular.exosomes import Exosome, ExosomeSystem
+from cognisom.engine.py.molecular.nucleic_acids import Gene, RNA, NucleicAcidType
+from cognisom.engine.py.molecular.exosomes import Exosome, ExosomeSystem
 
 
 class SimplifiedCell:

@@ -17,7 +17,7 @@ import math
 
 import pytest
 
-from engine.py.immune.tcell_kill import (
+from cognisom.engine.py.immune.tcell_kill import (
     DEFAULT_HILL_THRESHOLD,
     KillOutcome,
     kill_outcome,

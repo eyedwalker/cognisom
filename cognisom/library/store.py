@@ -49,7 +49,15 @@ def get_database_url() -> Optional[str]:
     if secret_arn:
         try:
             import boto3
-            client = boto3.client("secretsmanager", region_name="us-east-1")
+            # Region comes from the secret's own ARN rather than a hardcoded
+            # one: this used to pin us-east-1 while the rest of the platform
+            # runs in us-west-2, so any secret created alongside the servers
+            # was unreachable. Falls back to the ambient region for a bare
+            # secret name.
+            arn_parts = secret_arn.split(":")
+            secret_region = arn_parts[3] if secret_arn.startswith("arn:") and len(arn_parts) > 3 else None
+            client = boto3.client("secretsmanager", region_name=secret_region) if secret_region \
+                else boto3.client("secretsmanager")
             response = client.get_secret_value(SecretId=secret_arn)
             secret = json.loads(response["SecretString"])
             return secret.get("url")

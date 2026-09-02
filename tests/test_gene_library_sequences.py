@@ -24,8 +24,8 @@ import warnings
 
 import pytest
 
-from modules.molecular_module import MolecularModule
-from engine.py.molecular.mutation_effect import MutationEffectClassifier
+from cognisom.modules.molecular_module import MolecularModule
+from cognisom.engine.py.molecular.mutation_effect import MutationEffectClassifier
 
 
 @pytest.fixture

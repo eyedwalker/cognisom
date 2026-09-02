@@ -339,7 +339,7 @@ class SingleCellBridge:
             for ic_cfg in config.immune_cells:
                 immune_id = immune.next_immune_id
                 immune.next_immune_id += 1
-                from modules.immune_module import ImmuneCell
+                from cognisom.modules.immune_module import ImmuneCell
                 ic = ImmuneCell(
                     cell_id=immune_id,
                     position=np.array(ic_cfg["position"], dtype=np.float32),

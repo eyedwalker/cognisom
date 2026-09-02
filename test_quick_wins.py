@@ -6,9 +6,9 @@ Test All Quick Wins
 Test GUI, scenarios, and data export.
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, ImmuneModule, VascularModule
-from scenarios import (run_immunotherapy_scenario, run_hypoxia_scenario,
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, ImmuneModule, VascularModule
+from cognisom.scenarios import (run_immunotherapy_scenario, run_hypoxia_scenario,
                       run_epigenetic_therapy_scenario)
 
 print("=" * 70)

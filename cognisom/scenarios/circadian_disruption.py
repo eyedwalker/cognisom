@@ -9,8 +9,8 @@ Simulate jet lag / shift work effects.
 import sys
 sys.path.insert(0, '..')
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, CircadianModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, CircadianModule
 
 
 def run_circadian_disruption_scenario():

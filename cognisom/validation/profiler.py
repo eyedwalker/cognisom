@@ -177,7 +177,7 @@ class SimulationProfiler:
         try:
             from cognisom.core.simulation_engine import SimulationEngine, SimulationConfig
         except ImportError:
-            from core.simulation_engine import SimulationEngine, SimulationConfig
+            from cognisom.core.simulation_engine import SimulationEngine, SimulationConfig
 
         module_configs = module_configs or {}
         sim_config = SimulationConfig(dt=dt, duration=duration)

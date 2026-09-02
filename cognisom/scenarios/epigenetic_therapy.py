@@ -9,8 +9,8 @@ Simulate DNA methyltransferase inhibitors (DNMTi).
 import sys
 sys.path.insert(0, '..')
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, EpigeneticModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, EpigeneticModule
 
 
 def run_epigenetic_therapy_scenario():

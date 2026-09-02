@@ -9,8 +9,8 @@ Test all three modules working together:
 - Immune (T cells/NK cells/killing)
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import MolecularModule, CellularModule, ImmuneModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import MolecularModule, CellularModule, ImmuneModule
 
 print("=" * 70)
 print("FULL INTEGRATION TEST: Molecular + Cellular + Immune")

@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from engine.py.immune.tme_classifier import (
+from cognisom.engine.py.immune.tme_classifier import (
     DEFAULT_PDL1_FRAC_POS,
     DEFAULT_PDL1_PER_CELL_POS,
     DEFAULT_TIL_RATIO_POS,
@@ -228,11 +228,11 @@ def test_end_to_end_kras_g12d_yields_type_i_with_event_emission():
     adaptive PD-L1 induction. The colocated T cell makes the tumor
     TIL+; the activation-driven PD-L1 bump makes it PD-L1+. Result:
     Type I, ICB-responsive."""
-    from core import SimulationConfig, SimulationEngine
-    from core.event_bus import EventTypes
-    from modules.cellular_module import CellularModule
-    from modules.immune_module import ImmuneModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.core.event_bus import EventTypes
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.immune_module import ImmuneModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     np.random.seed(0)
     engine = SimulationEngine(SimulationConfig(

@@ -18,15 +18,15 @@ import math
 import numpy as np
 import pytest
 
-from engine.py.immune.mhc_loading import MHCPresentation
-from engine.py.immune.tcr_repertoire import (
+from cognisom.engine.py.immune.mhc_loading import MHCPresentation
+from cognisom.engine.py.immune.tcr_repertoire import (
     FEATURE_DIM,
     TCRRepertoire,
     affinity,
     cdr3_to_features,
     presentation_to_features,
 )
-from engine.py.molecular.peptidome import Peptide
+from cognisom.engine.py.molecular.peptidome import Peptide
 
 
 def _make_presentation(seq: str, allele: str, mut: bool = False) -> MHCPresentation:

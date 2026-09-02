@@ -180,19 +180,16 @@ class TestBatchedODEIntegrator:
         integrator = BatchedODEIntegrator(system, n_cells=50, method='rk45')
 
         y0 = np.random.rand(50, 2) * 100
-        integrator._state = ODEState(y=y0.astype(np.float32), t=0.0, dt=0.01, order=1)
+        # ODEState stores float32; compare against the same precision the
+        # integrator actually holds rather than the float64 source.
+        y0_stored = y0.astype(np.float32)
+        integrator._state = ODEState(y=y0_stored, t=0.0, dt=0.01, order=1)
 
         mrna = integrator.get_species('mRNA')
         protein = integrator.get_species('Protein')
 
         assert mrna.shape == (50,)
         assert protein.shape == (50,)
-        # The integrator stores state as float32 (see the ODEState
-        # construction above), so compare against the float32 view of
-        # y0 rather than the float64 original. Comparing to y0 directly
-        # asserted that a float32 round-trip is lossless and failed at
-        # ~6e-8 relative, which is just below float32 epsilon.
-        y0_stored = y0.astype(np.float32)
         np.testing.assert_array_equal(mrna, y0_stored[:, 0])
         np.testing.assert_array_equal(protein, y0_stored[:, 1])
 

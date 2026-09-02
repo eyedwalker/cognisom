@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from engine.py.immune.sympathetic import (
+from cognisom.engine.py.immune.sympathetic import (
     DEFAULT_MAX_SUPPRESSION,
     SympatheticState,
     sympathetic_attenuation,
@@ -121,10 +121,10 @@ def test_state_fields_match_attenuation():
 # ---------------------------------------------------------------------------
 
 def _build_engine(**immune_overrides):
-    from core import SimulationConfig, SimulationEngine
-    from modules.cellular_module import CellularModule
-    from modules.immune_module import ImmuneModule
-    from modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.immune_module import ImmuneModule
+    from cognisom.modules.molecular_module import MolecularModule
 
     engine = SimulationEngine(SimulationConfig(
         dt=0.01, duration=0.05, use_gpu=False,

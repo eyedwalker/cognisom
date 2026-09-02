@@ -135,6 +135,19 @@ class NeoantigenPredictor:
 
     def __init__(self):
         self.mapper = GeneProteinMapper()
+        # Records which scorer actually produced the affinities, so callers
+        # and reports can distinguish a real prediction from a PWM estimate.
+        self._binding_method: str = "unknown"
+
+    @property
+    def binding_method(self) -> str:
+        """Scorer used for the most recent prediction.
+
+        One of ``"mhcflurry-2.0.6"``, ``"pwm-fallback"``, or ``"unknown"``
+        before any prediction has run. Surface this anywhere affinities are
+        displayed or exported.
+        """
+        return self._binding_method
 
     def predict(
         self,
@@ -336,14 +349,30 @@ class NeoantigenPredictor:
         Returns:
             Predicted IC50 in nanomolar (lower = stronger binding).
         """
-        # Try MHCflurry first (production-grade)
-        try:
-            from .mhcflurry_binding import predict_binding, is_mhcflurry_available
-            if is_mhcflurry_available():
+        # Try MHCflurry first (production-grade).
+        # MHCflurryUnavailableError is deliberately NOT caught: it means the
+        # real predictor is missing and the operator has not opted in to the
+        # approximate PWM scorer. Swallowing it here is what allowed the
+        # fallback to run unnoticed in production.
+        from .mhcflurry_binding import (
+            predict_binding,
+            is_mhcflurry_available,
+            MHCflurryUnavailableError,
+        )
+        if is_mhcflurry_available():
+            try:
                 result = predict_binding(peptide, hla_allele)
+                self._binding_method = "mhcflurry-2.0.6"
                 return result.affinity_nm
-        except Exception:
-            pass  # Fall through to PWM
+            except MHCflurryUnavailableError:
+                raise
+            except Exception as e:
+                logger.warning(
+                    "MHCflurry prediction failed for %s/%s (%s); using PWM "
+                    "estimate for this peptide.", peptide, hla_allele, e
+                )
+
+        self._binding_method = "pwm-fallback"
         # Normalize allele format
         if not hla_allele.startswith("HLA-"):
             hla_allele = f"HLA-{hla_allele}"

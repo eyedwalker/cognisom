@@ -27,12 +27,19 @@ wheels/
 # Secrets and API keys
 .env
 .env.*
+# ...but the template carries no secrets and is how a fresh clone discovers
+# which variables are required.
+!.env.example
 *.key
 secrets/
 
 # Terraform
 infrastructure/terraform/.terraform/
-infrastructure/terraform/.terraform.lock.hcl
+# NOTE: .terraform.lock.hcl is deliberately NOT ignored. It pins provider
+# versions and must be committed, or `terraform init` can resolve different
+# providers against production on each run (switch-compute-mode.yml applies
+# with -auto-approve).
+!infrastructure/terraform/.terraform.lock.hcl
 infrastructure/terraform/terraform.tfvars
 infrastructure/terraform/*.tfstate
 infrastructure/terraform/*.tfstate.backup

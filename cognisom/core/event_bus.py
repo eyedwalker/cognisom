@@ -29,6 +29,28 @@ class EventTypes:
     CANCER_KILLED = 'cancer_killed'
     IMMUNE_SUPPRESSED = 'immune_suppressed'
     IMMUNE_RECRUITED = 'immune_recruited'
+
+    # Closed-loop neoantigen presentation (Upgrade 2). Ordered causally:
+    # MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
+    # CELL_KILLED_BY_TCELL. End-to-end test asserts this trace appears
+    # for a transformed cell whose neoantigen is recognized by the
+    # patient's TCR repertoire.
+    PEPTIDE_GENERATED = 'peptide_generated'
+    PEPTIDE_PRESENTED = 'peptide_presented'
+    CELL_KILLED_BY_TCELL = 'cell_killed_by_tcell'
+
+    # TME 4-type classification (Teng et al., Cancer Res 2015).
+    # Emitted when ImmuneModule.classify_tme() is called; data carries
+    # the full TMEClassification dataclass fields plus the resolved type.
+    TME_CLASSIFIED = 'tme_classified'
+
+    # T-cell exhaustion transition (Dolina et al. 2021, Wherry / Bengsch
+    # exhaustion literature). Fires once per clone when its encounter
+    # counter crosses the exhaustion threshold and it transitions from
+    # PD-1-lo precursor to PD-1-hi exhausted. The patent-evidence point
+    # is gating ICB rescue on the precursor pool: this event marks
+    # clones that have left it.
+    TCELL_EXHAUSTED = 'tcell_exhausted'
     
     # Tissue events
     HYPOXIA_DETECTED = 'hypoxia_detected'

@@ -20,7 +20,7 @@ if _root not in sys.path:
 
 import pytest
 
-from engine.py.molecular.nucleic_acids import DNA, RNA, NucleicAcidType
+from cognisom.engine.py.molecular.nucleic_acids import DNA, RNA, NucleicAcidType
 
 
 # -- short oligos: Wallace rule must match exactly ---------------------------

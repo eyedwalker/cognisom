@@ -313,7 +313,7 @@ class ParameterCalibrator:
         try:
             from cognisom.core.simulation_engine import SimulationEngine, SimulationConfig
         except ImportError:
-            from core.simulation_engine import SimulationEngine, SimulationConfig
+            from cognisom.core.simulation_engine import SimulationEngine, SimulationConfig
 
         # Build config from parameter values
         config = dict(benchmark.sim_config) if benchmark.sim_config else {}

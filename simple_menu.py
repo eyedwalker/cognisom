@@ -6,8 +6,8 @@ Simple Text Menu
 Text-based menu that works in terminal.
 """
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, ImmuneModule, VascularModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, ImmuneModule, VascularModule
 
 def show_menu():
     """Show main menu"""
@@ -100,19 +100,19 @@ def main():
             
         elif choice == '6':
             print("\n💉 Running immunotherapy scenario...")
-            from scenarios import run_immunotherapy_scenario
+            from cognisom.scenarios import run_immunotherapy_scenario
             result = run_immunotherapy_scenario()
             print(f"\n✓ Complete! Cancer cells: {result['cellular']['n_cancer']}")
             
         elif choice == '7':
             print("\n🫁 Running hypoxia scenario...")
-            from scenarios import run_hypoxia_scenario
+            from cognisom.scenarios import run_hypoxia_scenario
             result = run_hypoxia_scenario()
             print(f"\n✓ Complete! Hypoxic regions: {result['vascular']['hypoxic_regions']}")
             
         elif choice == '8':
             print("\n📑 Generating report...")
-            from api.publisher import Publisher
+            from cognisom.api.publisher import Publisher
             publisher = Publisher(engine)
             files = publisher.generate_all_formats('report')
             print("\n✓ Reports generated:")

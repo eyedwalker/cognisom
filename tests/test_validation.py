@@ -40,16 +40,20 @@ class TestBenchmarks:
                 assert len(ds.data_points) >= 2
 
     def test_benchmark_categories(self):
+        """The core benchmark categories are present and populated.
+
+        Asserted as a subset, not equality: the suite has since grown
+        "ode_solver", "smoldyn" and "hybrid", and an equality check turned
+        every future benchmark addition into a test failure. Categories are
+        also required to be non-empty, which is what the assertion was
+        really guarding.
+        """
         from cognisom.validation.benchmarks import get_all_benchmarks
         bms = get_all_benchmarks()
-        # The solver-parity categories (ode_solver, hybrid, smoldyn)
-        # were added after this test was written, and an equality
-        # assertion made every new category a test failure. Require the
-        # original three and let the set grow.
-        required = {"tumor_growth", "immune", "metabolic"}
-        assert required <= set(bms.keys()), (
-            f"missing benchmark categories: {required - set(bms.keys())}"
-        )
+        core = {"tumor_growth", "immune", "metabolic"}
+        assert core <= set(bms.keys()), f"missing core categories: {core - set(bms.keys())}"
+        empty = [cat for cat, datasets in bms.items() if not datasets]
+        assert not empty, f"benchmark categories with no datasets: {empty}"
 
     def test_benchmark_count(self):
         from cognisom.validation.benchmarks import summary

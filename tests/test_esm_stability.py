@@ -37,7 +37,7 @@ import os
 
 import pytest
 
-from engine.py.molecular.esm_stability import (
+from cognisom.engine.py.molecular.esm_stability import (
     DEFAULT_ESM_MODEL,
     ESMStabilityResult,
     RealESMStabilityScorer,
@@ -45,8 +45,8 @@ from engine.py.molecular.esm_stability import (
     apply_stability_to_impact,
     delta_ll_to_stability_modifier,
 )
-from engine.py.molecular.mutation_effect import MutationEffectClassifier
-from engine.py.molecular.reference_cds import KRAS_CDS
+from cognisom.engine.py.molecular.mutation_effect import MutationEffectClassifier
+from cognisom.engine.py.molecular.reference_cds import KRAS_CDS
 
 
 # Curated KRAS WT protein for the classifier integration tests
@@ -317,7 +317,7 @@ def test_synonymous_path_does_not_call_esm(clf):
 
     spy = _SpyScorer()
     # Find a synonymous wobble in KRAS
-    from engine.py.molecular.mutation_effect import _CODON_TABLE
+    from cognisom.engine.py.molecular.mutation_effect import _CODON_TABLE
     found = False
     for codon_1based in range(1, 50):
         cs = (codon_1based - 1) * 3

@@ -12,8 +12,8 @@ Concept: Deliver treatment when cancer cells are most vulnerable
 import sys
 sys.path.insert(0, '..')
 
-from core import SimulationEngine, SimulationConfig
-from modules import CellularModule, CircadianModule
+from cognisom.core import SimulationEngine, SimulationConfig
+from cognisom.modules import CellularModule, CircadianModule
 
 
 def run_chronotherapy_scenario():
