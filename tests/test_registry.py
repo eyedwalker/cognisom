@@ -474,18 +474,26 @@ class TestVirusPlugin:
         assert True
 
     def test_virus_entity_registered(self):
-        """Test that VirusEntity is registered."""
+        """Test that VirusEntity is registered under the plugin's own key.
+
+        Asserting ``"virus" in entity_registry`` would pass on the
+        built-in Virus entity alone, so it did not actually test that
+        the plugin registered anything. Assert on the plugin's key and
+        on the class behind it.
+        """
         import cognisom.plugins.examples.virus_plugin
         from cognisom.library.models import entity_registry
+        from cognisom.plugins.examples.virus_plugin import VirusEntity
 
-        assert "virus" in entity_registry
+        assert "example_virus" in entity_registry
+        assert entity_registry.get("example_virus") is VirusEntity
 
     def test_virus_prim_registered(self):
         """Test that BioVirusParticle is registered."""
         import cognisom.plugins.examples.virus_plugin
         from cognisom.biousd.schema import prim_registry
 
-        assert "bio_virus_particle" in prim_registry
+        assert "example_bio_virus_particle" in prim_registry
 
     def test_virus_module_registered(self):
         """Test that VirusModule is registered."""
