@@ -24,7 +24,11 @@ from dataclasses import dataclass, field
 from core.module_base import SimulationModule
 from core.event_bus import EventTypes
 from engine.py.immune.mhc_loading import MHCPresentation
-from engine.py.immune.tcr_repertoire import TCRMatch, TCRRepertoire
+from engine.py.immune.tcr_repertoire import (
+    ExhaustionState,
+    TCRMatch,
+    TCRRepertoire,
+)
 from engine.py.immune.tcell_kill import kill_outcome
 from engine.py.immune.tme_classifier import (
     TMEClassification,
@@ -539,6 +543,43 @@ class ImmuneModule(SimulationModule):
 
         return False, None
 
+    def _live_is_exhausted(self, match) -> bool:
+        """Resolve a TCR clone's exhaustion state from the repertoire.
+
+        ``TCRMatch`` is a *snapshot* taken at recognition time and cached
+        on the immune cell as ``active_tcr_match``. It is rewritten only
+        when the T cell re-recognizes a target, and cleared on target
+        loss or kill. But exhaustion accrues on every step of a
+        sustained engagement (``register_engagement`` in the contact
+        branch of ``_update_immune_cells``), so a clone can cross the
+        exhaustion threshold while the cached snapshot still reports
+        PRECURSOR.
+
+        Reading ``match.is_exhausted`` therefore misses the transition
+        for the whole duration of the engagement that caused it, which
+        is precisely the chronic-antigen-exposure regime the two-state
+        model exists to represent. Resolving against the repertoire by
+        clone id keeps the ICB-rescue gate honest within a single
+        engagement.
+
+        Falls back to the snapshot when the clone is unknown to the
+        repertoire (repertoire replaced mid-run, or a match constructed
+        by a caller outside the normal recognition path).
+        """
+        if self._tcr_repertoire is None:
+            return bool(match.is_exhausted)
+        tcr = getattr(match, 'tcr', None)
+        tcr_id = getattr(tcr, 'tcr_id', None)
+        if tcr_id is None:
+            return bool(match.is_exhausted)
+        try:
+            return (
+                self._tcr_repertoire.exhaustion_state(tcr_id)
+                is ExhaustionState.EXHAUSTED
+            )
+        except KeyError:
+            return bool(match.is_exhausted)
+
     def _target_kill_probability(self, immune_cell: ImmuneCell, target_cell) -> float:
         """Per-encounter kill probability.
 
@@ -555,10 +596,10 @@ class ImmuneModule(SimulationModule):
                 costimulation=self.costimulation,
                 checkpoint_block=self.checkpoint_block,
                 # Lecture slide 52: exhausted clones cannot be rescued
-                # by checkpoint blockade. Pass through the match's
-                # exhaustion state so kill_outcome gates the rescue
-                # term and applies the exhaustion multiplier.
-                is_exhausted=match.is_exhausted,
+                # by checkpoint blockade. The exhaustion state is read
+                # LIVE from the repertoire rather than from the cached
+                # TCRMatch -- see _live_is_exhausted for why.
+                is_exhausted=self._live_is_exhausted(match),
             )
             # Sympathetic suppression (Upgrade 7): β2AR drive scales
             # T-cell function down; β-blocker rescues. Composes with

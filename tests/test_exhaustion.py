@@ -326,3 +326,108 @@ def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
         imm._tcr_repertoire.exhaustion_state(exhausted_id)
         is ExhaustionState.EXHAUSTED
     )
+
+
+def test_kill_probability_drops_when_clone_exhausts_mid_engagement():
+    """Regression: exhaustion must reach the kill computation DURING a
+    sustained engagement, not only after the T cell re-recognizes.
+
+    ``active_tcr_match`` is a snapshot cached at recognition time and
+    refreshed only on re-recognition (cleared on target loss/kill). But
+    ``register_engagement`` fires on every step of continuous contact,
+    so a clone crosses the exhaustion threshold *while the snapshot is
+    still stale*. Reading exhaustion off that snapshot meant the
+    ICB-rescue gate stayed open for the entire engagement that caused
+    the exhaustion -- exactly the chronic-antigen regime the two-state
+    model exists to represent.
+
+    This test pins the live-resolution behaviour: with the cached match
+    object deliberately left untouched, crossing the threshold in the
+    repertoire must still collapse the per-encounter kill probability.
+    """
+    from core import SimulationConfig, SimulationEngine
+    from modules.cellular_module import CellularModule
+    from modules.immune_module import ImmuneModule
+    from modules.molecular_module import MolecularModule
+
+    np.random.seed(0)
+    engine = SimulationEngine(SimulationConfig(
+        dt=0.01, duration=0.02, use_gpu=False,
+    ))
+    engine.register_module("molecular", MolecularModule, {
+        "transcription_rate": 0.0,
+        "exosome_release_rate": 0.0,
+        "mutation_rate": 0.0,
+    })
+    engine.register_module("cellular", CellularModule, {
+        "n_normal_cells": 0, "n_cancer_cells": 0,
+        "hla_alleles": ["HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02"],
+    })
+    engine.register_module("immune", ImmuneModule, {
+        "n_t_cells": 1, "n_nk_cells": 0, "n_macrophages": 0,
+        "tcr_recognition_threshold": 0.0,
+        "tcr_repertoire_size": 200,
+        "tcr_seed": 0,
+        # Checkpoint blockade ON: this is what makes the test
+        # discriminating. A precursor clone gets the rescue term; an
+        # exhausted clone must not.
+        "costimulation": 0.2,
+        "checkpoint_block": 1.0,
+    })
+    engine.initialize()
+    mol = engine.modules["molecular"]
+    cel = engine.modules["cellular"]
+    imm = engine.modules["immune"]
+    cel.set_molecular_module(mol)
+    imm.set_cellular_module(cel)
+
+    pos = [100.0, 100.0, 50.0]
+    cancer_id = cel.add_cell(position=pos, cell_type="cancer")
+    cel.cells[cancer_id].mhc1_expression = 0.9
+    mol.add_cell(cancer_id)
+    t_id = next(iter(imm.immune_cells))
+    tcell = imm.immune_cells[t_id]
+    tcell.position = np.array(pos, dtype=np.float32)
+
+    # Keep the threshold out of reach so the run below establishes a
+    # recognition without incidentally exhausting the clone.
+    imm._tcr_repertoire.exhaustion_threshold = 10_000
+
+    mol.introduce_mutation(cancer_id, "KRAS", "G12D")
+    engine.run(duration=0.02)
+    engine.event_bus.process_events()
+
+    match = tcell.active_tcr_match
+    assert match is not None, (
+        "expected the T cell to have recognized the neoantigen and "
+        "cached a TCRMatch"
+    )
+    target = cel.cells[cancer_id]
+
+    p_precursor = imm._target_kill_probability(tcell, target)
+    assert p_precursor > 0.0
+
+    # Drive the clone over the threshold WITHOUT re-recognition, so the
+    # cached snapshot is left stale on purpose.
+    tcr_id = match.tcr.tcr_id
+    imm._tcr_repertoire.exhaustion_threshold = 1
+    imm._tcr_repertoire.register_engagement(tcr_id)
+    assert (
+        imm._tcr_repertoire.exhaustion_state(tcr_id)
+        is ExhaustionState.EXHAUSTED
+    )
+
+    # The snapshot is indeed stale -- that is the condition under which
+    # the original implementation silently kept the rescue term.
+    assert tcell.active_tcr_match is match
+    assert match.is_exhausted is False, (
+        "precondition: the cached match must still report PRECURSOR, "
+        "otherwise this test is not exercising the regression"
+    )
+
+    p_exhausted = imm._target_kill_probability(tcell, target)
+    assert p_exhausted < p_precursor, (
+        "kill probability must collapse once the clone exhausts, even "
+        "though the cached TCRMatch still reports PRECURSOR "
+        f"(precursor={p_precursor:.6f}, exhausted={p_exhausted:.6f})"
+    )
