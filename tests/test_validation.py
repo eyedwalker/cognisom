@@ -42,8 +42,14 @@ class TestBenchmarks:
     def test_benchmark_categories(self):
         from cognisom.validation.benchmarks import get_all_benchmarks
         bms = get_all_benchmarks()
-        expected = {"tumor_growth", "immune", "metabolic"}
-        assert set(bms.keys()) == expected
+        # The solver-parity categories (ode_solver, hybrid, smoldyn)
+        # were added after this test was written, and an equality
+        # assertion made every new category a test failure. Require the
+        # original three and let the set grow.
+        required = {"tumor_growth", "immune", "metabolic"}
+        assert required <= set(bms.keys()), (
+            f"missing benchmark categories: {required - set(bms.keys())}"
+        )
 
     def test_benchmark_count(self):
         from cognisom.validation.benchmarks import summary

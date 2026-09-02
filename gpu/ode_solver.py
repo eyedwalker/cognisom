@@ -458,6 +458,37 @@ class BatchedODEIntegrator:
         """
         self._cell_params = cell_params.astype(np.float32)
 
+    def _cpu_params(self):
+        """Parameter mapping for the CPU right-hand side.
+
+        Per-cell parameters were only ever read by the CUDA kernels,
+        which index ``cell_params[cell * n_cell_params + k]``. The CPU
+        path passed ``self.system.parameters`` -- the scalar dict --
+        straight through, so every cell integrated with identical rate
+        constants and ``set_cell_parameters`` was silently a no-op
+        wherever the GPU was unavailable. A population seeded with
+        lognormal parameter noise came out with a coefficient of
+        variation of ~2e-7, i.e. no heterogeneity at all.
+
+        The system RHS functions are written with ``y[..., i]``
+        broadcasting, so substituting per-cell arrays of shape
+        (n_cells,) for the scalars gives each cell its own parameters
+        with no change to the RHS.
+
+        Returns the scalar dict when set_cell_parameters has not been
+        called, so the default path is untouched.
+        """
+        if self._cell_params is None:
+            return self.system.parameters
+
+        names = list(self.system.parameters.keys())
+        n_cols = self._cell_params.shape[1]
+        params = dict(self.system.parameters)
+        for i, name in enumerate(names):
+            if i < n_cols:
+                params[name] = self._cell_params[:, i]
+        return params
+
     def _get_cell_params(self) -> np.ndarray:
         """Get per-cell parameters, initializing from system params if needed."""
         if self._cell_params is not None:
@@ -644,7 +675,7 @@ class BatchedODEIntegrator:
 
         y = self._state.y
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._cpu_params()
 
         def residual(y_new_flat):
             y_new = y_new_flat.reshape(y.shape)
@@ -677,7 +708,7 @@ class BatchedODEIntegrator:
         y = cp.asarray(self._state.y)
         t = self._state.t
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._cpu_params()
 
         # RK4 stages (vectorized across cells)
         k1 = cp.asarray(self.system.rhs_func(t, cp.asnumpy(y), params))
@@ -697,7 +728,7 @@ class BatchedODEIntegrator:
         y = self._state.y
         t = self._state.t
         dt = self._state.dt
-        params = self.system.parameters
+        params = self._cpu_params()
 
         k1 = self.system.rhs_func(t, y, params)
         k2 = self.system.rhs_func(t + dt/2, y + dt/2 * k1, params)
