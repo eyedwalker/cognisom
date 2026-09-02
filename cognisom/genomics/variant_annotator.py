@@ -403,19 +403,22 @@ class VariantAnnotator:
             if gene_upper in CANCER_DRIVER_GENES:
                 variant.is_cancer_driver = True
                 self._annotate_driver_details(variant, gene_upper)
-                # Generate protein change if missing (for raw VCFs without annotation)
-                # Limit to ~3 variants per gene to simulate exonic fraction
-                # (real genes are ~5% exonic, so 50 variants → ~2-3 coding)
+                # A variant's protein_change comes from the input VCF's
+                # own annotation (ANN / HGVSp, produced by a
+                # transcript-aware annotator upstream). When the VCF is
+                # unannotated we leave it None rather than guessing --
+                # see _predict_protein_change for why guessing is not
+                # available here.
+                #
+                # This previously called _predict_protein_change to
+                # fabricate one, throttled to 3 per gene "to simulate
+                # exonic fraction" via a counter stashed on the
+                # annotator instance as _pchange_count_<GENE>. Those
+                # counters were never reset, so reusing one annotator
+                # across patients silently annotated fewer variants for
+                # each subsequent patient.
                 if not variant.protein_change and variant.ref and variant.alt:
-                    gene_count_key = f"_pchange_count_{gene_upper}"
-                    count = getattr(self, gene_count_key, 0)
-                    if count < 3:  # Max 3 coding variants per gene
-                        variant.protein_change = self._predict_protein_change(
-                            variant, gene_upper
-                        )
-                        if variant.protein_change:
-                            variant.consequence = "missense_variant"
-                            setattr(self, gene_count_key, count + 1)
+                    self._predict_protein_change(variant, gene_upper)
 
     # GRCh38 gene coordinates for cancer driver genes (chr, start, end)
     GENE_COORDS = {
@@ -482,61 +485,52 @@ class VariantAnnotator:
     }
 
     def _predict_protein_change(self, variant, gene: str) -> Optional[str]:
-        """Generate a protein change annotation for SNVs in cancer driver genes.
+        """Protein-change annotation for an SNV. Returns None -- always.
 
-        Uses position within the gene to estimate codon position and
-        predicts the amino acid change from the DNA substitution.
-        For SNVs only (single base changes).
+        This function previously *invented* protein changes, and its
+        output fed the neoantigen predictor, the OncoKB annotator, and
+        (via ``mutation_adapter.variant_to_patent_mutation``) the
+        simulation pipeline itself. It worked like this:
+
+          * codon position was ``(variant.pos - gene_start) // 3``,
+            taken from the GENE_COORDS span -- ignoring exon structure,
+            UTR length, CDS offset, and strand, none of which are
+            available here;
+          * the reference amino acid came from a four-entry table keyed
+            on the reference *base* (``{"A":"K","C":"A","G":"G",
+            "T":"L"}``), which is not a property of a single base;
+          * the alternate amino acid came from a twelve-entry table
+            keyed on the (ref, alt) base pair.
+
+        The results were syntactically valid HGVS and biologically
+        meaningless. Because they were indistinguishable from real
+        annotations downstream, they contaminated every consumer.
+
+        Determining a protein consequence from a genomic coordinate
+        requires a transcript model -- exon boundaries, CDS start,
+        strand -- which this annotator does not have and cannot infer
+        from a chromosome span. There is no approximation of that which
+        is better than abstaining, so this abstains.
+
+        Real protein-level consequences are available two ways:
+          * annotated input -- ``VCFParser`` reads ``ANN`` / ``HGVSp``
+            from the INFO field when the upstream caller (VEP, SnpEff,
+            Funcotator) has already done the transcript-aware work;
+          * ``engine/py/molecular/mutation_effect.MutationEffectClassifier``
+            which translates against authentic RefSeq CDSes for the
+            curated driver panel and is the path the simulation uses.
+
+        Restoring generation here means giving the annotator a
+        transcript model, not a lookup table.
         """
-        if not variant.ref or not variant.alt:
-            return None
-        if len(variant.ref) != 1 or len(variant.alt) != 1:
-            # Indel — generate a frameshift annotation
-            if len(variant.ref) > len(variant.alt):
-                return f"p.del{len(variant.ref)-len(variant.alt)}"
-            else:
-                return f"p.ins{len(variant.alt)-len(variant.ref)}"
-
-        # SNV: estimate amino acid position from gene coordinates
-        coords = self.GENE_COORDS.get(gene)
-        if not coords:
-            return None
-
-        _, gene_start, _ = coords
-        offset = variant.pos - gene_start
-        if offset < 0:
-            return None
-
-        # Estimate amino acid position (rough: offset/3, assuming CDS starts near gene start)
-        aa_pos = max(1, offset // 3)
-
-        # Generate plausible ref/alt amino acids from the base change
-        # Use a simplified mapping: each base change at each codon position
-        # produces a specific amino acid change
-        bases = "ACGT"
-        ref_base = variant.ref.upper()
-        alt_base = variant.alt.upper()
-
-        if ref_base not in bases or alt_base not in bases:
-            return None
-
-        # Common amino acid substitutions for each base change
-        # This is simplified but produces valid protein changes for neoantigen prediction
-        _aa_from_base = {"A": "K", "C": "A", "G": "G", "T": "L"}
-        _alt_aa = {
-            ("A", "C"): "T", ("A", "G"): "R", ("A", "T"): "S",
-            ("C", "A"): "D", ("C", "G"): "R", ("C", "T"): "Y",
-            ("G", "A"): "E", ("G", "C"): "A", ("G", "T"): "V",
-            ("T", "A"): "H", ("T", "C"): "P", ("T", "G"): "Q",
-        }
-
-        ref_aa = _aa_from_base.get(ref_base, "X")
-        alt_aa = _alt_aa.get((ref_base, alt_base), "X")
-
-        if ref_aa == alt_aa:
-            return None  # Synonymous
-
-        return f"p.{ref_aa}{aa_pos}{alt_aa}"
+        logger.debug(
+            "No protein-change annotation for %s:%s %s>%s in %s: this "
+            "annotator has no transcript model, and the input VCF "
+            "carried no HGVSp. Pre-annotate with VEP/SnpEff to drive "
+            "the protein-level pipeline.",
+            variant.chrom, variant.pos, variant.ref, variant.alt, gene,
+        )
+        return None
 
     def _extract_gene_from_position(self, chrom: str, pos: int) -> Optional[str]:
         """Map chromosome position to cancer driver gene using built-in coordinates."""
