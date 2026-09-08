@@ -2620,222 +2620,204 @@ with tab_inspect:
     st.write("Replay simulation history frame-by-frame to inspect "
              "spatial and metabolic dynamics over time.")
 
-    # Generate or load time series data
-    if "sim_history" not in st.session_state:
-        # Generate synthetic time-series for demo
-        n_frames = 48  # 48 hours
-        n_cells_demo = 80
-        rng = np.random.RandomState(42)
+    # Frames come from a real run, or the inspector says so plainly.
+    #
+    # This block used to fabricate 48 frames of cells at
+    # rng.uniform(0, 200) coordinates, resampled independently every
+    # frame, under a heading promising to replay simulation history. The
+    # cells teleported because there were no trajectories, and it
+    # invented a parent id and a volume the engine does not compute at
+    # all. Anyone scrubbing that timeline was inspecting noise presented
+    # as a run.
+    runner = st.session_state.get("sim_runner")
+    history = runner.get_inspection_history() if runner is not None else []
 
-        history = []
-        for t in range(n_frames):
-            frame_cells = []
-            n_alive = n_cells_demo + t * 2  # growing population
-            for i in range(n_alive):
-                ct = "cancer" if i < 20 + t else ("immune" if i < 30 + t else "normal")
-                frame_cells.append({
-                    "cell_id": i,
-                    "position": (
-                        float(rng.uniform(0, 200)),
-                        float(rng.uniform(0, 200)),
-                        float(rng.uniform(0, 100)),
-                    ),
-                    "cell_type": ct,
-                    "phase": rng.choice(["G1", "S", "G2", "M"]),
-                    "alive": bool(rng.random() > 0.05),
-                    "oxygen": float(max(0, 0.21 - 0.002 * t + rng.normal(0, 0.01))),
-                    "glucose": float(max(0, 5.0 - 0.05 * t + rng.normal(0, 0.2))),
-                    "atp": float(max(0, 1000 - 10 * t + rng.normal(0, 50))),
-                    "age": float(t * 0.5 + rng.uniform(0, 5)),
-                    "volume": float(1.0 + rng.uniform(-0.2, 0.3)),
-                    "parent_id": max(0, i - n_cells_demo) if i >= n_cells_demo else -1,
-                })
-            history.append({
-                "time": float(t),
-                "cells": frame_cells,
-                "n_alive": sum(1 for c in frame_cells if c.get("alive", True)),
-                "n_cancer": sum(1 for c in frame_cells if c["cell_type"] == "cancer"),
-                "n_immune": sum(1 for c in frame_cells if c["cell_type"] == "immune"),
-                "n_normal": sum(1 for c in frame_cells if c["cell_type"] == "normal"),
-                "mean_oxygen": float(np.mean([c["oxygen"] for c in frame_cells])),
-                "mean_glucose": float(np.mean([c["glucose"] for c in frame_cells])),
-                "mean_atp": float(np.mean([c["atp"] for c in frame_cells])),
-            })
-        st.session_state["sim_history"] = history
-
-    history = st.session_state["sim_history"]
-    n_frames = len(history)
-
-    # Time controls
-    col_play, col_slider, col_speed = st.columns([1, 6, 2])
-    with col_play:
-        st.write("")  # spacer
-        is_playing = st.checkbox("Auto-play", value=False, key="time_play")
-    with col_slider:
-        frame_idx = st.slider(
-            "Time (hours)",
-            0, n_frames - 1,
-            value=0,
-            key="time_frame",
-            format="t=%d h",
+    if not history:
+        st.info(
+            "**No simulation to inspect yet.** Run a simulation in the "
+            "Live 3D tab and its recorded frames appear here. This "
+            "inspector only ever shows data from an actual run."
         )
-    with col_speed:
-        playback_speed = st.selectbox("Speed", [1, 2, 5, 10], index=1, key="play_speed")
+    else:
+        n_frames = len(history)
 
-    frame = history[frame_idx]
-
-    # Population curves
-    st.markdown("##### Population Dynamics")
-    col_chart, col_metrics = st.columns([3, 1])
-
-    with col_chart:
-        import plotly.graph_objects as go
-        from plotly.subplots import make_subplots
-
-        fig_pop = make_subplots(
-            rows=2, cols=1,
-            shared_xaxes=True,
-            subplot_titles=("Cell Counts", "Metabolic Means"),
-            vertical_spacing=0.12,
-        )
-
-        times = [h["time"] for h in history]
-        fig_pop.add_trace(go.Scatter(
-            x=times, y=[h["n_cancer"] for h in history],
-            name="Cancer", line=dict(color="#e74c3c"),
-        ), row=1, col=1)
-        fig_pop.add_trace(go.Scatter(
-            x=times, y=[h["n_immune"] for h in history],
-            name="Immune", line=dict(color="#2ecc71"),
-        ), row=1, col=1)
-        fig_pop.add_trace(go.Scatter(
-            x=times, y=[h["n_normal"] for h in history],
-            name="Normal", line=dict(color="#3498db"),
-        ), row=1, col=1)
-
-        # Metabolic
-        fig_pop.add_trace(go.Scatter(
-            x=times, y=[h["mean_oxygen"] for h in history],
-            name="O2", line=dict(color="#e67e22"),
-        ), row=2, col=1)
-        fig_pop.add_trace(go.Scatter(
-            x=times, y=[h["mean_glucose"] for h in history],
-            name="Glucose", line=dict(color="#9b59b6"),
-        ), row=2, col=1)
-
-        # Current time marker
-        fig_pop.add_vline(x=frame["time"], line_dash="dash", line_color="red")
-
-        fig_pop.update_layout(height=400, showlegend=True, margin=dict(t=40, b=20))
-        fig_pop.update_xaxes(title_text="Time (hours)", row=2, col=1)
-        fig_pop.update_yaxes(title_text="Count", row=1, col=1)
-        fig_pop.update_yaxes(title_text="Concentration", row=2, col=1)
-        st.plotly_chart(fig_pop, use_container_width=True)
-
-    with col_metrics:
-        st.metric("Time", f"{frame['time']:.0f} h")
-        st.metric("Alive", frame["n_alive"])
-        st.metric("Cancer", frame["n_cancer"])
-        st.metric("Immune", frame["n_immune"])
-        st.metric("Mean O2", f"{frame['mean_oxygen']:.4f}")
-        st.metric("Mean ATP", f"{frame['mean_atp']:.0f}")
-
-    # ── Cell Picker ───────────────────────────────────────────
-    st.divider()
-    st.markdown("#### Cell Picker")
-    st.write("Select a cell to inspect its full state at the current time point.")
-
-    frame_cells = frame["cells"]
-    cell_ids = [c["cell_id"] for c in frame_cells]
-
-    col_pick, col_filter = st.columns([2, 2])
-    with col_filter:
-        type_filter = st.selectbox(
-            "Filter by Type",
-            ["All"] + sorted(set(c["cell_type"] for c in frame_cells)),
-            key="picker_filter",
-        )
-    with col_pick:
-        if type_filter != "All":
-            filtered = [c for c in frame_cells if c["cell_type"] == type_filter]
-        else:
-            filtered = frame_cells
-        filtered_ids = [c["cell_id"] for c in filtered]
-        picked_id = st.selectbox(
-            "Cell ID",
-            filtered_ids,
-            key="picked_cell",
-        )
-
-    # Find picked cell
-    picked = next((c for c in frame_cells if c["cell_id"] == picked_id), None)
-
-    if picked:
-        col_state, col_pos, col_meta = st.columns(3)
-
-        with col_state:
-            st.markdown("**Identity & Phase**")
-            st.write(f"- **ID**: {picked['cell_id']}")
-            st.write(f"- **Type**: {picked['cell_type']}")
-            st.write(f"- **Phase**: {picked['phase']}")
-            st.write(f"- **Alive**: {picked['alive']}")
-            st.write(f"- **Age**: {picked['age']:.1f} h")
-            if picked.get("parent_id", -1) >= 0:
-                st.write(f"- **Parent**: Cell {picked['parent_id']}")
-
-        with col_pos:
-            st.markdown("**Position & Morphology**")
-            pos = picked["position"]
-            st.write(f"- **X**: {pos[0]:.1f} um")
-            st.write(f"- **Y**: {pos[1]:.1f} um")
-            st.write(f"- **Z**: {pos[2]:.1f} um")
-            st.write(f"- **Volume**: {picked.get('volume', 1.0):.2f}")
-
-        with col_meta:
-            st.markdown("**Metabolic State**")
-            o2 = picked.get("oxygen", 0)
-            gluc = picked.get("glucose", 0)
-            atp = picked.get("atp", 0)
-            st.write(f"- **O2**: {o2:.4f}")
-            st.write(f"- **Glucose**: {gluc:.2f} mM")
-            st.write(f"- **ATP**: {atp:.0f}")
-
-            # Health indicators
-            if o2 < 0.02:
-                st.warning("Severely hypoxic")
-            elif o2 < 0.05:
-                st.warning("Hypoxic")
-            if atp < 100:
-                st.warning("ATP critically low")
-
-        # Cell history across time
-        st.markdown("##### Cell History Across Time")
-        cell_trace_o2 = []
-        cell_trace_atp = []
-        cell_trace_times = []
-        for h in history:
-            match = next((c for c in h["cells"] if c["cell_id"] == picked_id), None)
-            if match:
-                cell_trace_times.append(h["time"])
-                cell_trace_o2.append(match.get("oxygen", 0))
-                cell_trace_atp.append(match.get("atp", 0))
-
-        if cell_trace_times:
-            fig_cell = make_subplots(
-                rows=1, cols=2,
-                subplot_titles=(f"Cell {picked_id} O2", f"Cell {picked_id} ATP"),
+        # Time controls
+        col_play, col_slider, col_speed = st.columns([1, 6, 2])
+        with col_play:
+            st.write("")  # spacer
+            # The Auto-play checkbox and Speed selectbox that used to sit
+            # here assigned variables nothing ever read, so the controls
+            # did nothing at all. Scrubbing is the honest affordance.
+            st.caption("Scrub \u2192")
+        with col_slider:
+            frame_idx = st.slider(
+                "Time (hours)",
+                0, n_frames - 1,
+                value=0,
+                key="time_frame",
+                format="t=%d h",
             )
-            fig_cell.add_trace(go.Scatter(
-                x=cell_trace_times, y=cell_trace_o2,
-                mode="lines", name="O2", line=dict(color="#e67e22"),
+        with col_speed:
+            st.caption(f"{n_frames} recorded frames")
+
+        frame = history[frame_idx]
+
+        # Population curves
+        st.markdown("##### Population Dynamics")
+        col_chart, col_metrics = st.columns([3, 1])
+
+        with col_chart:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+
+            fig_pop = make_subplots(
+                rows=2, cols=1,
+                shared_xaxes=True,
+                subplot_titles=("Cell Counts", "Metabolic Means"),
+                vertical_spacing=0.12,
+            )
+
+            times = [h["time"] for h in history]
+            fig_pop.add_trace(go.Scatter(
+                x=times, y=[h["n_cancer"] for h in history],
+                name="Cancer", line=dict(color="#e74c3c"),
             ), row=1, col=1)
-            fig_cell.add_trace(go.Scatter(
-                x=cell_trace_times, y=cell_trace_atp,
-                mode="lines", name="ATP", line=dict(color="#2ecc71"),
-            ), row=1, col=2)
-            fig_cell.add_vline(x=frame["time"], line_dash="dash", line_color="red")
-            fig_cell.update_layout(height=250, showlegend=False, margin=dict(t=30, b=20))
-            st.plotly_chart(fig_cell, use_container_width=True)
+            fig_pop.add_trace(go.Scatter(
+                x=times, y=[h["n_immune"] for h in history],
+                name="Immune", line=dict(color="#2ecc71"),
+            ), row=1, col=1)
+            fig_pop.add_trace(go.Scatter(
+                x=times, y=[h["n_normal"] for h in history],
+                name="Normal", line=dict(color="#3498db"),
+            ), row=1, col=1)
+
+            # Metabolic
+            fig_pop.add_trace(go.Scatter(
+                x=times, y=[h["mean_oxygen"] for h in history],
+                name="O2", line=dict(color="#e67e22"),
+            ), row=2, col=1)
+            fig_pop.add_trace(go.Scatter(
+                x=times, y=[h["mean_glucose"] for h in history],
+                name="Glucose", line=dict(color="#9b59b6"),
+            ), row=2, col=1)
+
+            # Current time marker
+            fig_pop.add_vline(x=frame["time"], line_dash="dash", line_color="red")
+
+            fig_pop.update_layout(height=400, showlegend=True, margin=dict(t=40, b=20))
+            fig_pop.update_xaxes(title_text="Time (hours)", row=2, col=1)
+            fig_pop.update_yaxes(title_text="Count", row=1, col=1)
+            fig_pop.update_yaxes(title_text="Concentration", row=2, col=1)
+            st.plotly_chart(fig_pop, use_container_width=True)
+
+        with col_metrics:
+            st.metric("Time", f"{frame['time']:.0f} h")
+            st.metric("Alive", frame["n_alive"])
+            st.metric("Cancer", frame["n_cancer"])
+            st.metric("Immune", frame["n_immune"])
+            st.metric("Mean O2", f"{frame['mean_oxygen']:.4f}")
+            st.metric("Mean ATP", f"{frame['mean_atp']:.0f}")
+
+        # ── Cell Picker ───────────────────────────────────────────
+        st.divider()
+        st.markdown("#### Cell Picker")
+        st.write("Select a cell to inspect its full state at the current time point.")
+
+        frame_cells = frame["cells"]
+        cell_ids = [c["cell_id"] for c in frame_cells]
+
+        col_pick, col_filter = st.columns([2, 2])
+        with col_filter:
+            type_filter = st.selectbox(
+                "Filter by Type",
+                ["All"] + sorted(set(c["cell_type"] for c in frame_cells)),
+                key="picker_filter",
+            )
+        with col_pick:
+            if type_filter != "All":
+                filtered = [c for c in frame_cells if c["cell_type"] == type_filter]
+            else:
+                filtered = frame_cells
+            filtered_ids = [c["cell_id"] for c in filtered]
+            picked_id = st.selectbox(
+                "Cell ID",
+                filtered_ids,
+                key="picked_cell",
+            )
+
+        # Find picked cell
+        picked = next((c for c in frame_cells if c["cell_id"] == picked_id), None)
+
+        if picked:
+            col_state, col_pos, col_meta = st.columns(3)
+
+            with col_state:
+                st.markdown("**Identity & Phase**")
+                st.write(f"- **ID**: {picked['cell_id']}")
+                st.write(f"- **Type**: {picked['cell_type']}")
+                st.write(f"- **Phase**: {picked['phase']}")
+                st.write(f"- **Alive**: {picked['alive']}")
+                st.write(f"- **Age**: {picked['age']:.1f} h")
+                # No parent shown: the engine emits a division event
+                # naming parent and daughter but stores no lineage
+                # edge, so ancestry cannot be reconstructed.
+                st.caption("Parent: not tracked (no lineage recorded)")
+
+            with col_pos:
+                st.markdown("**Position & Morphology**")
+                pos = picked["position"]
+                st.write(f"- **X**: {pos[0]:.1f} um")
+                st.write(f"- **Y**: {pos[1]:.1f} um")
+                st.write(f"- **Z**: {pos[2]:.1f} um")
+                # CellState carries no size, so there is no volume to
+                # report. Printing a default here read as a measurement.
+                st.caption("Volume: not modelled (cells have no size)")
+
+            with col_meta:
+                st.markdown("**Metabolic State**")
+                o2 = picked.get("oxygen", 0)
+                gluc = picked.get("glucose", 0)
+                atp = picked.get("atp", 0)
+                st.write(f"- **O2**: {o2:.4f}")
+                st.write(f"- **Glucose**: {gluc:.2f} mM")
+                st.write(f"- **ATP**: {atp:.0f}")
+
+                # Health indicators
+                if o2 < 0.02:
+                    st.warning("Severely hypoxic")
+                elif o2 < 0.05:
+                    st.warning("Hypoxic")
+                if atp < 100:
+                    st.warning("ATP critically low")
+
+            # Cell history across time
+            st.markdown("##### Cell History Across Time")
+            cell_trace_o2 = []
+            cell_trace_atp = []
+            cell_trace_times = []
+            for h in history:
+                match = next((c for c in h["cells"] if c["cell_id"] == picked_id), None)
+                if match:
+                    cell_trace_times.append(h["time"])
+                    cell_trace_o2.append(match.get("oxygen", 0))
+                    cell_trace_atp.append(match.get("atp", 0))
+
+            if cell_trace_times:
+                fig_cell = make_subplots(
+                    rows=1, cols=2,
+                    subplot_titles=(f"Cell {picked_id} O2", f"Cell {picked_id} ATP"),
+                )
+                fig_cell.add_trace(go.Scatter(
+                    x=cell_trace_times, y=cell_trace_o2,
+                    mode="lines", name="O2", line=dict(color="#e67e22"),
+                ), row=1, col=1)
+                fig_cell.add_trace(go.Scatter(
+                    x=cell_trace_times, y=cell_trace_atp,
+                    mode="lines", name="ATP", line=dict(color="#2ecc71"),
+                ), row=1, col=2)
+                fig_cell.add_vline(x=frame["time"], line_dash="dash", line_color="red")
+                fig_cell.update_layout(height=250, showlegend=False, margin=dict(t=30, b=20))
+                st.plotly_chart(fig_cell, use_container_width=True)
 
 
 # ────────────────────────────────────────────────────────────────

@@ -129,12 +129,20 @@ class SimulationSnapshot:
 @dataclass
 class CellSnapshot:
     """Snapshot of all cell & immune positions for 3D viz."""
+    #: Simulation time this snapshot was taken at, in hours.
+    time: float = 0.0
     cell_positions: np.ndarray = None   # (N, 3)
     cell_types: list = field(default_factory=list)         # 'normal' | 'cancer'
     cell_phases: list = field(default_factory=list)        # 'G1'/'S'/'G2'/'M'
     cell_oxygen: list = field(default_factory=list)
     cell_mhc1: list = field(default_factory=list)
     cell_ids: list = field(default_factory=list)
+    # Metabolic and age state. These live on CellState and were simply
+    # not being recorded, which is why the frame-by-frame inspector
+    # fabricated them instead of reading a run.
+    cell_glucose: list = field(default_factory=list)
+    cell_atp: list = field(default_factory=list)
+    cell_age: list = field(default_factory=list)
 
     immune_positions: np.ndarray = None  # (M, 3)
     immune_types: list = field(default_factory=list)       # 'T_cell' | 'NK_cell' | 'macrophage'
@@ -468,7 +476,7 @@ class EngineRunner:
 
     def _record_cell_snapshot(self):
         """Capture cell and immune positions for 3D rendering."""
-        snap = CellSnapshot()
+        snap = CellSnapshot(time=float(self.engine.time))
         mods = self.engine.modules
 
         # Cells
@@ -482,6 +490,9 @@ class EngineRunner:
                 snap.cell_oxygen = [float(c.oxygen) for c in alive]
                 snap.cell_mhc1 = [float(c.mhc1_expression) for c in alive]
                 snap.cell_ids = [c.cell_id for c in alive]
+                snap.cell_glucose = [float(c.glucose) for c in alive]
+                snap.cell_atp = [float(c.atp) for c in alive]
+                snap.cell_age = [float(c.age) for c in alive]
 
         # Immune
         immune = mods.get("immune")
@@ -509,6 +520,65 @@ class EngineRunner:
         self.cell_snapshots.append(snap)
 
     # ── Convenience accessors ────────────────────────────────────────
+
+    def get_inspection_history(self) -> List[Dict[str, Any]]:
+        """Per-frame cell records for the frame-by-frame inspector.
+
+        Reshapes the recorded snapshots into one dict per cell per
+        frame, which is what a time scrubber needs to follow an
+        individual cell across a run.
+
+        Two fields a caller might expect are deliberately absent rather
+        than filled in. There is no ``parent_id``, because the engine
+        records no lineage: the division event names a parent and a
+        daughter but nothing stores the edge. And there is no
+        ``volume``, because CellState has no size at all. Inventing
+        either would make the inspector display relationships and
+        morphology the simulation never computed.
+        """
+        frames: List[Dict[str, Any]] = []
+        for snap in self.cell_snapshots:
+            if snap.cell_positions is None or len(snap.cell_ids) == 0:
+                continue
+
+            n = len(snap.cell_ids)
+
+            def _at(seq, i, default=0.0):
+                return seq[i] if i < len(seq) else default
+
+            cells = [
+                {
+                    "cell_id": snap.cell_ids[i],
+                    "position": tuple(float(v) for v in snap.cell_positions[i]),
+                    "cell_type": _at(snap.cell_types, i, "unknown"),
+                    "phase": _at(snap.cell_phases, i, "?"),
+                    # Snapshots record living cells only.
+                    "alive": True,
+                    "oxygen": float(_at(snap.cell_oxygen, i)),
+                    "glucose": float(_at(snap.cell_glucose, i)),
+                    "atp": float(_at(snap.cell_atp, i)),
+                    "age": float(_at(snap.cell_age, i)),
+                    "mhc1_expression": float(_at(snap.cell_mhc1, i)),
+                }
+                for i in range(n)
+            ]
+
+            def _mean(key):
+                vals = [c[key] for c in cells]
+                return float(sum(vals) / len(vals)) if vals else 0.0
+
+            frames.append({
+                "time": float(snap.time),
+                "cells": cells,
+                "n_alive": len(cells),
+                "n_cancer": sum(1 for c in cells if c["cell_type"] == "cancer"),
+                "n_immune": len(snap.immune_types),
+                "n_normal": sum(1 for c in cells if c["cell_type"] == "normal"),
+                "mean_oxygen": _mean("oxygen"),
+                "mean_glucose": _mean("glucose"),
+                "mean_atp": _mean("atp"),
+            })
+        return frames
 
     def get_time_series(self) -> Dict[str, list]:
         """Return dict of lists suitable for Plotly / DataFrame."""

@@ -275,6 +275,20 @@ if run_btn:
         elapsed = time.time() - t0
 
         st.session_state.diap_frames = frames
+
+        # Frames reaching the viewer must be simulation output. The Kit
+        # extension can substitute fabricated frames when it cannot
+        # import the engine, and those are visually indistinguishable
+        # from real rolling and adhesion, so anything carrying the mock
+        # stamp is called out rather than rendered silently.
+        if any(f.get("is_mock") for f in frames if isinstance(f, dict)):
+            st.error(
+                "**These frames are fabricated, not simulation output.** "
+                "The simulation engine could not be imported, so mock "
+                "motion was generated in its place. Nothing shown below "
+                "represents real leukocyte behaviour."
+            )
+
         st.success(
             f"Simulation complete: {len(frames)} frames in {elapsed:.1f}s "
             f"[{gpu_tag}] "
