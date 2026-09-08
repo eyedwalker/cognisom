@@ -560,7 +560,45 @@ class CellularModule(SimulationModule):
         cell.dht_nM += (target - cell.dht_nM) * (1.0 - np.exp(-dt / DHT_RELAXATION_H))
 
     def _divide_cell(self, cell_id: int):
-        """Cell division"""
+        """Cell division.
+
+        Inheritance policy for the daughter's non-default state. Each
+        field is a modelling decision, not a mechanical copy:
+
+        * ``mutations`` / ``mhc1_expression`` -- clonal, inherited.
+        * ``mhc1_displayed_peptides`` -- inherited. The daughter carries
+          the parent's genome deltas (MolecularModule.on_cell_divided
+          forks the parent's CellGenomeView on this event), so it
+          transcribes the same mutant proteins and presents the same
+          neoantigens on the same patient HLA panel. Dropping the list
+          made every daughter of a displaying tumor cell invisible to
+          ImmuneModule._recognize, which gates T-cell recognition on it
+          being non-empty -- and no MUTATION_OCCURRED ever fires again
+          for an inherited mutation, so the daughter stayed invisible
+          for life. That was a silent bias toward tumor escape growing
+          with every division.
+          Copying is correct while presentation is a pure function of
+          the genome. If it ever becomes state-dependent (proteasome
+          composition, TAP transport, HLA LOH), regenerate from the
+          forked genome here instead of copying.
+          The list is copied, not aliased; MHCPresentation is a frozen
+          dataclass so the entries themselves are safe to share.
+        * ``pdl1_expression`` -- inherited. PD-L1 is signalling state,
+          not genome, so neither full inheritance nor a reset to 0 is
+          right: surface protein is partitioned between daughters and
+          then decays with the IFN-gamma stimulus. Inheriting the
+          parent's level is the closer approximation, since the
+          daughter sits ~5 um away in the same cytokine field that
+          induced the parent. Simplification: no halving at mitosis and
+          no decay term -- adaptive PD-L1 induced once is retained for
+          the clone's life.
+        * ``local_ecm_density`` -- NOT inherited; re-sampled. ECM is a
+          property of the location, not of the cell, so the daughter
+          takes the stromal density already present where it lands.
+          Sampled before the daughter is registered, so its own seeded
+          baseline does not pull the neighbourhood mean toward
+          ``cancer_baseline_ecm``.
+        """
         if cell_id not in self.cells:
             return
         
@@ -569,7 +607,14 @@ class CellularModule(SimulationModule):
         # Create daughter cell
         offset = np.random.randn(3) * 5  # Small offset
         daughter_pos = parent.position + offset
-        
+
+        # Sample the stroma at the daughter's position BEFORE the
+        # daughter exists, so it is not averaged into its own sample.
+        sampled_ecm = (
+            self.ecm_density_at(daughter_pos)
+            if parent.cell_type == 'cancer' else None
+        )
+
         daughter_id = self.add_cell(
             position=daughter_pos,
             cell_type=parent.cell_type
@@ -592,6 +637,12 @@ class CellularModule(SimulationModule):
         # artery. The tissue engine's daughters already inherit their state.
         daughter.oxygen = parent.oxygen
         daughter.glucose = parent.glucose
+        daughter.mhc1_displayed_peptides = list(
+            parent.mhc1_displayed_peptides
+        )
+        daughter.pdl1_expression = parent.pdl1_expression
+        if sampled_ecm is not None:
+            daughter.local_ecm_density = sampled_ecm
         
         # Reset parent age
         parent.age = 0.0
