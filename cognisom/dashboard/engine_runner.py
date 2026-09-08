@@ -7,10 +7,13 @@ Provides:
 - Event log capture for timeline views
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+
+log = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -24,6 +27,7 @@ from cognisom.modules import (
     MolecularModule, CellularModule, ImmuneModule,
     VascularModule, LymphaticModule, SpatialModule,
     EpigeneticModule, CircadianModule, MorphogenModule,
+    ODEModule, BNGLModule, HybridModule, SmoldynModule,
 )
 
 
@@ -266,7 +270,31 @@ class EngineRunner:
                 "epigenetic": EpigeneticModule,
                 "circadian": CircadianModule,
                 "morphogen": MorphogenModule,
+                # Solver modules. ParameterBridge.infer_enabled_modules
+                # turns these on and MODULE_PARAM_SCHEMA declares their
+                # parameters, but they were absent here, so every config
+                # the bridge produced for them was discarded without a
+                # word.
+                "ode": ODEModule,
+                "bngl": BNGLModule,
+                "hybrid": HybridModule,
+                "smoldyn": SmoldynModule,
             }
+
+            # A module that is asked for but cannot be registered is a
+            # silent no-op, which is exactly how the solver modules went
+            # unnoticed. Surface it instead.
+            unknown = [
+                name for name, on in self.modules_enabled.items()
+                if on and name not in module_classes
+            ]
+            if unknown:
+                log.warning(
+                    "modules_enabled requests %s, which EngineRunner "
+                    "cannot register; their configs will be ignored. "
+                    "Known modules: %s",
+                    sorted(unknown), sorted(module_classes),
+                )
 
             for name, cls in module_classes.items():
                 if self.modules_enabled.get(name, False):

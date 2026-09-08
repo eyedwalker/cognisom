@@ -48,6 +48,16 @@ from .circadian_module import CircadianModule
 from .morphogen_module import MorphogenModule
 from .cell_mechanics_module import CellMechanicsModule
 
+# Solver modules. These were importable by path but not exported here, so
+# EngineRunner could not register them and everything ParameterBridge
+# emitted under "ode", "bngl", "hybrid" and "smoldyn" was dropped in
+# transit -- including the anti-androgen AR-binding change, which is the
+# most mechanistically specific parameter the bridge produces.
+from .ode_module import ODEModule
+from .bngl_module import BNGLModule
+from .hybrid_module import HybridModule
+from .smoldyn_module import SmoldynModule
+
 
 # ── Module Registry ──────────────────────────────────────────────────
 

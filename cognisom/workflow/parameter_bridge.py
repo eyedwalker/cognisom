@@ -118,7 +118,7 @@ BASELINE_DEFAULTS: Dict[str, Dict[str, Any]] = {
 # Fallback: uses drug_class alone if mechanism doesn't match.
 
 DRUG_CLASS_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
-    "anti-androgen": {
+    "anti_androgen": {
         "ode": {"system": "ar_signaling", "k_bind": 10.0},  # reduced from 100
         "cellular": {"division_time_cancer": 18.0},  # slowed growth
     },
@@ -139,13 +139,65 @@ DRUG_CLASS_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         "molecular": {"transcription_rate": 0.5},
         "cellular": {"division_time_cancer": 16.0},
     },
-    "anti-cytokine": {
+    "anti_cytokine": {
         "immune": {"kill_probability": 0.6},
     },
     "tlr_agonist": {
         "immune": {"n_macrophages": 12, "kill_probability": 0.9},
     },
 }
+
+
+def normalize_lookup_key(raw: str) -> str:
+    """Normalize a free-text entity attribute into a lookup-table key.
+
+    Drug classes arrive from curation as free text ("Anti-androgen",
+    "checkpoint inhibitor"), so both the table keys and the query are
+    folded to lowercase with separators as underscores.
+
+    This exists as a named function because the two sides drifted:
+    ``_map_drugs_to_params`` normalized hyphens to underscores while two
+    table keys were still written with hyphens, so "anti-androgen" and
+    "anti-cytokine" could never match. For a prostate platform that
+    silently disabled the entire anti-androgen class -- enzalutamide and
+    friends were rescued only by the AR target map, and abiraterone,
+    whose target is CYP17A1, resolved to nothing at all.
+    """
+    return raw.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _assert_keys_reachable() -> None:
+    """Fail at import if any lookup key cannot be matched by a query.
+
+    A key that does not survive the normalization its own lookup site
+    applies is dead weight: nothing the caller passes can ever equal it.
+
+    The two table families use different conventions, and both are
+    checked against the transform their own call site performs. Drug
+    classes are free text folded by ``normalize_lookup_key``; gene
+    symbols and drug targets are matched with ``.upper()``.
+    """
+    unreachable = [
+        k for k in DRUG_CLASS_PARAM_MAP if k != normalize_lookup_key(k)
+    ]
+    if unreachable:
+        raise ValueError(
+            f"DRUG_CLASS_PARAM_MAP has keys no lookup can match: "
+            f"{unreachable}. Keys must be lowercase with underscores -- "
+            f"see normalize_lookup_key."
+        )
+
+    for table_name, table in (
+        ("DRUG_TARGET_PARAM_MAP", DRUG_TARGET_PARAM_MAP),
+        ("GENE_SPECIFIC_PARAM_MAP", GENE_SPECIFIC_PARAM_MAP),
+    ):
+        bad = [k for k in table if k != k.upper()]
+        if bad:
+            raise ValueError(
+                f"{table_name} has keys no lookup can match: {bad}. "
+                f"Gene symbols are matched with .upper() and must be "
+                f"written uppercase."
+            )
 
 # Target-based overrides: if drug.targets contains these genes, apply these params
 DRUG_TARGET_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
@@ -220,6 +272,11 @@ GENE_SPECIFIC_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         "cellular": {"division_time_cancer": 7.0},
     },
 }
+
+
+# Runs at import: an unreachable lookup key is a silent no-op, which is
+# how the anti-androgen class went undetected.
+_assert_keys_reachable()
 
 
 # ── ParameterBridge ────────────────────────────────────────────────────
@@ -345,7 +402,7 @@ class ParameterBridge:
                 continue
 
             drug_name = entity.name
-            drug_class = (entity.drug_class or "").lower().replace("-", "_").replace(" ", "_")
+            drug_class = normalize_lookup_key(entity.drug_class or "")
             mechanism = (entity.mechanism or "").lower()
 
             # Strategy 1: Target-based mapping (highest specificity)

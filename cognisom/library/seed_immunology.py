@@ -447,7 +447,17 @@ def _seed_immune_cell_types(store: EntityStore) -> int:
          "metabolites, linking diet to mucosal immunity. ILC3 dysfunction contributes to IBD."),
     ]
     count = 0
-    for name, itype, subtype, markers, cytokines, desc in cells:
+    for row in cells:
+        # An optional 7th element carries per-type behavioural
+        # parameters, e.g. {"kill_probability": 0.9, "detection_radius":
+        # 12.0}. None of the rows supply one yet, which is why every
+        # seeded immune cell was numerically identical. Anything not
+        # supplied stays None, meaning "not curated for this type",
+        # rather than inheriting a cytotoxic default that is simply
+        # wrong for a Treg or a naive CD8.
+        name, itype, subtype, markers, cytokines, desc = row[:6]
+        params = row[6] if len(row) > 6 else {}
+
         entity = ImmuneCellEntity(
             name=name,
             display_name=name,
@@ -458,6 +468,7 @@ def _seed_immune_cell_types(store: EntityStore) -> int:
             cytokines_secreting=cytokines,
             source="curated",
             tags=["immunology", itype, subtype],
+            **params,
         )
         store.add_entity(entity)
         count += 1
@@ -729,7 +740,18 @@ def _seed_cytokines(store: EntityStore) -> int:
          "MAPK", False, "CSF1", 60.0),
     ]
     count = 0
-    for name, family, receptor, producing, target, function, pathway, pro_inf, gene, mw in cytokines:
+    for row in cytokines:
+        # An optional 11th element carries the serum half-life in hours.
+        # It is absent from every row today, which is why the field was
+        # never populated: it was simply not passed to the constructor.
+        # Adding one number to the end of a row is now all the curation
+        # step requires. Until then the value stays None, meaning "not
+        # curated" rather than the previous 0.0, which read as a claim
+        # that the cytokine decays instantly.
+        (name, family, receptor, producing, target,
+         function, pathway, pro_inf, gene, mw) = row[:10]
+        half_life = row[10] if len(row) > 10 else None
+
         entity = Cytokine(
             name=name,
             display_name=name,
@@ -740,6 +762,7 @@ def _seed_cytokines(store: EntityStore) -> int:
             target_cells=target,
             function=function,
             signaling_pathway=pathway,
+            half_life_hours=half_life,
             pro_inflammatory=pro_inf,
             gene_symbol=gene,
             molecular_weight_kda=mw,
@@ -1998,7 +2021,12 @@ def _seed_endothelial_cells(store: EntityStore) -> int:
     ]
 
     count = 0
-    for (name, immune_type, subtype, markers, cytokines, desc) in cells:
+    for row in cells:
+        # Optional 7th element carries behavioural parameters; see the
+        # immune-cell seeding loop above.
+        name, immune_type, subtype, markers, cytokines, desc = row[:6]
+        params = row[6] if len(row) > 6 else {}
+
         entity = ImmuneCellEntity(
             name=name,
             description=desc,
@@ -2006,6 +2034,7 @@ def _seed_endothelial_cells(store: EntityStore) -> int:
             immune_subtype=subtype,
             surface_markers=markers,
             cytokines_secreting=cytokines,
+            **params,
         )
         store.add_entity(entity)
         count += 1
