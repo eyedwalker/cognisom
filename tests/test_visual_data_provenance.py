@@ -320,3 +320,47 @@ def test_usd_tab_offers_the_real_run():
     assert "Synthetic demo cluster" in tab, (
         "the synthetic option must be labelled as synthetic"
     )
+
+
+def test_a_run_started_on_the_simulation_page_reaches_the_3d_tabs():
+    """The Inspector, Lineage, Cell Population and USD tabs all key off
+    session_state["sim_runner"]. The Simulation page previously stored
+    only its own derived outputs under different names, so a run started
+    there left every one of those tabs reporting no simulation."""
+    sim_page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages" / "3_simulation.py"
+    ).read_text()
+    viz_page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+
+    assert 'st.session_state["sim_runner"] = runner' in sim_page, (
+        "the Simulation page must share its runner under the key the 3D "
+        "page reads"
+    )
+    assert 'st.session_state.get("sim_runner")' in viz_page
+
+
+def test_degenerate_runs_do_not_break_the_sliders():
+    """A short run records one frame and performs no divisions. The
+    synthetic timeline always had 48 frames and several generations, so
+    a slider with min == max could not arise until real data arrived."""
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    assert "if n_frames > 1:" in page
+    assert "if max_gen > 0:" in page
+
+
+def test_companion_session_keys_are_derived_not_assumed():
+    """A session carrying sim_runner without its siblings used to raise
+    KeyError and take the whole page down."""
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    # Writing the key is fine and necessary; reading it blindly is not.
+    assert 'ts = st.session_state["sim_time_series"]' not in page
+    assert 'st.session_state.get("sim_time_series")' in page
