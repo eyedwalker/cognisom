@@ -132,12 +132,20 @@ with tab_live3d:
             st.session_state["sim_events"] = runner.event_log
             st.session_state["sim_final_state"] = runner.get_final_state()
 
-    # Display results if available
+    # Display results if available.
+    #
+    # The companion keys are derived from the runner rather than read
+    # blindly. They are written together by the run button above, but a
+    # session carrying only sim_runner -- after a rerun, or a version
+    # change that added a key -- used to raise KeyError and take the
+    # whole page down. Deriving them cannot go stale or go missing.
     if "sim_runner" in st.session_state:
         runner = st.session_state["sim_runner"]
-        ts = st.session_state["sim_time_series"]
-        events = st.session_state["sim_events"]
-        final_state = st.session_state["sim_final_state"]
+        ts = st.session_state.get("sim_time_series") or runner.get_time_series()
+        events = st.session_state.get("sim_events", runner.event_log)
+        final_state = (
+            st.session_state.get("sim_final_state") or runner.get_final_state()
+        )
 
         st.success(f"**Simulation complete** — {len(runner.history)} time points recorded")
 
@@ -2662,13 +2670,23 @@ with tab_inspect:
             # did nothing at all. Scrubbing is the honest affordance.
             st.caption("Scrub \u2192")
         with col_slider:
-            frame_idx = st.slider(
-                "Time (hours)",
-                0, n_frames - 1,
-                value=0,
-                key="time_frame",
-                format="t=%d h",
-            )
+            # A slider needs a range. A short run can record a single
+            # frame, and the synthetic timeline this replaced always had
+            # forty-eight, so the degenerate case never arose before.
+            if n_frames > 1:
+                frame_idx = st.slider(
+                    "Time (hours)",
+                    0, n_frames - 1,
+                    value=0,
+                    key="time_frame",
+                    format="t=%d h",
+                )
+            else:
+                frame_idx = 0
+                st.caption(
+                    "Only one frame was recorded. Run longer, or lower "
+                    "the recording interval, to scrub."
+                )
         with col_speed:
             st.caption(f"{n_frames} recorded frames")
 
@@ -2887,11 +2905,17 @@ with tab_lineage:
                 key="lineage_type",
             )
         with col_gen:
-            max_gen_show = st.slider(
-                "Max Generation to Show",
-                0, max_gen, max_gen,
-                key="lineage_max_gen",
-            )
+            # Same degenerate case: a run with no divisions has a single
+            # generation, so there is no range to select over.
+            if max_gen > 0:
+                max_gen_show = st.slider(
+                    "Max Generation to Show",
+                    0, max_gen, max_gen,
+                    key="lineage_max_gen",
+                )
+            else:
+                max_gen_show = 0
+                st.caption("No divisions recorded, so a single generation.")
 
         # Filter nodes
         show_nodes = [n for n in nodes if n["generation"] <= max_gen_show]
