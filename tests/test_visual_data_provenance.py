@@ -184,3 +184,139 @@ def test_dashboard_surfaces_the_mock_stamp():
     ).read_text()
     assert 'f.get("is_mock")' in page
     assert "fabricated" in page.lower()
+
+
+# ── Lineage is reconstructed, not simulated separately ───────────────
+
+def _runner_with_events():
+    from cognisom.core.event_bus import EventTypes
+
+    runner = EngineRunner.__new__(EngineRunner)
+    runner.cell_snapshots = [
+        CellSnapshot(
+            time=0.0,
+            cell_positions=np.array([[0.0, 0.0, 0.0]]),
+            cell_types=["normal"], cell_phases=["G1"],
+            cell_oxygen=[0.2], cell_mhc1=[1.0], cell_ids=[1],
+            cell_glucose=[5.0], cell_atp=[1000.0], cell_age=[0.0],
+        )
+    ]
+    runner.event_log = [
+        {"time": 1.0, "step": 1, "event": EventTypes.CELL_DIVIDED,
+         "data": {"cell_id": 1, "daughter_id": 2, "cell_type": "normal"}},
+        {"time": 2.0, "step": 2, "event": EventTypes.MUTATION_OCCURRED,
+         "data": {"cell_id": 2, "gene": "KRAS", "mutation": "G12D"}},
+        {"time": 2.5, "step": 3, "event": EventTypes.CELL_TRANSFORMED,
+         "data": {"cell_id": 2}},
+        {"time": 3.0, "step": 4, "event": EventTypes.CELL_DIVIDED,
+         "data": {"cell_id": 2, "daughter_id": 3, "cell_type": "cancer"}},
+        {"time": 4.0, "step": 5, "event": EventTypes.CELL_DIED,
+         "data": {"cell_id": 1, "cause": "hypoxia"}},
+    ]
+    return runner
+
+
+def test_lineage_is_empty_without_a_run():
+    runner = EngineRunner.__new__(EngineRunner)
+    runner.cell_snapshots = []
+    runner.event_log = []
+    assert runner.get_lineage() == {"nodes": [], "edges": []}
+
+
+def test_lineage_reconstructs_real_ancestry_from_events():
+    """Ancestry is not stored on the cell, but every division emits an
+    event naming parent and daughter, so the tree is recoverable."""
+    tree = _runner_with_events().get_lineage()
+    by_id = {n["cell_id"]: n for n in tree["nodes"]}
+
+    assert set(tree["edges"]) == {(1, 2), (2, 3)}
+    assert by_id[1]["parent_id"] == -1 and by_id[1]["generation"] == 0
+    assert by_id[2]["parent_id"] == 1 and by_id[2]["generation"] == 1
+    assert by_id[3]["parent_id"] == 2 and by_id[3]["generation"] == 2
+    assert by_id[1]["n_divisions"] == 1
+
+
+def test_lineage_records_real_births_deaths_and_mutations():
+    by_id = {n["cell_id"]: n for n in _runner_with_events().get_lineage()["nodes"]}
+
+    assert by_id[2]["birth_time"] == 1.0
+    assert by_id[1]["death_time"] == 4.0
+    assert by_id[2]["death_time"] is None
+    assert by_id[2]["mutations"] == ["KRAS_G12D"]
+    # Transformation is applied, not guessed from a division probability.
+    assert by_id[2]["cell_type"] == "cancer"
+    # Daughters inherit the parent's mutations, as fork() does.
+    assert by_id[3]["mutations"] == ["KRAS_G12D"]
+
+
+def test_lineage_tab_no_longer_runs_its_own_monte_carlo():
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    tab = page[page.index("with tab_lineage:"):page.index("with tab_omniverse:")]
+    code = "\n".join(
+        l for l in tab.split("\n") if not l.strip().startswith("#")
+    )
+
+    assert "get_lineage" in tab
+    for banned in ("RandomState", "p_div", "p_death", "rng.random"):
+        assert banned not in code, f"lineage tab still simulates via {banned}"
+
+
+# ── No tab may halt the whole page ───────────────────────────────────
+
+def test_the_3d_page_never_calls_st_stop():
+    """st.stop() halts the entire Streamlit script, so a guard meant to
+    skip one tab silently removed every tab after it. The USD guard did
+    exactly that to the Export tab on any host without usd-core."""
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    code = "\n".join(
+        l for l in page.split("\n") if not l.strip().startswith("#")
+    )
+    assert "st.stop()" not in code
+
+
+def test_renderer_imports_are_module_level():
+    """They are hard dependencies of the page, so a per-tab ImportError
+    guard was both the wrong scope and the wrong kind."""
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    header = page[:page.index("# ── Tabs")]
+    for mod in ("cell_renderer", "field_renderer", "network_renderer", "exporters"):
+        assert mod in header, f"{mod} should be imported at module level"
+
+
+# ── The tissue view is actually three-dimensional ────────────────────
+
+def test_tissue_page_plots_all_three_axes():
+    """The heading said 3D above a flat chart that dropped the z column
+    it had already computed."""
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages" / "21_tissue_scale.py"
+    ).read_text()
+    assert "Scatter3d" in page
+    assert "display_pos[:, 2]" in page
+    assert 'st.scatter_chart(df, x="x", y="y"' not in page
+
+
+# ── The USD tab can export a real run ────────────────────────────────
+
+def test_usd_tab_offers_the_real_run():
+    page = (
+        REPO_ROOT / "cognisom" / "dashboard" / "_pages"
+        / "12_3d_visualization.py"
+    ).read_text()
+    tab = page[page.index("with tab_omniverse:"):page.index("with tab_export:")]
+
+    assert "get_inspection_history" in tab, (
+        "the USD tab should be able to export an actual run"
+    )
+    assert "Synthetic demo cluster" in tab, (
+        "the synthetic option must be labelled as synthetic"
+    )

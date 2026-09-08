@@ -580,6 +580,99 @@ class EngineRunner:
             })
         return frames
 
+    def get_lineage(self) -> Dict[str, Any]:
+        """Reconstruct the division tree from the recorded event log.
+
+        Ancestry is not stored on the cell -- CellState has no parent
+        field -- but it is fully recoverable from the run, because every
+        division emits an event naming both the parent and the daughter,
+        and this runner records those events without a cap.
+
+        Founders are the cells present in the first snapshot, plus any
+        cell that appears as a parent without ever having been a
+        daughter. Deaths and mutations are attached from their own
+        events, so a node's mutation list is what that cell actually
+        acquired rather than a sampled guess.
+
+        Returns ``{"nodes": [...], "edges": [(parent_id, daughter_id)]}``,
+        empty when nothing has been run.
+        """
+        nodes: Dict[int, Dict[str, Any]] = {}
+        edges: List[tuple] = []
+
+        def _founder(cell_id, cell_type, birth_time):
+            return {
+                "cell_id": cell_id,
+                "parent_id": -1,
+                "generation": 0,
+                "birth_time": float(birth_time),
+                "death_time": None,
+                "cell_type": cell_type,
+                "n_divisions": 0,
+                "mutations": [],
+            }
+
+        # Seed generation zero from the initial population.
+        if self.cell_snapshots:
+            first = self.cell_snapshots[0]
+            for i, cid in enumerate(first.cell_ids):
+                ctype = (
+                    first.cell_types[i] if i < len(first.cell_types) else "unknown"
+                )
+                nodes[cid] = _founder(cid, ctype, first.time)
+
+        for entry in self.event_log:
+            etype = entry.get("event")
+            data = entry.get("data") or {}
+            when = float(entry.get("time", 0.0))
+
+            if etype == EventTypes.CELL_DIVIDED:
+                parent_id = data.get("cell_id")
+                daughter_id = data.get("daughter_id")
+                if parent_id is None or daughter_id is None:
+                    continue
+                ctype = data.get("cell_type", "unknown")
+                parent = nodes.get(parent_id)
+                if parent is None:
+                    # Divided without having been seen: treat as a founder
+                    # rather than dropping the subtree it roots.
+                    parent = nodes.setdefault(
+                        parent_id, _founder(parent_id, ctype, when)
+                    )
+                parent["n_divisions"] += 1
+                nodes[daughter_id] = {
+                    "cell_id": daughter_id,
+                    "parent_id": parent_id,
+                    "generation": parent["generation"] + 1,
+                    "birth_time": when,
+                    "death_time": None,
+                    "cell_type": ctype,
+                    "n_divisions": 0,
+                    # A daughter inherits the parent's mutations, which is
+                    # what the genome view does via fork().
+                    "mutations": list(parent["mutations"]),
+                }
+                edges.append((parent_id, daughter_id))
+
+            elif etype == EventTypes.CELL_DIED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None and node["death_time"] is None:
+                    node["death_time"] = when
+
+            elif etype == EventTypes.CELL_TRANSFORMED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None:
+                    node["cell_type"] = "cancer"
+
+            elif etype == EventTypes.MUTATION_OCCURRED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None:
+                    label = f"{data.get('gene', '?')}_{data.get('mutation', '?')}"
+                    if label not in node["mutations"]:
+                        node["mutations"].append(label)
+
+        return {"nodes": list(nodes.values()), "edges": edges}
+
     def get_time_series(self) -> Dict[str, list]:
         """Return dict of lists suitable for Plotly / DataFrame."""
         keys = [

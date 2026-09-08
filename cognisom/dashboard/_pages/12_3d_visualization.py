@@ -10,6 +10,18 @@ to PDB, glTF, VTK, and CSV.
 
 import streamlit as st
 from cognisom.dashboard.page_config import safe_set_page_config
+
+# Renderer imports live here rather than inside each tab. They are hard
+# dependencies of this page -- without them it has no purpose -- and the
+# per-tab guards used st.stop() on ImportError, which halts the entire
+# Streamlit script rather than the tab, silently taking every later tab
+# down with it.
+from cognisom.visualization.cell_renderer import (
+    CellPopulationRenderer, CELL_TYPE_COLORS,
+)
+from cognisom.visualization.field_renderer import SpatialFieldRenderer
+from cognisom.visualization.network_renderer import InteractionNetworkRenderer
+from cognisom.visualization.exporters import SceneExporter
 import streamlit.components.v1 as components
 import numpy as np
 import tempfile
@@ -2355,13 +2367,6 @@ with tab_live3d:
 with tab_cells:
     st.subheader("3D Cell Population Viewer")
 
-    try:
-        from cognisom.visualization.cell_renderer import (
-            CellPopulationRenderer, CELL_TYPE_COLORS,
-        )
-    except ImportError:
-        st.error("Visualization module not available.")
-        st.stop()
 
     # Data source selection
     source = st.radio(
@@ -2382,14 +2387,32 @@ with tab_cells:
         )
         st.session_state["viz_cells"] = cells
     else:
-        if "sim_state" in st.session_state:
-            renderer = CellPopulationRenderer()
-            fig = renderer.render_from_engine(st.session_state["sim_state"])
-            st.plotly_chart(fig, use_container_width=True)
-            st.stop()
+        # Real cells from the last recorded frame of a run.
+        #
+        # This branch previously called render_from_engine on a session
+        # key named "sim_state" that nothing in the repo ever writes, and
+        # that method reads a "cells" entry which CellularModule.get_state
+        # does not return -- so the tab named Cell Population could never
+        # show a run, and silently fell through to demo data. It also
+        # called st.stop() on the success path, which halts the whole
+        # script and would have taken every later tab down with it.
+        runner = st.session_state.get("sim_runner")
+        frames = runner.get_inspection_history() if runner is not None else []
+        if frames:
+            cells = frames[-1]["cells"]
+            st.session_state["viz_cells"] = cells
+            st.caption(
+                f"Showing {len(cells)} cells from the final recorded frame "
+                f"(t = {frames[-1]['time']:.1f} h). Use the Scientific "
+                f"Inspector tab to scrub through the run."
+            )
         else:
-            st.info("No simulation state available. Run a simulation on the Simulation page first, or use Demo Data.")
-            cells = CellPopulationRenderer.generate_demo_cells()
+            st.info(
+                "**No simulation data yet.** Run a simulation in the Live "
+                "3D tab, or switch to Demo Data above to explore the "
+                "renderer with synthetic cells."
+            )
+            cells = []
             st.session_state["viz_cells"] = cells
 
     # Render options
@@ -2453,11 +2476,6 @@ with tab_cells:
 with tab_fields:
     st.subheader("3D Concentration Fields")
 
-    try:
-        from cognisom.visualization.field_renderer import SpatialFieldRenderer
-    except ImportError:
-        st.error("Field renderer not available.")
-        st.stop()
 
     # Generate demo fields
     if "viz_fields" not in st.session_state:
@@ -2541,12 +2559,6 @@ with tab_fields:
 with tab_network:
     st.subheader("Cell Interaction Network")
 
-    try:
-        from cognisom.visualization.network_renderer import InteractionNetworkRenderer
-        from cognisom.visualization.cell_renderer import CellPopulationRenderer
-    except ImportError:
-        st.error("Network renderer not available.")
-        st.stop()
 
     # Use cells from Tab 1 or generate
     cells = st.session_state.get("viz_cells")
@@ -2830,249 +2842,203 @@ with tab_lineage:
 
     import plotly.graph_objects as go
 
-    # Generate demo lineage data if not available
-    if "lineage_tree" not in st.session_state:
-        rng = np.random.RandomState(123)
-
-        # Build a division tree: each node is a cell
-        nodes = []
-        edges = []
-
-        # Root cells (generation 0)
-        for i in range(5):
-            ct = "cancer" if i < 2 else "normal"
-            nodes.append({
-                "cell_id": i,
-                "parent_id": -1,
-                "generation": 0,
-                "birth_time": 0.0,
-                "death_time": None,
-                "cell_type": ct,
-                "n_divisions": 0,
-                "mutations": [],
-            })
-
-        next_id = 5
-        # Simulate divisions over 48 hours
-        for t in range(1, 49):
-            new_nodes = []
-            for node in nodes:
-                if node["death_time"] is not None:
-                    continue
-                # Division probability depends on type
-                p_div = 0.08 if node["cell_type"] == "cancer" else 0.03
-                if rng.random() < p_div and node["n_divisions"] < 5:
-                    # Create daughter cell
-                    daughter = {
-                        "cell_id": next_id,
-                        "parent_id": node["cell_id"],
-                        "generation": node["generation"] + 1,
-                        "birth_time": float(t),
-                        "death_time": None,
-                        "cell_type": node["cell_type"],
-                        "n_divisions": 0,
-                        "mutations": list(node["mutations"]),
-                    }
-                    # Occasionally acquire mutation
-                    if rng.random() < 0.15 and node["cell_type"] == "cancer":
-                        muts = ["TP53_R175H", "PTEN_loss", "AR_V7", "MYC_amp",
-                                "BRCA2_del", "ERG_fusion", "SPOP_F133L"]
-                        new_mut = rng.choice(muts)
-                        if new_mut not in daughter["mutations"]:
-                            daughter["mutations"].append(new_mut)
-
-                    edges.append((node["cell_id"], next_id))
-                    new_nodes.append(daughter)
-                    node["n_divisions"] += 1
-                    next_id += 1
-
-                # Death probability
-                p_death = 0.01 if node["cell_type"] == "cancer" else 0.02
-                if rng.random() < p_death:
-                    node["death_time"] = float(t)
-
-            nodes.extend(new_nodes)
-
-        st.session_state["lineage_tree"] = {"nodes": nodes, "edges": edges}
-
-    tree_data = st.session_state["lineage_tree"]
+    # The tree is reconstructed from a real run, or the tab says it has
+    # none.
+    #
+    # This block used to run its own Monte Carlo: seeded RandomState,
+    # per-type division and death probabilities, and mutations sampled
+    # from a hardcoded list of driver names. It produced a plausible
+    # clonal tree that had never been simulated. Ancestry is genuinely
+    # recoverable, because every division emits an event naming parent
+    # and daughter, so the tree is now built from those events.
+    runner = st.session_state.get("sim_runner")
+    tree_data = runner.get_lineage() if runner is not None else {"nodes": [], "edges": []}
     nodes = tree_data["nodes"]
     edges = tree_data["edges"]
 
-    # Stats
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Cells", len(nodes))
-    c2.metric("Divisions", len(edges))
-    max_gen = max(n["generation"] for n in nodes)
-    c3.metric("Max Generation", max_gen)
-    alive = sum(1 for n in nodes if n["death_time"] is None)
-    c4.metric("Alive", alive)
-    with_muts = sum(1 for n in nodes if n["mutations"])
-    c5.metric("With Mutations", with_muts)
-
-    # ── Tree visualization ────────────────────────────────────
-    st.markdown("#### Division Tree")
-
-    col_filt, col_gen = st.columns(2)
-    with col_filt:
-        lineage_type = st.selectbox(
-            "Filter Cell Type",
-            ["All", "cancer", "normal"],
-            key="lineage_type",
+    if not nodes:
+        st.info(
+            "**No lineage to show yet.** Run a simulation in the Live 3D "
+            "tab and its division history appears here. This tree is "
+            "reconstructed from recorded division events, never simulated "
+            "separately."
         )
-    with col_gen:
-        max_gen_show = st.slider(
-            "Max Generation to Show",
-            0, max_gen, max_gen,
-            key="lineage_max_gen",
-        )
-
-    # Filter nodes
-    show_nodes = [n for n in nodes if n["generation"] <= max_gen_show]
-    if lineage_type != "All":
-        show_nodes = [n for n in show_nodes if n["cell_type"] == lineage_type]
-    show_ids = {n["cell_id"] for n in show_nodes}
-    show_edges = [(p, c) for p, c in edges if p in show_ids and c in show_ids]
-
-    # Layout: x = birth_time, y = generation (inverted for tree)
-    node_map = {n["cell_id"]: n for n in show_nodes}
-
-    # Assign y positions to avoid overlap within same generation
-    gen_counts = {}
-    for n in show_nodes:
-        g = n["generation"]
-        gen_counts[g] = gen_counts.get(g, 0)
-        n["_y_pos"] = gen_counts[g]
-        gen_counts[g] += 1
-
-    # Normalize y positions per generation
-    for n in show_nodes:
-        g = n["generation"]
-        total = gen_counts.get(g, 1)
-        n["_y_norm"] = (n["_y_pos"] - total / 2) * 2
-
-    # Draw tree
-    fig_tree = go.Figure()
-
-    # Edges
-    for parent_id, child_id in show_edges:
-        if parent_id in node_map and child_id in node_map:
-            p = node_map[parent_id]
-            c = node_map[child_id]
-            fig_tree.add_trace(go.Scatter(
-                x=[p["birth_time"], c["birth_time"]],
-                y=[p["_y_norm"], c["_y_norm"]],
-                mode="lines",
-                line=dict(color="#ccc", width=0.5),
-                showlegend=False,
-                hoverinfo="skip",
-            ))
-
-    # Nodes by type
-    type_colors = {"cancer": "#e74c3c", "normal": "#3498db", "immune": "#2ecc71"}
-    for ct, color in type_colors.items():
-        ct_nodes = [n for n in show_nodes if n["cell_type"] == ct]
-        if not ct_nodes:
-            continue
-
-        marker_colors = []
-        symbols = []
-        for n in ct_nodes:
-            if n["death_time"] is not None:
-                marker_colors.append("#999")
-                symbols.append("x")
-            elif n["mutations"]:
-                marker_colors.append("#f39c12")  # mutation = orange
-                symbols.append("diamond")
-            else:
-                marker_colors.append(color)
-                symbols.append("circle")
-
-        fig_tree.add_trace(go.Scatter(
-            x=[n["birth_time"] for n in ct_nodes],
-            y=[n["_y_norm"] for n in ct_nodes],
-            mode="markers",
-            marker=dict(
-                size=8,
-                color=marker_colors,
-                symbol=symbols,
-                line=dict(width=1, color="#333"),
-            ),
-            name=ct.title(),
-            text=[
-                f"Cell {n['cell_id']}<br>"
-                f"Gen {n['generation']}<br>"
-                f"Type: {n['cell_type']}<br>"
-                f"Born: {n['birth_time']:.0f}h<br>"
-                f"{'Dead: ' + str(n['death_time']) + 'h' if n['death_time'] else 'Alive'}<br>"
-                f"Mutations: {', '.join(n['mutations']) if n['mutations'] else 'none'}"
-                for n in ct_nodes
-            ],
-            hovertemplate="%{text}<extra></extra>",
-        ))
-
-    fig_tree.update_layout(
-        height=500,
-        xaxis_title="Time (hours)",
-        yaxis_title="Lineage Position",
-        title="Cell Division Lineage",
-        margin=dict(t=40, b=40),
-    )
-    st.plotly_chart(fig_tree, use_container_width=True)
-
-    # ── Mutation tracker ──────────────────────────────────────
-    st.divider()
-    st.markdown("#### Clonal Evolution — Mutation Tracker")
-
-    all_mutations = set()
-    for n in nodes:
-        all_mutations.update(n.get("mutations", []))
-
-    if all_mutations:
-        # Mutation frequency over time
-        mut_time = {}
-        for n in nodes:
-            for m in n.get("mutations", []):
-                t = n["birth_time"]
-                if m not in mut_time:
-                    mut_time[m] = []
-                mut_time[m].append(t)
-
-        fig_mut = go.Figure()
-        colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22"]
-        for i, (mut, times) in enumerate(sorted(mut_time.items())):
-            # Cumulative count over time
-            times_sorted = sorted(times)
-            cumulative = list(range(1, len(times_sorted) + 1))
-            fig_mut.add_trace(go.Scatter(
-                x=times_sorted, y=cumulative,
-                mode="lines+markers",
-                name=mut,
-                line=dict(color=colors[i % len(colors)]),
-                marker=dict(size=4),
-            ))
-
-        fig_mut.update_layout(
-            height=350,
-            xaxis_title="Time (hours)",
-            yaxis_title="Cumulative Cells with Mutation",
-            title="Mutation Expansion Over Time",
-            margin=dict(t=40, b=30),
-        )
-        st.plotly_chart(fig_mut, use_container_width=True)
-
-        # Mutation table
-        with st.expander("Mutation Details"):
-            for mut in sorted(all_mutations):
-                carriers = [n for n in nodes if mut in n.get("mutations", [])]
-                alive_carriers = [n for n in carriers if n["death_time"] is None]
-                st.write(
-                    f"- **{mut}**: {len(carriers)} total cells, "
-                    f"{len(alive_carriers)} alive, "
-                    f"first appeared at t={min(n['birth_time'] for n in carriers):.0f}h"
-                )
     else:
-        st.info("No mutations recorded in this lineage.")
+
+        # Stats
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Total Cells", len(nodes))
+        c2.metric("Divisions", len(edges))
+        max_gen = max(n["generation"] for n in nodes)
+        c3.metric("Max Generation", max_gen)
+        alive = sum(1 for n in nodes if n["death_time"] is None)
+        c4.metric("Alive", alive)
+        with_muts = sum(1 for n in nodes if n["mutations"])
+        c5.metric("With Mutations", with_muts)
+
+        # ── Tree visualization ────────────────────────────────────
+        st.markdown("#### Division Tree")
+
+        col_filt, col_gen = st.columns(2)
+        with col_filt:
+            lineage_type = st.selectbox(
+                "Filter Cell Type",
+                ["All", "cancer", "normal"],
+                key="lineage_type",
+            )
+        with col_gen:
+            max_gen_show = st.slider(
+                "Max Generation to Show",
+                0, max_gen, max_gen,
+                key="lineage_max_gen",
+            )
+
+        # Filter nodes
+        show_nodes = [n for n in nodes if n["generation"] <= max_gen_show]
+        if lineage_type != "All":
+            show_nodes = [n for n in show_nodes if n["cell_type"] == lineage_type]
+        show_ids = {n["cell_id"] for n in show_nodes}
+        show_edges = [(p, c) for p, c in edges if p in show_ids and c in show_ids]
+
+        # Layout: x = birth_time, y = generation (inverted for tree)
+        node_map = {n["cell_id"]: n for n in show_nodes}
+
+        # Assign y positions to avoid overlap within same generation
+        gen_counts = {}
+        for n in show_nodes:
+            g = n["generation"]
+            gen_counts[g] = gen_counts.get(g, 0)
+            n["_y_pos"] = gen_counts[g]
+            gen_counts[g] += 1
+
+        # Normalize y positions per generation
+        for n in show_nodes:
+            g = n["generation"]
+            total = gen_counts.get(g, 1)
+            n["_y_norm"] = (n["_y_pos"] - total / 2) * 2
+
+        # Draw tree
+        fig_tree = go.Figure()
+
+        # Edges
+        for parent_id, child_id in show_edges:
+            if parent_id in node_map and child_id in node_map:
+                p = node_map[parent_id]
+                c = node_map[child_id]
+                fig_tree.add_trace(go.Scatter(
+                    x=[p["birth_time"], c["birth_time"]],
+                    y=[p["_y_norm"], c["_y_norm"]],
+                    mode="lines",
+                    line=dict(color="#ccc", width=0.5),
+                    showlegend=False,
+                    hoverinfo="skip",
+                ))
+
+        # Nodes by type
+        type_colors = {"cancer": "#e74c3c", "normal": "#3498db", "immune": "#2ecc71"}
+        for ct, color in type_colors.items():
+            ct_nodes = [n for n in show_nodes if n["cell_type"] == ct]
+            if not ct_nodes:
+                continue
+
+            marker_colors = []
+            symbols = []
+            for n in ct_nodes:
+                if n["death_time"] is not None:
+                    marker_colors.append("#999")
+                    symbols.append("x")
+                elif n["mutations"]:
+                    marker_colors.append("#f39c12")  # mutation = orange
+                    symbols.append("diamond")
+                else:
+                    marker_colors.append(color)
+                    symbols.append("circle")
+
+            fig_tree.add_trace(go.Scatter(
+                x=[n["birth_time"] for n in ct_nodes],
+                y=[n["_y_norm"] for n in ct_nodes],
+                mode="markers",
+                marker=dict(
+                    size=8,
+                    color=marker_colors,
+                    symbol=symbols,
+                    line=dict(width=1, color="#333"),
+                ),
+                name=ct.title(),
+                text=[
+                    f"Cell {n['cell_id']}<br>"
+                    f"Gen {n['generation']}<br>"
+                    f"Type: {n['cell_type']}<br>"
+                    f"Born: {n['birth_time']:.0f}h<br>"
+                    f"{'Dead: ' + str(n['death_time']) + 'h' if n['death_time'] else 'Alive'}<br>"
+                    f"Mutations: {', '.join(n['mutations']) if n['mutations'] else 'none'}"
+                    for n in ct_nodes
+                ],
+                hovertemplate="%{text}<extra></extra>",
+            ))
+
+        fig_tree.update_layout(
+            height=500,
+            xaxis_title="Time (hours)",
+            yaxis_title="Lineage Position",
+            title="Cell Division Lineage",
+            margin=dict(t=40, b=40),
+        )
+        st.plotly_chart(fig_tree, use_container_width=True)
+
+        # ── Mutation tracker ──────────────────────────────────────
+        st.divider()
+        st.markdown("#### Clonal Evolution — Mutation Tracker")
+
+        all_mutations = set()
+        for n in nodes:
+            all_mutations.update(n.get("mutations", []))
+
+        if all_mutations:
+            # Mutation frequency over time
+            mut_time = {}
+            for n in nodes:
+                for m in n.get("mutations", []):
+                    t = n["birth_time"]
+                    if m not in mut_time:
+                        mut_time[m] = []
+                    mut_time[m].append(t)
+
+            fig_mut = go.Figure()
+            colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22"]
+            for i, (mut, times) in enumerate(sorted(mut_time.items())):
+                # Cumulative count over time
+                times_sorted = sorted(times)
+                cumulative = list(range(1, len(times_sorted) + 1))
+                fig_mut.add_trace(go.Scatter(
+                    x=times_sorted, y=cumulative,
+                    mode="lines+markers",
+                    name=mut,
+                    line=dict(color=colors[i % len(colors)]),
+                    marker=dict(size=4),
+                ))
+
+            fig_mut.update_layout(
+                height=350,
+                xaxis_title="Time (hours)",
+                yaxis_title="Cumulative Cells with Mutation",
+                title="Mutation Expansion Over Time",
+                margin=dict(t=40, b=30),
+            )
+            st.plotly_chart(fig_mut, use_container_width=True)
+
+            # Mutation table
+            with st.expander("Mutation Details"):
+                for mut in sorted(all_mutations):
+                    carriers = [n for n in nodes if mut in n.get("mutations", [])]
+                    alive_carriers = [n for n in carriers if n["death_time"] is None]
+                    st.write(
+                        f"- **{mut}**: {len(carriers)} total cells, "
+                        f"{len(alive_carriers)} alive, "
+                        f"first appeared at t={min(n['birth_time'] for n in carriers):.0f}h"
+                    )
+        else:
+            st.info("No mutations recorded in this lineage.")
 
 
 # ────────────────────────────────────────────────────────────────
@@ -3091,247 +3057,309 @@ with tab_omniverse:
         USD_AVAILABLE = False
 
     if not USD_AVAILABLE:
+        # Scoped to this tab. This used to call st.stop(), which halts
+        # the entire Streamlit script rather than the tab, so on any
+        # deployment without usd-core the Export tab below was collateral
+        # damage and never rendered at all.
         st.error("OpenUSD not installed. Install with: `pip install usd-core`")
         st.code("pip install usd-core", language="bash")
-        st.stop()
+    else:
 
-    st.success("OpenUSD (pxr) is available - Real USD operations enabled")
+        st.success("OpenUSD (pxr) is available - Real USD operations enabled")
 
-    # Import real connector
-    try:
-        from cognisom.omniverse.real_connector import (
-            RealOmniverseConnector, CellVisualization, SimulationFrame
-        )
-        CONNECTOR_AVAILABLE = True
-    except ImportError as e:
-        st.error(f"Real connector not available: {e}")
-        CONNECTOR_AVAILABLE = False
+        # Import real connector
+        try:
+            from cognisom.omniverse.real_connector import (
+                RealOmniverseConnector, CellVisualization, SimulationFrame
+            )
+            CONNECTOR_AVAILABLE = True
+        except ImportError as e:
+            st.error(f"Real connector not available: {e}")
+            CONNECTOR_AVAILABLE = False
 
-    if CONNECTOR_AVAILABLE:
-        st.divider()
-
-        # ── Scene Generation ────────────────────────────────────────
-        st.markdown("### Generate USD Scene")
-
-        col_cfg, col_gen = st.columns([2, 1])
-
-        with col_cfg:
-            scene_name = st.text_input("Scene Name", value="cognisom_simulation", key="usd_scene_name")
-
-            st.markdown("**Cell Configuration**")
-            col_a, col_b, col_c = st.columns(3)
-            n_stem = col_a.slider("Stem Cells", 5, 50, 15, key="usd_n_stem")
-            n_prog = col_b.slider("Progenitor", 10, 100, 30, key="usd_n_prog")
-            n_diff = col_c.slider("Differentiated", 10, 100, 40, key="usd_n_diff")
-            n_div = col_a.slider("Dividing", 2, 30, 8, key="usd_n_div")
-
-            cluster_radius = col_b.slider("Cluster Radius", 10, 50, 25, key="usd_radius")
-
-        with col_gen:
-            st.markdown("**Output Directory**")
-            output_dir = st.text_input("Path", value="data/simulation/usd", key="usd_output")
-
-            generate_btn = st.button("Generate USD Scene", type="primary", key="gen_usd")
-
-        if generate_btn:
-            import math
-            import random
-
-            with st.spinner("Creating real USD stage..."):
-                # Initialize connector
-                connector = RealOmniverseConnector(output_dir)
-
-                if connector.create_stage(scene_name):
-                    # Cell type configurations
-                    cell_types = {
-                        "stem": {"color": (0.2, 0.9, 0.3), "count": n_stem},
-                        "progenitor": {"color": (0.3, 0.6, 0.9), "count": n_prog},
-                        "differentiated": {"color": (0.9, 0.5, 0.2), "count": n_diff},
-                        "dividing": {"color": (0.9, 0.2, 0.9), "count": n_div},
-                    }
-
-                    random.seed(42)
-                    total_cells = 0
-
-                    for cell_type, cfg in cell_types.items():
-                        for i in range(cfg["count"]):
-                            # Spherical distribution
-                            theta = random.uniform(0, 2 * math.pi)
-                            phi = random.uniform(0, math.pi)
-                            r = random.uniform(3, cluster_radius)
-
-                            x = r * math.sin(phi) * math.cos(theta)
-                            y = r * math.sin(phi) * math.sin(theta) + 10
-                            z = r * math.cos(phi)
-
-                            cell = CellVisualization(
-                                cell_id=f"{cell_type}_{i:03d}",
-                                position=(x, y, z),
-                                radius=random.uniform(0.8, 2.0),
-                                color=cfg["color"],
-                                cell_type=cell_type,
-                                metabolic_state=random.uniform(0.5, 1.0),
-                            )
-                            connector.add_cell(cell)
-                            total_cells += 1
-
-                    connector.save()
-
-                    st.success(f"Created USD scene with {total_cells} cells")
-
-                    # Store connector info
-                    st.session_state["usd_connector"] = connector.get_info()
-                    st.session_state["usd_stage_path"] = str(connector.stage_path)
-
-                else:
-                    st.error("Failed to create USD stage")
-
-        # ── Display Current Scene ───────────────────────────────────
-        if "usd_stage_path" in st.session_state:
+        if CONNECTOR_AVAILABLE:
             st.divider()
-            st.markdown("### Current USD Scene")
 
-            stage_path = st.session_state["usd_stage_path"]
-            connector_info = st.session_state.get("usd_connector", {})
+            # ── Scene Generation ────────────────────────────────────────
+            st.markdown("### Generate USD Scene")
 
-            col_info, col_actions = st.columns([2, 1])
+            col_cfg, col_gen = st.columns([2, 1])
 
-            with col_info:
-                st.write(f"**File:** `{stage_path}`")
-                st.write(f"**Cells:** {connector_info.get('cell_count', 'N/A')}")
-                st.write(f"**Frames:** {connector_info.get('frame_count', 'N/A')}")
-                st.write(f"**Real USD:** {connector_info.get('is_real', False)}")
+            with col_cfg:
+                scene_name = st.text_input("Scene Name", value="cognisom_simulation", key="usd_scene_name")
 
-            with col_actions:
-                # Download USD file
-                from pathlib import Path
-                usd_path = Path(stage_path)
-                if usd_path.exists():
-                    with open(usd_path, 'r') as f:
-                        usd_content = f.read()
-                    st.download_button(
-                        "Download .usda",
-                        usd_content,
-                        file_name=usd_path.name,
-                        mime="text/plain",
-                        key="dl_usda",
-                    )
+                st.markdown("**Cell Configuration**")
+                col_a, col_b, col_c = st.columns(3)
+                n_stem = col_a.slider("Stem Cells", 5, 50, 15, key="usd_n_stem")
+                n_prog = col_b.slider("Progenitor", 10, 100, 30, key="usd_n_prog")
+                n_diff = col_c.slider("Differentiated", 10, 100, 40, key="usd_n_diff")
+                n_div = col_a.slider("Dividing", 2, 30, 8, key="usd_n_div")
 
-            # Preview USD content
-            with st.expander("Preview USD File (first 100 lines)"):
-                from pathlib import Path
-                usd_path = Path(stage_path)
-                if usd_path.exists():
-                    with open(usd_path, 'r') as f:
-                        lines = f.readlines()[:100]
-                    st.code("".join(lines), language="python")
-                else:
-                    st.warning("USD file not found")
+                cluster_radius = col_b.slider("Cluster Radius", 10, 50, 25, key="usd_radius")
 
-        # ── Viewer Options ──────────────────────────────────────────
-        st.divider()
-        st.markdown("### View USD Files")
+            with col_gen:
+                st.markdown("**Output Directory**")
+                output_dir = st.text_input("Path", value="data/simulation/usd", key="usd_output")
 
-        st.markdown("""
-        Your generated USD files can be viewed in:
+                generate_btn = st.button("Generate USD Scene", type="primary", key="gen_usd")
 
-        | Application | Platform | Notes |
-        |-------------|----------|-------|
-        | **NVIDIA Omniverse** | Windows/Linux | Full Omniverse experience |
-        | **usdview** | All | `pip install usd-core` then `usdview file.usda` |
-        | **Blender** | All | File > Import > USD |
-        | **Houdini** | All | Native USD support |
-        | **Maya** | All | With USD plugin |
-        | **Three.js** | Web | Using USD loader |
+            # Offer the real run as the scene source when one exists.
+            #
+            # This tab writes genuine USD, but its contents were always a
+            # spherical cloud of random.uniform positions with cell types
+            # (stem / progenitor / differentiated) the simulation does not
+            # even model. Real file format, invented contents. Exporting
+            # an actual run is the thing the tab was pretending to do.
+            _runner = st.session_state.get("sim_runner")
+            _run_frames = _runner.get_inspection_history() if _runner is not None else []
 
-        **Quick View Command:**
-        ```bash
-        # If you have usd-core installed
-        python -m pxr.Usdviewq data/simulation/usd/cognisom_simulation.usda
-        ```
-        """)
+            if _run_frames:
+                usd_source = st.radio(
+                    "Scene contents",
+                    ["Export the last simulation run", "Synthetic demo cluster"],
+                    key="usd_source",
+                    help="The demo cluster is a shaped point cloud, not "
+                         "simulation output.",
+                )
+            else:
+                usd_source = "Synthetic demo cluster"
+                st.caption(
+                    "No simulation run in this session, so only the "
+                    "synthetic demo cluster is available. Run a simulation "
+                    "in the Live 3D tab to export real cells."
+                )
 
-        # ── Animation Generation ────────────────────────────────────
-        st.divider()
-        st.markdown("### Generate Animation Sequence")
+            if generate_btn:
+                import math
+                import random
 
-        n_frames = st.slider("Number of Frames", 10, 100, 24, key="usd_n_frames")
+                export_real = usd_source.startswith("Export")
 
-        if st.button("Generate Animated Sequence", key="gen_anim"):
-            import math
-            import random
+                with st.spinner("Creating real USD stage..."):
+                    # Initialize connector
+                    connector = RealOmniverseConnector(output_dir)
 
-            with st.spinner(f"Generating {n_frames} frame animation..."):
-                connector = RealOmniverseConnector(output_dir)
+                    if export_real and connector.create_stage(scene_name):
+                        frame = _run_frames[-1]
+                        _type_colors = {
+                            "normal": (0.3, 0.6, 0.9),
+                            "cancer": (0.9, 0.2, 0.2),
+                            "immune": (0.2, 0.9, 0.3),
+                        }
+                        total_cells = 0
+                        for c in frame["cells"]:
+                            connector.add_cell(CellVisualization(
+                                cell_id=str(c["cell_id"]),
+                                position=tuple(float(v) for v in c["position"]),
+                                # Cells have no size in the model, so this
+                                # is a display radius, not a measurement.
+                                radius=1.5,
+                                color=_type_colors.get(c["cell_type"], (0.7, 0.7, 0.7)),
+                                cell_type=c["cell_type"],
+                                metabolic_state=float(c.get("oxygen", 0.0)),
+                            ))
+                            total_cells += 1
+                        connector.save()
+                        st.success(
+                            f"Exported {total_cells} real cells from t = "
+                            f"{frame['time']:.1f} h to USD"
+                        )
 
-                if connector.create_stage(f"{scene_name}_animated"):
-                    random.seed(42)
-
-                    # Create initial cells
-                    cells_data = []
-                    for i in range(50):
-                        cell_type = random.choice(["stem", "progenitor", "differentiated"])
-                        colors = {
-                            "stem": (0.2, 0.9, 0.3),
-                            "progenitor": (0.3, 0.6, 0.9),
-                            "differentiated": (0.9, 0.5, 0.2),
+                    elif connector.create_stage(scene_name):
+                        st.caption(
+                            "Synthetic demo cluster: shaped random "
+                            "positions, not simulation output."
+                        )
+                        # Cell type configurations
+                        cell_types = {
+                            "stem": {"color": (0.2, 0.9, 0.3), "count": n_stem},
+                            "progenitor": {"color": (0.3, 0.6, 0.9), "count": n_prog},
+                            "differentiated": {"color": (0.9, 0.5, 0.2), "count": n_diff},
+                            "dividing": {"color": (0.9, 0.2, 0.9), "count": n_div},
                         }
 
-                        theta = random.uniform(0, 2 * math.pi)
-                        phi = random.uniform(0, math.pi)
-                        r = random.uniform(5, 20)
+                        random.seed(42)
+                        total_cells = 0
 
-                        cells_data.append({
-                            "id": f"cell_{i:03d}",
-                            "base_pos": (
-                                r * math.sin(phi) * math.cos(theta),
-                                r * math.sin(phi) * math.sin(theta) + 10,
-                                r * math.cos(phi)
-                            ),
-                            "color": colors[cell_type],
-                            "cell_type": cell_type,
-                            "phase": random.uniform(0, 2 * math.pi),
-                        })
+                        for cell_type, cfg in cell_types.items():
+                            for i in range(cfg["count"]):
+                                # Spherical distribution
+                                theta = random.uniform(0, 2 * math.pi)
+                                phi = random.uniform(0, math.pi)
+                                r = random.uniform(3, cluster_radius)
 
-                    # Generate frames
-                    progress = st.progress(0)
-                    for frame in range(n_frames):
-                        cells = []
-                        for cd in cells_data:
-                            # Animate position (oscillation)
-                            t = frame / n_frames * 2 * math.pi
-                            offset = math.sin(t + cd["phase"]) * 2
+                                x = r * math.sin(phi) * math.cos(theta)
+                                y = r * math.sin(phi) * math.sin(theta) + 10
+                                z = r * math.cos(phi)
 
-                            pos = (
-                                cd["base_pos"][0] + offset * 0.5,
-                                cd["base_pos"][1] + offset,
-                                cd["base_pos"][2] + offset * 0.3,
-                            )
+                                cell = CellVisualization(
+                                    cell_id=f"{cell_type}_{i:03d}",
+                                    position=(x, y, z),
+                                    radius=random.uniform(0.8, 2.0),
+                                    color=cfg["color"],
+                                    cell_type=cell_type,
+                                    metabolic_state=random.uniform(0.5, 1.0),
+                                )
+                                connector.add_cell(cell)
+                                total_cells += 1
 
-                            cell = CellVisualization(
-                                cell_id=cd["id"],
-                                position=pos,
-                                radius=1.0 + math.sin(t + cd["phase"]) * 0.2,
-                                color=cd["color"],
-                                cell_type=cd["cell_type"],
-                                metabolic_state=0.5 + 0.5 * math.sin(t + cd["phase"]),
-                            )
-                            cells.append(cell)
+                        connector.save()
 
-                        sim_frame = SimulationFrame(
-                            timestamp=frame / 24.0,  # 24 fps
-                            cells=cells,
+                        st.success(f"Created USD scene with {total_cells} cells")
+
+                        # Store connector info
+                        st.session_state["usd_connector"] = connector.get_info()
+                        st.session_state["usd_stage_path"] = str(connector.stage_path)
+
+                    else:
+                        st.error("Failed to create USD stage")
+
+            # ── Display Current Scene ───────────────────────────────────
+            if "usd_stage_path" in st.session_state:
+                st.divider()
+                st.markdown("### Current USD Scene")
+
+                stage_path = st.session_state["usd_stage_path"]
+                connector_info = st.session_state.get("usd_connector", {})
+
+                col_info, col_actions = st.columns([2, 1])
+
+                with col_info:
+                    st.write(f"**File:** `{stage_path}`")
+                    st.write(f"**Cells:** {connector_info.get('cell_count', 'N/A')}")
+                    st.write(f"**Frames:** {connector_info.get('frame_count', 'N/A')}")
+                    st.write(f"**Real USD:** {connector_info.get('is_real', False)}")
+
+                with col_actions:
+                    # Download USD file
+                    from pathlib import Path
+                    usd_path = Path(stage_path)
+                    if usd_path.exists():
+                        with open(usd_path, 'r') as f:
+                            usd_content = f.read()
+                        st.download_button(
+                            "Download .usda",
+                            usd_content,
+                            file_name=usd_path.name,
+                            mime="text/plain",
+                            key="dl_usda",
                         )
-                        connector.render_frame(sim_frame)
-                        progress.progress((frame + 1) / n_frames)
 
-                    connector.save()
-                    st.success(f"Created animated USD with {n_frames} frames at {connector.stage_path}")
-                    st.session_state["usd_anim_path"] = str(connector.stage_path)
+                # Preview USD content
+                with st.expander("Preview USD File (first 100 lines)"):
+                    from pathlib import Path
+                    usd_path = Path(stage_path)
+                    if usd_path.exists():
+                        with open(usd_path, 'r') as f:
+                            lines = f.readlines()[:100]
+                        st.code("".join(lines), language="python")
+                    else:
+                        st.warning("USD file not found")
 
-        if "usd_anim_path" in st.session_state:
-            st.write(f"**Animated Scene:** `{st.session_state['usd_anim_path']}`")
-            st.info("Open in Omniverse or usdview to play the animation timeline")
+            # ── Viewer Options ──────────────────────────────────────────
+            st.divider()
+            st.markdown("### View USD Files")
+
+            st.markdown("""
+            Your generated USD files can be viewed in:
+
+            | Application | Platform | Notes |
+            |-------------|----------|-------|
+            | **NVIDIA Omniverse** | Windows/Linux | Full Omniverse experience |
+            | **usdview** | All | `pip install usd-core` then `usdview file.usda` |
+            | **Blender** | All | File > Import > USD |
+            | **Houdini** | All | Native USD support |
+            | **Maya** | All | With USD plugin |
+            | **Three.js** | Web | Using USD loader |
+
+            **Quick View Command:**
+            ```bash
+            # If you have usd-core installed
+            python -m pxr.Usdviewq data/simulation/usd/cognisom_simulation.usda
+            ```
+            """)
+
+            # ── Animation Generation ────────────────────────────────────
+            st.divider()
+            st.markdown("### Generate Animation Sequence")
+
+            n_frames = st.slider("Number of Frames", 10, 100, 24, key="usd_n_frames")
+
+            if st.button("Generate Animated Sequence", key="gen_anim"):
+                import math
+                import random
+
+                with st.spinner(f"Generating {n_frames} frame animation..."):
+                    connector = RealOmniverseConnector(output_dir)
+
+                    if connector.create_stage(f"{scene_name}_animated"):
+                        random.seed(42)
+
+                        # Create initial cells
+                        cells_data = []
+                        for i in range(50):
+                            cell_type = random.choice(["stem", "progenitor", "differentiated"])
+                            colors = {
+                                "stem": (0.2, 0.9, 0.3),
+                                "progenitor": (0.3, 0.6, 0.9),
+                                "differentiated": (0.9, 0.5, 0.2),
+                            }
+
+                            theta = random.uniform(0, 2 * math.pi)
+                            phi = random.uniform(0, math.pi)
+                            r = random.uniform(5, 20)
+
+                            cells_data.append({
+                                "id": f"cell_{i:03d}",
+                                "base_pos": (
+                                    r * math.sin(phi) * math.cos(theta),
+                                    r * math.sin(phi) * math.sin(theta) + 10,
+                                    r * math.cos(phi)
+                                ),
+                                "color": colors[cell_type],
+                                "cell_type": cell_type,
+                                "phase": random.uniform(0, 2 * math.pi),
+                            })
+
+                        # Generate frames
+                        progress = st.progress(0)
+                        for frame in range(n_frames):
+                            cells = []
+                            for cd in cells_data:
+                                # Animate position (oscillation)
+                                t = frame / n_frames * 2 * math.pi
+                                offset = math.sin(t + cd["phase"]) * 2
+
+                                pos = (
+                                    cd["base_pos"][0] + offset * 0.5,
+                                    cd["base_pos"][1] + offset,
+                                    cd["base_pos"][2] + offset * 0.3,
+                                )
+
+                                cell = CellVisualization(
+                                    cell_id=cd["id"],
+                                    position=pos,
+                                    radius=1.0 + math.sin(t + cd["phase"]) * 0.2,
+                                    color=cd["color"],
+                                    cell_type=cd["cell_type"],
+                                    metabolic_state=0.5 + 0.5 * math.sin(t + cd["phase"]),
+                                )
+                                cells.append(cell)
+
+                            sim_frame = SimulationFrame(
+                                timestamp=frame / 24.0,  # 24 fps
+                                cells=cells,
+                            )
+                            connector.render_frame(sim_frame)
+                            progress.progress((frame + 1) / n_frames)
+
+                        connector.save()
+                        st.success(f"Created animated USD with {n_frames} frames at {connector.stage_path}")
+                        st.session_state["usd_anim_path"] = str(connector.stage_path)
+
+            if "usd_anim_path" in st.session_state:
+                st.write(f"**Animated Scene:** `{st.session_state['usd_anim_path']}`")
+                st.info("Open in Omniverse or usdview to play the animation timeline")
 
 
 # ────────────────────────────────────────────────────────────────
@@ -3342,11 +3370,6 @@ with tab_export:
     st.subheader("Export 3D Data")
     st.write("Export cell populations and spatial fields to standard formats for use in external tools.")
 
-    try:
-        from cognisom.visualization.exporters import SceneExporter
-    except ImportError:
-        st.error("Exporter not available.")
-        st.stop()
 
     exporter = SceneExporter()
 
@@ -3355,127 +3378,129 @@ with tab_export:
     interactions = st.session_state.get("viz_interactions")
 
     if not cells:
+        # Scoped rather than st.stop(): halting the script is a page-wide
+        # action being used to skip one tab.
         st.info("Generate data in the other tabs first.")
-        st.stop()
+    else:
 
-    st.write(f"**Available data:** {len(cells)} cells"
-             + (f", {len(fields)} fields" if fields else "")
-             + (f", {len(interactions)} interactions" if interactions else ""))
+        st.write(f"**Available data:** {len(cells)} cells"
+                 + (f", {len(fields)} fields" if fields else "")
+                 + (f", {len(interactions)} interactions" if interactions else ""))
 
-    st.divider()
-
-    # ── Cell Export ──────────────────────────────────────────────
-    st.subheader("Cell Population Export")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.write("**PDB Format**")
-        st.caption("Open in PyMOL, UCSF Chimera")
-        if st.button("Export PDB", key="exp_pdb"):
-            path = Path(tempfile.mkdtemp()) / "cells.pdb"
-            exporter.cells_to_pdb(cells, str(path), scale=10.0)
-            with open(path) as f:
-                st.download_button(
-                    "Download .pdb",
-                    f.read(),
-                    file_name="cognisom_cells.pdb",
-                    mime="chemical/x-pdb",
-                    key="dl_pdb",
-                )
-
-    with col2:
-        st.write("**glTF Format**")
-        st.caption("Open in Blender, three.js")
-        if st.button("Export glTF", key="exp_gltf"):
-            path = Path(tempfile.mkdtemp()) / "cells.gltf"
-            exporter.cells_to_gltf(cells, str(path))
-            with open(path) as f:
-                st.download_button(
-                    "Download .gltf",
-                    f.read(),
-                    file_name="cognisom_cells.gltf",
-                    mime="model/gltf+json",
-                    key="dl_gltf",
-                )
-
-    with col3:
-        st.write("**CSV Format**")
-        st.caption("Open in Excel, pandas")
-        if st.button("Export CSV", key="exp_csv"):
-            path = Path(tempfile.mkdtemp()) / "cells.csv"
-            exporter.cells_to_csv(cells, str(path))
-            with open(path) as f:
-                st.download_button(
-                    "Download .csv",
-                    f.read(),
-                    file_name="cognisom_cells.csv",
-                    mime="text/csv",
-                    key="dl_csv",
-                )
-
-    with col4:
-        st.write("**JSON Scene**")
-        st.caption("Full scene with all data")
-        if st.button("Export JSON", key="exp_json"):
-            path = Path(tempfile.mkdtemp()) / "scene.json"
-            exporter.scene_to_json(
-                cells=cells,
-                fields=fields,
-                interactions=interactions,
-                metadata={"source": "Cognisom Dashboard"},
-                output_path=str(path),
-            )
-            with open(path) as f:
-                st.download_button(
-                    "Download .json",
-                    f.read(),
-                    file_name="cognisom_scene.json",
-                    mime="application/json",
-                    key="dl_json",
-                )
-
-    # ── Field Export ─────────────────────────────────────────────
-    if fields:
         st.divider()
-        st.subheader("Spatial Field Export")
 
-        col1, col2 = st.columns(2)
+        # ── Cell Export ──────────────────────────────────────────────
+        st.subheader("Cell Population Export")
+
+        col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            field_to_export = st.selectbox(
-                "Field", list(fields.keys()), key="export_field",
-            )
-            st.write("**VTK Format** — Open in ParaView, VisIt")
-            if st.button("Export Single Field VTK", key="exp_vtk_single"):
-                path = Path(tempfile.mkdtemp()) / f"{field_to_export}.vtk"
-                exporter.field_to_vtk(
-                    fields[field_to_export], str(path),
-                    field_name=field_to_export,
-                )
+            st.write("**PDB Format**")
+            st.caption("Open in PyMOL, UCSF Chimera")
+            if st.button("Export PDB", key="exp_pdb"):
+                path = Path(tempfile.mkdtemp()) / "cells.pdb"
+                exporter.cells_to_pdb(cells, str(path), scale=10.0)
                 with open(path) as f:
                     st.download_button(
-                        "Download .vtk",
+                        "Download .pdb",
                         f.read(),
-                        file_name=f"cognisom_{field_to_export}.vtk",
-                        mime="application/octet-stream",
-                        key="dl_vtk_single",
+                        file_name="cognisom_cells.pdb",
+                        mime="chemical/x-pdb",
+                        key="dl_pdb",
                     )
 
         with col2:
-            st.write("**Multi-Field VTK** — All fields in one file")
-            if st.button("Export All Fields VTK", key="exp_vtk_multi"):
-                path = Path(tempfile.mkdtemp()) / "all_fields.vtk"
-                exporter.fields_to_vtk(fields, str(path))
+            st.write("**glTF Format**")
+            st.caption("Open in Blender, three.js")
+            if st.button("Export glTF", key="exp_gltf"):
+                path = Path(tempfile.mkdtemp()) / "cells.gltf"
+                exporter.cells_to_gltf(cells, str(path))
                 with open(path) as f:
                     st.download_button(
-                        "Download .vtk",
+                        "Download .gltf",
                         f.read(),
-                        file_name="cognisom_all_fields.vtk",
-                        mime="application/octet-stream",
-                        key="dl_vtk_multi",
+                        file_name="cognisom_cells.gltf",
+                        mime="model/gltf+json",
+                        key="dl_gltf",
                     )
 
-# Footer
-from cognisom.dashboard.footer import render_footer
-render_footer()
+        with col3:
+            st.write("**CSV Format**")
+            st.caption("Open in Excel, pandas")
+            if st.button("Export CSV", key="exp_csv"):
+                path = Path(tempfile.mkdtemp()) / "cells.csv"
+                exporter.cells_to_csv(cells, str(path))
+                with open(path) as f:
+                    st.download_button(
+                        "Download .csv",
+                        f.read(),
+                        file_name="cognisom_cells.csv",
+                        mime="text/csv",
+                        key="dl_csv",
+                    )
+
+        with col4:
+            st.write("**JSON Scene**")
+            st.caption("Full scene with all data")
+            if st.button("Export JSON", key="exp_json"):
+                path = Path(tempfile.mkdtemp()) / "scene.json"
+                exporter.scene_to_json(
+                    cells=cells,
+                    fields=fields,
+                    interactions=interactions,
+                    metadata={"source": "Cognisom Dashboard"},
+                    output_path=str(path),
+                )
+                with open(path) as f:
+                    st.download_button(
+                        "Download .json",
+                        f.read(),
+                        file_name="cognisom_scene.json",
+                        mime="application/json",
+                        key="dl_json",
+                    )
+
+        # ── Field Export ─────────────────────────────────────────────
+        if fields:
+            st.divider()
+            st.subheader("Spatial Field Export")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                field_to_export = st.selectbox(
+                    "Field", list(fields.keys()), key="export_field",
+                )
+                st.write("**VTK Format** — Open in ParaView, VisIt")
+                if st.button("Export Single Field VTK", key="exp_vtk_single"):
+                    path = Path(tempfile.mkdtemp()) / f"{field_to_export}.vtk"
+                    exporter.field_to_vtk(
+                        fields[field_to_export], str(path),
+                        field_name=field_to_export,
+                    )
+                    with open(path) as f:
+                        st.download_button(
+                            "Download .vtk",
+                            f.read(),
+                            file_name=f"cognisom_{field_to_export}.vtk",
+                            mime="application/octet-stream",
+                            key="dl_vtk_single",
+                        )
+
+            with col2:
+                st.write("**Multi-Field VTK** — All fields in one file")
+                if st.button("Export All Fields VTK", key="exp_vtk_multi"):
+                    path = Path(tempfile.mkdtemp()) / "all_fields.vtk"
+                    exporter.fields_to_vtk(fields, str(path))
+                    with open(path) as f:
+                        st.download_button(
+                            "Download .vtk",
+                            f.read(),
+                            file_name="cognisom_all_fields.vtk",
+                            mime="application/octet-stream",
+                            key="dl_vtk_multi",
+                        )
+
+    # Footer
+    from cognisom.dashboard.footer import render_footer
+    render_footer()
