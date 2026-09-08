@@ -148,12 +148,41 @@ if entities:
             col_left, col_right = st.columns(2)
 
             with col_left:
-                # Physics parameters
+                # Physics parameters, shown with the evidence behind
+                # each one. A number with no recorded provenance is
+                # labelled as such rather than displayed as if curated.
                 if hasattr(entity, "physics_params") and entity.physics_params:
-                    st.markdown("**Physics / Simulation Parameters**")
-                    for k, v in entity.physics_params.items():
-                        label = k.replace("_", " ").title()
-                        st.markdown(f"- {label}: `{v}`")
+                    from cognisom.library.parameters import (
+                        assess, iter_parameters,
+                    )
+
+                    params = list(iter_parameters(entity))
+                    if params:
+                        st.markdown("**Physics / Simulation Parameters**")
+                        for name, pv in sorted(params):
+                            label = name.replace("_", " ").title()
+                            evidence = (
+                                pv.citation or pv.source or pv.rationale
+                                or "no recorded source"
+                            )
+                            badge = (
+                                "" if pv.is_simulation_grade else " ⚠"
+                            )
+                            st.markdown(
+                                f"- {label}: `{pv.value} {pv.unit}`"
+                                f" — _{pv.provenance.value}{badge}_"
+                                f" ({evidence})"
+                            )
+
+                    readiness = assess(entity)
+                    if not readiness.is_ready:
+                        gaps = sorted(
+                            readiness.missing + readiness.placeholder
+                        )
+                        st.caption(
+                            f"Not yet simulation-ready. Uncurated: "
+                            f"{', '.join(gaps)}"
+                        )
 
                 # Compartments
                 if hasattr(entity, "compartments") and entity.compartments:
