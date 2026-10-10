@@ -119,6 +119,11 @@ class EpigeneticModule(SimulationModule):
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
         self.subscribe(EventTypes.CELL_TRANSFORMED, self.on_cell_transformed)
         self.subscribe(EventTypes.HYPOXIA_DETECTED, self.on_hypoxia_detected)
+        # Without this, cell_epigenetics only ever grew: a 6 h Baseline run
+        # tracked 90 cells against 8 alive, so avg_methylation and
+        # silenced_genes -- both plotted on the dashboard -- were averages
+        # over dead cells. circadian and morphogen already handled it.
+        self.subscribe(EventTypes.CELL_DIED, self.on_cell_died)
         
         print(f"    ✓ DNA methylation system")
         print(f"    ✓ Histone modification system")
@@ -258,6 +263,12 @@ class EpigeneticModule(SimulationModule):
         }
     
     # Event handlers
+    def on_cell_died(self, data):
+        """Handle cell death - drop the dead cell's epigenetic state."""
+        cell_id = data.get('cell_id') if isinstance(data, dict) else None
+        if cell_id is not None:
+            self.remove_cell(cell_id)
+
     def on_cell_divided(self, data):
         """Handle cell division - inherit epigenetic marks"""
         parent_id = data['cell_id']

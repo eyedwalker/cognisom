@@ -104,9 +104,18 @@ class KEGGClient:
                     pathway_id = parts[0].replace("path:", "")
                     name = parts[1]
 
-                    # Filter by organism
-                    if organism and not pathway_id.startswith(organism):
-                        continue
+                    # find/pathway returns *reference* pathways, keyed
+                    # map#####. This used to drop anything not already
+                    # prefixed with the organism code, which is every row the
+                    # endpoint returns -- so the search found nothing for any
+                    # query while get_pathway("hsa05215") worked fine.
+                    # Map the reference id onto the requested organism instead.
+                    if organism:
+                        if pathway_id.startswith("map"):
+                            pathway_id = organism + pathway_id[len("map"):]
+                        elif not pathway_id.startswith(organism):
+                            # An organism-specific id for a different organism.
+                            continue
 
                     pathways.append(KEGGPathway(
                         pathway_id=pathway_id,
@@ -281,6 +290,25 @@ class PubChemCompound:
     url: str = ""
 
 
+#: PubChem renamed its SMILES properties: a request for ``CanonicalSMILES``
+#: is still accepted but the response is keyed ``SMILES`` (with
+#: ``ConnectivitySMILES`` alongside it), so reading ``CanonicalSMILES`` off
+#: the payload returned "" for every compound ever fetched -- which is why
+#: every drug row in the shipped library carried an empty SMILES and the
+#: docking and molecular-viewer paths had nothing to consume. Read whichever
+#: key is present, newest name first.
+_SMILES_KEYS = ("SMILES", "ConnectivitySMILES", "CanonicalSMILES", "IsomericSMILES")
+
+
+def _first_smiles(props: dict) -> str:
+    """The compound's SMILES under whichever key PubChem used."""
+    for key in _SMILES_KEYS:
+        value = props.get(key)
+        if value:
+            return value
+    return ""
+
+
 class PubChemClient:
     """Client for PubChem PUG REST API.
 
@@ -344,7 +372,7 @@ class PubChemClient:
         """
         try:
             # Get properties
-            props = "MolecularFormula,MolecularWeight,CanonicalSMILES,InChI,InChIKey,IUPACName,XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,RotatableBondCount"
+            props = "MolecularFormula,MolecularWeight,SMILES,ConnectivitySMILES,InChI,InChIKey,IUPACName,XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,RotatableBondCount"
             url = f"{self.BASE_URL}/compound/cid/{cid}/property/{props}/JSON"
             resp = self._session.get(url, timeout=30)
             resp.raise_for_status()
@@ -365,7 +393,7 @@ class PubChemClient:
                 cid=cid,
                 name=name,
                 iupac_name=props_data.get("IUPACName", ""),
-                smiles=props_data.get("CanonicalSMILES", ""),
+                smiles=_first_smiles(props_data),
                 inchi=props_data.get("InChI", ""),
                 inchi_key=props_data.get("InChIKey", ""),
                 molecular_formula=props_data.get("MolecularFormula", ""),
