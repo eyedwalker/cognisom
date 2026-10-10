@@ -41,6 +41,7 @@ class BenchmarkResult:
     category: str = ""              # "tumor_growth", "immune", "metabolic"
     source: str = ""                # publication reference
     passed: bool = False
+    skipped: bool = False           # Nothing to compare; never counts as a pass
     tolerance_pct: float = 20.0
     actual_error_pct: float = 0.0
     n_data_points: int = 0
@@ -55,6 +56,7 @@ class ValidationReport:
     benchmarks_run: int = 0
     benchmarks_passed: int = 0
     benchmarks_failed: int = 0
+    benchmarks_skipped: int = 0
     results: List[BenchmarkResult] = field(default_factory=list)
     recalibration_needed: bool = False
     suggested_adjustments: Dict[str, float] = field(default_factory=dict)
@@ -134,6 +136,10 @@ class SimulationValidationAgent:
         for benchmark in all_benchmarks:
             result = self._run_benchmark(benchmark)
             report.results.append(result)
+            if result.skipped:
+                # Neither numerator nor denominator of the pass rate.
+                report.benchmarks_skipped += 1
+                continue
             report.benchmarks_run += 1
             if result.passed:
                 report.benchmarks_passed += 1
@@ -177,6 +183,10 @@ class SimulationValidationAgent:
         for benchmark in benchmarks:
             result = self._run_benchmark(benchmark)
             report.results.append(result)
+            if result.skipped:
+                # Neither numerator nor denominator of the pass rate.
+                report.benchmarks_skipped += 1
+                continue
             report.benchmarks_run += 1
             if result.passed:
                 report.benchmarks_passed += 1
@@ -212,8 +222,12 @@ class SimulationValidationAgent:
             result.n_data_points = len(data_points)
 
             if not data_points:
-                result.passed = True
-                result.details = "No data points to validate"
+                # Skipped, not passed: a benchmark with nothing to compare
+                # cannot corroborate anything, and counting it as a pass
+                # inflated the pass rate with empty records.
+                result.skipped = True
+                result.passed = False
+                result.details = "Skipped: no data points to validate"
                 return result
 
             # Run simulation for this benchmark
@@ -285,10 +299,15 @@ class SimulationValidationAgent:
             return results
 
         except Exception as e:
-            log.warning("Simulation failed: %s, using fallback", e)
-            # Fallback: return values close to expected
-            return [p[1] * (1 + np.random.uniform(-0.1, 0.1))
-                    for p in data_points]
+            # Let the caller see that the simulation failed. This used to
+            # return the expected values perturbed by +/-10%, so a crashed
+            # engine was reported as a validation accurate to within 10% --
+            # the comparison agreed with its own ground truth.
+            log.error("Simulation failed, reporting the failure: %s", e)
+            raise RuntimeError(
+                f"simulation for this benchmark failed and no values can be "
+                f"reported for it: {e}"
+            ) from e
 
     def _get_metric(self, engine, module: str, metric: str) -> float:
         """Extract a metric from the simulation engine."""

@@ -122,15 +122,30 @@ class TestSimulationAccuracy:
         evaluator = SimulationEvaluator()
         assert len(evaluator._benchmarks) > 0
 
-    def test_report_has_grade(self):
+    def test_report_grades_an_unsimulated_run_as_failing(self):
+        """With no engine there is nothing to compare, so the grade is F.
+
+        This test used to pass ``{}`` positionally into the ``engine``
+        parameter and assert only that the grade was one of A-F. An empty
+        dict is falsy but not None, so it took the engine branch, raised
+        on ``engine.time``, and landed in a fallback that substituted the
+        benchmarks' own observed values perturbed by +/-15%. The report
+        came back "A", 9/9 passed -- and because this ran on every
+        ``pytest`` invocation it wrote a fresh fabricated Grade A report
+        into data/eval_results each time.
+        """
         from cognisom.eval.simulation_accuracy import SimulationEvaluator
         evaluator = SimulationEvaluator()
 
-        # Empty results - still generates a report with grade
-        sim_results = {}
-        report = evaluator.evaluate_against_benchmarks(sim_results)
-        assert hasattr(report, "overall_grade")
-        assert report.overall_grade in ["A", "B", "C", "D", "F"]
+        report = evaluator.evaluate_against_benchmarks(engine=None)
+
+        assert report.overall_grade == "F"
+        assert report.benchmarks_passed == 0
+        assert report.pass_rate == 0.0
+        # Nothing may report simulated values it did not obtain.
+        for comp in report.comparisons:
+            assert not comp.passed
+            assert comp.simulated_values == []
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -38,6 +38,8 @@ class BenchmarkComparison:
     r_squared: float = 0.0
     mean_percent_error: float = 0.0
     passed: bool = False
+    skipped: bool = False            # No data to compare; never counts as a pass
+    error: str = ""                  # Why the comparison could not be made
     tolerance: float = 20.0          # Percent error tolerance
     notes: str = ""
 
@@ -50,6 +52,7 @@ class AccuracyReport:
     benchmarks_evaluated: int = 0
     benchmarks_passed: int = 0
     benchmarks_failed: int = 0
+    benchmarks_skipped: int = 0
     overall_mae: float = 0.0
     overall_correlation: float = 0.0
     comparisons: List[BenchmarkComparison] = field(default_factory=list)
@@ -85,7 +88,9 @@ class AccuracyReport:
             f"Simulation Accuracy Report (Grade: {self.overall_grade})",
             f"=" * 50,
             f"Benchmarks: {self.benchmarks_passed}/{self.benchmarks_evaluated} passed "
-            f"({self.pass_rate * 100:.0f}%)",
+            f"({self.pass_rate * 100:.0f}%)"
+            + (f", {self.benchmarks_skipped} skipped"
+               if self.benchmarks_skipped else ""),
             f"Overall MAE: {self.overall_mae:.4f}",
             f"Overall Correlation: {self.overall_correlation:.3f}",
             "",
@@ -117,6 +122,8 @@ class AccuracyReport:
             "simulation_version": self.simulation_version,
             "benchmarks_evaluated": self.benchmarks_evaluated,
             "benchmarks_passed": self.benchmarks_passed,
+            "benchmarks_failed": self.benchmarks_failed,
+            "benchmarks_skipped": self.benchmarks_skipped,
             "pass_rate": self.pass_rate,
             "overall_grade": self.overall_grade,
             "overall_mae": self.overall_mae,
@@ -177,16 +184,24 @@ class SimulationEvaluator:
         for benchmark in self._benchmarks:
             comparison = self._evaluate_benchmark(benchmark, engine, tolerance)
             report.comparisons.append(comparison)
-            report.benchmarks_evaluated += 1
 
+            if comparison.skipped:
+                # Not evaluated, so it moves neither numerator nor denominator.
+                report.benchmarks_skipped += 1
+                continue
+
+            report.benchmarks_evaluated += 1
             if comparison.passed:
                 report.benchmarks_passed += 1
             else:
                 report.benchmarks_failed += 1
 
-            # Collect for overall metrics
-            all_observed.extend(comparison.observed_values)
-            all_simulated.extend(comparison.simulated_values)
+            # Collect for overall metrics -- only pairs that exist. A failed
+            # benchmark carries no simulated values, and extending one list
+            # without the other silently misaligned every subsequent pair.
+            if len(comparison.simulated_values) == len(comparison.observed_values):
+                all_observed.extend(comparison.observed_values)
+                all_simulated.extend(comparison.simulated_values)
 
             # Track by category
             cat = comparison.category
@@ -417,8 +432,13 @@ class SimulationEvaluator:
 
         data_points = benchmark.get("data_points", [])
         if not data_points:
+            # A benchmark with nothing to compare is skipped, not passed. This
+            # used to set passed=True, so the one benchmark in the built-in set
+            # that carries no data_points counted toward the pass rate by
+            # having nothing to check.
             comparison.notes = "No data points"
-            comparison.passed = True
+            comparison.skipped = True
+            comparison.passed = False
             return comparison
 
         # Extract observed values
@@ -431,12 +451,20 @@ class SimulationEvaluator:
                 benchmark, engine
             )
         except Exception as e:
-            log.warning("Simulation failed for %s: %s", comparison.benchmark_name, e)
-            # Use approximate values for testing
-            comparison.simulated_values = [
-                v * (1 + np.random.uniform(-0.15, 0.15))
-                for v in comparison.observed_values
-            ]
+            # A failed simulation is a failed benchmark. This used to substitute
+            # the observed values perturbed by +/-15%, which made the comparison
+            # agree with its own ground truth: the benchmark then passed, and
+            # the report graded the run on numbers no simulation produced.
+            # validation/validator.py:146 already handled this correctly.
+            log.error(
+                "Benchmark %s failed; reporting it as failed rather than "
+                "substituting values: %s", comparison.benchmark_name, e,
+            )
+            comparison.simulated_values = []
+            comparison.error = str(e)
+            comparison.passed = False
+            comparison.mean_percent_error = 100.0
+            return comparison
 
         # Calculate metrics
         if comparison.observed_values and comparison.simulated_values:
@@ -454,11 +482,25 @@ class SimulationEvaluator:
         return comparison
 
     def _run_simulation(self, benchmark: Dict, engine) -> List[float]:
-        """Run simulation for a benchmark."""
+        """Run the simulation for a benchmark, or refuse to guess.
+
+        Raises
+        ------
+        ValueError
+            When no engine was supplied. There is no simulation to compare
+            against, and the only honest report is that the comparison could
+            not be made.
+        """
         if engine is None:
-            # Return approximate values
-            data_points = benchmark.get("data_points", [])
-            return [p[1] * (1 + np.random.uniform(-0.1, 0.1)) for p in data_points]
+            # This used to return the benchmark's own observed values perturbed
+            # by +/-10%. Since nothing in the repo passes a real engine, that
+            # was the only branch that ever ran: every report compared the
+            # ground truth against itself and graded the result "A".
+            raise ValueError(
+                f"no simulation engine supplied, so benchmark "
+                f"{benchmark.get('name', 'unknown')!r} cannot be evaluated; "
+                f"pass engine= a SimulationEngine to compare against it"
+            )
 
         # Configure and run simulation
         sim_config = benchmark.get("sim_config", {})
