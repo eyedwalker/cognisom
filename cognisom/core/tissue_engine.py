@@ -220,7 +220,7 @@ class TissueSimulationEngine:
             positions_per_gpu = [ca.positions[:ca.n_real] for ca in self._cell_arrays]
             for field_name in self._diffusion.field_names:
                 concentrations[field_name] = self._diffusion.sample_at_positions(
-                    positions_per_gpu, field_name,
+                    positions_per_gpu, field_name, cfg.resolution_um,
                 )
 
         # ── 3. ODE step (intracellular signaling) ────────────────
