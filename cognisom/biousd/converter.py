@@ -143,12 +143,15 @@ class SimulationToUSD:
             f'    Cells: {scene.total_cells} ({scene.alive_cells} alive)',
             '    """',
             '    defaultPrim = "BioScene"',
+            # A dictionary key containing a colon must be quoted, or the
+            # layer will not parse -- this file wrote plausible content that
+            # Usd.Stage.Open then refused at the customLayerData block.
             f'    customLayerData = {{',
-            f'        float bio:simulationTime = {scene.simulation_time}',
-            f'        float bio:timeStep = {scene.time_step}',
-            f'        int bio:stepCount = {scene.step_count}',
-            f'        string bio:version = "0.1.0"',
-            f'        string bio:engine = "cognisom"',
+            f'        float "bio:simulationTime" = {scene.simulation_time}',
+            f'        float "bio:timeStep" = {scene.time_step}',
+            f'        int "bio:stepCount" = {scene.step_count}',
+            f'        string "bio:version" = "0.1.0"',
+            f'        string "bio:engine" = "cognisom"',
             f'    }}',
             ')',
             '',

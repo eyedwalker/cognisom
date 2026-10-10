@@ -138,11 +138,22 @@ class PrecisionTransformManager:
         # Set up axis (Y-up is standard for biology visualization)
         UsdGeom.SetStageUpAxis(self.stage, UsdGeom.Tokens.y)
 
-        # Add custom metadata for biological scale
-        root = self.stage.GetPseudoRoot()
-        root.SetCustomDataByKey("cognisom:biologicalScale", self.default_scale.value)
-        root.SetCustomDataByKey("cognisom:metersPerUnit", self._scale_metadata.meters_per_unit)
-        root.SetCustomDataByKey("cognisom:precisionMode", "localFloat_globalDouble")
+        # Add custom metadata for biological scale.
+        #
+        # This is layer metadata, not prim metadata. It used to call
+        # SetCustomDataByKey on stage.GetPseudoRoot(), which USD rejects
+        # unconditionally -- "'customData' is not registered as valid metadata
+        # for spec type SdfSpecTypePseudoRoot" -- so constructing a
+        # PrecisionTransformManager raised. SceneManager caught that and
+        # reported precision_mode_enabled as False, and because the call sits
+        # inside RealOmniverseConnector.create_stage's try block, that
+        # connector returned False on its own default settings and the
+        # dashboard's "Generate USD Scene" button failed.
+        self.stage.SetMetadata("customLayerData", {
+            "cognisom:biologicalScale": self.default_scale.value,
+            "cognisom:metersPerUnit": self._scale_metadata.meters_per_unit,
+            "cognisom:precisionMode": "localFloat_globalDouble",
+        })
 
         log.info(f"Stage configured for {self.default_scale.value} scale "
                  f"(metersPerUnit={self._scale_metadata.meters_per_unit})")

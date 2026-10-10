@@ -34,7 +34,7 @@ class "BioPrecisePointAPI"
     custom double3[] precise:positions (
         doc = "Double-precision particle/atom coordinates for simulation."
         customData = {
-            string cognisom:usage = "simulation"
+            string "cognisom:usage" = "simulation"
         }
     )
 
@@ -42,7 +42,7 @@ class "BioPrecisePointAPI"
     custom double3[] precise:velocities (
         doc = "Double-precision velocity vectors (m/s or nm/ps)."
         customData = {
-            string cognisom:usage = "simulation"
+            string "cognisom:usage" = "simulation"
         }
     )
 
@@ -50,7 +50,7 @@ class "BioPrecisePointAPI"
     custom double[] precise:masses (
         doc = "Particle masses in atomic mass units (Daltons)."
         customData = {
-            string cognisom:usage = "simulation"
+            string "cognisom:usage" = "simulation"
         }
     )
 
@@ -58,7 +58,7 @@ class "BioPrecisePointAPI"
     custom double3[] precise:forces (
         doc = "Current force vectors on each particle."
         customData = {
-            string cognisom:usage = "debug"
+            string "cognisom:usage" = "debug"
         }
     )
 

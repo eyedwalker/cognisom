@@ -321,16 +321,25 @@ class SBMLToUSD:
             '    upAxis = "Y"',
             ')',
             '',
-            'def Xform "World" {',
         ]
 
-        # Global parameters as custom data
+        # Global parameters as prim metadata on /World.
+        #
+        # This used to emit `custom dictionary sbml_parameters = { ... }` as
+        # an attribute inside the prim body. `dictionary` is not a valid USDA
+        # attribute type and a key/value block has to be prim metadata, in the
+        # parentheses before the body -- so the file this wrote was rejected by
+        # Usd.Stage.Open even though the SBML parsing behind it was correct.
         if model.parameters:
-            lines.append('    custom dictionary sbml_parameters = {')
+            lines.append('def Xform "World" (')
+            lines.append('    customData = {')
             for k, v in model.parameters.items():
-                lines.append(f'        double {k} = {v}')
+                lines.append(f'        double "{k}" = {v}')
             lines.append('    }')
-            lines.append('')
+            lines.append(') {')
+        else:
+            lines.append('def Xform "World" {')
+        lines.append('')
 
         # Compartments
         if scene.tissues:

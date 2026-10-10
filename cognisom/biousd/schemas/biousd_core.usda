@@ -110,19 +110,31 @@ class BioImmuneCell "BioImmuneCell" (
     )
     float bio:immune:detectionRadius = 10.0 (
         doc = "Scanning radius in micrometres"
-        customData = { float min = 1.0, float max = 100.0 }
+        customData = {
+            float min = 1.0
+            float max = 100.0
+        }
     )
     float bio:immune:killRadius = 5.0 (
         doc = "Effective kill distance in micrometres"
-        customData = { float min = 1.0, float max = 50.0 }
+        customData = {
+            float min = 1.0
+            float max = 50.0
+        }
     )
     float bio:immune:killProbability = 0.8 (
         doc = "Per-contact kill probability"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:immune:mhc1Expression = 1.0 (
         doc = "MHC class I surface expression level (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
 }
 
@@ -154,7 +166,10 @@ class BioGene "BioGene" (
     )
     float bio:gene:expressionLevel = 0.5 (
         doc = "Normalised expression level (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     string[] bio:gene:mutations = [] (
         doc = "List of mutation identifiers (e.g. 'R175H', 'G12D')"
@@ -275,7 +290,10 @@ class BioCapillary "BioCapillary" (
     )
     float bio:capillary:oxygenConc = 0.21 (
         doc = "Oxygen concentration (normalised, 0-0.21)"
-        customData = { float min = 0.0, float max = 0.3 }
+        customData = {
+            float min = 0.0
+            float max = 0.3
+        }
     )
     float bio:capillary:glucoseConc = 5.0 (
         doc = "Glucose concentration in mM"
@@ -366,11 +384,17 @@ class "BioMetabolicAPI" (
 {
     float bio:metabolic:oxygen = 0.21 (
         doc = "O2 level (0-0.21, arterial=0.21, hypoxic<0.02)"
-        customData = { float min = 0.0, float max = 0.3 }
+        customData = {
+            float min = 0.0
+            float max = 0.3
+        }
     )
     float bio:metabolic:glucose = 5.0 (
         doc = "Glucose concentration in mM"
-        customData = { float min = 0.0, float max = 20.0 }
+        customData = {
+            float min = 0.0
+            float max = 20.0
+        }
     )
     float bio:metabolic:atp = 1000.0 (
         doc = "ATP energy units"
@@ -394,11 +418,17 @@ class "BioGeneExpressionAPI" (
 {
     float bio:geneExpression:level = 0.5 (
         doc = "Normalised overall expression (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:geneExpression:methylation = 0.0 (
         doc = "Global methylation level (0-1, higher = more silenced)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     string[] bio:geneExpression:activeGenes = [] (
         doc = "List of actively transcribed gene names"
@@ -420,19 +450,31 @@ class "BioEpigeneticAPI" (
 {
     float bio:epigenetic:methylationLevel = 0.0 (
         doc = "CpG methylation level (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:epigenetic:h3k4me3 = 1.0 (
         doc = "H3K4me3 active promoter mark (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:epigenetic:h3k27me3 = 0.0 (
         doc = "H3K27me3 Polycomb repressive mark (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:epigenetic:h3k9ac = 1.0 (
         doc = "H3K9ac active acetylation mark (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     bool bio:epigenetic:chromatinOpen = true (
         doc = "true = euchromatin (open), false = heterochromatin (closed)"
@@ -451,11 +493,17 @@ class "BioImmuneAPI" (
 {
     float bio:immune:mhc1Expression = 1.0 (
         doc = "MHC class I expression (0-1, low = immune evasion)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
     float bio:immune:activationState = 0.0 (
         doc = "Immune activation level (0-1)"
-        customData = { float min = 0.0, float max = 1.0 }
+        customData = {
+            float min = 0.0
+            float max = 1.0
+        }
     )
 }
 
