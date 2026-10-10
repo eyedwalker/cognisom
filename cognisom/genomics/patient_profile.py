@@ -448,9 +448,23 @@ class PatientProfileBuilder:
             v.gene for v in coding if v.gene
         ))
 
-        # Map to proteins
-        driver_genes = sorted(set(v.gene for v in drivers if v.gene))
-        proteins = self.mapper.get_proteins_for_genes(driver_genes)
+        # Map to proteins.
+        #
+        # Neoantigens are generated from every protein-altering somatic
+        # variant, not only those in the curated driver panel. Restricting to
+        # drivers was a consequence of the bundled proteome holding 37
+        # sequences: a variant in any other gene had no protein to generate a
+        # peptide from, so gating on the panel and gating on the proteome
+        # amounted to the same thing. With the MANE Select proteome fetched
+        # (scripts/fetch_mane_proteome.py) roughly 19,300 genes resolve, and
+        # the panel restriction would now be the only thing discarding them --
+        # a typical exome carries one to three hundred protein-altering
+        # somatic variants against a handful of driver hits.
+        #
+        # `drivers` is still what feeds actionability and the driver list on
+        # the profile; only antigen generation widens.
+        neoantigen_genes = sorted(set(v.gene for v in coding if v.gene))
+        proteins = self.mapper.get_proteins_for_genes(neoantigen_genes)
 
         # TMB is a density: somatic coding mutations per callable megabase.
         # Three separate things have to hold before the quotient means
@@ -510,10 +524,10 @@ class PatientProfileBuilder:
 
         # Neoantigen prediction
         neoantigens = []
-        if hla_alleles and drivers:
+        if hla_alleles and coding:
             try:
                 neoantigens = self.neoantigen_predictor.predict(
-                    cancer_mutations=drivers,
+                    cancer_mutations=coding,
                     affected_proteins=proteins,
                     hla_alleles=hla_alleles,
                 )

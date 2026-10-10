@@ -7,6 +7,7 @@ Uses the UniProt REST API for sequence retrieval and a built-in
 cache of key prostate cancer protein sequences.
 """
 
+import gzip
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -161,7 +162,92 @@ def _load_reference_proteome() -> Dict[str, ProteinInfo]:
     return proteins
 
 
-BUILTIN_PROTEINS: Dict[str, ProteinInfo] = _load_reference_proteome()
+#: Optional exome-wide layer, produced by scripts/fetch_mane_proteome.py.
+#: Not committed -- it is ~7 MB gzipped and derived rather than authored.
+MANE_FASTA = _DATA_DIR / "mane_select_proteins.faa.gz"
+
+
+def _load_mane_proteome() -> Dict[str, ProteinInfo]:
+    """Parse the generated MANE Select proteome, if it has been fetched.
+
+    This is what makes the neoantigen path exome-wide. Without it only the
+    37 curated genes have a protein sequence, so a variant anywhere else
+    cannot produce a peptide no matter how it is annotated.
+
+    Returns an empty mapping when the file is absent, which is the normal
+    state of a fresh checkout: the curated panel still works, and the
+    caller sees the smaller gene set rather than an error.
+    """
+    proteins: Dict[str, ProteinInfo] = {}
+    if not MANE_FASTA.exists():
+        return proteins
+
+    gene = accession = name = None
+    chunks: List[str] = []
+
+    def flush():
+        if gene and chunks:
+            sequence = "".join(chunks)
+            proteins[gene] = ProteinInfo(
+                gene=gene,
+                uniprot_id=accession or "",
+                protein_name=name or gene,
+                sequence=sequence,
+                length=len(sequence),
+                # MANE Select numbering matches what the annotator reports,
+                # because vep_annotator pins the same transcripts. The
+                # curated-panel offsets exist to reconcile UniProt canonical
+                # numbering and do not apply here.
+                numbering_offset=0,
+            )
+
+    try:
+        with gzip.open(MANE_FASTA, "rt") as fh:
+            for line in fh:
+                line = line.rstrip("\n")
+                if line.startswith(">"):
+                    flush()
+                    header = line[1:]
+                    fields, _, name = header.partition(" ")
+                    parts = fields.split("|")
+                    gene = parts[0]
+                    accession = parts[1] if len(parts) > 1 else ""
+                    chunks = []
+                elif line.strip():
+                    chunks.append(line.strip())
+        flush()
+    except OSError as e:
+        logger.warning("Could not read %s (%s); continuing with the curated "
+                       "panel only.", MANE_FASTA, e)
+        return {}
+
+    logger.info("Loaded %d MANE Select proteins", len(proteins))
+    return proteins
+
+
+def _build_protein_table() -> Dict[str, ProteinInfo]:
+    """MANE Select underneath, the curated panel on top.
+
+    The curated entries win where both exist. They are Swiss-Prot canonical
+    sequences whose numbering has been checked against documented hotspots --
+    including the AR +1 offset verified against eight mutations -- so
+    replacing them wholesale would discard that verification for no gain.
+    MANE fills in every gene the curated panel does not cover, which is the
+    point: 37 genes becomes roughly 19,300.
+    """
+    table = _load_mane_proteome()
+    curated = _load_reference_proteome()
+    n_mane = len(table)
+    table.update(curated)
+    if n_mane:
+        logger.info(
+            "Protein reference: %d genes (%d from MANE Select, %d curated "
+            "taking precedence)", len(table), n_mane, len(curated),
+        )
+    return table
+
+
+BUILTIN_PROTEINS: Dict[str, ProteinInfo] = _build_protein_table()
 
 
 class GeneProteinMapper:

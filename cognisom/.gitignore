@@ -91,5 +91,10 @@ data/
 # package silently falls back to a per-gene UniProt fetch at runtime.
 !genomics/data/
 !genomics/data/**
+# ...except the MANE Select proteome, which is ~6 MB of derived data rebuilt
+# by scripts/fetch_mane_proteome.py. The curated FASTA above is small and
+# authored, so it is tracked; this one is large and regenerable, so it is not.
+# This rule must come after the negations above, or they would re-include it.
+genomics/data/mane_select_proteins.faa.gz
 *.csv
 *.tsv
