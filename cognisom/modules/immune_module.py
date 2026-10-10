@@ -105,36 +105,36 @@ class ImmuneModule(SimulationModule):
         self.next_immune_id = 0
 
         # Parameters
-        self.n_t_cells = config.get('n_t_cells', 15)
-        self.n_nk_cells = config.get('n_nk_cells', 10)
-        self.n_macrophages = config.get('n_macrophages', 8)
-        self.patrol_speed = config.get('patrol_speed', 5.0)  # μm/min
+        self.n_t_cells = self.config.get('n_t_cells', 15)
+        self.n_nk_cells = self.config.get('n_nk_cells', 10)
+        self.n_macrophages = self.config.get('n_macrophages', 8)
+        self.patrol_speed = self.config.get('patrol_speed', 5.0)  # μm/min
         # Baseline kill probability used by NK / macrophage and as a
         # fallback when a T cell engages a cancer cell that has no
         # MHC-I-displayed neoantigens (e.g., immune-escape variants).
-        self.kill_probability = config.get('kill_probability', 0.8)
+        self.kill_probability = self.config.get('kill_probability', 0.8)
 
         # TCR-pMHC matching for T cells (Upgrade 2). The repertoire is
         # patient-specific; seed is stable so the closed-loop test can
         # reproduce a recognized match.
-        self.tcr_repertoire_size = int(config.get('tcr_repertoire_size', 1000))
+        self.tcr_repertoire_size = int(self.config.get('tcr_repertoire_size', 1000))
         self.tcr_recognition_threshold = float(
-            config.get('tcr_recognition_threshold', 0.7)
+            self.config.get('tcr_recognition_threshold', 0.7)
         )
-        self.tcr_seed = int(config.get('tcr_seed', 0))
+        self.tcr_seed = int(self.config.get('tcr_seed', 0))
         # Costimulation strength on the tumor side. Real tumors
         # downregulate CD80/CD86; we leave this exposed for sensitivity
         # studies (immunotherapy ON / OFF).
-        self.costimulation = float(config.get('costimulation', 0.6))
-        self.checkpoint_block = float(config.get('checkpoint_block', 0.0))
+        self.costimulation = float(self.config.get('costimulation', 0.6))
+        self.checkpoint_block = float(self.config.get('checkpoint_block', 0.0))
 
         # Sympathetic / β2-adrenergic axis (Upgrade 7). Patient
         # chronic-stress proxy + propranolol-style β-blocker rescue.
         # See engine/py/immune/sympathetic.py for the rationale.
-        self.stress_level = float(config.get('stress_level', 0.0))
-        self.beta_blocker = float(config.get('beta_blocker', 0.0))
+        self.stress_level = float(self.config.get('stress_level', 0.0))
+        self.beta_blocker = float(self.config.get('beta_blocker', 0.0))
         self.sympathetic_max_suppression = float(
-            config.get('sympathetic_max_suppression', DEFAULT_MAX_SUPPRESSION)
+            self.config.get('sympathetic_max_suppression', DEFAULT_MAX_SUPPRESSION)
         )
         self._tcr_repertoire: Optional[TCRRepertoire] = None
 

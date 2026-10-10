@@ -81,10 +81,10 @@ class VascularModule(SimulationModule):
         self.next_capillary_id = 0
         
         # Parameters
-        self.n_capillaries = config.get('n_capillaries', 8)
-        self.arterial_O2 = config.get('arterial_O2', 0.21)
-        self.arterial_glucose = config.get('arterial_glucose', 5.0)
-        self.exchange_rate = config.get('exchange_rate', 1.0)
+        self.n_capillaries = self.config.get('n_capillaries', 8)
+        self.arterial_O2 = self.config.get('arterial_O2', 0.21)
+        self.arterial_glucose = self.config.get('arterial_glucose', 5.0)
+        self.exchange_rate = self.config.get('exchange_rate', 1.0)
         
         # Statistics
         self.total_O2_delivered = 0.0

@@ -141,10 +141,10 @@ class CellularModule(SimulationModule):
         self.next_cell_id = 0
 
         # Parameters
-        self.division_time_normal = config.get('division_time_normal', 24.0)  # hours
-        self.division_time_cancer = config.get('division_time_cancer', 12.0)  # hours
-        self.glucose_consumption_normal = config.get('glucose_consumption', 0.2)
-        self.glucose_consumption_cancer = config.get('glucose_consumption_cancer', 0.5)
+        self.division_time_normal = self.config.get('division_time_normal', 24.0)  # hours
+        self.division_time_cancer = self.config.get('division_time_cancer', 12.0)  # hours
+        self.glucose_consumption_normal = self.config.get('glucose_consumption', 0.2)
+        self.glucose_consumption_cancer = self.config.get('glucose_consumption_cancer', 0.5)
 
         # ECM / desmoplasia dynamics (Upgrade 6). Cancer cells deposit
         # local stromal ECM proportional to ``ecm_deposition_rate``
@@ -153,29 +153,29 @@ class CellularModule(SimulationModule):
         # is True. Defaults model a moderately fibrotic tumor; PDAC-
         # like configs can set the rate ~5-10x higher.
         self.ecm_deposition_rate = float(
-            config.get('ecm_deposition_rate', 0.05)
+            self.config.get('ecm_deposition_rate', 0.05)
         )
         self.ecm_degradation_rate = float(
-            config.get('ecm_degradation_rate', 0.10)
+            self.config.get('ecm_degradation_rate', 0.10)
         )
         self.anti_fibrotic_active = bool(
-            config.get('anti_fibrotic_active', False)
+            self.config.get('anti_fibrotic_active', False)
         )
         # Cancer cells start with this baseline ECM at spawn time,
         # matching the lecture's "PDAC tumors arrive with 80% stroma"
         # observation. Override per cancer-type preset.
         self.cancer_baseline_ecm = float(
-            config.get('cancer_baseline_ecm', 0.0)
+            self.config.get('cancer_baseline_ecm', 0.0)
         )
 
         # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
         # neoantigen predictor uses; auto-picks up MHCflurry when
         # available, otherwise PWM fallback.
         self.hla_alleles: List[str] = list(
-            config.get('hla_alleles', DEFAULT_HLA_ALLELES)
+            self.config.get('hla_alleles', DEFAULT_HLA_ALLELES)
         )
         self.max_displayed_per_mutation = int(
-            config.get('max_displayed_per_mutation', 5)
+            self.config.get('max_displayed_per_mutation', 5)
         )
         self._mhc_loader: Optional[MHCLoader] = None
 

@@ -76,10 +76,10 @@ class LymphaticModule(SimulationModule):
         self.next_vessel_id = 0
         
         # Parameters
-        self.n_vessels = config.get('n_vessels', 4)
-        self.drainage_rate = config.get('drainage_rate', 0.01)
-        self.metastasis_probability = config.get('metastasis_probability', 0.001)
-        self.immune_trafficking_rate = config.get('immune_trafficking_rate', 0.05)
+        self.n_vessels = self.config.get('n_vessels', 4)
+        self.drainage_rate = self.config.get('drainage_rate', 0.01)
+        self.metastasis_probability = self.config.get('metastasis_probability', 0.001)
+        self.immune_trafficking_rate = self.config.get('immune_trafficking_rate', 0.05)
         
         # Statistics
         self.total_fluid_drained = 0.0

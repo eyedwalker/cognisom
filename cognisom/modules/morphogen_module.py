@@ -106,8 +106,8 @@ class MorphogenModule(SimulationModule):
         self.cell_identities: Dict[int, PositionalIdentity] = {}
         
         # Parameters
-        self.tissue_size = config.get('tissue_size', (200, 200, 100))
-        self.enable_fate_determination = config.get('enable_fate_determination', True)
+        self.tissue_size = self.config.get('tissue_size', (200, 200, 100))
+        self.enable_fate_determination = self.config.get('enable_fate_determination', True)
         
         # Statistics
         self.total_fates_determined = 0

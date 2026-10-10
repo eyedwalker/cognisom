@@ -96,13 +96,13 @@ class EpigeneticModule(SimulationModule):
         self.cell_epigenetics: Dict[int, Dict[str, EpigeneticState]] = {}
         
         # Parameters
-        self.methylation_rate = config.get('methylation_rate', 0.01)
-        self.demethylation_rate = config.get('demethylation_rate', 0.005)
-        self.histone_mod_rate = config.get('histone_mod_rate', 0.02)
+        self.methylation_rate = self.config.get('methylation_rate', 0.01)
+        self.demethylation_rate = self.config.get('demethylation_rate', 0.005)
+        self.histone_mod_rate = self.config.get('histone_mod_rate', 0.02)
         
         # Cancer-associated changes
-        self.cancer_hypermethylation = config.get('cancer_hypermethylation', True)
-        self.hypoxia_methylation = config.get('hypoxia_methylation', True)
+        self.cancer_hypermethylation = self.config.get('cancer_hypermethylation', True)
+        self.hypoxia_methylation = self.config.get('hypoxia_methylation', True)
         
         # Statistics
         self.total_silencing_events = 0

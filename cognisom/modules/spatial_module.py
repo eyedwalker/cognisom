@@ -218,14 +218,14 @@ class SpatialModule(SimulationModule):
         super().__init__(config)
         
         # Grid configuration
-        self.grid_size = config.get('grid_size', (20, 20, 10))
-        self.resolution = config.get('resolution', 10.0)  # μm per voxel
+        self.grid_size = self.config.get('grid_size', (20, 20, 10))
+        self.resolution = self.config.get('resolution', 10.0)  # μm per voxel
         
         # Fields
         self.fields: Dict[str, SpatialField] = {}
         
         # Parameters
-        self.update_interval = config.get('update_interval', 0.1)  # hours
+        self.update_interval = self.config.get('update_interval', 0.1)  # hours
         self.time_since_update = 0.0
     
     def initialize(self):

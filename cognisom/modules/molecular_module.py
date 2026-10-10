@@ -96,10 +96,10 @@ class MolecularModule(SimulationModule):
         self.exosome_system = None
 
         # Parameters (adjustable)
-        self.transcription_rate = config.get('transcription_rate', 1.0)
-        self.translation_rate = config.get('translation_rate', 0.5)
-        self.exosome_release_rate = config.get('exosome_release_rate', 0.1)
-        self.mutation_rate = config.get('mutation_rate', 0.001)
+        self.transcription_rate = self.config.get('transcription_rate', 1.0)
+        self.translation_rate = self.config.get('translation_rate', 0.5)
+        self.exosome_release_rate = self.config.get('exosome_release_rate', 0.1)
+        self.mutation_rate = self.config.get('mutation_rate', 0.001)
 
         # Statistics
         self.total_exosomes_released = 0

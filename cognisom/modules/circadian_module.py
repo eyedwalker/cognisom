@@ -111,9 +111,9 @@ class CircadianModule(SimulationModule):
         self.cell_clocks: Dict[int, CircadianClock] = {}
         
         # Parameters
-        self.coupling_strength = config.get('coupling_strength', 0.1)
-        self.amplitude = config.get('amplitude', 1.0)
-        self.enable_gating = config.get('enable_gating', True)
+        self.coupling_strength = self.config.get('coupling_strength', 0.1)
+        self.amplitude = self.config.get('amplitude', 1.0)
+        self.enable_gating = self.config.get('enable_gating', True)
         
         # Statistics
         self.total_peaks = 0
