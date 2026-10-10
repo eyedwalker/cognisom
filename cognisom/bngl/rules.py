@@ -299,6 +299,14 @@ class RuleExpander:
         self.molecule_types = molecule_types
         self.rules = rules
         self.parameters = parameters or {}
+        #: True when the last expand() stopped because it ran into
+        #: max_species rather than because no new species were produced. A
+        #: network that was truncated is not the network the rules describe,
+        #: so anything downstream must refuse to integrate it.
+        self.hit_species_limit = False
+        #: True when the last expand() stopped because it ran into
+        #: max_iterations without converging.
+        self.hit_iteration_limit = False
 
     def expand(
         self,
@@ -333,14 +341,29 @@ class RuleExpander:
 
         reactions: List[Reaction] = []
         new_species = list(seed_species)
+        self.hit_species_limit = False
+        self.hit_iteration_limit = True  # cleared below if we converge
 
         for iteration in range(max_iterations):
             if len(species_dict) >= max_species:
-                log.warning(f"Max species limit ({max_species}) reached")
+                # Terminating here means the network was truncated, not
+                # completed. Expansion that runs away usually indicates a
+                # defect in the rules or in the expander rather than a
+                # genuinely large network -- a single 1:1 binding rule should
+                # give 3 species, not max_species of them.
+                log.error(
+                    "rule expansion hit the species limit (%d) after %d "
+                    "iterations; the network is truncated and does not "
+                    "represent the rules as written",
+                    max_species, iteration,
+                )
+                self.hit_species_limit = True
+                self.hit_iteration_limit = False
                 break
 
             if not new_species and iteration > 0:
                 log.debug(f"No new species after {iteration} iterations")
+                self.hit_iteration_limit = False
                 break
 
             species_to_process = new_species
@@ -364,6 +387,7 @@ class RuleExpander:
                         new_species.append(sp)
 
                         if len(species_dict) >= max_species:
+                            self.hit_species_limit = True
                             break
 
         log.info(f"Rule expansion: {len(species_dict)} species, "

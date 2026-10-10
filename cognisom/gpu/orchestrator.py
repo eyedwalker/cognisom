@@ -61,9 +61,27 @@ class GPUOrchestrator:
     where possible. Original methods are preserved as `_original_update`.
     """
 
-    def __init__(self, force_cpu: bool = False):
+    #: Why the immune module is not accelerated by default. _patch_immune
+    #: replaces ImmuneModule.update wholesale, and the replacement predates
+    #: the hardening of the recognition path: ImmuneModule carries 49
+    #: references to TCR match state, per-target kill probability, engagement
+    #: registration and the peptidome, and the replacement carries none. Its
+    #: T-cell rule is `mhc > mhc1_threshold_t` (default 0.2), so the whole
+    #: neoantigen -> peptidome -> MHC loading -> TCR repertoire loop is
+    #: bypassed, along with the ECM barrier, exhaustion bookkeeping and its
+    #: events, the TCR-match flag that gates CELL_KILLED_BY_TCELL, and the
+    #: sympathetic multiplier. Turning on use_gpu silently disabled four of
+    #: the platform's flagship capabilities, and no test would have noticed.
+    _IMMUNE_SKIP_REASON = (
+        "immune acceleration bypasses the TCR/pMHC recognition path, "
+        "per-target kill probability, exhaustion and the sympathetic axis; "
+        "pass accelerate_immune=True to opt in regardless"
+    )
+
+    def __init__(self, force_cpu: bool = False, accelerate_immune: bool = False):
         self.backend = get_backend(force_cpu=force_cpu)
         self._patched_modules: Dict[str, Any] = {}
+        self.accelerate_immune = accelerate_immune
 
     def accelerate(self, engine) -> AccelerationReport:
         """Patch engine modules with GPU-accelerated versions.
@@ -88,8 +106,20 @@ class GPUOrchestrator:
                 report.modules_accelerated.append(f"cellular ({module_type})")
 
             elif module_type == "ImmuneModule":
-                self._patch_immune(module, engine)
-                report.modules_accelerated.append(f"immune ({module_type})")
+                if not self.accelerate_immune:
+                    logger.warning(
+                        "not accelerating %s: %s", name, self._IMMUNE_SKIP_REASON,
+                    )
+                    report.modules_skipped.append(
+                        f"{name} ({module_type}) - {self._IMMUNE_SKIP_REASON}"
+                    )
+                else:
+                    logger.warning(
+                        "accelerating %s on request; %s", name,
+                        self._IMMUNE_SKIP_REASON,
+                    )
+                    self._patch_immune(module, engine)
+                    report.modules_accelerated.append(f"immune ({module_type})")
 
             else:
                 report.modules_skipped.append(f"{name} ({module_type})")

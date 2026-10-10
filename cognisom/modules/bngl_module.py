@@ -137,6 +137,30 @@ class BNGLModule(SimulationModule):
         log.info(f"  Network: {len(self.species_list)} species, "
                  f"{len(self.reactions)} reactions")
 
+        # Refuse to integrate a truncated network.
+        #
+        # Expansion that terminates on the species cap has not finished: the
+        # reaction set is a prefix of something larger, mass is not conserved
+        # across it, and integrating it produces confident numbers for a model
+        # nobody wrote. This is reachable today -- the bundled
+        # simple_receptor model is one 1:1 binding rule whose correct network
+        # is 3 species and 2 reactions, and it expands to max_species of
+        # them, because product bonds are dropped so the rule re-matches its
+        # own product. Until the expander is correct, failing here is the
+        # honest outcome; see cognisom/bngl/rules.py.
+        if getattr(expander, 'hit_species_limit', False):
+            raise RuntimeError(
+                f"BNGL rule expansion hit the species limit "
+                f"({self.max_species}) instead of converging, so the network "
+                f"is truncated: {len(self.species_list)} species and "
+                f"{len(self.reactions)} reactions were generated from "
+                f"{len(self.model.rules)} rule(s). Integrating a truncated "
+                f"network would give meaningless results, so this refuses to "
+                f"run. Check the rules for a pattern that matches its own "
+                f"product, or raise max_species if the network really is "
+                f"this large."
+            )
+
         # Initialize state (concentrations)
         initial_counts = self.model.get_initial_counts()
         self.state = np.zeros(len(self.species_list), dtype=np.float64)
