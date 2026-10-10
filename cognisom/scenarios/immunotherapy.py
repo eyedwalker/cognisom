@@ -87,8 +87,18 @@ def run_immunotherapy_scenario():
     print("CANCER CONTROL:")
     print(f"  Initial cancer cells: 10")
     print(f"  Final cancer cells: {state['cellular']['n_cancer']}")
-    print(f"  Cancer eliminated: {10 - state['cellular']['n_cancer']}")
-    print(f"  Elimination rate: {((10 - state['cellular']['n_cancer']) / 10 * 100):.1f}%")
+    # Report growth as growth. This used to print a negative elimination
+    # rate -- "-380.0%" -- because the ladder assumed the tumour could only
+    # shrink. Before the vascular oxygen fix it printed "100.0% eliminated"
+    # with zero kills, because the tumour had asphyxiated rather than been
+    # treated, so the honest direction matters here.
+    _n_cancer = state['cellular']['n_cancer']
+    _delta = _n_cancer - 10
+    if _delta > 0:
+        print(f"  Cancer grew by: {_delta} (10 -> {_n_cancer})")
+    else:
+        print(f"  Cancer eliminated: {-_delta} of 10 "
+              f"({(-_delta) / 10 * 100:.1f}%)")
     print()
     print("IMMUNE RESPONSE:")
     print(f"  Total immune cells: {state['immune']['n_immune_cells']}")
