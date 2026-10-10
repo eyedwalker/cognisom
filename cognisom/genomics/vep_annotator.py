@@ -83,6 +83,12 @@ VEP_IMAGE = os.environ.get("COGNISOM_VEP_IMAGE", "ensemblorg/ensembl-vep:release
 DEFAULT_CACHE_DIR = os.environ.get("COGNISOM_VEP_CACHE", "/data/vep")
 
 
+#: The twenty canonical amino acids, one-letter. Deliberately excludes `*`
+#: (stop) and `X` (unknown / frameshifted product): both appear in VEP's
+#: Amino_acids field but neither is a residue that can be substituted into a
+#: peptide.
+_CANONICAL_AA = frozenset("ACDEFGHIKLMNPQRSTVWY")
+
 #: Three-letter to one-letter, for HGVS protein notation.
 AA3_TO_1 = {
     "Ala": "A", "Arg": "R", "Asn": "N", "Asp": "D", "Cys": "C",
@@ -501,6 +507,16 @@ def _protein_change(consequence: Dict) -> Optional[str]:
         return None
     ref_aa, _, alt_aa = amino_acids.partition("/")
     if len(ref_aa) != 1 or len(alt_aa) != 1:
+        return None
+    # VEP writes `<ref>/X` for a frameshift, where X is not a residue but a
+    # marker that the downstream product is unknown. Both sides are a single
+    # character, so without this guard the frameshift was emitted as the
+    # substitution `p.R248X` and accepted downstream as a missense to "X",
+    # producing peptides containing a literal X while the skipped-variant
+    # counter recorded nothing. Only emit a substitution when both residues
+    # are real amino acids; anything else returns None and is counted as a
+    # variant class this path cannot represent.
+    if ref_aa not in _CANONICAL_AA or alt_aa not in _CANONICAL_AA:
         return None
     return f"p.{ref_aa}{position}{alt_aa}"
 

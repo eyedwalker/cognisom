@@ -32,6 +32,27 @@ from .vcf_parser import Variant
 
 logger = logging.getLogger(__name__)
 
+#: The twenty canonical amino acids. A substitution is only representable on
+#: the missense path when both residues are among these; `X`, `*` and the
+#: ambiguity codes are not residues that can be written into a peptide.
+_CANONICAL_AA = frozenset("ACDEFGHIKLMNPQRSTVWY")
+
+
+@dataclass(frozen=True)
+class _CachedBinding:
+    """One scored peptide-allele pair, with everything the scorer returned.
+
+    `percentile_rank` and `presentation_score` are None on the approximate
+    position-weight-matrix path, which produces neither. Callers must treat
+    None as "this scorer does not provide it" rather than substituting a
+    value, so that an approximate run is never reported as a calibrated one.
+    """
+
+    affinity_nm: float
+    percentile_rank: Optional[float] = None
+    presentation_score: Optional[float] = None
+    method: str = "unknown"
+
 # Amino acid hydrophobicity index (Kyte-Doolittle scale)
 # Used to estimate peptide properties relevant to MHC binding
 HYDROPHOBICITY = {
@@ -72,6 +93,10 @@ class Neoantigen:
     best_hla_allele: str            # Best-binding HLA allele
     binding_affinity_nm: float      # Predicted IC50 in nanomolar
     percentile_rank: float          # Rank among random peptides (0-100, lower=better)
+    presentation_score: Optional[float] = None
+    """Scorer's combined binding-and-processing score (0-1, higher = more
+    likely presented). None when the scorer does not produce one, which is
+    the case on the approximate position-weight-matrix path."""
     all_allele_scores: Dict[str, float] = field(default_factory=dict)
 
     # Classification
@@ -200,7 +225,12 @@ class NeoantigenPredictor:
         self._binding_method: str = "unknown"
         self.diagnostics = PredictionDiagnostics()
         # (peptide, allele) -> IC50, filled by one batched call per run.
-        self._binding_cache: Dict[Tuple[str, str], float] = {}
+        # Keyed on (peptide, allele). Holds the whole prediction, not just the
+        # affinity: the trained scorer also returns a calibrated percentile
+        # rank and a presentation score, and both were previously computed and
+        # thrown away, leaving ranking to run on raw IC50 with a four-valued
+        # step function standing in for the percentile.
+        self._binding_cache: Dict[Tuple[str, str], "_CachedBinding"] = {}
 
     def _warm_binding_cache(self, peptides: Sequence[str],
                             hla_alleles: Sequence[str]) -> None:
@@ -255,8 +285,24 @@ class NeoantigenPredictor:
 
         methods = set()
         for (peptide, allele), result in zip(pairs, results):
-            self._binding_cache[(peptide, allele)] = result.affinity_nm
-            methods.add(getattr(result, "method", "unknown"))
+            method = getattr(result, "method", "unknown")
+            # Keep the calibrated percentile and the presentation score only
+            # where the trained scorer produced them. The approximate path
+            # reports placeholder values for both, and carrying those forward
+            # as if they were calibrated is how an approximation comes to be
+            # read as a neural-network prediction.
+            trained = method == "mhcflurry"
+            self._binding_cache[(peptide, allele)] = _CachedBinding(
+                affinity_nm=result.affinity_nm,
+                percentile_rank=(
+                    getattr(result, "percentile_rank", None) if trained else None
+                ),
+                presentation_score=(
+                    getattr(result, "presentation_score", None) if trained else None
+                ),
+                method=method,
+            )
+            methods.add(method)
 
         # Report the scorer that actually produced these numbers, not the
         # one that was asked for. The batch path can fall back per allele,
@@ -344,6 +390,17 @@ class NeoantigenPredictor:
             wt_aa = match.group(1)
             pos = int(match.group(2))  # 1-indexed
             mut_aa = match.group(3)
+
+            # `[A-Z]` matches more than the twenty residues. `X` (unknown or
+            # frameshifted product) and `B`/`Z`/`J`/`U`/`O` (ambiguity and
+            # non-standard codes) all pass the regex, and an upstream
+            # annotator that writes `p.R248X` for a frameshift would otherwise
+            # be treated as a missense to "X" -- yielding peptides containing a
+            # literal X while this counter recorded nothing. Count those as the
+            # variant class they are rather than fabricating a substitution.
+            if wt_aa not in _CANONICAL_AA or mut_aa not in _CANONICAL_AA:
+                diag.skipped_not_missense += 1
+                continue
 
             if getattr(protein, "is_partial", False):
                 diag.genes_with_partial_reference.append(gene)
@@ -437,8 +494,16 @@ class NeoantigenPredictor:
                     else:
                         level = "non-binder"
 
-                    # Percentile rank (approximate from affinity)
-                    percentile = self._affinity_to_percentile(best_affinity)
+                    # Prefer the scorer's own calibrated percentile and
+                    # presentation score. Only fall back to the coarse
+                    # affinity-derived estimate when the scorer did not
+                    # supply one, which is the approximate path.
+                    scored = self._binding_cache.get((mut_pep, best_allele))
+                    presentation_score = scored.presentation_score if scored else None
+                    if scored is not None and scored.percentile_rank is not None:
+                        percentile = scored.percentile_rank
+                    else:
+                        percentile = self._affinity_to_percentile(best_affinity)
 
                     neo = Neoantigen(
                         peptide=mut_pep,
@@ -451,6 +516,7 @@ class NeoantigenPredictor:
                         best_hla_allele=best_allele,
                         binding_affinity_nm=best_affinity,
                         percentile_rank=percentile,
+                        presentation_score=presentation_score,
                         all_allele_scores=allele_scores,
                         is_strong_binder=is_strong,
                         is_weak_binder=is_weak,
@@ -571,7 +637,7 @@ class NeoantigenPredictor:
         """
         cached = self._binding_cache.get((peptide, hla_allele))
         if cached is not None:
-            return cached
+            return cached.affinity_nm
 
         # Try MHCflurry first (production-grade).
         # MHCflurryUnavailableError is deliberately NOT caught: it means the
