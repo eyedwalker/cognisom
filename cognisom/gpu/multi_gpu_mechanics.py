@@ -1,10 +1,17 @@
 """Multi-GPU spatial-hash cell mechanics for tissue-scale simulation.
 
-Replaces O(N²) pairwise force computation with O(N·k) spatial hash lookup.
-Each GPU builds a local spatial hash over its cells (real + ghost), then
-computes JKR adhesion + Hertz repulsion forces using 27-bucket neighbor search.
+Replaces O(N²) pairwise force computation with O(N·k) binned neighbour
+search. Each partition bins its cells (real + ghost) on a uniform lattice,
+then computes JKR adhesion + Hertz repulsion forces over the pairs that the
+3x3x3 bin stencil turns up.
 
-Supports both real multi-GPU (CuPy) and CPU simulation mode (NumPy).
+Neighbour search, force kernel and integration are whole-array operations
+dispatched through ``xp`` (numpy or cupy), so the same code runs on CPU and
+on GPU and never round-trips cell state to the host.
+
+``MechanicsConfig.max_neighbors`` bounds the memory of a pair-expansion
+chunk, not the number of contacts a cell may have: the scalar loop this
+replaced never capped contacts either.
 
 Usage::
 
@@ -17,9 +24,11 @@ Usage::
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 
@@ -53,13 +62,29 @@ class MechanicsConfig:
         return MechanicsConfig()
 
 
-# ── Spatial Hash ──────────────────────────────────────────────────
+#: Distance beyond contact over which JKR adhesion still acts (um).
+#: Was an inline literal in the original force loop.
+ADHESION_RANGE_UM = 2.0
+
+#: Bin-table size target for :class:`NeighborGrid`, in bins per cell. The
+#: cost curve is a broad minimum: measured on 8 CPU partitions, 10k and
+#: 100k cells, 8 is 30% off the optimum and 128 is 10% off, with 32 best at
+#: both scales. See the class docstring for the trade-off it balances.
+BINS_PER_CELL = float(os.environ.get("COGNISOM_BINS_PER_CELL", "32"))
+
+
+# ── Spatial Hash (legacy, scalar) ─────────────────────────────────
 
 class SpatialHash:
     """3D spatial hash grid for fast neighbor lookups on one partition.
 
     Cells are hashed into buckets of size bucket_size_um.
     Neighbor queries check the 27 surrounding buckets (3x3x3 stencil).
+
+    Retained as public API and as a readable statement of the neighbour
+    relation. The simulation itself uses :class:`NeighborGrid`, which
+    computes the same relation with array operations instead of a Python
+    dict; this class walks Python lists and is far too slow for a step loop.
     """
 
     def __init__(self, bucket_size: float = 15.0):
@@ -164,14 +189,178 @@ class SpatialHash:
         return neighbor_ids, neighbor_counts
 
 
+# ── Vectorized neighbour search ───────────────────────────────────
+
+# The 27-bin stencil only needs nine lookups: bins adjacent along z are
+# contiguous in the linear bin index, so one (dx, dy) pair covers its three
+# dz neighbours as a single contiguous run of sorted cells.
+_STENCIL_XY: Tuple[Tuple[int, int], ...] = tuple(
+    (dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+)
+_N_STENCIL = len(_STENCIL_XY)
+
+
+def _xp_for(arr: Any):
+    """Return the array module that owns ``arr`` (numpy or cupy)."""
+    if arr is not None and hasattr(arr, "__cuda_array_interface__"):
+        try:
+            import cupy
+            return cupy
+        except ImportError:  # pragma: no cover - device array without cupy
+            pass
+    return np
+
+
+class NeighborGrid:
+    """Uniform-bin neighbour search expressed as array operations.
+
+    Cells are binned on a uniform lattice, sorted by bin index, and queried
+    by gathering the contiguous runs of sorted cells that the 3x3x3 bin
+    stencil covers. Every step is a whole-array operation dispatched through
+    ``xp``, so the same code runs on NumPy today and on CuPy unchanged.
+
+    The bin edge is at least ``search_radius``, which guarantees the stencil
+    contains every cell within ``search_radius`` of a query cell. Beyond
+    that the edge trades two costs against each other: a smaller edge means
+    more bins to count and prefix-sum (work and memory proportional to
+    ``volume / edge**3``), a larger edge means more candidate pairs to test
+    (work proportional to ``n_cells * density * edge**3``). Balancing them
+    puts the optimum at a fixed number of bins per cell, which is what
+    ``bins_per_cell`` expresses; tissue densities here are sparse enough
+    that the bin table, not the pair list, is the thing worth capping.
+
+    Candidate pairs are produced in chunks (``pair_budget`` at a time) to
+    bound peak memory in dense configurations.
+    """
+
+    def __init__(
+        self,
+        positions: Any,
+        search_radius: float,
+        bins_per_cell: float = BINS_PER_CELL,
+        pair_budget: int = 1 << 20,
+        cell_chunk: int = 8192,
+    ):
+        self._xp = xp = _xp_for(positions)
+        self._positions = positions
+        self.n_cells = n = int(positions.shape[0])
+        self.search_radius = float(search_radius)
+        self._pair_budget = int(pair_budget)
+        self._cell_chunk = int(cell_chunk)
+
+        self.bin_size = max(float(search_radius), 1e-9)
+        self.n_bins = 0
+        self._lin = None
+        self._starts = None
+        self._order = None
+        self._offsets = None
+
+        if n == 0:
+            return
+
+        # One host round-trip for the bounding box: three scalars, used to
+        # size the bin table. Everything else stays on the device.
+        lo = positions.min(axis=0)
+        hi = positions.max(axis=0)
+        extent = [float(v) for v in (hi - lo)]
+
+        budget = max(4096.0, bins_per_cell * n)
+        for _ in range(96):
+            est = 1.0
+            for e in extent:
+                est *= int(e / self.bin_size) + 4
+                if est > budget:
+                    break
+            if est <= budget:
+                break
+            self.bin_size *= 1.5
+
+        inv = 1.0 / self.bin_size
+        keys = xp.floor(positions * inv).astype(xp.int64)
+        rel = keys - keys.min(axis=0)[None, :]
+        span = rel.max(axis=0) + 3          # one empty pad bin at each end
+        nx, ny, nz = (int(span[0]), int(span[1]), int(span[2]))
+
+        # Pad by one bin per axis so the +-1 stencil can never wrap from the
+        # top of one row into the bottom of the next.
+        lin = ((rel[:, 0] + 1) * ny + (rel[:, 1] + 1)) * nz + (rel[:, 2] + 1)
+        self.n_bins = nx * ny * nz
+        self._lin = lin
+        self._order = xp.argsort(lin)
+        counts = xp.bincount(lin, minlength=self.n_bins)
+        self._starts = xp.concatenate([
+            xp.zeros(1, dtype=counts.dtype), xp.cumsum(counts),
+        ])
+        # dz = -1 is the start of each contiguous three-bin run.
+        self._offsets = xp.asarray(
+            [(dx * ny + dy) * nz - 1 for dx, dy in _STENCIL_XY],
+            dtype=lin.dtype,
+        )
+
+    def _runs(self, start: int, end: int):
+        """(lo, count) of the sorted-cell runs for query cells [start, end)."""
+        lo_bin = self._lin[start:end, None] + self._offsets[None, :]
+        lo = self._starts[lo_bin].ravel()
+        cnt = self._starts[lo_bin + 3].ravel() - lo
+        return lo, cnt
+
+    def iter_candidate_pairs(self, n_query: int) -> Iterator[Tuple[Any, Any]]:
+        """Yield ``(i_idx, j_idx)`` candidate pair chunks.
+
+        Every cell pair closer than ``search_radius`` appears exactly once
+        (``i`` restricted to the first ``n_query`` cells). Self-pairs and
+        pairs beyond the radius may also appear; callers filter them.
+        """
+        if self._lin is None or n_query <= 0:
+            return
+        xp = self._xp
+        start = 0
+        chunk = max(1, self._cell_chunk)
+
+        while start < n_query:
+            end = min(start + chunk, n_query)
+            lo, cnt = self._runs(start, end)
+            total = int(cnt.sum())
+
+            # Too many candidates to expand at once: retry a smaller slice.
+            if total > self._pair_budget and (end - start) > 1:
+                chunk = max(1, int(chunk * self._pair_budget / max(total, 1)))
+                continue
+
+            if total > 0:
+                ends = xp.cumsum(cnt)
+                slot = xp.repeat(xp.arange(cnt.size, dtype=cnt.dtype), cnt)
+                within = xp.arange(total, dtype=cnt.dtype) - (ends - cnt)[slot]
+                j_idx = self._order[lo[slot] + within]
+                i_idx = slot // _N_STENCIL + start
+                yield i_idx, j_idx
+
+            start = end
+            if chunk < self._cell_chunk:
+                chunk = min(self._cell_chunk, chunk * 2)
+
+
 # ── Multi-GPU Cell Mechanics ──────────────────────────────────────
+
+class _Partition:
+    """Built neighbour state for one partition."""
+
+    __slots__ = ("grid", "cutoff_sq", "stencil_keys")
+
+    def __init__(self, grid: NeighborGrid, cutoff_sq: float, stencil_keys):
+        self.grid = grid
+        self.cutoff_sq = cutoff_sq
+        # Only set when the configured bucket is too small for the cells in
+        # it; then the original 27-bucket stencil is reproduced exactly.
+        self.stencil_keys = stencil_keys
+
 
 class MultiGPUCellMechanics:
     """Distributed cell mechanics across multiple GPU partitions.
 
     Each GPU:
-    1. Builds a spatial hash over its cells (real + ghost)
-    2. Computes pairwise JKR forces using neighbor lookup
+    1. Bins its cells (real + ghost) into a :class:`NeighborGrid`
+    2. Computes pairwise JKR forces over the stencil's candidate pairs
     3. Integrates positions with overdamped Langevin dynamics
     """
 
@@ -187,46 +376,114 @@ class MultiGPUCellMechanics:
         self._ghost_ex = ghost_exchanger
         self._config = config or MechanicsConfig.default()
 
-        # Per-GPU spatial hashes
-        self._hashes: List[Optional[SpatialHash]] = [
+        # Per-GPU neighbour state
+        self._hashes: List[Optional[_Partition]] = [
             None for _ in range(multi_gpu.n_gpus)
         ]
+        self._warned_bucket_too_small = False
 
     @property
     def config(self) -> MechanicsConfig:
         return self._config
 
+    def _device_scope(self, gpu_id: int):
+        """Make partition ``gpu_id``'s device current for ``xp`` work.
+
+        CPU mode is a no-op. On GPU the kernels below operate on the
+        partition's own arrays, so the matching device has to be current.
+        """
+        mode = getattr(self._mgpu, "mode", "cpu")
+        if mode == "multi_gpu":
+            import cupy as cp
+            return cp.cuda.Device(gpu_id)
+        if mode == "single_gpu":
+            import cupy as cp
+            return cp.cuda.Device(0)
+        return contextlib.nullcontext()
+
     def build_spatial_hash(
         self,
         cell_arrays: List["TissueCellArrays"],
     ) -> None:
-        """Build spatial hash on each GPU partition.
+        """Build the neighbour grid on each GPU partition.
 
-        Uses all cells (real + ghost) so boundary forces are correct.
+        Uses all cells (real + ghost) so boundary forces are correct. The
+        arrays stay on their device: positions are binned with ``xp`` ops.
 
         Args:
             cell_arrays: Per-GPU cell data (from TissueDistributor).
         """
         for gpu_id, ca in enumerate(cell_arrays):
-            n_total = ca.n_total
-            if n_total == 0:
-                self._hashes[gpu_id] = SpatialHash(self._config.bucket_size_um)
-                continue
+            with self._device_scope(gpu_id):
+                self._hashes[gpu_id] = self._build_partition(ca)
 
-            # Get positions on CPU for spatial hash building
-            pos_np = self._mgpu.to_numpy(ca.positions[:n_total])
+        if log.isEnabledFor(logging.DEBUG):
+            total_cells = sum(ca.n_total for ca in cell_arrays)
+            total_bins = sum(
+                p.grid.n_bins for p in self._hashes if p is not None
+            )
+            log.debug(
+                "Neighbour grids built: %d cells in %d bins across %d GPUs",
+                total_cells, total_bins, len(cell_arrays),
+            )
 
-            sh = SpatialHash(self._config.bucket_size_um)
-            sh.build(pos_np)
-            self._hashes[gpu_id] = sh
+    def _build_partition(self, ca: "TissueCellArrays") -> _Partition:
+        """Bin one partition's cells (real + ghost) for neighbour queries."""
+        bucket = self._config.bucket_size_um
+        n_total = ca.n_total
+        if n_total == 0:
+            return _Partition(
+                NeighborGrid(_empty_positions(ca.positions), bucket),
+                (bucket * 2.0) ** 2, None,
+            )
 
-        total_cells = sum(ca.n_total for ca in cell_arrays)
-        total_buckets = sum(
-            len(h._table) for h in self._hashes if h is not None
-        )
-        log.debug(
-            "Spatial hashes built: %d cells in %d buckets across %d GPUs",
-            total_cells, total_buckets, len(cell_arrays),
+        positions = ca.positions[:n_total]
+        radii = ca.radii[:n_total]
+        r_max = float(radii.max())
+
+        # Farthest separation at which the force law is still non-zero.
+        contact_range = 2.0 * r_max + ADHESION_RANGE_UM
+        stencil_keys = None
+
+        if contact_range <= bucket:
+            # The original 27-bucket stencil saw every contact, so any
+            # search that finds all pairs within contact_range gives
+            # identical forces — and the bin edge is free to be tuned.
+            search_radius = contact_range
+            cutoff_sq = contact_range * contact_range
+        else:
+            # The configured bucket is smaller than the cells in it, so
+            # the original stencil missed contacts depending on how
+            # cells aligned to buckets. Reproduce it exactly: search
+            # out to max_dist and keep only bucket-adjacent pairs.
+            max_dist = bucket * 2.0
+            search_radius = max_dist
+            cutoff_sq = max_dist * max_dist
+            stencil_keys = _xp_for(positions).floor(
+                positions * (1.0 / bucket)
+            ).astype(np.int64)
+            if not self._warned_bucket_too_small:
+                self._warned_bucket_too_small = True
+                log.warning(
+                    "bucket_size_um=%.1f is below the %.1f um contact "
+                    "range of cells with radius %.1f um: the 27-bucket "
+                    "stencil cannot see every contact. Reproducing the "
+                    "original behaviour, misses included.",
+                    bucket, contact_range, r_max,
+                )
+
+        # max_neighbors sizes the pair-expansion chunk rather than
+        # truncating contacts: the scalar force loop called
+        # SpatialHash.query_neighbors, which never applied the cap (only
+        # the unused query_neighbors_batch did), so capping here would
+        # change the physics in dense tissue. Read as "max_neighbors
+        # contacts for each of 16k cells at a time".
+        return _Partition(
+            NeighborGrid(
+                positions, search_radius,
+                pair_budget=max(1 << 16, self._config.max_neighbors << 14),
+            ),
+            cutoff_sq, stencil_keys,
         )
 
     def compute_forces(
@@ -259,38 +516,31 @@ class MultiGPUCellMechanics:
                 )
                 continue
 
-            sh = self._hashes[gpu_id]
-            if sh is None:
+            part = self._hashes[gpu_id]
+            if part is None:
                 forces_list.append(
                     self._mgpu.allocate_on_device((n_real, 3), np.float32, gpu_id)
                 )
                 continue
 
-            # Get data on CPU
-            pos_np = self._mgpu.to_numpy(ca.positions[:ca.n_total])
-            radii_np = self._mgpu.to_numpy(ca.radii[:ca.n_total])
-            alive_np = self._mgpu.to_numpy(ca.alive[:ca.n_total])
+            with self._device_scope(gpu_id):
+                xp = _xp_for(ca.positions)
+                forces = self._pair_forces(xp, ca, part, n_real)
 
-            forces = self._compute_forces_cpu(
-                pos_np, radii_np, alive_np, n_real, sh,
-            )
+                # Add chemotaxis forces if gradients provided
+                if gradients is not None and gradients[gpu_id] is not None:
+                    grad = gradients[gpu_id]
+                    if len(grad) >= n_real:
+                        # Chemotaxis: cells migrate up the gradient
+                        forces += grad[:n_real] * self._config.migration_force
 
-            # Add chemotaxis forces if gradients provided
-            if gradients is not None and gradients[gpu_id] is not None:
-                grad_np = self._mgpu.to_numpy(gradients[gpu_id])
-                if len(grad_np) >= n_real:
-                    # Chemotaxis: cells migrate up concentration gradient
-                    migration = grad_np[:n_real] * self._config.migration_force
-                    forces += migration
+                # Add random fluctuations (Brownian-like)
+                if self._config.random_force > 0:
+                    forces += (
+                        _normal_noise(xp, n_real) * self._config.random_force
+                    )
 
-            # Add random fluctuations (Brownian-like)
-            if self._config.random_force > 0:
-                noise = np.random.randn(n_real, 3).astype(np.float32)
-                forces += noise * self._config.random_force
-
-            forces_list.append(
-                self._mgpu.to_device(forces.astype(np.float32), gpu_id)
-            )
+            forces_list.append(forces)
 
         return forces_list
 
@@ -304,7 +554,7 @@ class MultiGPUCellMechanics:
 
         dx/dt = F / gamma  (overdamped: inertia negligible)
 
-        Only updates REAL cells (not ghosts).
+        Only updates REAL cells (not ghosts), in place on the device.
 
         Args:
             cell_arrays: Per-GPU cell data (modified in-place).
@@ -319,34 +569,27 @@ class MultiGPUCellMechanics:
             if n_real == 0:
                 continue
 
-            # Get force and position on CPU
-            f_np = self._mgpu.to_numpy(forces[gpu_id])
-            pos_np = self._mgpu.to_numpy(ca.positions[:n_real])
-            alive_np = self._mgpu.to_numpy(ca.alive[:n_real])
+            with self._device_scope(gpu_id):
+                xp = _xp_for(ca.positions)
+                f = forces[gpu_id]
+                alive = ca.alive[:n_real]
 
-            # Overdamped: displacement = F * dt / gamma
-            # Convert dt from hours to seconds for force balance
-            dt_seconds = dt * 3600.0
-            displacement = f_np[:n_real] * dt_seconds / gamma
+                # Overdamped: displacement = F * dt / gamma
+                # Convert dt from hours to seconds for force balance
+                dt_seconds = dt * 3600.0
+                displacement = f[:n_real] * dt_seconds / gamma
 
-            # Clamp displacement for stability
-            disp_mag = np.linalg.norm(displacement, axis=1, keepdims=True)
-            scale = np.minimum(1.0, max_disp / np.maximum(disp_mag, 1e-10))
-            displacement *= scale
+                # Clamp displacement for stability
+                disp_mag = xp.linalg.norm(displacement, axis=1, keepdims=True)
+                scale = xp.minimum(1.0, max_disp / xp.maximum(disp_mag, 1e-10))
+                displacement = displacement * scale
 
-            # Only move alive cells
-            alive_mask = alive_np[:, np.newaxis] if alive_np.ndim == 1 else alive_np
-            if alive_mask.ndim == 1:
-                alive_mask = alive_mask[:, np.newaxis]
-            displacement *= alive_mask
+                # Only move alive cells
+                alive_mask = alive if alive.ndim > 1 else alive[:, None]
+                displacement = displacement * alive_mask
 
-            # Update positions
-            new_pos = pos_np + displacement.astype(np.float64)
-
-            # Write back to device
-            full_pos = self._mgpu.to_numpy(ca.positions)
-            full_pos[:n_real] = new_pos
-            ca.positions = self._mgpu.to_device(full_pos, gpu_id)
+                # Update positions in place (ghosts untouched)
+                ca.positions[:n_real] += displacement
 
     def compute_pressure(
         self,
@@ -360,6 +603,7 @@ class MultiGPUCellMechanics:
         Returns:
             Per-GPU (n_real,) float32 pressure values.
         """
+        k_rep = self._config.repulsion_stiffness
         pressure_list = []
 
         for gpu_id, ca in enumerate(cell_arrays):
@@ -370,98 +614,104 @@ class MultiGPUCellMechanics:
                 )
                 continue
 
-            sh = self._hashes[gpu_id]
-            if sh is None:
+            part = self._hashes[gpu_id]
+            if part is None:
                 pressure_list.append(
                     self._mgpu.allocate_on_device((n_real,), np.float32, gpu_id)
                 )
                 continue
 
-            pos_np = self._mgpu.to_numpy(ca.positions[:ca.n_total])
-            radii_np = self._mgpu.to_numpy(ca.radii[:ca.n_total])
+            with self._device_scope(gpu_id):
+                xp = _xp_for(ca.positions)
+                positions = ca.positions[:ca.n_total]
+                radii = ca.radii[:ca.n_total]
+                pressure = xp.zeros(n_real, dtype=xp.float64)
 
-            pressure = np.zeros(n_real, dtype=np.float32)
-            max_dist = self._config.bucket_size_um * 2
+                for i_idx, j_idx in part.grid.iter_candidate_pairs(n_real):
+                    sel, dist = _select_pairs(
+                        xp, positions, i_idx, j_idx, part,
+                    )
+                    if sel is None:
+                        continue
+                    ii = i_idx[sel]
+                    overlap = (radii[ii] + radii[j_idx[sel]]) - dist
+                    weight = xp.where(overlap > 0, overlap * k_rep, 0.0)
+                    pressure += xp.bincount(
+                        ii, weights=weight, minlength=n_real,
+                    )
 
-            for i in range(n_real):
-                nbrs = sh.query_neighbors(i, max_dist)
-                for j in nbrs:
-                    diff = pos_np[j] - pos_np[i]
-                    dist = np.sqrt(diff @ diff)
-                    overlap = (radii_np[i] + radii_np[j]) - dist
-                    if overlap > 0:
-                        pressure[i] += overlap * self._config.repulsion_stiffness
-
-            pressure_list.append(
-                self._mgpu.to_device(pressure, gpu_id)
-            )
+                pressure_list.append(pressure.astype(xp.float32))
 
         return pressure_list
 
     # ── Internal ───────────────────────────────────────────────────
 
-    def _compute_forces_cpu(
+    def _pair_forces(
         self,
-        positions: np.ndarray,
-        radii: np.ndarray,
-        alive: np.ndarray,
+        xp: Any,
+        ca: "TissueCellArrays",
+        part: _Partition,
         n_real: int,
-        spatial_hash: SpatialHash,
-    ) -> np.ndarray:
-        """Compute pairwise forces on CPU using spatial hash.
+    ) -> Any:
+        """Vectorized JKR/Hertz pair forces for one partition.
 
-        JKR-like model:
+        JKR-like model (unchanged from the original scalar loop):
         - Overlap > 0: repulsive force = k_rep * overlap * normal
         - Overlap in [-adhesion_range, 0]: adhesive force = -k_adh * |overlap| * normal
         - Overlap < -adhesion_range: no force
 
-        Args:
-            positions: (N_total, 3) all cell positions (real + ghost).
-            radii: (N_total,) cell radii.
-            alive: (N_total,) alive flags.
-            n_real: Number of real cells (forces only for these).
-            spatial_hash: Built spatial hash over all cells.
-
         Returns:
-            (n_real, 3) float32 force array.
+            (n_real, 3) float32 force array on the cells' own device.
         """
         k_rep = self._config.repulsion_stiffness
         k_adh = self._config.adhesion_strength
-        max_dist = self._config.bucket_size_um * 2
-        adhesion_range = 2.0  # um — max distance for adhesion beyond contact
+        adh = ADHESION_RANGE_UM
 
-        forces = np.zeros((n_real, 3), dtype=np.float32)
+        n_total = ca.n_total
+        positions = ca.positions[:n_total]
+        radii = ca.radii[:n_total]
+        alive = ca.alive[:n_total]
+        if alive.dtype != bool:
+            alive = alive.astype(bool)
 
-        for i in range(n_real):
-            if not alive[i]:
+        acc = xp.zeros((n_real, 3), dtype=xp.float64)
+
+        for i_idx, j_idx in part.grid.iter_candidate_pairs(n_real):
+            sel, dist = _select_pairs(
+                xp, positions, i_idx, j_idx, part,
+            )
+            if sel is None:
                 continue
 
-            nbrs = spatial_hash.query_neighbors(i, max_dist)
+            ii = i_idx[sel]
+            jj = j_idx[sel]
+            diff = positions[jj] - positions[ii]
 
-            for j in nbrs:
-                if not alive[j]:
-                    continue
+            contact_dist = radii[ii] + radii[jj]
+            overlap = contact_dist - dist          # positive = overlapping
 
-                diff = positions[j] - positions[i]
-                dist = np.sqrt(diff @ diff)
-                if dist < 1e-8:
-                    continue  # Same position, skip
+            # Coincident cells are skipped, exactly as the scalar loop
+            # did, and dead cells neither feel nor exert a force.
+            acting = (dist >= 1e-8) & alive[ii] & alive[jj]
+            repulsive = overlap > 0
+            adhesive = (~repulsive) & (overlap > -adh)
 
-                normal = diff / dist
-                contact_dist = radii[i] + radii[j]
-                overlap = contact_dist - dist  # positive = overlapping
+            force_mag = xp.where(repulsive, -(k_rep * overlap), 0.0)
+            force_mag = xp.where(
+                adhesive, k_adh * (adh + overlap) / adh, force_mag,
+            )
+            force_mag = xp.where(acting, force_mag, 0.0)
 
-                if overlap > 0:
-                    # Hertz repulsion
-                    force_mag = k_rep * overlap
-                    forces[i] -= force_mag * normal  # Push apart
+            # normal = diff / dist, then force_mag * normal (same order as
+            # the scalar loop, so each pair's contribution is bit-identical).
+            safe_dist = xp.where(acting, dist, 1.0)
+            for axis in range(3):
+                contrib = force_mag * (diff[:, axis] / safe_dist)
+                acc[:, axis] += xp.bincount(
+                    ii, weights=contrib, minlength=n_real,
+                )
 
-                elif overlap > -adhesion_range:
-                    # JKR adhesion (attractive)
-                    force_mag = k_adh * (adhesion_range + overlap) / adhesion_range
-                    forces[i] += force_mag * normal  # Pull together
-
-        return forces
+        return acc.astype(xp.float32)
 
     def gather_force_stats(
         self,
@@ -495,3 +745,53 @@ class MultiGPUCellMechanics:
                 for i, (m, a) in enumerate(zip(max_forces, mean_forces))
             ],
         }
+
+
+# ── Pair helpers ──────────────────────────────────────────────────
+
+def _select_pairs(xp, positions, i_idx, j_idx, part: _Partition):
+    """Filter candidate pairs down to the ones close enough to interact.
+
+    Returns ``(sel, dist)`` where ``sel`` indexes the surviving candidates
+    and ``dist`` is their separation, or ``(None, None)`` if none survive.
+    The alive mask is applied afterwards, on the far smaller surviving set.
+    """
+    diff = positions[j_idx] - positions[i_idx]
+    # Summed in the same order as the scalar loop's dot product.
+    dist_sq = (
+        diff[:, 0] * diff[:, 0]
+        + diff[:, 1] * diff[:, 1]
+        + diff[:, 2] * diff[:, 2]
+    )
+
+    keep = (dist_sq < part.cutoff_sq) & (j_idx != i_idx)
+    if part.stencil_keys is not None:
+        keep &= _bucket_adjacent(xp, part.stencil_keys, i_idx, j_idx)
+
+    sel = xp.nonzero(keep)[0]
+    if sel.size == 0:
+        return None, None
+    return sel, xp.sqrt(dist_sq[sel])
+
+
+def _bucket_adjacent(xp, keys, i_idx, j_idx):
+    """True where two cells sit in the same or an adjoining hash bucket."""
+    delta = xp.abs(keys[j_idx] - keys[i_idx])
+    return delta.max(axis=1) <= 1
+
+
+def _normal_noise(xp, n_real: int):
+    """(n_real, 3) float32 standard normals.
+
+    The NumPy path deliberately keeps drawing from the global ``np.random``
+    stream so seeded runs reproduce exactly as before.
+    """
+    if xp is np:
+        return np.random.randn(n_real, 3).astype(np.float32)
+    return xp.random.standard_normal((n_real, 3), dtype=xp.float32)
+
+
+def _empty_positions(like: Any):
+    """A (0, 3) float64 array on the same device as ``like``."""
+    xp = _xp_for(like)
+    return xp.zeros((0, 3), dtype=xp.float64)
