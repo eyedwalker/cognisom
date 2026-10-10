@@ -86,6 +86,9 @@ class BNGLModule(SimulationModule):
         self.model_spec = self.config.get('model', 'simple_receptor')
         self.method = self.config.get('method', 'ode')
         self.max_species = self.config.get('max_species', 10000)
+        # Exposed so the iteration-limit refusal below can name it, and
+        # so a genuinely deep network can be given more room.
+        self.max_iterations = self.config.get('max_iterations', 100)
         self.ode_rtol = self.config.get('ode_rtol', 1e-6)
         self.ode_atol = self.config.get('ode_atol', 1e-8)
 
@@ -132,6 +135,7 @@ class BNGLModule(SimulationModule):
         self.reactions, self.species_list = expander.expand(
             seed_species=self.model.get_seed_species_list(),
             max_species=self.max_species,
+            max_iterations=self.max_iterations,
         )
 
         log.info(f"  Network: {len(self.species_list)} species, "
@@ -142,12 +146,11 @@ class BNGLModule(SimulationModule):
         # Expansion that terminates on the species cap has not finished: the
         # reaction set is a prefix of something larger, mass is not conserved
         # across it, and integrating it produces confident numbers for a model
-        # nobody wrote. This is reachable today -- the bundled
-        # simple_receptor model is one 1:1 binding rule whose correct network
-        # is 3 species and 2 reactions, and it expands to max_species of
-        # them, because product bonds are dropped so the rule re-matches its
-        # own product. Until the expander is correct, failing here is the
-        # honest outcome; see cognisom/bngl/rules.py.
+        # nobody wrote. The expander no longer runs away on a well-posed rule
+        # set -- the bundled simple_receptor model converges at 3 species and
+        # egfr_signaling at 15 -- so reaching this now means the network may
+        # genuinely be unbounded. It stays as a backstop, because a rule set
+        # really can be.
         if getattr(expander, 'hit_species_limit', False):
             raise RuntimeError(
                 f"BNGL rule expansion hit the species limit "
@@ -156,19 +159,102 @@ class BNGLModule(SimulationModule):
                 f"{len(self.reactions)} reactions were generated from "
                 f"{len(self.model.rules)} rule(s). Integrating a truncated "
                 f"network would give meaningless results, so this refuses to "
-                f"run. Check the rules for a pattern that matches its own "
-                f"product, or raise max_species if the network really is "
-                f"this large."
+                f"run. The rule set may be genuinely unbounded -- check for a "
+                f"molecule carrying two binding sites for the same partner, "
+                f"which polymerises without limit -- or raise max_species if "
+                f"the network really is this large."
             )
 
-        # Initialize state (concentrations)
-        initial_counts = self.model.get_initial_counts()
+        # Refuse a network truncated by the ITERATION limit.
+        #
+        # The species cap only fires if the network reaches max_species
+        # within max_iterations. A rule set that adds few species per
+        # iteration -- monomer addition onto a growing filament, where one
+        # reactant pattern names every site free so only a monomer matches --
+        # is unbounded yet never reaches the cap. This is the other half of
+        # the same refusal, not a duplicate of it.
+        if getattr(expander, 'hit_iteration_limit', False):
+            raise RuntimeError(
+                f"BNGL rule expansion stopped at the iteration limit "
+                f"({self.max_iterations}) without converging, so the network "
+                f"is truncated: {len(self.species_list)} species and "
+                f"{len(self.reactions)} reactions from "
+                f"{len(self.model.rules)} rule(s). Species were still being "
+                f"added when the loop ended, which usually means the rule set "
+                f"is unbounded -- a pattern that matches its own product, or "
+                f"monomer addition onto a growing complex. Integrating a "
+                f"truncated network would give meaningless results. Raise "
+                f"max_iterations only if the network genuinely converges "
+                f"beyond it."
+            )
+
+        # Refuse a network whose species identity is not exact.
+        #
+        # Species are deduplicated on a canonical string built from a
+        # Weisfeiler-Leman refinement of the complex. Within each tie class
+        # the smallest rendering over all orderings is taken, which is
+        # exact, but a complex with more than Species.CANON_ORDERING_BUDGET
+        # orderings in one class falls back to an ordering that is not
+        # invariant, so two spellings of one complex could be counted as
+        # two species. That inflates every count derived from it, so refuse
+        # rather than approximate.
+        if getattr(expander, 'canonicalization_degraded', False):
+            raise RuntimeError(
+                "BNGL rule expansion produced at least one complex too "
+                "symmetric to canonicalize exactly, so two spellings of the "
+                "same species may have been counted twice and every count "
+                "derived from the network would be inflated. This needs a "
+                "complete canonical labelling (see "
+                "Species.CANON_ORDERING_BUDGET in cognisom/bngl/molecules.py), "
+                "not a larger max_species."
+            )
+
+        # Initialize state (concentrations).
+        #
+        # Seed amounts are keyed on the canonical string -- the same identity
+        # the expander interns species on -- and SUMMED over seed lines.
+        # Keying on str(sp) silently dropped a seed whenever two seed lines
+        # spell one complex differently, which BNGL permits: now that species
+        # identity is invariant to bond ids, molecule order and
+        # within-molecule component order, the two spellings collapse to one
+        # species but only one spelling matched. Measured on a model seeding
+        # `L(r!1).R(l!1,Y~U) 300` and `L(r!1).R(Y~U,l!1) 700`: 300 of the
+        # declared 1000 landed, so 70% of the mass was absent before the first
+        # step -- a regression against the pre-canonicalisation code.
+        #
+        # model.seed_species carries the parsed Species, so key off that
+        # rather than off get_initial_counts(), which has already stringified.
         self.state = np.zeros(len(self.species_list), dtype=np.float64)
 
+        def _identity(spec):
+            canon = getattr(spec, 'canonical_string', None)
+            return canon() if callable(canon) else str(spec)
+
+        seeded: Dict[str, float] = {}
+        for ss in self.model.seed_species:
+            key = _identity(ss.species)
+            seeded[key] = seeded.get(key, 0.0) + float(ss.count)
+
+        landed = set()
         for i, sp in enumerate(self.species_list):
-            sp_key = str(sp)
-            if sp_key in initial_counts:
-                self.state[i] = initial_counts[sp_key]
+            key = _identity(sp)
+            if key in seeded:
+                self.state[i] = seeded[key]
+                landed.add(key)
+
+        # A declared seed that matched no expanded species is mass the model
+        # asked for and the network does not contain. Refuse rather than
+        # integrate a system that silently starts light.
+        unlanded = sorted(set(seeded) - landed)
+        if unlanded:
+            raise RuntimeError(
+                f"{len(unlanded)} of {len(seeded)} declared seed species "
+                f"matched no species in the expanded network, so their mass "
+                f"would be silently absent from the initial state: "
+                f"{unlanded[:5]}. This usually means a seed pattern is not "
+                f"reachable from the rules, or is spelled in a way the parser "
+                f"read differently."
+            )
 
         # Build stoichiometry matrix for ODE
         if self.method == 'ode':
@@ -187,10 +273,33 @@ class BNGLModule(SimulationModule):
         n_species = len(self.species_list)
         n_reactions = len(self.reactions)
 
-        # Species string to index mapping
+        # Species string to index mapping. This is keyed on str(sp), while
+        # the expander dedups on Species.canonical_string(), so a collision
+        # here would silently merge two species and a miss would silently
+        # drop a reaction endpoint -- which is how 390 of 900 endpoints went
+        # missing and the integrator was handed non-conservative rows.
         self._species_idx = {
             str(sp): i for i, sp in enumerate(self.species_list)
         }
+        if len(self._species_idx) != n_species:
+            raise RuntimeError(
+                f"two of the {n_species} species render to the same string, "
+                f"so the stoichiometry index is incomplete "
+                f"({len(self._species_idx)} distinct keys). This is a bug in "
+                f"the species naming, not in the model."
+            )
+        missing = sorted({
+            str(e)
+            for rxn in self.reactions
+            for e in list(rxn.reactants) + list(rxn.products)
+            if str(e) not in self._species_idx
+        })
+        if missing:
+            raise RuntimeError(
+                f"{len(missing)} reaction endpoint(s) are not in the species "
+                f"index, so their stoichiometry would be dropped and mass "
+                f"would not be conserved: {missing[:3]}"
+            )
 
         # Stoichiometry matrix
         self._stoich = np.zeros((n_reactions, n_species), dtype=np.float64)

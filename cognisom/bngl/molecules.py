@@ -20,10 +20,15 @@ This defines a receptor R with:
 
 from __future__ import annotations
 
+import itertools
+import logging
+import math
 import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, Union
+
+log = logging.getLogger(__name__)
 
 
 # ── Component and State Definitions ──────────────────────────────────────
@@ -195,20 +200,31 @@ class ComponentInstance:
             s += "!+"
         return s
 
-    def matches(self, other: "ComponentInstance") -> bool:
-        """Check if this component instance matches another (for pattern matching)."""
-        if self.name != other.name:
+    def matches(self, pattern: "ComponentInstance") -> bool:
+        """
+        Does this component (a concrete species component) satisfy ``pattern``?
+
+        The wildcards live on the PATTERN side, never on the species side:
+        callers pass ``s_comp.matches(p_comp)``. Testing them on ``self``
+        makes every ``!+`` pattern unmatchable, because the species side
+        says BOUND and the comparison is BOUND == BOUND_WILDCARD.
+        """
+        if self.name != pattern.name:
             return False
-        # State matching
-        if self.state is not None and other.state is not None:
-            if self.state.name != other.state.name:
+        # State: a pattern that does not name a state matches any state.
+        if pattern.state is not None:
+            if self.state is None or self.state.name != pattern.state.name:
                 return False
-        # Bond matching
-        if self.bond_state == BondState.WILDCARD:
-            return True  # Matches any bond state
-        if self.bond_state == BondState.BOUND_WILDCARD:
-            return other.bond_state == BondState.BOUND
-        return self.bond_state == other.bond_state
+        # Bond
+        if pattern.bond_state == BondState.WILDCARD:
+            return True                                    # '!'  any bond state
+        if pattern.bond_state == BondState.BOUND_WILDCARD:
+            return self.bond_state == BondState.BOUND       # '!+' bound to anything
+        if pattern.bond_state == BondState.BOUND:
+            # A number in a pattern is a local label, not an identity: which
+            # bond it is gets resolved by Species.embeddings, not here.
+            return self.bond_state == BondState.BOUND
+        return self.bond_state == BondState.UNBOUND
 
 
 @dataclass
@@ -251,19 +267,16 @@ class MoleculeInstance:
         return str(self) == str(other)
 
     def matches(self, pattern: "MoleculeInstance") -> bool:
-        """Check if this molecule matches a pattern."""
+        """
+        Check if this molecule matches a pattern.
+
+        Pattern components are matched injectively: two pattern components
+        with the same name must land on two different components of this
+        molecule, not both on the same one.
+        """
         if self.name != pattern.name:
             return False
-        # Check each pattern component
-        for p_comp in pattern.components:
-            found = False
-            for s_comp in self.components:
-                if s_comp.matches(p_comp):
-                    found = True
-                    break
-            if not found:
-                return False
-        return True
+        return bool(_component_maps(self, pattern, limit=1))
 
     @classmethod
     def from_type(cls, mol_type: MoleculeType) -> "MoleculeInstance":
@@ -307,6 +320,74 @@ class Bond:
     comp2_name: str
 
 
+# ── Pattern embeddings ───────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class Embedding:
+    """
+    One injective embedding of a pattern into a species.
+
+    Attributes
+    ----------
+    mol_map : Tuple[int, ...]
+        ``mol_map[k]`` is the species molecule index that pattern molecule
+        ``k`` was mapped onto.
+    comp_map : Dict[Tuple[int, int], int]
+        ``comp_map[(k, pc)]`` is the component index, within that species
+        molecule, that pattern component ``pc`` of pattern molecule ``k``
+        was mapped onto.
+    """
+    mol_map: Tuple[int, ...]
+    comp_map: Dict[Tuple[int, int], int]
+
+    def __hash__(self) -> int:
+        return hash((self.mol_map, tuple(sorted(self.comp_map.items()))))
+
+    def signature(self) -> Tuple:
+        """Order-independent, hashable identity for this embedding."""
+        return (self.mol_map, tuple(sorted(self.comp_map.items())))
+
+
+def _component_maps(
+    s_mol: MoleculeInstance,
+    p_mol: MoleculeInstance,
+    limit: int = 0,
+) -> List[Dict[int, int]]:
+    """
+    Every injective map {pattern component index -> species component index}
+    under which each species component satisfies its pattern component.
+    """
+    n_p = len(p_mol.components)
+    if n_p > len(s_mol.components):
+        return []
+    out: List[Dict[int, int]] = []
+    cur: Dict[int, int] = {}
+    used: Set[int] = set()
+
+    def recurse(pc: int) -> None:
+        if limit and len(out) >= limit:
+            return
+        if pc == n_p:
+            out.append(dict(cur))
+            return
+        p_comp = p_mol.components[pc]
+        for sc, s_comp in enumerate(s_mol.components):
+            if sc in used:
+                continue
+            if not s_comp.matches(p_comp):
+                continue
+            used.add(sc)
+            cur[pc] = sc
+            recurse(pc + 1)
+            del cur[pc]
+            used.discard(sc)
+            if limit and len(out) >= limit:
+                return
+
+    recurse(0)
+    return out
+
+
 # ── Species and Patterns ─────────────────────────────────────────────────
 
 @dataclass
@@ -334,6 +415,14 @@ class Species:
     """
     molecules: List[MoleculeInstance] = field(default_factory=list)
     bonds: List[Bond] = field(default_factory=list)
+    #: Memoized canonical string. Any in-place mutation of molecules,
+    #: states or bonds must clear it via invalidate_canonical().
+    _canon: Optional[str] = field(default=None, compare=False, repr=False)
+    _canon_exact: bool = field(default=True, compare=False, repr=False)
+
+    def invalidate_canonical(self) -> None:
+        self._canon = None
+        self._canon_exact = True
 
     @property
     def n_molecules(self) -> int:
@@ -350,26 +439,426 @@ class Species:
             return False
         return self.canonical_string() == other.canonical_string()
 
+    # ── Bond bookkeeping ─────────────────────────────────────────────────
+    #
+    # The component bond ids (ComponentInstance.bond_state + .bond_id) are
+    # the single source of truth for connectivity, because __str__ renders
+    # from them. Species.bonds is strictly derived: anything that mutates
+    # components must call rebuild_bonds_from_components().
+
+    def bond_endpoints(self) -> Dict[int, List[Tuple[int, int]]]:
+        """Map bond id -> list of (molecule index, component index).
+
+        Addressing endpoints by component INDEX rather than name is what
+        makes a molecule with two components of the same name unambiguous.
+        """
+        out: Dict[int, List[Tuple[int, int]]] = {}
+        for mi, mol in enumerate(self.molecules):
+            for ci, comp in enumerate(mol.components):
+                if comp.bond_state == BondState.BOUND and comp.bond_id is not None:
+                    out.setdefault(comp.bond_id, []).append((mi, ci))
+        return out
+
+    @property
+    def max_bond_id(self) -> int:
+        """Largest bond id in use, or 0 when the species has no bonds."""
+        ids = [
+            c.bond_id
+            for m in self.molecules
+            for c in m.components
+            if c.bond_state == BondState.BOUND and c.bond_id is not None
+        ]
+        return max(ids) if ids else 0
+
+    def bond_partner(self, mol_idx: int, comp_idx: int) -> Optional[Tuple[int, int]]:
+        """Return the (molecule index, component index) bonded to this site."""
+        comp = self.molecules[mol_idx].components[comp_idx]
+        if comp.bond_state != BondState.BOUND or comp.bond_id is None:
+            return None
+        for ep in self.bond_endpoints().get(comp.bond_id, []):
+            if ep != (mol_idx, comp_idx):
+                return ep
+        return None
+
+    def rebuild_bonds_from_components(self) -> None:
+        """Derive Species.bonds from the component bond ids.
+
+        A bond id that does not have exactly two endpoints is not a bond:
+        every endpoint carrying it is demoted to UNBOUND rather than left
+        dangling, because a dangling half-bond reads as "bound" to the
+        matcher while connecting nothing.
+        """
+        bonds: List[Bond] = []
+        for bid, eps in sorted(self.bond_endpoints().items()):
+            if len(eps) == 2:
+                (m1, c1), (m2, c2) = eps
+                bonds.append(Bond(
+                    id=bid,
+                    mol1_idx=m1,
+                    comp1_name=self.molecules[m1].components[c1].name,
+                    mol2_idx=m2,
+                    comp2_name=self.molecules[m2].components[c2].name,
+                ))
+            else:
+                for (mi, ci) in eps:
+                    comp = self.molecules[mi].components[ci]
+                    comp.bond_state = BondState.UNBOUND
+                    comp.bond_id = None
+        self.bonds = bonds
+        self.invalidate_canonical()
+
+    def connected_components(self) -> List[List[int]]:
+        """Molecule indices grouped by bond connectivity, each group sorted."""
+        n = len(self.molecules)
+        adj: List[Set[int]] = [set() for _ in range(n)]
+        for eps in self.bond_endpoints().values():
+            if len(eps) != 2:
+                continue
+            (m1, _), (m2, _) = eps
+            if m1 != m2:
+                adj[m1].add(m2)
+                adj[m2].add(m1)
+        seen: Set[int] = set()
+        groups: List[List[int]] = []
+        for start in range(n):
+            if start in seen:
+                continue
+            stack = [start]
+            group: List[int] = []
+            seen.add(start)
+            while stack:
+                cur = stack.pop()
+                group.append(cur)
+                for nxt in adj[cur]:
+                    if nxt not in seen:
+                        seen.add(nxt)
+                        stack.append(nxt)
+            groups.append(sorted(group))
+        return groups
+
+    # ── Canonical form ───────────────────────────────────────────────────
+    #
+    # canonical_string() is the species IDENTITY: __hash__ and __eq__ are
+    # built on it, and the rule expander keys its species table on it. It
+    # must therefore be invariant under (i) the order molecules happen to
+    # sit in the list, (ii) the order components sit in a molecule, and
+    # (iii) the integers used as bond ids -- otherwise L(r!1).R(l!1) and
+    # L(r!7).R(l!7) are two species and a 1:1 rule still "polymerises",
+    # just in a new form.
+
+    #: Budget on the number of molecule orderings the exhaustive tie-break
+    #: may try, per connected fragment. Weisfeiler-Leman refinement reduces
+    #: most complexes to a single ordering; a highly symmetric complex can
+    #: exceed this, in which case the result is still invariant but may not
+    #: be complete, and canonical_is_exact goes False.
+    CANON_ORDERING_BUDGET = 5040
+
+    def _molecule_shape(self, mol_idx: int) -> str:
+        """Bond-id-independent, component-order-independent molecule label."""
+        mol = self.molecules[mol_idx]
+        parts = []
+        for c in mol.components:
+            s = c.name
+            if c.state is not None:
+                s += "~" + c.state.name
+            if c.bond_state == BondState.BOUND:
+                s += "!"
+            elif c.bond_state == BondState.WILDCARD:
+                s += "!?"
+            elif c.bond_state == BondState.BOUND_WILDCARD:
+                s += "!+"
+            parts.append(s)
+        return f"{mol.name}({','.join(sorted(parts))})"
+
+    def _refined_labels(self) -> List[int]:
+        """Weisfeiler-Leman refinement of the molecule labels.
+
+        Labels are interned to small integers after every round. Carrying
+        the previous round's label forward as a string instead doubles the
+        label length each round, which is exponential in complex size.
+        """
+        n = len(self.molecules)
+        shapes = [self._molecule_shape(i) for i in range(n)]
+        intern = {s: k for k, s in enumerate(sorted(set(shapes)))}
+        labels = [intern[s] for s in shapes]
+
+        nbr: List[List[Tuple[str, str, int]]] = [[] for _ in range(n)]
+        for eps in self.bond_endpoints().values():
+            if len(eps) != 2:
+                continue
+            (m1, c1), (m2, c2) = eps
+            n1 = self.molecules[m1].components[c1].name
+            n2 = self.molecules[m2].components[c2].name
+            nbr[m1].append((n1, n2, m2))
+            nbr[m2].append((n2, n1, m1))
+
+        for _ in range(n):
+            sigs = [
+                (labels[i], tuple(sorted((a, b, labels[j]) for a, b, j in nbr[i])))
+                for i in range(n)
+            ]
+            intern2 = {sig: k for k, sig in enumerate(sorted(set(sigs)))}
+            new = [intern2[s] for s in sigs]
+            if new == labels:
+                break
+            labels = new
+        return labels
+
+    def _render_with_order(
+        self,
+        order: List[int],
+        start_bond: int = 1,
+        comp_orders: Optional[Dict[int, List[int]]] = None,
+    ) -> str:
+        """Render the given molecules in the given order.
+
+        Bond ids are renumbered from ``start_bond`` in first-encounter
+        order, and the components of each molecule are emitted in a
+        deterministic order that does not depend on how they were written.
+        """
+        pos = {mi: k for k, mi in enumerate(order)}
+        eps = self.bond_endpoints()
+
+        def comp_key(mi: int, ci: int) -> Tuple[str, str, str, int, str]:
+            c = self.molecules[mi].components[ci]
+            partner_pos, partner_name = -1, ""
+            if c.bond_state == BondState.BOUND and c.bond_id is not None:
+                for (pm, pc) in eps.get(c.bond_id, []):
+                    if (pm, pc) != (mi, ci):
+                        partner_pos = pos.get(pm, -1)
+                        partner_name = self.molecules[pm].components[pc].name
+                        break
+            return (
+                c.name,
+                c.state.name if c.state is not None else "",
+                c.bond_state.name,
+                partner_pos,
+                partner_name,
+            )
+
+        self._last_comp_key = comp_key
+        remap: Dict[int, int] = {}
+        next_id = start_bond
+        rendered: List[str] = []
+        for mi in order:
+            mol = self.molecules[mi]
+            if comp_orders is not None and mi in comp_orders:
+                idxs = comp_orders[mi]
+            else:
+                idxs = sorted(
+                    range(len(mol.components)), key=lambda ci: comp_key(mi, ci)
+                )
+            parts = []
+            for ci in idxs:
+                c = mol.components[ci]
+                s = c.name
+                if c.state is not None:
+                    s += "~" + c.state.name
+                if c.bond_state == BondState.BOUND and c.bond_id is not None:
+                    if c.bond_id not in remap:
+                        remap[c.bond_id] = next_id
+                        next_id += 1
+                    s += f"!{remap[c.bond_id]}"
+                elif c.bond_state == BondState.WILDCARD:
+                    s += "!"
+                elif c.bond_state == BondState.BOUND_WILDCARD:
+                    s += "!+"
+                parts.append(s)
+            rendered.append(f"{mol.name}({','.join(parts)})" if parts else mol.name)
+        return ".".join(rendered)
+
+    def _canonical_fragment(self, idxs: List[int]) -> Tuple[str, List[int]]:
+        """Lexicographically smallest rendering of one connected fragment."""
+        self._best_comp_orders = None
+        labels = self._refined_labels()
+        classes: Dict[int, List[int]] = {}
+        for mi in idxs:
+            classes.setdefault(labels[mi], []).append(mi)
+        keys = sorted(classes)
+
+        budget = 1
+        for k in keys:
+            budget *= math.factorial(len(classes[k]))
+            if budget > self.CANON_ORDERING_BUDGET:
+                break
+
+        if budget > self.CANON_ORDERING_BUDGET:
+            self._canon_exact = False
+            order = [mi for k in keys for mi in sorted(classes[k])]
+            log.warning(
+                "canonicalization of a %d-molecule complex exceeded the "
+                "ordering budget (%d); the key is still invariant but may "
+                "not distinguish two isomorphic complexes",
+                len(idxs), self.CANON_ORDERING_BUDGET,
+            )
+            return self._render_with_order(order), order
+
+        best: Optional[str] = None
+        best_order: Optional[List[int]] = None
+        best_comps: Optional[Dict[int, List[int]]] = None
+        per_class = [list(itertools.permutations(sorted(classes[k]))) for k in keys]
+        for combo in itertools.product(*per_class):
+            order = [mi for block in combo for mi in block]
+            # Rendering once primes comp_key for this molecule order; the
+            # components of a molecule that tie under it have to be
+            # permuted too, or the canonical string keeps whatever order
+            # the species happened to be WRITTEN in.
+            self._render_with_order(order)
+            ck = self._last_comp_key
+            groups: List[Tuple[int, List[List[int]]]] = []
+            extra = 1
+            for mi in order:
+                idxs = sorted(
+                    range(len(self.molecules[mi].components)),
+                    key=lambda ci: ck(mi, ci),
+                )
+                runs: List[List[int]] = []
+                for ci in idxs:
+                    if runs and ck(mi, runs[-1][0]) == ck(mi, ci):
+                        runs[-1].append(ci)
+                    else:
+                        runs.append([ci])
+                # Only a run of BOUND components needs permuting: two tied
+                # UNBOUND components render identically, so their order
+                # cannot change the string.
+                perms_per_run = [
+                    list(itertools.permutations(r))
+                    if len(r) > 1 and self.molecules[mi].components[
+                        r[0]].bond_state == BondState.BOUND
+                    else [tuple(r)]
+                    for r in runs
+                ]
+                opts = [
+                    [c for run in perm_runs for c in run]
+                    for perm_runs in itertools.product(*perms_per_run)
+                ]
+                extra *= len(opts)
+                groups.append((mi, opts))
+            if extra > self.CANON_ORDERING_BUDGET:
+                self._canon_exact = False
+                opts_sel = {mi: o[0] for mi, o in groups}
+                s = self._render_with_order(order, comp_orders=opts_sel)
+                if best is None or s < best:
+                    best, best_order, best_comps = s, order, opts_sel
+                continue
+            for pick in itertools.product(*[o for _, o in groups]):
+                comp_orders = {mi: list(pick[k]) for k, (mi, _) in enumerate(groups)}
+                s = self._render_with_order(order, comp_orders=comp_orders)
+                if best is None or s < best:
+                    best, best_order, best_comps = s, order, comp_orders
+        self._best_comp_orders = best_comps
+        return best or "", best_order or []
+
     def canonical_string(self) -> str:
-        """Return canonical string representation (sorted)."""
-        # Sort molecules alphabetically for canonical form
-        mol_strs = sorted(str(m) for m in self.molecules)
-        return ".".join(mol_strs)
+        """Canonical, relabeling-invariant string for this species.
+
+        This is the identity key. Connected fragments are canonicalized
+        independently, sorted, then re-rendered with a running bond offset
+        so the result stays a parseable BNGL species string.
+        """
+        if self._canon is not None:
+            return self._canon
+        self._canon_exact = True
+        frags = []
+        for g in self.connected_components():
+            key, order = self._canonical_fragment(g)
+            frags.append((key, order, self._best_comp_orders))
+        frags.sort(key=lambda fo: fo[0])
+        out: List[str] = []
+        next_bond = 1
+        for _, order, comps in frags:
+            out.append(self._render_with_order(
+                order, start_bond=next_bond, comp_orders=comps))
+            n_bonds = sum(
+                1 for bid, eps in self.bond_endpoints().items()
+                if len(eps) == 2 and eps[0][0] in order
+            )
+            next_bond += n_bonds
+        self._canon = ".".join(out)
+        return self._canon
+
+    @property
+    def canonical_is_exact(self) -> bool:
+        """False when canonicalization fell back past the ordering budget."""
+        self.canonical_string()
+        return self._canon_exact
+
+    # ── Pattern matching ─────────────────────────────────────────────────
+
+    def embeddings(
+        self,
+        pattern: "Pattern",
+        limit: int = 0,
+    ) -> List["Embedding"]:
+        """Every injective embedding of ``pattern`` into this species.
+
+        An embedding maps each pattern molecule to a distinct molecule of
+        this species and each pattern component to a distinct component of
+        that molecule, honouring states, bond states, AND the pattern's own
+        internal bonds -- without which a dissociation pattern
+        ``L(r!1).R(l!1)`` would match any L sitting beside any R.
+
+        A rule needs every embedding, not the first: a pattern can embed
+        into one species two ways and give two different products.
+        """
+        p_mols = pattern.molecules
+        n_p = len(p_mols)
+        if n_p == 0 or n_p > len(self.molecules):
+            return []
+
+        # Per (pattern molecule, species molecule): all component maps.
+        cand: Dict[Tuple[int, int], List[Dict[int, int]]] = {}
+        for pk, p_mol in enumerate(p_mols):
+            for si, s_mol in enumerate(self.molecules):
+                if s_mol.name != p_mol.name:
+                    continue
+                maps = _component_maps(s_mol, p_mol)
+                if maps:
+                    cand[(pk, si)] = maps
+
+        # The pattern's own bonds, as (pm, pc) endpoint pairs.
+        p_bond_eps: Dict[int, List[Tuple[int, int]]] = {}
+        for pk, p_mol in enumerate(p_mols):
+            for pc, comp in enumerate(p_mol.components):
+                if comp.bond_state == BondState.BOUND and comp.bond_id is not None:
+                    p_bond_eps.setdefault(comp.bond_id, []).append((pk, pc))
+        p_bonds = [tuple(v) for v in p_bond_eps.values() if len(v) == 2]
+
+        results: List[Embedding] = []
+        mol_map: List[int] = []
+        comp_map: Dict[Tuple[int, int], int] = {}
+
+        def recurse(pk: int) -> None:
+            if limit and len(results) >= limit:
+                return
+            if pk == n_p:
+                for (pm1, pc1), (pm2, pc2) in p_bonds:
+                    a = (mol_map[pm1], comp_map[(pm1, pc1)])
+                    b = (mol_map[pm2], comp_map[(pm2, pc2)])
+                    if self.bond_partner(*a) != b:
+                        return
+                results.append(Embedding(tuple(mol_map), dict(comp_map)))
+                return
+            for si in range(len(self.molecules)):
+                if si in mol_map:
+                    continue
+                for cmap in cand.get((pk, si), ()):
+                    mol_map.append(si)
+                    for pc, sc in cmap.items():
+                        comp_map[(pk, pc)] = sc
+                    recurse(pk + 1)
+                    for pc in cmap:
+                        del comp_map[(pk, pc)]
+                    mol_map.pop()
+                    if limit and len(results) >= limit:
+                        return
+
+        recurse(0)
+        return results
 
     def matches(self, pattern: "Pattern") -> bool:
         """Check if this species matches a pattern."""
-        # Each molecule in pattern must match some molecule in species
-        used = set()
-        for p_mol in pattern.molecules:
-            matched = False
-            for i, s_mol in enumerate(self.molecules):
-                if i not in used and s_mol.matches(p_mol):
-                    used.add(i)
-                    matched = True
-                    break
-            if not matched:
-                return False
-        return True
+        return bool(self.embeddings(pattern, limit=1))
 
     def copy(self) -> "Species":
         """Create a deep copy."""
@@ -437,6 +926,15 @@ def parse_component_instance(
             if s.name == state_str:
                 state = s
                 break
+        if state is None:
+            # Falling through with state=None means "any state" to the
+            # matcher, so "R(Y~Q)" would silently become "R(Y)" and a
+            # phosphorylation rule would become an identity reaction.
+            declared = "~".join(st.name for st in comp_def.states) or "<none>"
+            raise ValueError(
+                f"component {comp_def.name!r} has no state {state_str!r} "
+                f"(declared states: {declared})"
+            )
     else:
         comp_name = comp_str.split('!')[0]
 
@@ -517,28 +1015,9 @@ def parse_species(
         if mol_str:
             molecules.append(parse_molecule_instance(mol_str, mol_types))
 
-    # Extract bonds from component instances
-    bonds = []
-    bond_endpoints = {}  # bond_id -> [(mol_idx, comp_name), ...]
-
-    for mol_idx, mol in enumerate(molecules):
-        for comp in mol.components:
-            if comp.bond_state == BondState.BOUND and comp.bond_id is not None:
-                if comp.bond_id not in bond_endpoints:
-                    bond_endpoints[comp.bond_id] = []
-                bond_endpoints[comp.bond_id].append((mol_idx, comp.name))
-
-    for bond_id, endpoints in bond_endpoints.items():
-        if len(endpoints) == 2:
-            bonds.append(Bond(
-                id=bond_id,
-                mol1_idx=endpoints[0][0],
-                comp1_name=endpoints[0][1],
-                mol2_idx=endpoints[1][0],
-                comp2_name=endpoints[1][1],
-            ))
-
-    return Species(molecules=molecules, bonds=bonds)
+    species = Species(molecules=molecules)
+    species.rebuild_bonds_from_components()
+    return species
 
 
 def parse_pattern(

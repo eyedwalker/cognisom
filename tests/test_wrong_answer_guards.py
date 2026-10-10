@@ -15,13 +15,15 @@ multiplier. ``use_gpu=True`` is reachable from the application entry point, and
 the 76 passing GPU tests only exercise construction in forced-CPU mode, so
 nothing would have noticed.
 
-**BNGL expansion.** The expander drops bond assignments from products, so a
-rule re-matches its own product forever. The bundled ``simple_receptor`` model
-is one 1:1 binding rule whose correct network is 3 species and 2 reactions; it
-expands to ``max_species`` of them with tens of thousands of bogus polymer
-reactions, and ``BNGLModule`` then integrated that network without complaint
-and lost mass. Terminating on the species cap means the network is truncated,
-which is never a network worth integrating.
+**BNGL expansion.** Terminating on the species cap means the network is
+truncated -- a prefix of something larger, across which mass is not
+conserved -- which is never a network worth integrating. This was reachable
+for the wrong reason until the expander was fixed: it dropped bond
+assignments from products, so a rule re-matched its own product forever and
+the bundled ``simple_receptor`` model, one 1:1 binding rule whose correct
+network is 3 species and 2 reactions, expanded to ``max_species`` of them.
+The guard stays as a backstop, because a rule set can be genuinely
+unbounded; the cases below use a polymer model that really is.
 """
 from __future__ import annotations
 
@@ -130,42 +132,71 @@ def test_other_modules_are_unaffected_by_the_guard():
 
 # ── BNGL expansion ───────────────────────────────────────────────────────
 
-def test_expander_records_that_it_hit_the_species_limit():
-    from cognisom.bngl.parser import BNGLModel
+#: A two-site monomer really does polymerize without end, so expansion of
+#: it can only ever terminate on the species cap. The bundled
+#: simple_receptor model used to do the same for the wrong reason.
+POLYMER_BNGL = """begin parameters
+    kp 1.0
+    km 0.1
+end parameters
+
+begin molecule types
+    A(l,r)
+end molecule types
+
+begin seed species
+    A(l,r) 1000
+end seed species
+
+begin reaction rules
+    A(r) + A(l) <-> A(r!1).A(l!1) kp, km
+end reaction rules
+"""
+
+
+@pytest.fixture
+def polymer_model(tmp_path):
+    path = tmp_path / "polymer.bngl"
+    path.write_text(POLYMER_BNGL)
+    return path
+
+
+def test_expander_records_that_it_hit_the_species_limit(polymer_model):
+    from cognisom.bngl.parser import load_bngl_model
     from cognisom.bngl.rules import RuleExpander
 
-    model = BNGLModel.simple_receptor()
+    model = load_bngl_model(polymer_model)
     expander = RuleExpander(model.molecule_types, model.rules, model.parameters)
 
     expander.expand(
-        seed_species=[s.species for s in model.seed_species],
-        max_species=50,
+        seed_species=model.get_seed_species_list(),
+        max_species=12,
     )
 
     assert expander.hit_species_limit is True
 
 
-def test_the_module_refuses_to_initialize_a_truncated_network():
+def test_the_module_refuses_to_initialize_a_truncated_network(polymer_model):
     from cognisom.modules.bngl_module import BNGLModule
 
-    mod = BNGLModule({'model': 'simple_receptor', 'max_species': 50})
+    mod = BNGLModule({'model': str(polymer_model), 'max_species': 12})
 
     with pytest.raises(RuntimeError) as excinfo:
         mod.initialize()
 
     message = str(excinfo.value)
     assert "truncated" in message
-    assert "50" in message, "the message should name the limit it hit"
+    assert "12" in message, "the message should name the limit it hit"
     assert "max_species" in message, "and how to change it"
 
 
-def test_the_refusal_is_specific_about_the_cause():
-    """A rule matching its own product is the likely cause, so say so."""
+def test_the_refusal_names_a_cause_worth_checking(polymer_model):
+    """Hitting the cap now means the network may genuinely be unbounded."""
     from cognisom.modules.bngl_module import BNGLModule
 
-    mod = BNGLModule({'model': 'simple_receptor', 'max_species': 50})
+    mod = BNGLModule({'model': str(polymer_model), 'max_species': 12})
 
-    with pytest.raises(RuntimeError, match="own product"):
+    with pytest.raises(RuntimeError, match="unbounded"):
         mod.initialize()
 
 
@@ -179,3 +210,21 @@ def test_a_converging_expansion_does_not_set_the_flag():
 
     assert expander.hit_species_limit is False
     assert reactions == []
+
+
+@pytest.mark.parametrize(
+    "name,n_species", [("simple_receptor", 3), ("egfr_signaling", 15)]
+)
+def test_the_bundled_models_do_not_trip_the_guard(name, n_species):
+    """The guard is a backstop, not the normal path.
+
+    Both bundled models converge well inside a modest cap. Before the
+    expander was fixed both ran to the cap instead, so this is the case
+    that only passes with the fix in place.
+    """
+    from cognisom.modules.bngl_module import BNGLModule
+
+    mod = BNGLModule({'model': name, 'max_species': 50})
+    mod.initialize()
+
+    assert len(mod.species_list) == n_species
