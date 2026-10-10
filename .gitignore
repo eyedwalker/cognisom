@@ -71,6 +71,11 @@ output/
 *.gif
 *.mp4
 results.json
+# SceneExporter defaults its output to a cwd-relative "scene.json"
+# (cognisom/visualization/exporters.py), so running a dashboard page or a
+# demo from the repo root drops one here. The default itself is worth
+# changing; until then, do not commit the artifact.
+scene.json
 
 # Jupyter
 .ipynb_checkpoints/
