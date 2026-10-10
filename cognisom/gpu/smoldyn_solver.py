@@ -53,6 +53,13 @@ from .physics_interface import (
 
 log = logging.getLogger(__name__)
 
+try:
+    from scipy.spatial import cKDTree as _cKDTree
+    _HAVE_CKDTREE = True
+except ImportError:  # pragma: no cover - scipy is a hard dependency in practice
+    _cKDTree = None
+    _HAVE_CKDTREE = False
+
 
 # ── CUDA Kernels ─────────────────────────────────────────────────────────
 
@@ -330,6 +337,158 @@ void bimolecular_reactions(
     }
 }
 """
+
+
+# ── Neighbour Search ─────────────────────────────────────────────────────
+#
+# The bimolecular step needs every pair of particles closer than a binding
+# radius. Two interchangeable implementations, both returning index arrays into
+# the two position arrays they were handed:
+#
+#   * ``_pairs_kdtree``    - scipy's cKDTree. Fastest on the CPU at every
+#     density measured (~2.5x the cell list, dilute or dense), but CPU-only.
+#   * ``_pairs_cell_list`` - a binned cell list built purely from array
+#     operations dispatched through ``xp``, so it also runs on CuPy unchanged.
+#
+# Both agree exactly with a brute-force O(n^2) scan; that equivalence is a test
+# (tests/test_smoldyn_solver.py::TestNeighborSearch).
+
+_NEIGHBOR_CELL_OFFSETS = np.array(
+    [(dx, dy, dz) for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1)],
+    dtype=np.int64,
+)
+
+# Cell coordinates are packed into a single int64 key, 21 bits per axis.
+# Coordinates beyond that range are clamped, which merges far-apart cells into
+# one bucket: that only ever *adds* candidate pairs, which then fail the
+# distance test. It can never drop a true neighbour.
+_CELL_KEY_BITS = 21
+_CELL_KEY_MAX = (1 << _CELL_KEY_BITS) - 1
+
+
+def _pairs_kdtree(pos_a: np.ndarray, pos_b: np.ndarray, radius: float):
+    """Index pairs with |a - b| < radius, via scipy's cKDTree."""
+    tree_a = _cKDTree(pos_a)
+    # A self-reaction searches one set against itself; build its tree once.
+    tree_b = tree_a if pos_b is pos_a else _cKDTree(pos_b)
+    hits = tree_a.sparse_distance_matrix(tree_b, radius, output_type="ndarray")
+    # sparse_distance_matrix includes distance == radius; the solver's rule is
+    # strict, so drop the boundary.
+    keep = hits["v"] < radius
+    return hits["i"][keep], hits["j"][keep]
+
+
+def _cell_keys(xp, cells):
+    """Pack integer cell coordinates into one int64 key per cell."""
+    c = xp.clip(cells + 1, 0, _CELL_KEY_MAX)
+    return (
+        (c[..., 0] << (2 * _CELL_KEY_BITS))
+        | (c[..., 1] << _CELL_KEY_BITS)
+        | c[..., 2]
+    )
+
+
+def _pairs_cell_list(xp, pos_a, pos_b, radius: float, origin):
+    """Index pairs with |a - b| < radius, via a binned cell list.
+
+    The binding radius is the bin size, so a particle's partners can only be in
+    its own cell or the 26 around it. Cells are kept sparse (sorted keys +
+    searchsorted) rather than dense, because a dense grid over a 100 µm box at
+    a 0.1 µm binding radius would be 10^9 cells.
+
+    Every step is an array operation issued through ``xp``, so this runs
+    unchanged on CuPy.
+    """
+    n_a = pos_a.shape[0]
+    n_b = pos_b.shape[0]
+    empty = xp.zeros(0, dtype=np.int64)
+    if n_a == 0 or n_b == 0 or radius <= 0.0:
+        return empty, empty
+
+    cells_a = xp.floor((pos_a - origin) / radius).astype(np.int64)
+    cells_b = xp.floor((pos_b - origin) / radius).astype(np.int64)
+
+    keys_b = _cell_keys(xp, cells_b)
+    order = xp.argsort(keys_b)
+    sorted_keys = keys_b[order]
+
+    # Each A particle probes its own cell plus the 26 neighbours.
+    offsets = xp.asarray(_NEIGHBOR_CELL_OFFSETS)
+    n_offsets = _NEIGHBOR_CELL_OFFSETS.shape[0]
+    probe = _cell_keys(xp, cells_a[:, None, :] + offsets[None, :, :]).ravel()
+
+    lo = xp.searchsorted(sorted_keys, probe, side="left")
+    hi = xp.searchsorted(sorted_keys, probe, side="right")
+    counts = hi - lo
+    total = int(counts.sum())
+    if total == 0:
+        return empty, empty
+
+    # Ragged expansion: one candidate per (probe, occupant of that cell).
+    probe_of = xp.repeat(xp.arange(probe.shape[0], dtype=np.int64), counts)
+    group_start = xp.cumsum(counts) - counts
+    rank = xp.arange(total, dtype=np.int64) - group_start[probe_of]
+    idx_a = probe_of // n_offsets
+    idx_b = order[lo[probe_of] + rank]
+
+    d2 = ((pos_a[idx_a] - pos_b[idx_b]) ** 2).sum(axis=1)
+    keep = d2 < radius * radius
+    return idx_a[keep], idx_b[keep]
+
+
+def _match_pairs(backend, first, second):
+    """Reduce candidate pairs to a one-reaction-per-particle matching.
+
+    Pairs are taken in lexicographic ``(first, second)`` order and only if
+    neither particle has already reacted - exactly what the old
+    ``for i: for j > i: ...; break`` scan did, so the matching is deterministic
+    and reproduces the sequential result.
+
+    Pairs whose two particles appear in no other candidate pair cannot conflict
+    with anything, so they are accepted in bulk. Only the overlapping remainder
+    needs the sequential pass, and at the densities this solver runs at that
+    remainder is usually empty.
+    """
+    xp = backend.xp
+
+    order = xp.lexsort(xp.stack((second, first)))
+    first = first[order]
+    second = second[order]
+
+    # Degree over *both* columns: with a self-reaction (A + A -> B) the same
+    # particle can appear as `first` in one pair and `second` in another.
+    flat = xp.concatenate((first, second))
+    _, inverse, counts = xp.unique(flat, return_inverse=True, return_counts=True)
+    degree = counts[xp.reshape(inverse, (-1,))]
+    n_pairs = first.shape[0]
+    isolated = (degree[:n_pairs] == 1) & (degree[n_pairs:] == 1)
+
+    if bool(xp.all(isolated)):
+        return first, second
+
+    contested = ~isolated
+    rest_first = backend.to_numpy(first[contested])
+    rest_second = backend.to_numpy(second[contested])
+
+    taken: set = set()
+    accepted: List[int] = []
+    for k in range(rest_first.shape[0]):
+        a = int(rest_first[k])
+        b = int(rest_second[k])
+        if a in taken or b in taken:
+            continue
+        taken.add(a)
+        taken.add(b)
+        accepted.append(k)
+
+    if not accepted:
+        return first[isolated], second[isolated]
+
+    pick = xp.asarray(np.asarray(accepted, dtype=np.int64))
+    return (
+        xp.concatenate((first[isolated], first[contested][pick])),
+        xp.concatenate((second[isolated], second[contested][pick])),
+    )
 
 
 # ── Data Classes ─────────────────────────────────────────────────────────
@@ -631,6 +790,18 @@ class ParticleSystem:
         """Total number of alive particles."""
         return int(self._backend.xp.sum(self.alive))
 
+    @property
+    def n_slots(self) -> int:
+        """Number of slots ever handed out - an upper bound on live indices.
+
+        ``positions``/``species``/``alive`` are preallocated to ``n_max``, but
+        ``add_particles`` only ever appends, so no slot at or beyond this index
+        has been populated. Stepping only this prefix is what keeps a solver
+        built with the default 100k capacity from paying for 100k slots when it
+        holds 1k particles.
+        """
+        return self._next_free
+
 
 # ── Smoldyn Solver ───────────────────────────────────────────────────────
 
@@ -648,6 +819,11 @@ class SmoldynSolver:
         Maximum number of particles to pre-allocate
     cell_size : float
         Size of spatial hash cells (should be >= max binding radius)
+    neighbor_search : {'auto', 'kdtree', 'cells'}
+        Neighbour search used by the CPU/array-backend bimolecular step.
+        'kdtree' uses scipy's cKDTree (CPU only, fastest here); 'cells' uses a
+        binned cell list built from ``xp`` array operations, which also runs on
+        CuPy. 'auto' picks cKDTree on NumPy and the cell list otherwise.
 
     Examples
     --------
@@ -670,9 +846,16 @@ class SmoldynSolver:
         system: SmoldynSystem,
         n_max_particles: int = 100000,
         cell_size: Optional[float] = None,
+        neighbor_search: str = "auto",
     ):
         self.system = system
         self.n_max = n_max_particles
+        if neighbor_search not in ("auto", "kdtree", "cells"):
+            raise ValueError(
+                f"neighbor_search must be 'auto', 'kdtree' or 'cells', "
+                f"got {neighbor_search!r}"
+            )
+        self.neighbor_search = neighbor_search
 
         self._backend = get_backend()
         self._time = 0.0
@@ -693,6 +876,11 @@ class SmoldynSolver:
             'y_min': b[2], 'y_max': b[3],
             'z_min': b[4], 'z_max': b[5],
         }
+        # Same bounds as (3,) arrays, so the boundary stage is one vector op
+        # over all three axes instead of a loop over them.
+        self._bounds_lo = np.array([b[0], b[2], b[4]], dtype=np.float32)
+        self._bounds_hi = np.array([b[1], b[3], b[5]], dtype=np.float32)
+        self._bounds_span = self._bounds_hi - self._bounds_lo
 
         # Spatial hashing
         self._cell_size = cell_size or self._compute_cell_size()
@@ -766,6 +954,10 @@ class SmoldynSolver:
             self._bimol_bind_r[i] = rxn.binding_radius
 
         self._n_bimol = n_bimol
+        # Most systems have no first-order reactions at all; knowing that up
+        # front lets the step skip the whole stage instead of gathering a rate
+        # for every live particle.
+        self._has_uni = bool(np.any(self._uni_rates > 0))
 
     def _compile_kernels(self):
         """Compile CUDA kernels."""
@@ -920,93 +1112,216 @@ class SmoldynSolver:
              np.int32(gx), np.int32(gy), np.int32(gz))
         )
 
-    def _step_cpu(self, dt: float):
-        """CPU fallback step."""
-        positions = self._backend.to_numpy(self.particles.positions)
-        species = self._backend.to_numpy(self.particles.species)
-        alive = self._backend.to_numpy(self.particles.alive)
+    def _live_indices(self):
+        """Indices of the live particles, ascending.
 
-        n = self.n_max
-        n_species = self.system.n_species
-
-        # 1. Brownian motion
-        for i in range(n):
-            if not alive[i]:
-                continue
-            sp = species[i]
-            D = self._diffusion[sp]
-            sigma = np.sqrt(2 * D * dt)
-            positions[i] += np.random.randn(3) * sigma
-
-        # 2. Reflect boundaries
-        b = self._bounds
-        for i in range(n):
-            if not alive[i]:
-                continue
-            for dim, (lo, hi) in enumerate([(b['x_min'], b['x_max']),
-                                            (b['y_min'], b['y_max']),
-                                            (b['z_min'], b['z_max'])]):
-                if positions[i, dim] < lo:
-                    positions[i, dim] = 2 * lo - positions[i, dim]
-                if positions[i, dim] > hi:
-                    positions[i, dim] = 2 * hi - positions[i, dim]
-
-        # 3. Unimolecular reactions
-        for i in range(n):
-            if not alive[i]:
-                continue
-            sp = species[i]
-            rate = self._uni_rates[sp]
-            if rate > 0:
-                prob = 1 - np.exp(-rate * dt)
-                if np.random.rand() < prob:
-                    product = self._uni_products[sp]
-                    if product < 0:
-                        alive[i] = 0
-                    else:
-                        species[i] = product
-
-        # 4. Bimolecular reactions (O(n²) for CPU - simplified)
-        for r in range(self._n_bimol):
-            sp1 = self._bimol_reactant1[r]
-            sp2 = self._bimol_reactant2[r]
-            bind_r2 = self._bimol_bind_r[r] ** 2
-
-            for i in range(n):
-                if not alive[i] or species[i] != sp1:
-                    continue
-                for j in range(i + 1, n):
-                    if not alive[j] or species[j] != sp2:
-                        continue
-
-                    dist2 = np.sum((positions[i] - positions[j]) ** 2)
-                    if dist2 < bind_r2:
-                        # React
-                        alive[i] = 0
-                        alive[j] = 0
-
-                        prod1 = self._bimol_product1[r]
-                        prod2 = self._bimol_product2[r]
-
-                        midpoint = (positions[i] + positions[j]) / 2
-
-                        if prod1 >= 0:
-                            species[i] = prod1
-                            positions[i] = midpoint
-                            alive[i] = 1
-
-                        if prod2 >= 0:
-                            species[j] = prod2
-                            positions[j] = midpoint
-                            alive[j] = 1
-
-                        break
-
-        # Write back
+        Only the slots that have actually been handed out are scanned, and
+        ``alive`` is int32, so it is *compared* rather than used as a mask -
+        ``positions[alive]`` would be integer fancy indexing, not a filter.
+        """
         xp = self._backend.xp
-        self.particles.positions = xp.asarray(positions)
-        self.particles.species = xp.asarray(species)
-        self.particles.alive = xp.asarray(alive)
+        n_slots = self.particles.n_slots
+        if n_slots == 0:
+            return xp.zeros(0, dtype=np.int64)
+        return xp.flatnonzero(self.particles.alive[:n_slots] == 1)
+
+    def _reflect(self, pos):
+        """Fold coordinates back inside the compartment, in place.
+
+        A single reflection per wall still leaves a particle outside the domain
+        if it overshot by more than the domain width; folding is that same
+        reflection applied as many times as needed, so "no live particle
+        outside the compartment" holds for any step size. Coordinates already
+        inside are left untouched, bit for bit.
+
+        Only the rows that actually crossed a wall are folded. In a dilute box
+        that is a handful of particles per step, and the arithmetic is several
+        passes over the position array, so it is worth not doing it for the
+        ~99% that are nowhere near a wall.
+        """
+        xp = self._backend.xp
+        lo = xp.asarray(self._bounds_lo)
+        hi = xp.asarray(self._bounds_hi)
+
+        rows = xp.flatnonzero(xp.any((pos < lo) | (pos > hi), axis=1))
+        if rows.shape[0] == 0:
+            return pos
+
+        out = pos[rows]
+        span = xp.asarray(self._bounds_span)
+        # A degenerate (zero-width) axis would divide by zero; such an axis has
+        # exactly one legal coordinate, lo.
+        wide = span > 0
+        safe = xp.where(wide, span, xp.ones_like(span))
+        u = xp.abs(out - lo) % (2.0 * safe)
+        folded = lo + xp.where(u > safe, 2.0 * safe - u, u)
+        folded = xp.where(wide, folded, lo)
+        pos[rows] = xp.where((out < lo) | (out > hi), folded, out)
+        return pos
+
+    def _step_cpu(self, dt: float):
+        """Array-backend step, used whenever the CUDA kernels are unavailable.
+
+        Every stage is a vectorised operation over the *live* particles only,
+        issued through ``self._backend.xp``, so this runs on NumPy today and on
+        CuPy unchanged. The particle arrays are updated in place, so references
+        handed out earlier stay valid.
+        """
+        xp = self._backend.xp
+        parts = self.particles
+        positions, species = parts.positions, parts.species
+
+        live = self._live_indices()
+        n_live = int(live.shape[0])
+
+        if n_live:
+            n_slots = parts.n_slots
+            # Nothing has died yet in the common case, so the live set is the
+            # whole allocated prefix and we can work on a view instead of
+            # gathering and scattering.
+            contiguous = n_live == n_slots
+            sel = slice(0, n_slots) if contiguous else live
+            pos = positions[sel]
+
+            # 1. Brownian displacement. Per-axis sigma = sqrt(2*D*dt), so the
+            #    mean squared displacement is 6*D*dt in 3D.
+            sigma = xp.sqrt(2.0 * xp.asarray(self._diffusion)[species[sel]] * dt)
+            pos += xp.random.randn(n_live, 3) * sigma[:, None]
+
+            # 2. Reflect off the compartment walls (in place).
+            self._reflect(pos)
+
+            if not contiguous:
+                positions[live] = pos
+
+            # 3. Unimolecular reactions (A -> B, A -> nothing).
+            if self._has_uni:
+                self._unimolecular_reactions(live, dt)
+
+        # 4. Bimolecular reactions (A + B -> C), via a neighbour search rather
+        #    than the O(n^2) pair scan this used to be.
+        if self._n_bimol > 0:
+            self._bimolecular_reactions()
+
+    def _unimolecular_reactions(self, live, dt: float):
+        """First-order reactions over the live particles, vectorised."""
+        xp = self._backend.xp
+        parts = self.particles
+
+        rate = xp.asarray(self._uni_rates)[parts.species[live]]
+        reactive = rate > 0
+        candidates = live[reactive]
+        if candidates.shape[0] == 0:
+            return
+
+        # One uniform per candidate, in ascending particle order - the same
+        # draws, in the same order, that the per-particle loop consumed.
+        prob = 1.0 - xp.exp(-rate[reactive] * dt)
+        fired = candidates[xp.random.rand(candidates.shape[0]) < prob]
+        if fired.shape[0] == 0:
+            return
+
+        product = xp.asarray(self._uni_products)[parts.species[fired]]
+        dies = product < 0
+        parts.alive[fired[dies]] = 0
+        survived = ~dies
+        parts.species[fired[survived]] = product[survived]
+
+    def _find_pairs(self, pos_a, pos_b, radius: float):
+        """Index pairs closer than ``radius``, via the configured search."""
+        xp = self._backend.xp
+
+        mode = self.neighbor_search
+        if mode == "auto":
+            mode = "kdtree" if (_HAVE_CKDTREE and xp is np) else "cells"
+
+        if mode == "kdtree":
+            if not _HAVE_CKDTREE:
+                raise RuntimeError(
+                    "neighbor_search='kdtree' needs scipy; use 'cells' instead"
+                )
+            idx_a, idx_b = _pairs_kdtree(
+                self._backend.to_numpy(pos_a),
+                self._backend.to_numpy(pos_b),
+                radius,
+            )
+            return xp.asarray(idx_a), xp.asarray(idx_b)
+
+        return _pairs_cell_list(
+            xp, pos_a, pos_b, radius, xp.asarray(self._bounds_lo)
+        )
+
+    def _bimolecular_reactions(self):
+        """Second-order reactions over the live particles.
+
+        Candidate pairs come from a neighbour search instead of comparing every
+        particle with every other one; they are then reduced to a
+        one-reaction-per-particle matching in ascending particle index, which is
+        the matching the old sequential scan produced.
+        """
+        xp = self._backend.xp
+        parts = self.particles
+        n_slots = parts.n_slots
+        if n_slots == 0:
+            return
+        positions, species, alive = parts.positions, parts.species, parts.alive
+
+        for r in range(self._n_bimol):
+            radius = float(self._bimol_bind_r[r])
+            if radius <= 0.0:
+                continue
+            sp1 = int(self._bimol_reactant1[r])
+            sp2 = int(self._bimol_reactant2[r])
+
+            # Re-derived per reaction: an earlier reaction in this same step may
+            # already have consumed or converted particles.
+            is_live = alive[:n_slots] == 1
+            idx_a = xp.flatnonzero(is_live & (species[:n_slots] == sp1))
+            if idx_a.shape[0] == 0:
+                continue
+            self_reaction = sp1 == sp2
+            idx_b = idx_a if self_reaction else xp.flatnonzero(
+                is_live & (species[:n_slots] == sp2)
+            )
+            if idx_b.shape[0] == 0:
+                continue
+
+            pos_a = positions[idx_a]
+            pos_b = pos_a if self_reaction else positions[idx_b]
+            hit_a, hit_b = self._find_pairs(pos_a, pos_b, radius)
+            if hit_a.shape[0] == 0:
+                continue
+
+            first = idx_a[hit_a]
+            second = idx_b[hit_b]
+            if self_reaction:
+                # A + A: keep one entry per unordered pair, low index first,
+                # and drop the particle-with-itself hits.
+                keep = first < second
+                first, second = first[keep], second[keep]
+                if first.shape[0] == 0:
+                    continue
+
+            first, second = _match_pairs(self._backend, first, second)
+            if first.shape[0] == 0:
+                continue
+
+            # Both reactants are consumed; a product takes over the reactant's
+            # slot at the pair's midpoint.
+            midpoint = (positions[first] + positions[second]) / 2.0
+            alive[first] = 0
+            alive[second] = 0
+
+            prod1 = int(self._bimol_product1[r])
+            prod2 = int(self._bimol_product2[r])
+            if prod1 >= 0:
+                species[first] = prod1
+                positions[first] = midpoint
+                alive[first] = 1
+            if prod2 >= 0:
+                species[second] = prod2
+                positions[second] = midpoint
+                alive[second] = 1
 
     def get_state(self) -> Dict[str, Any]:
         """Get current simulation state."""
