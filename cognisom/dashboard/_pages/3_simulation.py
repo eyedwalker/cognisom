@@ -90,7 +90,15 @@ if run_btn or st.session_state.get("sim_engine_ran"):
         runner.run(progress_callback=_progress)
         progress_bar.progress(1.0, text="Simulation complete.")
 
-        # Cache in session
+        # Cache in session.
+        #
+        # The runner itself is stored under the same key the 3D
+        # Visualization page uses, so a run started here is visible to
+        # the Scientific Inspector, Lineage Tree, Cell Population and USD
+        # export tabs there. Without it those tabs report no simulation
+        # even though one just finished, because this page only stored
+        # its derived outputs under its own key names.
+        st.session_state["sim_runner"] = runner
         st.session_state["sim_ts"] = runner.get_time_series()
         st.session_state["sim_events"] = runner.event_log
         st.session_state["sim_event_summary"] = runner.get_event_summary()

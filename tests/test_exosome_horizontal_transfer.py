@@ -48,11 +48,15 @@ def _build_engine() -> SimulationEngine:
     return engine
 
 
-def _stage_transfer(engine):
+def _stage_transfer(engine, gene='KRAS', mutation='G12D'):
     """Build cancer source + normal recipient, package an oncogenic
     exosome from the source, mark it uptaken by the recipient, and
     drain the staging events so subsequent assertions only see
     post-uptake events.
+
+    ``gene`` / ``mutation`` select the driver carried by the cargo.
+    Defaults to KRAS G12D; pass another driver to distinguish the
+    transmitted mutation from the legacy hardcoded phenotype label.
 
     Returns (source_id, recipient_id, exosome).
     """
@@ -62,7 +66,7 @@ def _stage_transfer(engine):
 
     source_id = cellular.add_cell(position=[10, 10, 10], cell_type='cancer')
     molecular.add_cell(source_id)
-    molecular.introduce_mutation(source_id, 'KRAS', 'G12D')
+    molecular.introduce_mutation(source_id, gene, mutation)
 
     recipient_id = cellular.add_cell(position=[20, 20, 20], cell_type='normal')
     molecular.add_cell(recipient_id)
@@ -212,3 +216,51 @@ def test_non_oncogenic_cargo_does_not_transfer_delta(monkeypatch):
         and data.get('cell_id') == recipient_id
     ]
     assert recipient_mutations == []
+
+
+def test_phenotype_label_matches_transmitted_mutation(monkeypatch):
+    """The recipient's phenotype labels must name the mutation actually
+    transferred, not a hardcoded one.
+
+    transform_cell used to append the literal string 'KRAS_G12D'
+    regardless of cargo, so a cell whose genome delta recorded one
+    driver carried a phenotype label asserting another. The genome layer
+    and the label layer disagreed, and only the genome layer was right.
+    """
+    monkeypatch.setattr(np.random, 'random', lambda: 0.0)
+    engine = _build_engine()
+    cellular = engine.modules['cellular']
+    molecular = engine.modules['molecular']
+    # BRAF, deliberately NOT KRAS: with the legacy hardcoded label this
+    # test fails, because the recipient would carry a BRAF genome delta
+    # and a phenotype label reading 'KRAS_G12D'.
+    _source_id, recipient_id, _exo = _stage_transfer(
+        engine, gene='BRAF', mutation='V600E',
+    )
+
+    _drive_uptake(engine)
+
+    recipient = cellular.cells[recipient_id]
+    assert recipient.cell_type == 'cancer'
+    assert 'BRAF_V600E' in recipient.mutations, (
+        f"recipient should carry the transmitted BRAF V600E label; got "
+        f"{recipient.mutations}"
+    )
+    assert 'KRAS_G12D' not in recipient.mutations, (
+        f"recipient must not be labelled with a mutation it never "
+        f"received; got {recipient.mutations}"
+    )
+
+    # Every label must correspond to a delta actually present in the
+    # recipient's genome view.
+    for label in recipient.mutations:
+        gene_name, _, mutation_label = label.partition('_')
+        deltas = molecular.cell_views[recipient_id].deltas_for_gene(gene_name)
+        assert deltas, (
+            f"phenotype label {label!r} names gene {gene_name!r}, but the "
+            f"recipient's genome view carries no delta for that gene"
+        )
+        assert any(d.mutation_id == mutation_label for d in deltas), (
+            f"phenotype label {label!r} is not backed by a genome delta; "
+            f"deltas present: {[d.mutation_id for d in deltas]}"
+        )

@@ -238,8 +238,15 @@ class DiapedesisManager:
         try:
             from cognisom.simulations.diapedesis import DiapedesisSim, DiapedesisConfig
         except ImportError:
+            # Fabricated frames are legitimate for smoke-testing the Kit
+            # scene without the engine on the path. They are NOT
+            # legitimate to show someone unlabelled: the mock generator
+            # produces rng.uniform leukocyte motion that is visually
+            # indistinguishable from real rolling and adhesion. This
+            # warning only reaches a container log, so every frame is
+            # tagged and the tag is what the UI must surface.
             carb.log_warn("[diapedesis] DiapedesisSim not available, "
-                          "using mock frames")
+                          "returning MOCK frames -- not simulation output")
             return self._generate_mock_frames(duration, fps)
 
         # Build config from preset params
@@ -268,9 +275,19 @@ class DiapedesisManager:
                       f"over {duration}s")
         return frames
 
+    #: Key stamped on every fabricated frame. Consumers must check it
+    #: before presenting frames as simulation output.
+    MOCK_FRAME_KEY = "is_mock"
+
     def _generate_mock_frames(self, duration: float,
                               fps: float) -> List[Dict]:
-        """Generate mock frames for testing without simulation engine."""
+        """Generate mock frames for testing without the simulation engine.
+
+        Every frame is stamped with ``is_mock`` so that the fabrication
+        is visible to anything downstream. Without the stamp these are
+        indistinguishable from real output, which is how a demo can show
+        convincing leukocyte behaviour that is pure noise.
+        """
         import math
         import random
 
@@ -375,6 +392,11 @@ class DiapedesisManager:
                     "bacteria_total": n_bacteria,
                 },
             })
+
+        # Stamp every frame. This is the only signal downstream has that
+        # it is holding fabricated data rather than simulation output.
+        for f in frames:
+            f[self.MOCK_FRAME_KEY] = True
 
         return frames
 

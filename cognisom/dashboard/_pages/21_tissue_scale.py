@@ -311,21 +311,53 @@ with tab_sim:
             with mcol4:
                 st.metric("Balance", f"{summary.get('balance_pct', 0):.0f}%")
 
-            # 3D Scatter plot
+            # 3D scatter.
+            #
+            # This heading said "(3D)" above a flat st.scatter_chart on x
+            # and y, silently discarding the z column it had already
+            # built. The positions are three-dimensional, so the view now
+            # is too.
             positions = viz_data.get("positions")
             if positions is not None and len(positions) > 0:
-                st.markdown("### Cell Positions (3D)")
-                # Subsample for display
-                max_display = min(50_000, len(positions))
+                # A 3D scene carries far fewer points than a 2D chart
+                # before the browser struggles, so the cap here is
+                # tighter than the engine-side visualization limit.
+                max_display = min(20_000, len(positions))
                 if len(positions) > max_display:
                     idx = np.random.choice(len(positions), max_display, replace=False)
                     display_pos = positions[idx]
                 else:
                     display_pos = positions
 
-                import pandas as pd
-                df = pd.DataFrame(display_pos, columns=["x", "y", "z"])
-                st.scatter_chart(df, x="x", y="y", height=400)
+                st.markdown("### Cell Positions (3D)")
+                if len(positions) > max_display:
+                    st.caption(
+                        f"Showing a random {max_display:,} of "
+                        f"{len(positions):,} cells."
+                    )
+
+                import plotly.graph_objects as go
+
+                fig_pos = go.Figure(go.Scatter3d(
+                    x=display_pos[:, 0],
+                    y=display_pos[:, 1],
+                    z=display_pos[:, 2],
+                    mode="markers",
+                    marker=dict(size=2, color=display_pos[:, 2],
+                                colorscale="Viridis", opacity=0.7,
+                                colorbar=dict(title="z (um)")),
+                ))
+                fig_pos.update_layout(
+                    height=500,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    scene=dict(
+                        xaxis_title="x (um)",
+                        yaxis_title="y (um)",
+                        zaxis_title="z (um)",
+                        aspectmode="data",
+                    ),
+                )
+                st.plotly_chart(fig_pos, use_container_width=True)
 
             # Field slices
             field_slices = viz_data.get("field_slices", {})

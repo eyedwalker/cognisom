@@ -107,6 +107,49 @@ class ODEModule(SimulationModule):
         self.total_steps = 0
         self.total_rhs_evals = 0
 
+    # Config keys consumed by the module itself rather than passed
+    # through to the ODE system's parameter dict.
+    _RESERVED_CONFIG_KEYS = frozenset({
+        'system', 'n_cells', 'method', 'rtol', 'atol', 'heterogeneity',
+    })
+
+    def _apply_parameter_overrides(self):
+        """Override the system's rate constants from module config.
+
+        Any config key that names a parameter of the constructed system
+        replaces the factory default. Keys that name nothing are logged
+        rather than ignored, so a typo in a scenario does not silently
+        produce baseline dynamics.
+        """
+        if self.system is None or not self.system.parameters:
+            return
+
+        applied, unknown = {}, []
+        for key, value in self.config.items():
+            if key in self._RESERVED_CONFIG_KEYS:
+                continue
+            if key in self.system.parameters:
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    unknown.append(key)
+                    continue
+                applied[key] = (self.system.parameters[key], float(value))
+                self.system.parameters[key] = float(value)
+            else:
+                unknown.append(key)
+
+        for key, (was, now) in applied.items():
+            log.info(
+                "ODEModule: %s overridden %s -> %s from config",
+                key, was, now,
+            )
+        if unknown:
+            log.warning(
+                "ODEModule: config keys %s match no parameter of system "
+                "'%s' and were ignored. Available: %s",
+                sorted(unknown), self.system_name,
+                sorted(self.system.parameters),
+            )
+
     def initialize(self):
         """Initialize ODE solver and state."""
         from cognisom.gpu.ode_solver import (
@@ -123,6 +166,18 @@ class ODEModule(SimulationModule):
             self.system = ODESystem.ar_signaling_pathway()
         else:
             self.system = ODESystem.gene_expression_2species()
+
+        # Apply rate-constant overrides from config onto the system the
+        # factory just built.
+        #
+        # Without this the module accepted a parameter and then ignored
+        # it. ParameterBridge emits {"ode": {"system": "ar_signaling",
+        # "k_bind": 10.0}} for the anti-androgen class, encoding the
+        # ten-fold reduction in androgen-receptor binding that is the
+        # mechanism of the drug. It reached self.config and stopped
+        # there, because the rate lives in the factory's literal
+        # parameters dict. The whole pharmacology was inert.
+        self._apply_parameter_overrides()
 
         # Create integrator
         self.integrator = BatchedODEIntegrator(

@@ -1182,10 +1182,20 @@ class ImmuneCellEntity(BioEntity):
     position: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
     activated: bool = False
     target_cell_id: str = ""        # ID of cell being targeted
-    detection_radius: float = 10.0  # Scanning radius in um
-    kill_radius: float = 5.0        # Effective kill distance in um
-    kill_probability: float = 0.8   # Per-contact kill chance
-    mhc1_expression: float = 1.0    # MHC class I surface expression
+    # Behavioural parameters. None means "not curated for this cell
+    # type", which is distinct from a measured value.
+    #
+    # These were class-level constants (10.0 / 5.0 / 0.8 / 1.0) and no
+    # seeding code ever overrode them, so all twenty-five seeded immune
+    # cell types were numerically identical: a regulatory T cell, a
+    # naive CD8, an M2 macrophage and a cytotoxic NK cell all carried a
+    # per-contact kill chance of 0.8. For the non-cytotoxic types that
+    # is not a missing value, it is a wrong one.
+    detection_radius: Optional[float] = None  # Scanning radius in um
+    kill_radius: Optional[float] = None       # Effective kill distance in um
+    kill_probability: Optional[float] = None  # Per-contact kill chance
+    mhc1_expression: Optional[float] = None   # MHC class I surface expression
+    # Per-instance state, legitimately zero at construction.
     activation_state: float = 0.0   # 0-1 activation level
     # Inherited from PhysicalCell
     phase: str = "G0"
@@ -1224,10 +1234,10 @@ class ImmuneCellEntity(BioEntity):
         self.position = props.get("position", [0.0, 0.0, 0.0])
         self.activated = props.get("activated", False)
         self.target_cell_id = props.get("target_cell_id", "")
-        self.detection_radius = props.get("detection_radius", 10.0)
-        self.kill_radius = props.get("kill_radius", 5.0)
-        self.kill_probability = props.get("kill_probability", 0.8)
-        self.mhc1_expression = props.get("mhc1_expression", 1.0)
+        self.detection_radius = props.get("detection_radius", None)
+        self.kill_radius = props.get("kill_radius", None)
+        self.kill_probability = props.get("kill_probability", None)
+        self.mhc1_expression = props.get("mhc1_expression", None)
         self.activation_state = props.get("activation_state", 0.0)
         self.phase = props.get("phase", "G0")
         self.alive = props.get("alive", True)
@@ -1646,7 +1656,13 @@ class Cytokine(BioEntity):
     target_cells: List[str] = field(default_factory=list)      # ["T_cell", "NK_cell"]
     function: str = ""              # Primary biological function
     signaling_pathway: str = ""     # JAK-STAT, NF-kB, MAPK
-    half_life_hours: float = 0.0    # Serum half-life
+    # Serum half-life. None means "not curated", which is the honest
+    # state for most of these. It was previously 0.0, which is not a
+    # missing value but a claim that the cytokine decays instantly --
+    # and no seeding code ever set it, so every cytokine in the library
+    # asserted that. A simulator building a cytokine field from these
+    # would have every signal vanish within one timestep.
+    half_life_hours: Optional[float] = None
     pro_inflammatory: bool = True
     gene_symbol: str = ""           # Gene encoding this cytokine (e.g. "IL2", "IFNG")
     molecular_weight_kda: float = 0.0
@@ -1672,7 +1688,7 @@ class Cytokine(BioEntity):
         self.target_cells = props.get("target_cells", [])
         self.function = props.get("function", "")
         self.signaling_pathway = props.get("signaling_pathway", "")
-        self.half_life_hours = props.get("half_life_hours", 0.0)
+        self.half_life_hours = props.get("half_life_hours", None)
         self.pro_inflammatory = props.get("pro_inflammatory", True)
         self.gene_symbol = props.get("gene_symbol", "")
         self.molecular_weight_kda = props.get("molecular_weight_kda", 0.0)

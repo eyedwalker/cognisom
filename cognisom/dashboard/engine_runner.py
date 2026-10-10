@@ -7,10 +7,13 @@ Provides:
 - Event log capture for timeline views
 """
 
+import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+
+log = logging.getLogger(__name__)
 
 import numpy as np
 
@@ -24,6 +27,7 @@ from cognisom.modules import (
     MolecularModule, CellularModule, ImmuneModule,
     VascularModule, LymphaticModule, SpatialModule,
     EpigeneticModule, CircadianModule, MorphogenModule,
+    ODEModule, BNGLModule, HybridModule, SmoldynModule,
 )
 
 
@@ -125,12 +129,20 @@ class SimulationSnapshot:
 @dataclass
 class CellSnapshot:
     """Snapshot of all cell & immune positions for 3D viz."""
+    #: Simulation time this snapshot was taken at, in hours.
+    time: float = 0.0
     cell_positions: np.ndarray = None   # (N, 3)
     cell_types: list = field(default_factory=list)         # 'normal' | 'cancer'
     cell_phases: list = field(default_factory=list)        # 'G1'/'S'/'G2'/'M'
     cell_oxygen: list = field(default_factory=list)
     cell_mhc1: list = field(default_factory=list)
     cell_ids: list = field(default_factory=list)
+    # Metabolic and age state. These live on CellState and were simply
+    # not being recorded, which is why the frame-by-frame inspector
+    # fabricated them instead of reading a run.
+    cell_glucose: list = field(default_factory=list)
+    cell_atp: list = field(default_factory=list)
+    cell_age: list = field(default_factory=list)
 
     immune_positions: np.ndarray = None  # (M, 3)
     immune_types: list = field(default_factory=list)       # 'T_cell' | 'NK_cell' | 'macrophage'
@@ -266,7 +278,31 @@ class EngineRunner:
                 "epigenetic": EpigeneticModule,
                 "circadian": CircadianModule,
                 "morphogen": MorphogenModule,
+                # Solver modules. ParameterBridge.infer_enabled_modules
+                # turns these on and MODULE_PARAM_SCHEMA declares their
+                # parameters, but they were absent here, so every config
+                # the bridge produced for them was discarded without a
+                # word.
+                "ode": ODEModule,
+                "bngl": BNGLModule,
+                "hybrid": HybridModule,
+                "smoldyn": SmoldynModule,
             }
+
+            # A module that is asked for but cannot be registered is a
+            # silent no-op, which is exactly how the solver modules went
+            # unnoticed. Surface it instead.
+            unknown = [
+                name for name, on in self.modules_enabled.items()
+                if on and name not in module_classes
+            ]
+            if unknown:
+                log.warning(
+                    "modules_enabled requests %s, which EngineRunner "
+                    "cannot register; their configs will be ignored. "
+                    "Known modules: %s",
+                    sorted(unknown), sorted(module_classes),
+                )
 
             for name, cls in module_classes.items():
                 if self.modules_enabled.get(name, False):
@@ -440,7 +476,7 @@ class EngineRunner:
 
     def _record_cell_snapshot(self):
         """Capture cell and immune positions for 3D rendering."""
-        snap = CellSnapshot()
+        snap = CellSnapshot(time=float(self.engine.time))
         mods = self.engine.modules
 
         # Cells
@@ -454,6 +490,9 @@ class EngineRunner:
                 snap.cell_oxygen = [float(c.oxygen) for c in alive]
                 snap.cell_mhc1 = [float(c.mhc1_expression) for c in alive]
                 snap.cell_ids = [c.cell_id for c in alive]
+                snap.cell_glucose = [float(c.glucose) for c in alive]
+                snap.cell_atp = [float(c.atp) for c in alive]
+                snap.cell_age = [float(c.age) for c in alive]
 
         # Immune
         immune = mods.get("immune")
@@ -481,6 +520,158 @@ class EngineRunner:
         self.cell_snapshots.append(snap)
 
     # ── Convenience accessors ────────────────────────────────────────
+
+    def get_inspection_history(self) -> List[Dict[str, Any]]:
+        """Per-frame cell records for the frame-by-frame inspector.
+
+        Reshapes the recorded snapshots into one dict per cell per
+        frame, which is what a time scrubber needs to follow an
+        individual cell across a run.
+
+        Two fields a caller might expect are deliberately absent rather
+        than filled in. There is no ``parent_id``, because the engine
+        records no lineage: the division event names a parent and a
+        daughter but nothing stores the edge. And there is no
+        ``volume``, because CellState has no size at all. Inventing
+        either would make the inspector display relationships and
+        morphology the simulation never computed.
+        """
+        frames: List[Dict[str, Any]] = []
+        for snap in self.cell_snapshots:
+            if snap.cell_positions is None or len(snap.cell_ids) == 0:
+                continue
+
+            n = len(snap.cell_ids)
+
+            def _at(seq, i, default=0.0):
+                return seq[i] if i < len(seq) else default
+
+            cells = [
+                {
+                    "cell_id": snap.cell_ids[i],
+                    "position": tuple(float(v) for v in snap.cell_positions[i]),
+                    "cell_type": _at(snap.cell_types, i, "unknown"),
+                    "phase": _at(snap.cell_phases, i, "?"),
+                    # Snapshots record living cells only.
+                    "alive": True,
+                    "oxygen": float(_at(snap.cell_oxygen, i)),
+                    "glucose": float(_at(snap.cell_glucose, i)),
+                    "atp": float(_at(snap.cell_atp, i)),
+                    "age": float(_at(snap.cell_age, i)),
+                    "mhc1_expression": float(_at(snap.cell_mhc1, i)),
+                }
+                for i in range(n)
+            ]
+
+            def _mean(key):
+                vals = [c[key] for c in cells]
+                return float(sum(vals) / len(vals)) if vals else 0.0
+
+            frames.append({
+                "time": float(snap.time),
+                "cells": cells,
+                "n_alive": len(cells),
+                "n_cancer": sum(1 for c in cells if c["cell_type"] == "cancer"),
+                "n_immune": len(snap.immune_types),
+                "n_normal": sum(1 for c in cells if c["cell_type"] == "normal"),
+                "mean_oxygen": _mean("oxygen"),
+                "mean_glucose": _mean("glucose"),
+                "mean_atp": _mean("atp"),
+            })
+        return frames
+
+    def get_lineage(self) -> Dict[str, Any]:
+        """Reconstruct the division tree from the recorded event log.
+
+        Ancestry is not stored on the cell -- CellState has no parent
+        field -- but it is fully recoverable from the run, because every
+        division emits an event naming both the parent and the daughter,
+        and this runner records those events without a cap.
+
+        Founders are the cells present in the first snapshot, plus any
+        cell that appears as a parent without ever having been a
+        daughter. Deaths and mutations are attached from their own
+        events, so a node's mutation list is what that cell actually
+        acquired rather than a sampled guess.
+
+        Returns ``{"nodes": [...], "edges": [(parent_id, daughter_id)]}``,
+        empty when nothing has been run.
+        """
+        nodes: Dict[int, Dict[str, Any]] = {}
+        edges: List[tuple] = []
+
+        def _founder(cell_id, cell_type, birth_time):
+            return {
+                "cell_id": cell_id,
+                "parent_id": -1,
+                "generation": 0,
+                "birth_time": float(birth_time),
+                "death_time": None,
+                "cell_type": cell_type,
+                "n_divisions": 0,
+                "mutations": [],
+            }
+
+        # Seed generation zero from the initial population.
+        if self.cell_snapshots:
+            first = self.cell_snapshots[0]
+            for i, cid in enumerate(first.cell_ids):
+                ctype = (
+                    first.cell_types[i] if i < len(first.cell_types) else "unknown"
+                )
+                nodes[cid] = _founder(cid, ctype, first.time)
+
+        for entry in self.event_log:
+            etype = entry.get("event")
+            data = entry.get("data") or {}
+            when = float(entry.get("time", 0.0))
+
+            if etype == EventTypes.CELL_DIVIDED:
+                parent_id = data.get("cell_id")
+                daughter_id = data.get("daughter_id")
+                if parent_id is None or daughter_id is None:
+                    continue
+                ctype = data.get("cell_type", "unknown")
+                parent = nodes.get(parent_id)
+                if parent is None:
+                    # Divided without having been seen: treat as a founder
+                    # rather than dropping the subtree it roots.
+                    parent = nodes.setdefault(
+                        parent_id, _founder(parent_id, ctype, when)
+                    )
+                parent["n_divisions"] += 1
+                nodes[daughter_id] = {
+                    "cell_id": daughter_id,
+                    "parent_id": parent_id,
+                    "generation": parent["generation"] + 1,
+                    "birth_time": when,
+                    "death_time": None,
+                    "cell_type": ctype,
+                    "n_divisions": 0,
+                    # A daughter inherits the parent's mutations, which is
+                    # what the genome view does via fork().
+                    "mutations": list(parent["mutations"]),
+                }
+                edges.append((parent_id, daughter_id))
+
+            elif etype == EventTypes.CELL_DIED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None and node["death_time"] is None:
+                    node["death_time"] = when
+
+            elif etype == EventTypes.CELL_TRANSFORMED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None:
+                    node["cell_type"] = "cancer"
+
+            elif etype == EventTypes.MUTATION_OCCURRED:
+                node = nodes.get(data.get("cell_id"))
+                if node is not None:
+                    label = f"{data.get('gene', '?')}_{data.get('mutation', '?')}"
+                    if label not in node["mutations"]:
+                        node["mutations"].append(label)
+
+        return {"nodes": list(nodes.values()), "edges": edges}
 
     def get_time_series(self) -> Dict[str, list]:
         """Return dict of lists suitable for Plotly / DataFrame."""
