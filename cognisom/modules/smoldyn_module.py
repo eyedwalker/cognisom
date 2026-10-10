@@ -278,20 +278,22 @@ class SmoldynModule(SimulationModule):
         if self.solver is None:
             return np.zeros((0, 3), dtype=np.float32)
 
-        particles = self.solver.particles
-        mask = particles.alive.copy()
-
+        species_idx = None
         if species_name is not None:
-            species_idx = None
             for i, s in enumerate(self.system.species):
                 if s.name == species_name:
                     species_idx = i
                     break
             if species_idx is None:
                 raise KeyError(f"Unknown species: {species_name}")
-            mask &= (particles.species == species_idx)
 
-        return particles.positions[mask].copy()
+        # Delegate to the particle system rather than re-deriving the mask here.
+        # `alive` is an int32 array, so `positions[alive]` is integer fancy
+        # indexing, not boolean masking: it returned one row per *slot* in the
+        # preallocated buffer (n_max rows, built from rows 0 and 1) instead of
+        # one row per live particle. ParticleSystem.get_positions compares
+        # `alive == 1` and is correct.
+        return self.solver.particles.get_positions(species_idx).copy()
 
     def get_species_positions(self) -> Dict[str, np.ndarray]:
         """
