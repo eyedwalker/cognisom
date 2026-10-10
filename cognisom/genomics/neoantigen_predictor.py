@@ -107,8 +107,28 @@ class Neoantigen:
     # Immunogenicity features
     agretopicity: float = 0.0       # Ratio of mutant/WT binding (>1 = better)
     foreignness: float = 0.0        # Sequence dissimilarity to self-proteome
-    expression_level: str = "high"  # From RNA-seq if available
-    clonality: str = "clonal"       # Clonal vs subclonal mutation
+    variant_allele_frequency: Optional[float] = None
+    """Fraction of tumour reads carrying the variant, from the caller.
+
+    Parsed by the VCF reader and used in somatic classification; carried
+    here so ranking and downstream selection can see it. A low frequency
+    marks a variant that is subclonal, poorly covered, or an artifact --
+    a target present in a minority of tumour cells is a poor vaccine
+    candidate however well its peptide binds.
+    """
+
+    expression_level: Optional[str] = None
+    """Transcript abundance for the source gene. None until RNA is
+    quantified: the pipeline aligns RNA but runs no quantifier, so there
+    is nothing to populate this from. It previously defaulted to the
+    string "high", which every record asserted regardless of data."""
+
+    clonality: Optional[str] = None
+    """Clonal or subclonal. None because cancer-cell fraction needs
+    tumour purity and allele-specific copy number, neither of which this
+    pipeline computes; allele frequency alone does not determine it. It
+    previously defaulted to "clonal" for every record. Use
+    `variant_allele_frequency` for what is actually measured."""
 
     # Vaccine design
     vaccine_priority: int = 0       # 1=highest priority
@@ -136,6 +156,10 @@ class Neoantigen:
             "is_strong_binder": self.is_strong_binder,
             "agretopicity": round(self.agretopicity, 2),
             "foreignness": round(self.foreignness, 2),
+            "variant_allele_frequency": (
+                round(self.variant_allele_frequency, 4)
+                if self.variant_allele_frequency is not None else None
+            ),
             "vaccine_priority": self.vaccine_priority,
             "include_in_vaccine": self.include_in_vaccine,
             "binding_method": self.binding_method,
@@ -523,6 +547,8 @@ class NeoantigenPredictor:
                         binding_level=level,
                         agretopicity=agretopicity,
                         foreignness=foreignness,
+                        variant_allele_frequency=getattr(
+                            variant, "tumor_af", None),
                         binding_method=self._binding_method,
                     )
                     all_neoantigens.append(neo)
@@ -531,7 +557,19 @@ class NeoantigenPredictor:
                 diag.variants_yielding_peptides += 1
 
         # Sort by binding affinity (lower = better)
-        all_neoantigens.sort(key=lambda n: n.binding_affinity_nm)
+        # Primary key is unchanged, so any ordering that was already
+        # determined by affinity stays as it was. The allele frequency
+        # only breaks ties -- and the PWM scorer quantises affinity to a
+        # handful of values, so ties are common there. Among equally
+        # good binders, prefer the variant present in more of the tumour;
+        # records without a frequency sort last rather than first.
+        all_neoantigens.sort(
+            key=lambda n: (
+                n.binding_affinity_nm,
+                -(n.variant_allele_frequency
+                  if n.variant_allele_frequency is not None else -1.0),
+            )
+        )
 
         # Remove duplicates (same peptide, same allele)
         seen = set()
