@@ -24,6 +24,47 @@ from .errors import MADError, MADErrorCode
 logger = logging.getLogger(__name__)
 
 
+#: Limitations that hold on every path, before the immune line.
+BASE_LIMITATIONS_HEAD = (
+    "Retrospectively validated on prostate cancer cohorts (SU2C mCRPC, TCGA-PRAD)",
+    "Treatment effectiveness estimates are simulation-based, not prospective",
+    "Neoantigen binding uses MHCflurry when available, PWM fallback otherwise",
+)
+
+#: Limitations that hold on every path, after the immune line.
+BASE_LIMITATIONS_TAIL = (
+    "Does not account for prior treatment history, comorbidities, or patient preference",
+)
+
+IMMUNE_MEASURED_LIMITATION = (
+    "Immune microenvironment classification uses marker-based heuristics"
+)
+
+IMMUNE_NOT_MEASURED_LIMITATION = (
+    "No immune microenvironment measurement was available: no cell-state "
+    "classifier ran, so exhaustion, Treg, M2 and PD-L1 inputs are absent "
+    "rather than low, and the immune score is reported as unknown"
+)
+
+
+def _limitations_for(twin) -> List[str]:
+    """Limitations that describe what actually ran for this patient.
+
+    The immune line used to be a constant, so a decision asserted that a
+    marker-based classifier had run even on the tumor-only path, where
+    `twin.immune_classification` is None and no marker was ever read.
+
+    Splitting head from tail keeps the immune line at its original index,
+    so a measured decision's `limitations` is byte-identical to before.
+    """
+    measured = bool(getattr(twin, "immune_profile_measured", False))
+    return [
+        *BASE_LIMITATIONS_HEAD,
+        IMMUNE_MEASURED_LIMITATION if measured else IMMUNE_NOT_MEASURED_LIMITATION,
+        *BASE_LIMITATIONS_TAIL,
+    ]
+
+
 @dataclass
 class BoardDecision:
     """Final consensus decision from the MAD Molecular Tumor Board."""
@@ -80,13 +121,9 @@ class BoardDecision:
     matching_trials: List[Dict[str, Any]] = field(default_factory=list)
     """Recruiting clinical trials matching this patient's biomarkers."""
 
-    limitations: List[str] = field(default_factory=lambda: [
-        "Retrospectively validated on prostate cancer cohorts (SU2C mCRPC, TCGA-PRAD)",
-        "Treatment effectiveness estimates are simulation-based, not prospective",
-        "Neoantigen binding uses MHCflurry when available, PWM fallback otherwise",
-        "Immune microenvironment classification uses marker-based heuristics",
-        "Does not account for prior treatment history, comorbidities, or patient preference",
-    ])
+    #: Defaults to the no-measurement text, so the stronger claim can
+    #: never be made by omitting the twin.
+    limitations: List[str] = field(default_factory=lambda: _limitations_for(None))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -145,8 +182,14 @@ class BoardModerator:
         genomics_opinion: AgentOpinion,
         immune_opinion: AgentOpinion,
         clinical_opinion: AgentOpinion,
+        twin=None,          # Optional[DigitalTwinConfig]
     ) -> BoardDecision:
-        """Synthesize three agent opinions into a board decision."""
+        """Synthesize three agent opinions into a board decision.
+
+        `twin` is keyword-with-default only so existing callers keep
+        working; without it the decision reports the weaker limitation,
+        which is the safe direction.
+        """
         session_id = str(uuid.uuid4())
         timestamp = datetime.utcnow().isoformat()
 
@@ -237,6 +280,7 @@ class BoardModerator:
             evidence_chain=evidence_chain,
             dissenting_views=dissenting,
             warnings=unique_warnings,
+            limitations=_limitations_for(twin),
         )
 
     def run_full_analysis(
@@ -265,6 +309,7 @@ class BoardModerator:
             genomics_opinion=genomics_opinion,
             immune_opinion=immune_opinion,
             clinical_opinion=clinical_opinion,
+            twin=twin,
         )
 
         # Enrich with clinical trial matching

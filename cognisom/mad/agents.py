@@ -459,13 +459,16 @@ class ImmuneAgent(MADAgent):
 
         # --- Extract immune parameters ---
         immune_score = getattr(twin, "immune_score", "unknown")
-        exhaustion = getattr(twin, "t_cell_exhaustion_fraction", 0.0)
-        mean_exhaustion = getattr(twin, "mean_exhaustion", 0.0)
-        treg_fraction = getattr(twin, "treg_fraction", 0.0)
-        m2_fraction = getattr(twin, "m2_macrophage_fraction", 0.0)
-        immune_fraction = getattr(twin, "immune_cell_fraction", 0.0)
-        pd_l1 = getattr(twin, "pd_l1_expression", 0.5)
-        mhc1_down = getattr(twin, "mhc1_downregulation", 0.0)
+        # These defaults are None, not numbers: on an unmeasured twin the
+        # attribute EXISTS with value None, so a getattr default is never
+        # consulted and a numeric one only made the absence look handled.
+        # (`mean_exhaustion` and `m2_macrophage_fraction` were read here and
+        # never used anywhere in this method, so they are gone.)
+        exhaustion = getattr(twin, "t_cell_exhaustion_fraction", None)
+        treg_fraction = getattr(twin, "treg_fraction", None)
+        immune_fraction = getattr(twin, "immune_cell_fraction", None)
+        pd_l1 = getattr(twin, "pd_l1_expression", None)
+        mhc1_down = getattr(twin, "mhc1_downregulation", None)
         vaccine_candidates = getattr(twin, "vaccine_candidate_count", 0)
         strong_binders = getattr(twin, "strong_binder_count", 0)
         hla_alleles = getattr(twin, "hla_alleles", [])
@@ -475,7 +478,11 @@ class ImmuneAgent(MADAgent):
             warnings.append(MADErrorCode.NO_HLA_DATA.value)
             confidence -= 0.15
 
-        if immune_score == "unknown":
+        # MAD-003. Either an explicit "unknown" score or an unmeasured
+        # immune profile is grounds to warn. The flag defaults to True so a
+        # twin-like object from outside this package is not newly flagged.
+        if (not getattr(twin, "immune_profile_measured", True)
+                or immune_score == "unknown"):
             warnings.append(MADErrorCode.LOW_CONFIDENCE_IMMUNE.value)
             confidence -= 0.20
 
@@ -493,7 +500,9 @@ class ImmuneAgent(MADAgent):
             pd1_score += delta
             pd1_contribs.append(FeatureContribution(
                 "hot_tumor", delta, "positive",
-                f"Hot immune microenvironment ({immune_fraction:.0%} immune cells)",
+                "Hot immune microenvironment"
+                + (f" ({immune_fraction:.0%} immune cells)"
+                   if immune_fraction is not None else ""),
             ))
             evidence.append(EvidenceItem(
                 source_type="biomarker",
@@ -511,14 +520,14 @@ class ImmuneAgent(MADAgent):
             ))
 
         # Exhaustion: need exhausted T-cells to reactivate
-        if 0.2 < exhaustion < 0.8:
+        if exhaustion is not None and 0.2 < exhaustion < 0.8:
             delta = 0.15
             pd1_score += delta
             pd1_contribs.append(FeatureContribution(
                 "reversible_exhaustion", delta, "positive",
                 f"{exhaustion:.0%} T-cells exhausted — reactivation potential with PD-1 blockade",
             ))
-        elif exhaustion >= 0.8:
+        elif exhaustion is not None and exhaustion >= 0.8:
             delta = -0.10
             pd1_score += delta
             pd1_contribs.append(FeatureContribution(
@@ -531,7 +540,7 @@ class ImmuneAgent(MADAgent):
             )
 
         # PD-L1 expression
-        if pd_l1 > 0.5:
+        if pd_l1 is not None and pd_l1 > 0.5:
             delta = 0.10
             pd1_score += delta
             pd1_contribs.append(FeatureContribution(
@@ -548,7 +557,7 @@ class ImmuneAgent(MADAgent):
         combo_score = pd1_score * 0.6  # Inherit PD-1 base
         combo_contribs = list(pd1_contribs)  # Copy PD-1 contributions
 
-        if treg_fraction > 0.2:
+        if treg_fraction is not None and treg_fraction > 0.2:
             delta = 0.25
             combo_score += delta
             combo_contribs.append(FeatureContribution(
@@ -599,7 +608,7 @@ class ImmuneAgent(MADAgent):
             ))
 
         # MHC-I downregulation hurts vaccines
-        if mhc1_down > 0.3:
+        if mhc1_down is not None and mhc1_down > 0.3:
             delta = -mhc1_down * 0.25
             vax_score += delta
             vax_contribs.append(FeatureContribution(
@@ -634,7 +643,9 @@ class ImmuneAgent(MADAgent):
 
         # 4. Vaccine + pembro combo
         vp_score = (vax_score * 0.5 + pd1_score * 0.5)
-        if is_vaccine_eligible and immune_score != "cold":
+        # Positive evidence only: with immune_score "unknown" the old
+        # `!= "cold"` boosted this combination on the ABSENCE of evidence.
+        if is_vaccine_eligible and immune_score in ("hot", "suppressed"):
             vp_score = min(1.0, vp_score + 0.10)
         treatment_scores["neoantigen_vaccine_pembro"] = max(0.0, min(1.0, vp_score))
         treatment_contribs["neoantigen_vaccine_pembro"] = (

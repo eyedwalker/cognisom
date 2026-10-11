@@ -35,17 +35,24 @@ class DigitalTwinConfig:
     has_ar_mutation: bool = False
     has_pten_loss: bool = False
 
-    # Immune landscape (derived from C2S)
-    immune_score: str = "unknown"  # hot, cold, excluded, suppressed
-    t_cell_exhaustion_fraction: float = 0.0
-    mean_exhaustion: float = 0.0
-    m2_macrophage_fraction: float = 0.0
-    treg_fraction: float = 0.0
-    immune_cell_fraction: float = 0.0
+    # Immune landscape (derived from C2S).
+    #
+    # `immune_profile_measured` is False whenever no cell-state classifier
+    # ran. The fields below are then None, not zero: a tumor measured to
+    # have no exhausted T-cells and a tumor nobody looked at route a
+    # patient differently, and a float in the plausible range cannot tell
+    # them apart.
+    immune_profile_measured: bool = False
+    immune_score: str = "unknown"  # hot, cold, excluded, suppressed, unknown
+    t_cell_exhaustion_fraction: Optional[float] = None
+    mean_exhaustion: Optional[float] = None
+    m2_macrophage_fraction: Optional[float] = None
+    treg_fraction: Optional[float] = None
+    immune_cell_fraction: Optional[float] = None
 
     # Derived simulation parameters
-    mhc1_downregulation: float = 0.0  # 0=normal, 1=complete loss
-    pd_l1_expression: float = 0.5  # PD-L1 on tumor cells (0-1)
+    mhc1_downregulation: Optional[float] = None  # 0=normal, 1=complete loss
+    pd_l1_expression: Optional[float] = None  # PD-L1 on tumor cells (0-1)
     neoantigen_count: int = 0
 
     # Neoantigen vaccine data
@@ -72,6 +79,7 @@ class DigitalTwinConfig:
             has_ar_mutation=profile.has_ar_mutation,
             has_pten_loss=profile.has_pten_loss,
             # Immune
+            immune_profile_measured=True,
             immune_score=classification.immune_score,
             t_cell_exhaustion_fraction=classification.exhausted_fraction,
             mean_exhaustion=classification.mean_exhaustion,
@@ -104,14 +112,16 @@ class DigitalTwinConfig:
             gene_effects = _resolver.get_gene_effects_for_mutations(
                 profile.affected_genes
             )
-            config.mhc1_downregulation = gene_effects.get("mhc1_downregulation", 0.0)
+            config.mhc1_downregulation = gene_effects.get("mhc1_downregulation")
         except Exception:
-            # Fallback to hardcoded values
+            # Fallback to hardcoded values. Accumulate into a local, because
+            # the field's default is now None and `+=` on it would raise.
+            fallback = 0.0
             if profile.has_pten_loss:
-                config.mhc1_downregulation += 0.3
+                fallback += 0.3
             if profile.has_tp53_mutation:
-                config.mhc1_downregulation += 0.2
-            config.mhc1_downregulation = min(1.0, config.mhc1_downregulation)
+                fallback += 0.2
+            config.mhc1_downregulation = min(1.0, fallback)
 
         # PD-L1 expression correlates with immune infiltration
         if classification.immune_score == "hot":
@@ -122,8 +132,10 @@ class DigitalTwinConfig:
             config.pd_l1_expression = 0.2
 
         logger.info(
-            f"Built DigitalTwinConfig: TMB={config.tumor_mutational_burden:.1f}, "
-            f"immune={config.immune_score}, exhaustion={config.mean_exhaustion:.2f}"
+            "Built DigitalTwinConfig: TMB=%.1f, immune=%s, exhaustion=%s",
+            config.tumor_mutational_burden, config.immune_score,
+            "not measured" if config.mean_exhaustion is None
+            else f"{config.mean_exhaustion:.2f}",
         )
         return config
 
@@ -136,7 +148,7 @@ class DigitalTwinConfig:
             else int(profile.tumor_mutational_burden * 1.5)
         )
         # Calculate MHC-I downregulation from entity library
-        mhc1_down = 0.0
+        mhc1_down: Optional[float] = None
         try:
             from .parameter_resolver import SimulationParameterResolver
             from cognisom.library.store import EntityStore
@@ -144,13 +156,14 @@ class DigitalTwinConfig:
             gene_effects = _resolver.get_gene_effects_for_mutations(
                 profile.affected_genes
             )
-            mhc1_down = gene_effects.get("mhc1_downregulation", 0.0)
+            mhc1_down = gene_effects.get("mhc1_downregulation")
         except Exception:
+            fallback = 0.0
             if profile.has_pten_loss:
-                mhc1_down += 0.3
+                fallback += 0.3
             if profile.has_tp53_mutation:
-                mhc1_down += 0.2
-            mhc1_down = min(1.0, mhc1_down)
+                fallback += 0.2
+            mhc1_down = min(1.0, fallback)
 
         return cls(
             patient=profile,
@@ -159,7 +172,21 @@ class DigitalTwinConfig:
             has_dna_repair_defect=profile.has_dna_repair_defect,
             has_ar_mutation=profile.has_ar_mutation,
             has_pten_loss=profile.has_pten_loss,
-            immune_score="hot" if profile.is_tmb_high else "cold",
+            # No cell-state classifier ran on this path, so there is no
+            # immune microenvironment to report. TMB is not a substitute:
+            # `is_tmb_high` is gated on estimability, so an unestimable TMB
+            # used to arrive here as positive evidence of a *cold* tumor,
+            # and laundering a continuous biomarker into this categorical
+            # put a step discontinuity in checkpoint effectiveness at
+            # TMB = 10.
+            immune_profile_measured=False,
+            immune_score="unknown",
+            t_cell_exhaustion_fraction=None,
+            mean_exhaustion=None,
+            m2_macrophage_fraction=None,
+            treg_fraction=None,
+            immune_cell_fraction=None,
+            pd_l1_expression=None,
             neoantigen_count=neo_count,
             mhc1_downregulation=mhc1_down,
             hla_alleles=profile.hla_alleles or [],
@@ -181,9 +208,10 @@ class DigitalTwinConfig:
                 "cancer_proliferation_boost": 1.2 if self.has_pten_loss else 1.0,
             },
             "immune": {
-                "n_t_cells": max(5, int(30 * self.immune_cell_fraction / 0.15)),
-                "n_nk_cells": max(3, int(10 * self.immune_cell_fraction / 0.15)),
-                "n_macrophages": max(3, int(15 * self.immune_cell_fraction / 0.15)),
+                "measured": self.immune_profile_measured,
+                "n_t_cells": _scale_count(30, self.immune_cell_fraction, 5),
+                "n_nk_cells": _scale_count(10, self.immune_cell_fraction, 3),
+                "n_macrophages": _scale_count(15, self.immune_cell_fraction, 3),
                 "t_cell_initial_exhaustion": self.mean_exhaustion,
                 "treg_fraction": self.treg_fraction,
                 "m2_fraction": self.m2_macrophage_fraction,
@@ -202,6 +230,7 @@ class DigitalTwinConfig:
             "has_dna_repair_defect": self.has_dna_repair_defect,
             "has_ar_mutation": self.has_ar_mutation,
             "has_pten_loss": self.has_pten_loss,
+            "immune_profile_measured": self.immune_profile_measured,
             "immune_score": self.immune_score,
             "t_cell_exhaustion_fraction": self.t_cell_exhaustion_fraction,
             "mean_exhaustion": self.mean_exhaustion,
@@ -217,3 +246,28 @@ class DigitalTwinConfig:
             "vaccine_candidate_count": self.vaccine_candidate_count,
             "neoantigen_vaccine_candidate": self.neoantigen_vaccine_candidate,
         }
+
+
+#: The immune-microenvironment fields that only a cell-state classifier can
+#: fill. Tests iterate this, so adding a field here without teaching
+#: `from_profile_only` to pass None for it fails loudly.
+IMMUNE_PROFILE_FIELDS = (
+    "t_cell_exhaustion_fraction",
+    "mean_exhaustion",
+    "m2_macrophage_fraction",
+    "treg_fraction",
+    "immune_cell_fraction",
+    "pd_l1_expression",
+)
+
+
+def _scale_count(base: int, fraction: Optional[float], floor: int) -> Optional[int]:
+    """Scale a seeding count by a measured immune fraction.
+
+    Returns None when the fraction was never measured, rather than the
+    floor: a floor makes an unmeasured tumor indistinguishable from a
+    minimally infiltrated one.
+    """
+    if fraction is None:
+        return None
+    return max(floor, int(base * fraction / 0.15))

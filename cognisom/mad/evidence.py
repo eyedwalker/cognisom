@@ -62,7 +62,13 @@ class FeatureContribution:
     """Change in effectiveness score attributable to this feature."""
 
     direction: str
-    """'positive' or 'negative' — whether this feature helps or hurts."""
+    """'positive', 'negative', or 'neutral'.
+
+    'neutral' means the feature was considered and found absent -- it
+    contributed nothing because it was never measured. That is reported
+    rather than omitted so a decomposition shows what was unavailable
+    instead of silently dropping it.
+    """
 
     description: str = ""
     """Optional human-readable explanation."""

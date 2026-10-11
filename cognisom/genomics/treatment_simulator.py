@@ -37,7 +37,7 @@ class TreatmentResult:
 
     # Immune effects
     t_cell_reactivation_fraction: float  # Fraction of exhausted T-cells reactivated
-    final_exhaustion: float  # Post-treatment exhaustion score
+    final_exhaustion: Optional[float]  # Post-treatment exhaustion, None if unmeasured
     immune_related_adverse_events: float  # 0-1 risk score
 
     # Classification
@@ -48,6 +48,17 @@ class TreatmentResult:
     mechanism: str
     rationale: str
 
+    #: Twin fields this prediction wanted but could not read, because no
+    #: cell-state classifier ran. Every effectiveness term that depended on
+    #: one was skipped rather than defaulted, so a reader can tell which
+    #: inputs the number actually rests on. Empty means all were measured.
+    unmeasured_inputs: List[str] = field(default_factory=list)
+
+    @property
+    def inputs_fully_measured(self) -> bool:
+        """False when any immune input was absent rather than measured."""
+        return not self.unmeasured_inputs
+
     def summary(self) -> Dict:
         return {
             "treatment": self.treatment_name,
@@ -57,6 +68,7 @@ class TreatmentResult:
             "pfs_days": self.progression_free_days,
             "confidence": round(self.confidence, 2),
             "irae_risk": round(self.immune_related_adverse_events, 2),
+            "unmeasured_inputs": list(self.unmeasured_inputs),
         }
 
 
@@ -286,10 +298,26 @@ class TreatmentSimulator:
 
         # T-cell reactivation
         reversal = profile.get("exhaustion_reversal", 0) * effectiveness
-        final_exhaustion = max(0, twin.mean_exhaustion * (1 - reversal))
+        unmeasured: List[str] = []
+        if twin.mean_exhaustion is None:
+            # With no measured pre-treatment exhaustion there is no
+            # post-treatment exhaustion to report.
+            final_exhaustion = None
+            unmeasured.append("mean_exhaustion")
+        else:
+            final_exhaustion = max(0, twin.mean_exhaustion * (1 - reversal))
 
-        # irAE risk
-        irae = profile.get("irae_base_risk", 0.1) * (1 + twin.immune_cell_fraction)
+        # irAE risk. The patient-specific term needs a measured immune
+        # fraction. Without one, report the drug's base risk and name the
+        # missing input, rather than coalescing the absence to zero and
+        # presenting a population number as patient-specific.
+        irae_base = profile.get("irae_base_risk", 0.1)
+        if twin.immune_cell_fraction is None:
+            irae = irae_base
+            unmeasured.append("immune_cell_fraction")
+        else:
+            irae = irae_base * (1 + twin.immune_cell_fraction)
+        unmeasured.extend(self._unmeasured_for_class(profile, twin))
 
         return TreatmentResult(
             treatment_name=profile["name"],
@@ -306,7 +334,29 @@ class TreatmentSimulator:
             confidence=self._estimate_confidence(profile, twin),
             mechanism=profile["mechanism"],
             rationale=self._generate_rationale(profile, twin, effectiveness),
+            unmeasured_inputs=sorted(set(unmeasured)),
         )
+
+    @staticmethod
+    def _unmeasured_for_class(profile: Dict, twin) -> List[str]:
+        """Twin fields the effectiveness model for this class wanted.
+
+        Mirrors `_calculate_effectiveness`'s branch conditions, so the list
+        names inputs that genuinely would have moved this score rather than
+        every absent field.
+        """
+        treatment_class = profile.get("class", "")
+        missing: List[str] = []
+        if "PD-1" in treatment_class or "anti-PD" in treatment_class:
+            if twin.pd_l1_expression is None:
+                missing.append("pd_l1_expression")
+            if twin.t_cell_exhaustion_fraction is None:
+                missing.append("t_cell_exhaustion_fraction")
+        if "CTLA-4" in treatment_class and twin.treg_fraction is None:
+            missing.append("treg_fraction")
+        if "vaccine" in treatment_class and twin.mhc1_downregulation is None:
+            missing.append("mhc1_downregulation")
+        return missing
 
     def compare_treatments(self, treatment_keys: List[str],
                            twin: DigitalTwinConfig,
@@ -332,13 +382,17 @@ class TreatmentSimulator:
                 twin.tumor_mutational_burden >= 10.0 or
                 twin.microsatellite_instability == "MSI-H"):
             recommended.append("pembrolizumab")
-            if twin.treg_fraction > 0.2:
+            if twin.treg_fraction is not None and twin.treg_fraction > 0.2:
                 recommended.append("pembro_ipi_combo")
 
         # PARP for DNA repair defects
         if twin.has_dna_repair_defect:
             recommended.append("olaparib")
-            if twin.immune_score != "cold":
+            # Escalating to the checkpoint combination needs positive
+            # evidence of infiltration. `!= "cold"` treated an unmeasured
+            # microenvironment as grounds to escalate, which is the same
+            # defect this change exists to remove.
+            if twin.immune_score in ("hot", "suppressed"):
                 recommended.append("olaparib_pembro_combo")
 
         # AR therapy if AR mutation
@@ -349,7 +403,7 @@ class TreatmentSimulator:
         if twin.neoantigen_vaccine_candidate:
             recommended.append("neoantigen_vaccine")
             # Vaccine + checkpoint combo is the strongest approach
-            if twin.immune_score != "cold":
+            if twin.immune_score in ("hot", "suppressed"):
                 recommended.append("neoantigen_vaccine_pembro")
 
         # Combo for cold tumors
@@ -368,9 +422,13 @@ class TreatmentSimulator:
         if "PD-1" in treatment_class or "anti-PD" in treatment_class:
             # Anti-PD-1 effectiveness depends on:
             # - PD-L1 expression (higher → more responsive)
-            eff += 0.2 * twin.pd_l1_expression
+            # An unmeasured biomarker must neither raise nor lower the
+            # predicted effectiveness, so its term is skipped entirely.
+            if twin.pd_l1_expression is not None:
+                eff += 0.2 * twin.pd_l1_expression
             # - Exhausted T-cells to reactivate (need some, but not all)
-            if 0.2 < twin.t_cell_exhaustion_fraction < 0.8:
+            if (twin.t_cell_exhaustion_fraction is not None
+                    and 0.2 < twin.t_cell_exhaustion_fraction < 0.8):
                 eff += 0.15
             # - TMB (more neoantigens → more T-cell targets)
             eff += min(0.2, twin.tumor_mutational_burden / 50.0)
@@ -382,7 +440,8 @@ class TreatmentSimulator:
 
         if "CTLA-4" in treatment_class:
             # Anti-CTLA-4 works by depleting Tregs
-            eff += 0.2 * twin.treg_fraction  # More Tregs → more effect
+            if twin.treg_fraction is not None:
+                eff += 0.2 * twin.treg_fraction  # More Tregs → more effect
             eff += 0.1  # Priming enhancement
 
         if "PARP" in treatment_class:
@@ -420,7 +479,8 @@ class TreatmentSimulator:
                 eff -= 0.15  # Hard to activate cold tumors
 
             # MHC-I downregulation reduces vaccine efficacy
-            eff -= twin.mhc1_downregulation * 0.3
+            if twin.mhc1_downregulation is not None:
+                eff -= twin.mhc1_downregulation * 0.3
 
         # MSI-H boosts checkpoint response
         if twin.microsatellite_instability == "MSI-H":
@@ -550,7 +610,12 @@ class TreatmentSimulator:
         if twin.tumor_mutational_burden >= 10:
             parts.append(f"- High TMB ({twin.tumor_mutational_burden:.1f}/Mb) — more neoantigens")
 
-        if twin.t_cell_exhaustion_fraction > 0.3:
+        if twin.t_cell_exhaustion_fraction is None:
+            parts.append(
+                "- T-cell exhaustion not measured (no cell-state data); "
+                "no exhaustion term contributed to this estimate"
+            )
+        elif twin.t_cell_exhaustion_fraction > 0.3:
             parts.append(f"- {twin.t_cell_exhaustion_fraction:.0%} exhausted T-cells available for reactivation")
 
         if twin.has_dna_repair_defect and "PARP" in profile.get("class", ""):

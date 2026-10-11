@@ -25,10 +25,24 @@ log = logging.getLogger(__name__)
 
 class SegmentationMethod(Enum):
     """Available segmentation methods."""
-    OTSU = auto()           # Simple Otsu thresholding
-    WATERSHED = auto()      # Marker-controlled watershed
+    OTSU = auto()           # Otsu threshold + labelling, via scikit-image
+    WATERSHED = auto()      # Marker-controlled watershed, via scikit-image
     CELLPOSE = auto()       # Cellpose deep learning (if available)
     STARDIST = auto()       # StarDist deep learning (if available)
+    # What actually runs when scikit-image is absent: a hand-rolled Otsu
+    # threshold plus BFS labelling, needing only numpy. It must be
+    # nameable, or a result cannot report it truthfully.
+    BASIC_THRESHOLD = auto()
+
+
+class SegmentationUnavailable(RuntimeError):
+    """A segmentation method was requested that cannot run here.
+
+    Raised instead of quietly substituting a different algorithm. An Otsu
+    threshold is not an approximation of a Cellpose model, and a result
+    labelled CELLPOSE that came from thresholding cannot be reviewed,
+    reproduced, or compared against a published benchmark.
+    """
 
 
 @dataclass
@@ -79,7 +93,14 @@ class SegmentationResult:
     cell_properties : List[CellProperties]
         Properties for each cell
     method : SegmentationMethod
-        Method used for segmentation
+        The method that actually produced these labels -- NOT the one that
+        was requested. `fallback_from` carries the request when they differ.
+    fallback_from : Optional[SegmentationMethod]
+        The requested method, when something else ran. None if the
+        requested method ran.
+    morphology_measured : bool
+        False when eccentricity and solidity are dataclass defaults rather
+        than measurements, because scikit-image was unavailable.
     parameters : Dict[str, Any]
         Parameters used
     """
@@ -87,7 +108,14 @@ class SegmentationResult:
     n_cells: int
     cell_properties: List[CellProperties] = field(default_factory=list)
     method: SegmentationMethod = SegmentationMethod.WATERSHED
+    fallback_from: Optional[SegmentationMethod] = None
+    morphology_measured: bool = False
     parameters: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_fallback(self) -> bool:
+        """True when a method other than the requested one produced these."""
+        return self.fallback_from is not None
 
     @property
     def is_3d(self) -> bool:
@@ -120,25 +148,48 @@ class CellSegmenter:
     >>> print(f"Found {result.n_cells} cells")
     """
 
+    METHOD_NAMES = {
+        'watershed': SegmentationMethod.WATERSHED,
+        'otsu': SegmentationMethod.OTSU,
+        'cellpose': SegmentationMethod.CELLPOSE,
+        'stardist': SegmentationMethod.STARDIST,
+        'basic_threshold': SegmentationMethod.BASIC_THRESHOLD,
+    }
+
+    #: Methods whose output no other method here approximates. Falling back
+    #: from one of these would substitute classical intensity thresholding
+    #: for a learned instance segmenter, so it is refused instead. The
+    #: classical trio may substitute for each other, because they are the
+    #: same kind of algorithm and the result now says which one ran.
+    NO_SUBSTITUTE = (SegmentationMethod.CELLPOSE, SegmentationMethod.STARDIST)
+
     def __init__(
         self,
         method: Union[str, SegmentationMethod] = 'watershed',
         min_size: int = 100,
         max_size: int = 50000,
+        allow_fallback: bool = True,
     ):
         if isinstance(method, str):
-            method_map = {
-                'watershed': SegmentationMethod.WATERSHED,
-                'otsu': SegmentationMethod.OTSU,
-                'cellpose': SegmentationMethod.CELLPOSE,
-                'stardist': SegmentationMethod.STARDIST,
-            }
-            self.method = method_map.get(method.lower(), SegmentationMethod.WATERSHED)
+            try:
+                self.method = self.METHOD_NAMES[method.lower()]
+            except KeyError:
+                # `.get(..., WATERSHED)` turned CellSegmenter('cellpoze')
+                # into a silent watershed run: a typo became a different
+                # algorithm with no diagnostic anywhere.
+                raise ValueError(
+                    f"Unknown segmentation method {method!r}. "
+                    f"Available: {sorted(self.METHOD_NAMES)}"
+                ) from None
         else:
             self.method = method
 
         self.min_size = min_size
         self.max_size = max_size
+        self.allow_fallback = allow_fallback
+        #: Set by whichever leaf actually produced the labels; see segment().
+        self._ran: Optional[SegmentationMethod] = None
+        self._morphology_measured = False
 
     def segment(
         self,
@@ -182,6 +233,25 @@ class CellSegmenter:
         else:
             raise ValueError(f"Unsupported image dimensions: {image.ndim}")
 
+        # Each leaf sets self._ran to the algorithm it actually ran, so the
+        # result reports that rather than the request. Reset per call, or a
+        # reused segmenter carries a stale answer.
+        self._ran = None
+
+        if (self.method in self.NO_SUBSTITUTE
+                and not self._method_available(self.method)):
+            raise SegmentationUnavailable(
+                f"{self.method.name} was requested but is not installed, and "
+                f"no available method approximates it. Install the imaging "
+                f"extras (requirements.imaging.txt), or request "
+                f"'otsu'/'watershed' explicitly."
+            )
+        if not self.allow_fallback and not self._method_available(self.method):
+            raise SegmentationUnavailable(
+                f"{self.method.name} was requested with allow_fallback=False "
+                f"but its dependencies are not installed."
+            )
+
         # Dispatch to method
         if self.method == SegmentationMethod.OTSU:
             labels = self._segment_otsu(img, **kwargs)
@@ -191,8 +261,13 @@ class CellSegmenter:
             labels = self._segment_cellpose(img, **kwargs)
         elif self.method == SegmentationMethod.STARDIST:
             labels = self._segment_stardist(img, **kwargs)
+        elif self.method == SegmentationMethod.BASIC_THRESHOLD:
+            labels = self._segment_basic_threshold(img)
+            self._ran = SegmentationMethod.BASIC_THRESHOLD
         else:
             labels = self._segment_watershed(img, markers, **kwargs)
+
+        ran = self._ran or self.method
 
         # Filter by size
         labels = self._filter_by_size(labels)
@@ -200,13 +275,47 @@ class CellSegmenter:
         # Compute properties
         properties = self._compute_properties(labels, img)
 
+        if ran is not self.method:
+            log.warning(
+                "%s was requested but %s ran; result.method reports %s and "
+                "result.fallback_from reports %s",
+                self.method.name, ran.name, ran.name, self.method.name,
+            )
+
         return SegmentationResult(
             labels=labels,
             n_cells=len(properties),
             cell_properties=properties,
-            method=self.method,
+            method=ran,
+            fallback_from=None if ran is self.method else self.method,
+            morphology_measured=self._morphology_measured,
             parameters={'min_size': self.min_size, 'max_size': self.max_size},
         )
+
+    @staticmethod
+    def _method_available(method: "SegmentationMethod") -> bool:
+        """Whether `method` can actually run in this interpreter.
+
+        Checked with find_spec rather than by importing, so refusing a
+        request costs nothing and does not depend on reaching the leaf.
+        """
+        import importlib.util as _u
+
+        def have(mod: str) -> bool:
+            try:
+                return _u.find_spec(mod) is not None
+            except (ImportError, ValueError):
+                return False
+
+        if method == SegmentationMethod.CELLPOSE:
+            return have("cellpose")
+        if method == SegmentationMethod.STARDIST:
+            return have("stardist")
+        if method == SegmentationMethod.OTSU:
+            return have("skimage")
+        if method == SegmentationMethod.WATERSHED:
+            return have("skimage") and have("scipy")
+        return True  # BASIC_THRESHOLD needs only numpy
 
     def _segment_otsu(self, image: np.ndarray, **kwargs) -> np.ndarray:
         """Simple Otsu thresholding segmentation."""
@@ -225,11 +334,17 @@ class CellSegmenter:
             # Label connected components
             labels = label(binary)
 
+            self._ran = SegmentationMethod.OTSU
             return labels.astype(np.int32)
 
         except ImportError:
+            # Note this path is a *different algorithm* from scikit-image
+            # Otsu (manual histogram, no remove_small_objects), so reporting
+            # OTSU here was a mislabelling too.
             log.warning("scikit-image not available, using basic thresholding")
-            return self._segment_basic_threshold(image)
+            labels = self._segment_basic_threshold(image)
+            self._ran = SegmentationMethod.BASIC_THRESHOLD
+            return labels
 
     def _segment_basic_threshold(self, image: np.ndarray) -> np.ndarray:
         """Basic thresholding without scipy/skimage."""
@@ -316,6 +431,7 @@ class CellSegmenter:
             # Watershed
             labels = watershed(-smoothed, markers, mask=image > 0)
 
+            self._ran = SegmentationMethod.WATERSHED
             return labels.astype(np.int32)
 
         except ImportError:
@@ -330,11 +446,18 @@ class CellSegmenter:
             model = models.Cellpose(model_type='cyto')
             masks, _, _, _ = model.eval(image, diameter=30, channels=[0, 0])
 
+            self._ran = SegmentationMethod.CELLPOSE
             return masks.astype(np.int32)
 
         except ImportError:
-            log.warning("Cellpose not available, falling back to watershed")
-            return self._segment_watershed(image, **kwargs)
+            # Unreachable via segment(), which refuses this request up
+            # front; kept so a direct call cannot mislabel either.
+            raise SegmentationUnavailable(
+                "Cellpose was requested but is not installed. Classical "
+                "thresholding is not a substitute for a learned instance "
+                "segmenter; install the imaging extras, or request "
+                "'otsu'/'watershed' explicitly."
+            ) from None
 
     def _segment_stardist(self, image: np.ndarray, **kwargs) -> np.ndarray:
         """Segment using StarDist (if available)."""
@@ -344,11 +467,16 @@ class CellSegmenter:
             model = StarDist2D.from_pretrained('2D_versatile_fluo')
             labels, _ = model.predict_instances(image)
 
+            self._ran = SegmentationMethod.STARDIST
             return labels.astype(np.int32)
 
         except ImportError:
-            log.warning("StarDist not available, falling back to watershed")
-            return self._segment_watershed(image, **kwargs)
+            raise SegmentationUnavailable(
+                "StarDist was requested but is not installed. Classical "
+                "thresholding is not a substitute for a learned instance "
+                "segmenter; install the imaging extras, or request "
+                "'otsu'/'watershed' explicitly."
+            ) from None
 
     def _filter_by_size(self, labels: np.ndarray) -> np.ndarray:
         """Remove objects outside size range."""
@@ -383,6 +511,8 @@ class CellSegmenter:
     ) -> List[CellProperties]:
         """Compute properties for each labeled region."""
         properties = []
+        # Reset per call so a reused segmenter cannot carry a stale True.
+        self._morphology_measured = False
 
         try:
             from skimage.measure import regionprops
@@ -401,9 +531,18 @@ class CellSegmenter:
                     mean_intensity=region.mean_intensity if intensity_image is not None else None,
                 )
                 properties.append(props)
+            self._morphology_measured = True
 
         except ImportError:
-            # Manual computation without skimage
+            # Manual computation without skimage. eccentricity and solidity
+            # are left at their dataclass defaults and are NOT measurements
+            # of anything; `morphology_measured` records that. A reader
+            # plotting them would otherwise get a column of 0.0 and 1.0 that
+            # looks like a perfectly circular, perfectly solid population.
+            log.warning(
+                "scikit-image absent: eccentricity and solidity are not "
+                "computed and remain at their defaults (0.0 and 1.0)"
+            )
             unique_labels = np.unique(labels)
             unique_labels = unique_labels[unique_labels > 0]
 

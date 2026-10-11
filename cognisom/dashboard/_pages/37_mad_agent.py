@@ -194,6 +194,7 @@ with tab_board:
                 genomics_opinion=genomics_opinion,
                 immune_opinion=immune_opinion,
                 clinical_opinion=clinical_opinion,
+                twin=twin,
             )
 
             elapsed = time.time() - start_time
@@ -267,7 +268,8 @@ with tab_board:
                     )
                     if ranking.contributions:
                         for c in ranking.contributions[:3]:
-                            icon = "↑" if c.direction == "positive" else "↓"
+                            icon = {"positive": "↑", "negative": "↓"}.get(
+                                c.direction, "·")
                             st.caption(f"  {icon} {c.description}")
 
                 if opinion.dissenting_notes:

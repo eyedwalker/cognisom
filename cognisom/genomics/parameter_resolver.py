@@ -32,8 +32,84 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from cognisom.library.store import EntityStore
+from cognisom.library.parameters import Provenance, get_parameter
 
 log = logging.getLogger(__name__)
+
+# (entity name, field) pairs already reported, so a resolver used inside a
+# loop warns once per missing number rather than once per call.
+_MISSING_REPORTED: set = set()
+
+
+def reset_missing_log() -> None:
+    """Forget which absences have been reported. For tests."""
+    _MISSING_REPORTED.clear()
+
+
+GENE_EFFECT_FIELDS = (
+    "mhc1_downregulation_effect", "tumor_growth_multiplier",
+    "pd_l1_effect", "pi3k_pathway_activation",
+)
+
+CELL_PARAM_FIELDS = (
+    "division_time_hours", "apoptosis_rate_per_hour",
+    "migration_speed_um_per_min", "oxygen_consumption_rate",
+    "glucose_consumption_rate", "detection_radius_um",
+    "kill_radius_um", "kill_probability", "exhaustion_rate",
+)
+
+#: Fields only a cytotoxic-effector row carries. Used to break the
+#: cell_type / immune_cell name collision toward the row that can answer.
+CYTOTOXIC_FIELDS = ("kill_probability", "detection_radius_um", "exhaustion_rate")
+
+METABOLITE_PARAM_FIELDS = (
+    "diffusion_coefficient_m2_per_s", "normal_concentration_mM",
+    "critical_low_mM",
+)
+
+
+def _resolve(entity, field: str) -> Optional[float]:
+    """The entity's value for `field`, or None if it has none.
+
+    Goes through `library.parameters.get_parameter` rather than reading
+    `physics_params` directly, because that is the only reader which can
+    tell a curated value from a type-level default stamped in by
+    enrichment. It never substitutes a literal: a plausible number
+    standing in for an absent one is the defect this function removes.
+
+    A value genuinely stored as 0.0 is returned as 0.0, so a measured
+    zero and an absent field stay distinguishable in both directions.
+    """
+    pv = get_parameter(entity, field)
+    if pv is None:
+        key = (getattr(entity, "name", "?"), field)
+        if key not in _MISSING_REPORTED:
+            _MISSING_REPORTED.add(key)
+            log.warning(
+                "%s has no value for %r; omitting it rather than "
+                "substituting a default", key[0], field,
+            )
+        return None
+    return pv.value
+
+
+def _provenance_of(entity, fields) -> str:
+    """Worst provenance among the fields actually present on `entity`.
+
+    Today this returns ':placeholder' for every entity in the library --
+    0 of 294 entities carry a provenance sidecar and 665 of 665
+    parameters resolve as PLACEHOLDER. That label is the point:
+    `_source: entity_library` claimed a curation that exists nowhere yet.
+    """
+    levels = [
+        pv.provenance for pv in (get_parameter(entity, f) for f in fields)
+        if pv is not None
+    ]
+    if not levels:
+        return "absent"
+    if Provenance.PLACEHOLDER in levels:
+        return "entity_library:placeholder"
+    return "entity_library:curated"
 
 
 class SimulationParameterResolver:
@@ -144,7 +220,7 @@ class SimulationParameterResolver:
 
     # ── Gene Immune Effects ─────────────────────────────────────────
 
-    def get_gene_immune_effect(self, gene_name: str) -> Dict[str, float]:
+    def get_gene_immune_effect(self, gene_name: str) -> Dict[str, Any]:
         """Get immune-related effects of a gene mutation.
 
         Returns dict with:
@@ -157,42 +233,105 @@ class SimulationParameterResolver:
 
         gene = self.store.find_entity_by_name(gene_name, "gene")
         if not gene:
-            return {"mhc1_downregulation_effect": 0.0, "tumor_growth_multiplier": 1.0}
+            # The old miss-return was the worst case in this file:
+            # `tumor_growth_multiplier: 1.0` for an unknown gene is not a
+            # neutral placeholder, it is a positive assertion that the
+            # mutation does not affect growth.
+            #
+            # DEBUG, not WARNING: an exome-wide VCF reaches here for
+            # thousands of genes and the library holds 20. The aggregate in
+            # `get_gene_effects_for_mutations` warns once with a count,
+            # which is the readable form of the same fact.
+            log.debug(
+                "No gene entity named %r in the library; reporting no "
+                "effects rather than neutral ones", gene_name,
+            )
+            self._gene_cache[gene_name] = {"_source": "absent"}
+            return self._gene_cache[gene_name]
 
-        pp = gene.physics_params if hasattr(gene, "physics_params") else {}
-
+        # Keys are omitted rather than set to None, so existing
+        # `.get(key, default)` callers keep working and a caller that wants
+        # to know whether a value exists can ask with `in`.
         effect = {
-            "mhc1_downregulation_effect": pp.get("mhc1_downregulation_effect", 0.0),
-            "tumor_growth_multiplier": pp.get("tumor_growth_multiplier", 1.0),
-            "pd_l1_effect": pp.get("pd_l1_effect", 0.0),
-            "pi3k_pathway_activation": pp.get("pi3k_pathway_activation", 0.0),
-            "_source": "entity_library",
+            f: v for f, v in (
+                (f, _resolve(gene, f)) for f in GENE_EFFECT_FIELDS
+            ) if v is not None
         }
+        effect["_source"] = _provenance_of(gene, GENE_EFFECT_FIELDS)
 
         self._gene_cache[gene_name] = effect
         return effect
 
     def get_gene_effects_for_mutations(
         self, mutated_genes: List[str]
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """Aggregate immune effects across all mutated genes.
 
         Returns combined MHC-I downregulation, tumor growth multiplier,
         and other effects.
         """
+        # An empty gene list is a DIFFERENT absence: it means annotation
+        # ran and found nothing to report, so zero effect is the correct
+        # answer. Only genes that exist but carry no value are "unknown".
+        if not mutated_genes:
+            return {
+                "mhc1_downregulation": 0.0,
+                "tumor_growth_multiplier": 1.0,
+                "_source": "no_mutations",
+                "_genes": [],
+                "_contributing_genes": [],
+                "_unresolved_genes": [],
+            }
+
         total_mhc1_down = 0.0
         growth_multiplier = 1.0
+        contributing: List[str] = []
+        unresolved: List[str] = []
 
         for gene_name in mutated_genes:
             effect = self.get_gene_immune_effect(gene_name)
-            total_mhc1_down += effect.get("mhc1_downregulation_effect", 0.0)
-            growth_multiplier *= effect.get("tumor_growth_multiplier", 1.0)
+            mhc1 = effect.get("mhc1_downregulation_effect")
+            growth = effect.get("tumor_growth_multiplier")
+            if mhc1 is None and growth is None:
+                unresolved.append(gene_name)
+                continue
+            contributing.append(gene_name)
+            total_mhc1_down += mhc1 or 0.0
+            growth_multiplier *= 1.0 if growth is None else growth
+
+        if unresolved:
+            # One line per call, with a count, instead of one per gene.
+            log.warning(
+                "%d of %d mutated genes carry no immune annotation in the "
+                "library (first few: %s); their contribution is reported as "
+                "absent, not as zero",
+                len(unresolved), len(mutated_genes), unresolved[:5],
+            )
 
         return {
-            "mhc1_downregulation": min(1.0, total_mhc1_down),
-            "tumor_growth_multiplier": growth_multiplier,
-            "_source": "entity_library",
-            "_genes": mutated_genes,
+            # None, not 0.0, when no mutated gene carried a value: a tumor
+            # whose genes are all uncurated is not a tumor with intact
+            # MHC-I. The library holds 20 prostate genes, so a patient from
+            # another tissue routinely lands here.
+            "mhc1_downregulation": (
+                min(1.0, total_mhc1_down) if contributing else None
+            ),
+            "tumor_growth_multiplier": growth_multiplier if contributing else None,
+            # The aggregate inherits the provenance of the rows that
+            # contributed, so a consumer can see that the number rests on
+            # uncurated stamps rather than on curation.
+            "_source": (
+                _provenance_of(
+                    self.store.find_entity_by_name(contributing[0], "gene"),
+                    GENE_EFFECT_FIELDS,
+                ) if contributing else "absent"
+            ),
+            "_genes": list(mutated_genes),
+            # What makes the aggregate auditable: without these, a 37-gene
+            # panel with one hit and a 1-gene panel with one hit produce
+            # indistinguishable output.
+            "_contributing_genes": contributing,
+            "_unresolved_genes": unresolved,
         }
 
     # ── Cell Type Parameters ────────────────────────────────────────
@@ -203,42 +342,70 @@ class SimulationParameterResolver:
         Returns division time, migration speed, oxygen consumption, etc.
         from the cell type entity in the library.
         """
-        # Search both cell_type and immune_cell
-        cell = self.store.find_entity_by_name(cell_name, "cell_type")
-        if not cell:
-            cell = self.store.find_entity_by_name(cell_name, "immune_cell")
-        if not cell:
+        # A name can exist as BOTH a cell_type and an immune_cell row
+        # ("NK cell" is the only such collision in the shipped library).
+        # Querying cell_type first reported an NK cell with no
+        # kill_probability, and the hardcoded 0.0 below then presented it as
+        # a cell that cannot kill anything. Prefer the row that actually
+        # carries cytotoxic parameters, and record both which row answered
+        # and that the name was ambiguous.
+        as_immune = self.store.find_entity_by_name(cell_name, "immune_cell")
+        as_cell = self.store.find_entity_by_name(cell_name, "cell_type")
+        cytotoxic = as_immune is not None and any(
+            get_parameter(as_immune, f) is not None for f in CYTOTOXIC_FIELDS
+        )
+        cell = as_immune if cytotoxic else (as_cell or as_immune)
+        if cell is None:
+            log.warning(
+                "No cell_type or immune_cell entity named %r in the "
+                "library; returning no parameters", cell_name,
+            )
             return {}
 
-        pp = cell.physics_params if hasattr(cell, "physics_params") else {}
-        return {
-            "division_time_hours": pp.get("division_time_hours", 24.0),
-            "apoptosis_rate_per_hour": pp.get("apoptosis_rate_per_hour", 0.001),
-            "migration_speed_um_per_min": pp.get("migration_speed_um_per_min", 0.5),
-            "oxygen_consumption_rate": pp.get("oxygen_consumption_rate", 0.05),
-            "glucose_consumption_rate": pp.get("glucose_consumption_rate", 0.02),
-            "detection_radius_um": pp.get("detection_radius_um", 0.0),
-            "kill_radius_um": pp.get("kill_radius_um", 0.0),
-            "kill_probability": pp.get("kill_probability", 0.0),
-            "exhaustion_rate": pp.get("exhaustion_rate", 0.0),
-            "_source": "entity_library",
+        params = {
+            f: v for f, v in (
+                (f, _resolve(cell, f)) for f in CELL_PARAM_FIELDS
+            ) if v is not None
         }
+        params["_entity_type"] = cell.entity_type.value
+        if as_immune is not None and as_cell is not None:
+            other = as_cell if cell is as_immune else as_immune
+            params["_shadowed_by"] = other.entity_type.value
+            key = (cell_name, "__ambiguous_entity_type__")
+            if key not in _MISSING_REPORTED:
+                _MISSING_REPORTED.add(key)
+                log.warning(
+                    "%r exists as both an immune_cell and a cell_type "
+                    "entity; answering from the %s row. Resolve the "
+                    "duplicate in the library.",
+                    cell_name, cell.entity_type.value,
+                )
+        params["_source"] = _provenance_of(cell, CELL_PARAM_FIELDS)
+        return params
 
     # ── Metabolite Parameters ───────────────────────────────────────
 
-    def get_metabolite_params(self, metabolite_name: str) -> Dict[str, float]:
+    def get_metabolite_params(self, metabolite_name: str) -> Dict[str, Any]:
         """Get diffusion and concentration parameters for a metabolite."""
         met = self.store.find_entity_by_name(metabolite_name, "metabolite")
         if not met:
+            log.warning(
+                "No metabolite entity named %r in the library; returning "
+                "no parameters", metabolite_name,
+            )
             return {}
 
-        pp = met.physics_params if hasattr(met, "physics_params") else {}
-        return {
-            "diffusion_coefficient_m2_per_s": pp.get("diffusion_coefficient_m2_per_s", 1e-9),
-            "normal_concentration_mM": pp.get("normal_concentration_mM", 5.0),
-            "critical_low_mM": pp.get("critical_low_mM", 0.5),
-            "_source": "entity_library",
+        # NOTE what this does NOT fix: all 12 metabolites carry the same
+        # stamped 1e-9 m^2/s and 5.0 mM, so they still return those --
+        # now correctly labelled placeholder. The label is the deliverable
+        # here; the values still need curation.
+        params = {
+            f: v for f, v in (
+                (f, _resolve(met, f)) for f in METABOLITE_PARAM_FIELDS
+            ) if v is not None
         }
+        params["_source"] = _provenance_of(met, METABOLITE_PARAM_FIELDS)
+        return params
 
     # ── Cache Management ────────────────────────────────────────────
 
@@ -246,6 +413,7 @@ class SimulationParameterResolver:
         """Clear all cached lookups (call after entity modifications)."""
         self._profile_cache = None
         self._gene_cache.clear()
+        _MISSING_REPORTED.clear()
 
 
 def _normalize_drug_key(name: str) -> str:

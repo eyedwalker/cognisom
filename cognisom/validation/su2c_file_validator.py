@@ -85,7 +85,7 @@ class SU2CValidationResult:
     n_mutations_parsed: int = 0
     n_drivers: int = 0
     predicted_tmb: float = 0.0
-    predicted_mhc1_downreg: float = 0.0
+    predicted_mhc1_downreg: Optional[float] = None
     predicted_best_treatment: str = ""
     predicted_best_response: str = ""
     predicted_vaccine_eligible: bool = False

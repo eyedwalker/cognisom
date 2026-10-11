@@ -131,11 +131,15 @@ with col2:
 with col3:
     st.metric("MSI", twin.microsatellite_instability)
 with col4:
-    st.metric("Exhaustion", f"{twin.mean_exhaustion:.0%}")
+    st.metric("Exhaustion",
+              "not measured" if twin.mean_exhaustion is None
+              else f"{twin.mean_exhaustion:.0%}")
 with col5:
     st.metric("Neoantigens", f"~{twin.neoantigen_count}")
 with col6:
-    st.metric("PD-L1", f"{twin.pd_l1_expression:.0%}")
+    st.metric("PD-L1",
+              "not measured" if twin.pd_l1_expression is None
+              else f"{twin.pd_l1_expression:.0%}")
 
 # Genomic vulnerabilities
 st.subheader("Genomic Vulnerabilities")
@@ -145,7 +149,9 @@ vulnerabilities = [
     ("DNA Repair Defect", twin.has_dna_repair_defect, "PARP inhibitors"),
     ("AR Mutation", twin.has_ar_mutation, "AR antagonists (resistance risk)"),
     ("PTEN Loss", twin.has_pten_loss, "PI3K/AKT inhibitors"),
-    ("MHC-I Loss", twin.mhc1_downregulation > 0.3, "NK cell therapy"),
+    ("MHC-I Loss",
+     twin.mhc1_downregulation is not None and twin.mhc1_downregulation > 0.3,
+     "NK cell therapy"),
     ("TMB-High", twin.tumor_mutational_burden >= 10, "Checkpoint inhibitors"),
 ]
 
@@ -274,7 +280,9 @@ if results:
             with col_d2:
                 st.metric("Best Response", f"{(1 - result.best_response) * 100:.0f}% reduction")
                 st.metric("PFS", f"{result.progression_free_days} days")
-                st.metric("Post-treatment Exhaustion", f"{result.final_exhaustion:.2f}")
+                st.metric("Post-treatment Exhaustion",
+                          "not measured" if result.final_exhaustion is None
+                          else f"{result.final_exhaustion:.2f}")
 
 # ─────────────────────────────────────────────────────────────────────────
 # THERAPY RECOMMENDATIONS (from genomic profile)

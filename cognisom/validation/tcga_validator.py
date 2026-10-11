@@ -118,7 +118,7 @@ class ValidationResult:
     pfs_months: float = 0.0
     # Cognisom predictions
     predicted_tmb: float = 0.0
-    predicted_mhc1_downreg: float = 0.0
+    predicted_mhc1_downreg: Optional[float] = None
     predicted_best_treatment: str = ""
     predicted_best_response: str = ""
     predicted_vaccine_eligible: bool = False

@@ -36,6 +36,7 @@ from .segmentation import (
     SegmentationResult,
     CellProperties,
     SegmentationMethod,
+    SegmentationUnavailable,
 )
 from .mesh_generation import (
     MeshGenerator,
@@ -62,6 +63,7 @@ __all__ = [
     "SegmentationResult",
     "CellProperties",
     "SegmentationMethod",
+    "SegmentationUnavailable",
     # Mesh generation
     "MeshGenerator",
     "SimulationMesh",

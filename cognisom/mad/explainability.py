@@ -82,16 +82,30 @@ def explain_effectiveness(
     # --- Anti-PD-1 branch ---
     if "PD-1" in treatment_class or "anti-PD" in treatment_class:
         # PD-L1 expression
-        pd_l1 = getattr(twin, "pd_l1_expression", 0.5)
-        delta = 0.2 * pd_l1
-        contributions.append(FeatureContribution(
-            "pd_l1_expression", round(delta, 4), "positive",
-            f"PD-L1 expression {pd_l1:.0%} contributes to anti-PD-1 response",
-        ))
+        pd_l1 = getattr(twin, "pd_l1_expression", None)
+        if pd_l1 is None:
+            # Emitted explicitly rather than omitted: a clinician reading
+            # the decomposition should see that PD-L1 was considered and
+            # found absent, not find it silently missing from the list.
+            contributions.append(FeatureContribution(
+                "pd_l1_expression", 0.0, "neutral",
+                "PD-L1 expression not measured — contributes nothing to this score",
+            ))
+        else:
+            delta = 0.2 * pd_l1
+            contributions.append(FeatureContribution(
+                "pd_l1_expression", round(delta, 4), "positive",
+                f"PD-L1 expression {pd_l1:.0%} contributes to anti-PD-1 response",
+            ))
 
         # Exhaustion window
-        exhaustion = getattr(twin, "t_cell_exhaustion_fraction", 0.0)
-        if 0.2 < exhaustion < 0.8:
+        exhaustion = getattr(twin, "t_cell_exhaustion_fraction", None)
+        if exhaustion is None:
+            contributions.append(FeatureContribution(
+                "exhaustion_window", 0.0, "neutral",
+                "T-cell exhaustion not measured — contributes nothing to this score",
+            ))
+        elif 0.2 < exhaustion < 0.8:
             contributions.append(FeatureContribution(
                 "exhaustion_window", 0.15, "positive",
                 f"T-cell exhaustion {exhaustion:.0%} in reactivation window (20-80%)",
@@ -120,12 +134,18 @@ def explain_effectiveness(
 
     # --- Anti-CTLA-4 branch ---
     if "CTLA-4" in treatment_class:
-        treg = getattr(twin, "treg_fraction", 0.0)
-        delta = 0.2 * treg
-        contributions.append(FeatureContribution(
-            "treg_depletion_target", round(delta, 4), "positive",
-            f"Treg fraction {treg:.0%} — target for anti-CTLA-4 depletion",
-        ))
+        treg = getattr(twin, "treg_fraction", None)
+        if treg is None:
+            contributions.append(FeatureContribution(
+                "treg_depletion_target", 0.0, "neutral",
+                "Treg fraction not measured — contributes nothing to this score",
+            ))
+        else:
+            delta = 0.2 * treg
+            contributions.append(FeatureContribution(
+                "treg_depletion_target", round(delta, 4), "positive",
+                f"Treg fraction {treg:.0%} — target for anti-CTLA-4 depletion",
+            ))
         contributions.append(FeatureContribution(
             "priming_enhancement", 0.10, "positive",
             "Anti-CTLA-4 enhances T-cell priming in lymph nodes",
@@ -202,8 +222,8 @@ def explain_effectiveness(
                 "Cold tumor — vaccine-primed T-cells may not infiltrate",
             ))
 
-        mhc1_down = getattr(twin, "mhc1_downregulation", 0.0)
-        if mhc1_down > 0:
+        mhc1_down = getattr(twin, "mhc1_downregulation", None)
+        if mhc1_down is not None and mhc1_down > 0:
             delta = -mhc1_down * 0.3
             contributions.append(FeatureContribution(
                 "mhc1_downregulation", round(delta, 4), "negative",
