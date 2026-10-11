@@ -136,15 +136,33 @@ CHECKPOINT_TRIALS: Dict[str, EvidenceItem] = {
         source_id="NCT02628067",
         claim="Pembrolizumab in TMB-H (>=10 mut/Mb) solid tumors: ORR 29%",
         strength="2A",
-        supporting_data={"ORR_TMB_high": 0.29, "median_PFS_months": 4.1},
+        # ORR 29% (95% CI 21-39) is the FDA-approval analysis over the 102
+        # TMB-high patients of 755 with evaluable TMB. Median PFS in that
+        # group is 2.1 months (95% CI 2.1-3.7) -- the same median as the
+        # TMB-low group, with the separation showing in the 12- and
+        # 24-month rates rather than the median. This read 4.1, which is
+        # not a published KEYNOTE-158 figure.
+        supporting_data={"ORR_TMB_high": 0.29, "median_PFS_months": 2.1},
     ),
     "checkmate_650": EvidenceItem(
         source_type="clinical_trial",
         source_name="CheckMate-650",
         source_id="NCT02985957",
-        claim="Nivolumab + ipilimumab in mCRPC: ORR 25% in post-chemo, 10% in pre-chemo",
+        # The cohorts were assigned backwards here. Sharma et al. report ORR
+        # 25% in the PRE-chemotherapy cohort (cohort 1, chemo-naive) and 10%
+        # in the POST-chemotherapy cohort (cohort 2), with median rPFS 5.5 vs
+        # 3.8 months and median OS 19.0 vs 15.2. Stating it the other way round
+        # inverts the clinical message: it implied the combination works better
+        # after chemotherapy has failed, when the published result is the
+        # opposite.
+        claim="Nivolumab + ipilimumab in mCRPC: ORR 25% pre-chemo, 10% post-chemo",
         strength="2B",
-        supporting_data={"ORR_post_chemo": 0.25, "ORR_pre_chemo": 0.10},
+        supporting_data={
+            "ORR_pre_chemo": 0.25,
+            "ORR_post_chemo": 0.10,
+            "median_rPFS_months_pre_chemo": 5.5,
+            "median_rPFS_months_post_chemo": 3.8,
+        },
     ),
 }
 
