@@ -448,7 +448,7 @@ class EntityEnricher:
             if existing:
                 return existing if isinstance(existing, Pathway) else None
 
-        existing = self.store.find_entity_by_name(name, "pathway")
+        existing = self.store.find_active_entity_by_identity(name, "pathway")
         if existing:
             return existing if isinstance(existing, Pathway) else None
 

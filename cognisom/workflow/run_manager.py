@@ -129,7 +129,10 @@ class RunManager:
         )
         run.artifacts_dir = str(self._artifacts.run_dir(run.entity_id))
 
-        self._store.add_entity(run)
+        if not self._store.add_entity(run):
+            raise RuntimeError(
+                f"Failed to persist run '{run.name}' ({run.entity_id})"
+            )
 
         # Create relationship: run -> scenario
         from cognisom.library.models import Relationship

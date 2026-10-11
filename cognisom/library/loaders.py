@@ -111,7 +111,13 @@ class EntityLoader:
                 tags=["prostate_cancer"] if gene_type else [],
             )
 
-            self.store.add_entity(gene)
+            if not self.store.add_entity(gene):
+                existing = self.store.find_active_entity_by_identity(symbol, "gene")
+                if existing is not None:
+                    log.info("Gene %s already present — reusing", symbol)
+                    return existing
+                log.error("Failed to store gene %s", symbol)
+                return None
             log.info("Loaded gene: %s (NCBI:%s)", symbol, gene_id)
             return gene
         except Exception as e:
@@ -188,7 +194,15 @@ class EntityLoader:
                 tags=["prostate_cancer"],
             )
 
-            self.store.add_entity(protein)
+            if not self.store.add_entity(protein):
+                existing = self.store.find_active_entity_by_identity(
+                    prot_name, "protein"
+                )
+                if existing is not None:
+                    log.info("Protein %s already present — reusing", prot_name)
+                    return existing
+                log.error("Failed to store protein %s", prot_name)
+                return None
             log.info("Loaded protein: %s (UniProt:%s)", prot_name, accession)
             return protein
         except Exception as e:
@@ -277,7 +291,8 @@ class EntityLoader:
             source="manual",
             tags=tags or ["prostate_cancer"],
         )
-        self.store.add_entity(drug)
+        if not self.store.add_entity(drug):
+            return self.store.find_active_entity_by_identity(drug.name, "drug")
         return drug
 
     def add_mutation(

@@ -114,9 +114,14 @@ with tab_scenario:
                 initial_cell_counts=SCENARIOS[preset].get("cellular", {}),
                 created_by=user.username if user else "researcher",
             )
-            store.add_entity(scenario)
-            st.success(f"Created scenario: **{scenario_name}** ({scenario.entity_id[:8]}...)")
-            st.session_state["last_scenario_id"] = scenario.entity_id
+            if store.add_entity(scenario):
+                st.success(f"Created scenario: **{scenario_name}** ({scenario.entity_id[:8]}...)")
+                st.session_state["last_scenario_id"] = scenario.entity_id
+            else:
+                st.error(
+                    f"Could not save scenario **{scenario_name}** — nothing was "
+                    f"created. See the application log."
+                )
 
     with col_existing:
         st.markdown("**Existing Scenarios**")

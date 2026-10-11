@@ -470,8 +470,8 @@ def _seed_immune_cell_types(store: EntityStore) -> int:
             tags=["immunology", itype, subtype],
             **params,
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -769,8 +769,8 @@ def _seed_cytokines(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "cytokine", family],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -919,8 +919,8 @@ def _seed_pathogens_viruses(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "pathogen", "virus", family],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1084,8 +1084,8 @@ def _seed_pathogens_bacteria(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "pathogen", "bacterium"],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1223,8 +1223,8 @@ def _seed_antibody_types(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "antibody", isotype],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1398,8 +1398,8 @@ def _seed_complement_components(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "complement", pathway],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1591,8 +1591,8 @@ def _seed_prrs(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "prr", ptype],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1717,8 +1717,8 @@ def _seed_mhc_molecules(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "mhc", f"class_{mclass}"],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1780,8 +1780,8 @@ def _seed_immune_drugs(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "drug", dclass],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
 
     # Add simulation physics_params to immunotherapy drugs
     _immuno_sim_params = {
@@ -1885,8 +1885,8 @@ def _seed_immune_pathways(store: EntityStore) -> int:
             source="curated",
             tags=["immunology", "pathway", ptype],
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
     return count
 
 
@@ -1991,8 +1991,8 @@ def _seed_adhesion_molecules(store: EntityStore) -> int:
             gene_symbol=gene,
             structure_type=structure,
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
 
     log.info("  Seeded %d adhesion molecules", count)
     return count
@@ -2036,8 +2036,8 @@ def _seed_endothelial_cells(store: EntityStore) -> int:
             cytokines_secreting=cytokines,
             **params,
         )
-        store.add_entity(entity)
-        count += 1
+        if store.add_entity(entity):
+            count += 1
 
     log.info("  Seeded %d endothelial cell types", count)
     return count

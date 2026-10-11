@@ -38,6 +38,39 @@ from .models import (
 log = logging.getLogger(__name__)
 
 
+# Entity types for which `(name, entity_type)` is NOT an identity.
+#
+# bc6d521 made `(lower(name), entity_type)` the library's identity key, which
+# is right for the curated catalog -- there is one TP53 gene. It is wrong for
+# the workflow system, whose entities are instances rather than catalog
+# entries and which generate their own colliding names:
+#
+#   SIMULATION_RUN     RunManager's default name is minute-resolution
+#                      ("Run 2026-10-10 07:38"), so two runs started in the
+#                      same minute collide with no user input at all.
+#   PARAMETER_SET      ScenarioBuilder names these f"{context}_{module}_params",
+#                      a pure function of (scenario_type, module), so every
+#                      second scenario of a type collides on every one.
+#   SIMULATION_SCENARIO/
+#   RESEARCH_PROJECT   user-named, and rebuilding a named scenario or starting
+#                      a second project with the same title is legitimate.
+#
+# Reusing the existing row instead would be worse than refusing: the config is
+# in the builder's arguments, so handing back a different old scenario runs the
+# user's simulation against parameters they did not ask for.
+#
+# Safe because nothing resolves these four types by name. All 31
+# `find_entity_by_name` call sites in the repo target gene, protein, drug,
+# pathway, cell_type, immune_cell or metabolite; these four are always reached
+# by `entity_id`.
+NAME_IS_NOT_IDENTITY = frozenset({
+    EntityType.SIMULATION_SCENARIO,
+    EntityType.SIMULATION_RUN,
+    EntityType.RESEARCH_PROJECT,
+    EntityType.PARAMETER_SET,
+})
+
+
 def get_database_url() -> Optional[str]:
     """Get PostgreSQL connection URL from environment or AWS Secrets Manager."""
     # Direct environment variable
@@ -325,6 +358,30 @@ class EntityStore:
         )
         return cursor.fetchone() is not None
 
+    def find_active_entity_by_identity(
+        self, name: str, entity_type: str
+    ) -> Optional[BioEntity]:
+        """Fetch the active entity holding this identity, or None.
+
+        The exact inverse of ``entity_exists``: same case-folding, same
+        strip, same ACTIVE filter. ``find_entity_by_name`` is
+        case-sensitive and status-blind, so a caller that pre-checked
+        with it and then inserted could be refused by ``add_entity`` and
+        walk away with an entity that is not in the database.
+        """
+        cursor = self._execute(
+            "SELECT data_json FROM entities WHERE lower(name) = ? "
+            "AND entity_type = ? AND status = ? LIMIT 1",
+            (name.strip().lower(), entity_type, EntityStatus.ACTIVE.value),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        data_json = row["data_json"] if isinstance(row, dict) else row[0]
+        if isinstance(data_json, str):
+            data_json = json.loads(data_json)
+        return BioEntity.from_dict(data_json)
+
     def add_entity(self, entity: BioEntity, allow_duplicate: bool = False) -> bool:
         """Insert a new entity. Returns True on success.
 
@@ -340,8 +397,10 @@ class EntityStore:
             allow_duplicate: Insert even if the name/type pair is taken.
                 Only for callers that genuinely need homonyms.
         """
-        if not allow_duplicate and self.entity_exists(
-            entity.name, entity.entity_type.value
+        if (
+            not allow_duplicate
+            and entity.entity_type not in NAME_IS_NOT_IDENTITY
+            and self.entity_exists(entity.name, entity.entity_type.value)
         ):
             log.debug(
                 "Skipping duplicate %s '%s' (already present and active)",

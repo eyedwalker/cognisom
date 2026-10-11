@@ -125,7 +125,10 @@ class ScenarioBuilder:
             tags=[scenario_type],
         )
 
-        self._store.add_entity(scenario)
+        if not self._store.add_entity(scenario):
+            raise RuntimeError(
+                f"Failed to persist scenario '{name}' ({scenario.entity_id})"
+            )
         log.info(
             "Built scenario '%s': %d genes, %d drugs, %d param sets",
             name, len(gene_ids), len(drug_ids), len(param_set_ids),
@@ -305,6 +308,7 @@ class ScenarioBuilder:
         """
         from cognisom.workflow.parameter_bridge import (
             ParameterBridge,
+            normalize_lookup_key,
             BASELINE_DEFAULTS,
             DRUG_CLASS_PARAM_MAP,
             DRUG_TARGET_PARAM_MAP,
@@ -319,7 +323,7 @@ class ScenarioBuilder:
             entity = self._store.get_entity(drug_id)
             if not isinstance(entity, Drug):
                 continue
-            drug_class = (entity.drug_class or "").lower().replace("-", "_").replace(" ", "_")
+            drug_class = normalize_lookup_key(entity.drug_class or "")
 
             for target in (entity.targets or []):
                 target_upper = target.upper()
@@ -375,7 +379,10 @@ class ScenarioBuilder:
                 if isinstance(v, str):
                     ps.parameters[k] = v  # type: ignore
 
-            self._store.add_entity(ps)
+            if not self._store.add_entity(ps):
+                raise RuntimeError(
+                    f"Failed to persist ParameterSet '{ps.name}' ({ps.entity_id})"
+                )
             param_set_ids.append(ps.entity_id)
 
             log.debug(

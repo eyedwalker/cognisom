@@ -58,7 +58,10 @@ class ProjectManager:
             methodology=methodology,
             created_by="researcher",
         )
-        self._store.add_entity(project)
+        if not self._store.add_entity(project):
+            raise RuntimeError(
+                f"Failed to persist project '{title}' ({project.entity_id})"
+            )
         log.info("Created project %s: %s", project.entity_id, title)
         return project
 
