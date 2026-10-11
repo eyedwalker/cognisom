@@ -46,9 +46,30 @@ class CircadianClock:
     
     # Synchronization to master clock
     coupling_strength: float = 0.1
+
+    # CLOCK_BMAL1 one step ago. The module compares two consecutive
+    # increments to recognise a local extremum, so it needs the value
+    # from two steps back; None until the clock has been stepped twice.
+    prev_CLOCK_BMAL1: float = None
+
+    def __post_init__(self):
+        # The field defaults (CLOCK_BMAL1=1.0, PER_CRY=0.0) describe
+        # phase 0 only, so a clock created at any other phase reported
+        # phase-0 gene levels until its first update(). That both
+        # misreported the cell's state and registered as a spurious
+        # extremum on the first step.
+        self._refresh_clock_genes()
+
+    def _refresh_clock_genes(self):
+        """Recompute the clock-gene levels from the current phase."""
+        t = (self.phase / 24.0) * 2 * np.pi
+        self.CLOCK_BMAL1 = 0.5 + 0.5 * self.amplitude * np.cos(t)
+        self.PER_CRY = 0.5 + 0.5 * self.amplitude * np.cos(t + np.pi)
     
     def update(self, dt: float, master_phase: float):
         """Update clock state"""
+        self.prev_CLOCK_BMAL1 = self.CLOCK_BMAL1
+
         # Advance phase
         self.phase += (dt / self.period) * 24.0
         self.phase = self.phase % 24.0
@@ -63,9 +84,7 @@ class CircadianClock:
         self.phase += self.coupling_strength * phase_diff * dt
         
         # Update clock genes (sinusoidal)
-        t = (self.phase / 24.0) * 2 * np.pi
-        self.CLOCK_BMAL1 = 0.5 + 0.5 * self.amplitude * np.cos(t)
-        self.PER_CRY = 0.5 + 0.5 * self.amplitude * np.cos(t + np.pi)
+        self._refresh_clock_genes()
     
     def get_time_of_day(self) -> str:
         """Get time of day"""
@@ -164,14 +183,49 @@ class CircadianModule(SimulationModule):
         
         # Update cellular clocks
         for clock in self.cell_clocks.values():
-            old_phase = clock.phase
+            two_steps_ago = clock.prev_CLOCK_BMAL1
+            one_step_ago = clock.CLOCK_BMAL1
             clock.update(dt, self.master_phase)
             
-            # Detect peaks/troughs
-            if old_phase < 12 and clock.phase >= 12:
+            # Detect peaks/troughs. A peak and a trough are extrema of
+            # CLOCK_BMAL1, not of the phase:
+            # CLOCK_BMAL1 = 0.5 + 0.5*A*cos(2*pi*phase/24) is at its
+            # MAXIMUM at phase 0 and its MINIMUM at phase 12. The old
+            # `old_phase < 12 and phase >= 12` test therefore counted
+            # every trough as a peak, and `old_phase < 0` could only fire
+            # on the transiently negative phase the coupling term leaves
+            # behind, which happens at phase ~ 0 -- i.e. at the peak.
+            # Detect the sign change of d(CLOCK_BMAL1)/dt instead.
+            if two_steps_ago is None:
+                continue  # needs two steps of history
+
+            rising = one_step_ago - two_steps_ago
+            falling = clock.CLOCK_BMAL1 - one_step_ago
+
+            # Midline guard. A sign change of d(CLOCK_BMAL1)/dt is necessary
+            # but not sufficient: dphase/dt = 1 + k*(master - phase) goes
+            # NEGATIVE once a clock leads the master by more than 1/k, which
+            # at the shipped coupling_strength of 0.1 is 10 h. That reversal
+            # is a local extremum of CLOCK_BMAL1 at an arbitrary point on the
+            # cycle, and a purely derivative-based detector counts it.
+            # Measured on the real dashboard path before this guard: 6 of 15
+            # "peaks" fired at CLOCK_BMAL1 < 0.1, i.e. at the trough.
+            # The oscillation's mean is exactly 0.5 at any amplitude, so a
+            # genuine maximum is always above it and a genuine minimum below.
+            if rising > 0 and falling <= 0 and clock.CLOCK_BMAL1 > 0.5:
                 self.total_peaks += 1
-            elif old_phase < 0 and clock.phase >= 0:
+                self.emit_event(EventTypes.CIRCADIAN_PEAK, {
+                    'cell_id': clock.cell_id,
+                    'phase': clock.phase,
+                    'CLOCK_BMAL1': clock.CLOCK_BMAL1,
+                })
+            elif rising < 0 and falling >= 0 and clock.CLOCK_BMAL1 < 0.5:
                 self.total_troughs += 1
+                self.emit_event(EventTypes.CIRCADIAN_TROUGH, {
+                    'cell_id': clock.cell_id,
+                    'phase': clock.phase,
+                    'CLOCK_BMAL1': clock.CLOCK_BMAL1,
+                })
     
     def get_metabolic_modifier(self, cell_id: int) -> float:
         """Get circadian modifier for metabolism"""

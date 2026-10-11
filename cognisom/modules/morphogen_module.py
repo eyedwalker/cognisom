@@ -116,6 +116,9 @@ class MorphogenModule(SimulationModule):
         # References
         self.spatial_module = None
         self.cellular_module = None
+
+        # Gradients already registered as a source on a spatial field
+        self._registered_sources = set()
     
     def initialize(self):
         """Initialize morphogen system"""
@@ -155,7 +158,9 @@ class MorphogenModule(SimulationModule):
         """Add cell and determine its positional identity"""
         identity = PositionalIdentity(
             cell_id=cell_id,
-            position=position.copy()
+            # np.array() rather than .copy(): CellMechanicsModule rebinds
+            # cell.position to a plain tuple, which has no .copy().
+            position=np.array(position, dtype=float)
         )
         
         # Sense morphogen levels
@@ -166,13 +171,10 @@ class MorphogenModule(SimulationModule):
         
         # Determine fate
         if self.enable_fate_determination:
-            identity.determine_fate()
+            self._specify_fate(identity)
             
-            # Track fate
-            if identity.cell_fate not in self.fate_counts:
-                self.fate_counts[identity.cell_fate] = 0
-            self.fate_counts[identity.cell_fate] += 1
-            self.total_fates_determined += 1
+            # Counting now lives in _specify_fate(), so the
+            # re-specification that update() performs shares one tally.
         
         self.cell_identities[cell_id] = identity
     
@@ -184,6 +186,7 @@ class MorphogenModule(SimulationModule):
     def set_spatial_module(self, spatial_module):
         """Link to spatial module"""
         self.spatial_module = spatial_module
+        self._registered_sources = set()
     
     def set_cellular_module(self, cellular_module):
         """Link to cellular module"""
@@ -198,26 +201,94 @@ class MorphogenModule(SimulationModule):
             # Simple exponential decay model
             self._update_gradients_simple(dt)
         
-        # Update cell sensing
+        # Update cell sensing. identity.position is a copy taken at
+        # add_cell() time, so unless it is re-read from the cellular
+        # module every cell senses the gradient at its birthplace for the
+        # whole run. Re-deriving the coordinates and the fate belongs to
+        # the same step: re-sensing alone left anterior_posterior and
+        # cell_fate frozen at their birth values even when the sensed
+        # concentrations changed.
         for identity in self.cell_identities.values():
+            self._refresh_position(identity)
             self._sense_morphogens(identity)
+            self._determine_position(identity)
+            self._specify_fate(identity)
     
     def _update_gradients_spatial(self, dt: float):
         """Update gradients using spatial module"""
-        # Add morphogen sources to spatial fields
+        # Register each morphogen source with its spatial field ONCE.
+        # SpatialField.add_source() appends, and SpatialField.update()
+        # deposits rate*dt for every entry, so re-adding each step grew
+        # the list without bound and multiplied the deposited morphogen
+        # by the step count. An organizer is static, so one entry each is
+        # correct. (This path is unreachable today: set_spatial_module()
+        # has no callers, and SpatialModule creates only oxygen, glucose
+        # and cytokine fields, so the name test never matches anyway.)
         for name, gradient in self.gradients.items():
+            if name in self._registered_sources:
+                continue
             if name.lower() in self.spatial_module.fields:
                 field = self.spatial_module.fields[name.lower()]
                 
                 # Add source
                 field.add_source(gradient.source_position, 
                                gradient.source_strength)
+                self._registered_sources.add(name)
     
     def _update_gradients_simple(self, dt: float):
-        """Update gradients using simple exponential model"""
-        # Concentration = C0 * exp(-distance / decay_length)
-        pass
+        """Nothing to integrate: the simple model is evaluated on demand.
+
+        The analytic form C = C0 * exp(-distance / decay_length) is a
+        steady state with no stored field, and _sense_morphogens()
+        evaluates it directly at each cell's position, so there is no
+        per-step gradient state to advance. Kept as the explicit
+        counterpart to _update_gradients_spatial() rather than deleted,
+        so the branch in update() stays symmetric.
+        """
+        return
     
+    def _refresh_position(self, identity: PositionalIdentity):
+        """Re-read the cell's current position from the cellular module.
+
+        Without a cellular module there is nothing to refresh against, so
+        the birth position is kept.
+        """
+        if self.cellular_module is None:
+            return
+
+        cell = getattr(self.cellular_module, 'cells', {}).get(identity.cell_id)
+        if cell is None:
+            return
+
+        position = getattr(cell, 'position', None)
+        if position is None:
+            return
+
+        # CellularModule stores an ndarray, but CellMechanicsModule
+        # rebinds cell.position to a plain tuple when it writes positions
+        # back, so normalise rather than assuming either.
+        identity.position = np.array(position, dtype=float)
+
+    def _specify_fate(self, identity: PositionalIdentity):
+        """Determine (or re-determine) the cell's fate, and count it.
+
+        Counts only a genuine change of fate, so the statistic stays a
+        count of specification decisions rather than of simulation steps.
+        """
+        if not self.enable_fate_determination:
+            return
+
+        previous_fate = identity.cell_fate
+        identity.determine_fate()
+
+        if identity.cell_fate == previous_fate:
+            return
+
+        if identity.cell_fate not in self.fate_counts:
+            self.fate_counts[identity.cell_fate] = 0
+        self.fate_counts[identity.cell_fate] += 1
+        self.total_fates_determined += 1
+
     def _sense_morphogens(self, identity: PositionalIdentity):
         """Cell senses morphogen concentrations at its position"""
         for name, gradient in self.gradients.items():
@@ -267,11 +338,20 @@ class MorphogenModule(SimulationModule):
     
     def get_state(self) -> Dict[str, Any]:
         """Return current morphogen state"""
+        # Census of the cells alive now. self.fate_counts is a
+        # cumulative tally that is never decremented, so publishing it as
+        # the "distribution" reported the fates of a population that had
+        # already died: 90 fates against n_cells_tracked = 0.
+        census: Dict[str, int] = {}
+        for identity in self.cell_identities.values():
+            census[identity.cell_fate] = census.get(identity.cell_fate, 0) + 1
+
         return {
             'n_gradients': len(self.gradients),
             'n_cells_tracked': len(self.cell_identities),
             'total_fates_determined': self.total_fates_determined,
-            'fate_distribution': dict(self.fate_counts),
+            'fate_distribution': census,
+            'cumulative_fate_assignments': dict(self.fate_counts),
             'gradient_names': list(self.gradients.keys())
         }
     
@@ -282,9 +362,21 @@ class MorphogenModule(SimulationModule):
         daughter_id = data.get('daughter_id')
         daughter_position = data.get('daughter_position')
         
-        if daughter_id and daughter_position is not None:
+        if daughter_id is None:
+            return
+
+        if daughter_position is None and self.cellular_module is not None:
+            # CellularModule's CELL_DIVIDED payload carries daughter_id
+            # but no daughter_position, so no daughter was ever tracked
+            # and n_cells_tracked decayed to zero over any run with
+            # turnover. Look the position up instead of giving up.
+            cell = getattr(self.cellular_module, 'cells', {}).get(daughter_id)
+            if cell is not None:
+                daughter_position = getattr(cell, 'position', None)
+
+        if daughter_position is not None:
             # Daughter gets new identity based on her position
-            self.add_cell(daughter_id, np.array(daughter_position))
+            self.add_cell(daughter_id, np.array(daughter_position, dtype=float))
     
     def on_cell_died(self, data):
         """Handle cell death - remove identity"""

@@ -338,6 +338,11 @@ class EngineRunner:
             lymphatic.set_cellular_module(cellular)
         if lymphatic and immune:
             lymphatic.set_immune_module(immune)
+        if morphogen and cellular:
+            # MorphogenModule keeps only a copy of each cell's birth
+            # position, so without this it senses the gradient at the
+            # birthplace for the whole run and never tracks a daughter.
+            morphogen.set_cellular_module(cellular)
 
         # Register cells in supporting modules
         if cellular:

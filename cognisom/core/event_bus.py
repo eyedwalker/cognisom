@@ -55,6 +55,13 @@ class EventTypes:
     # is gating ICB rescue on the precursor pool: this event marks
     # clones that have left it.
     TCELL_EXHAUSTED = 'tcell_exhausted'
+
+    # Circadian extrema. CircadianModule's class docstring has always
+    # promised these; they were never defined, so nothing could be
+    # emitted or subscribed. Emitted once per cell per clock cycle when
+    # CLOCK_BMAL1 reaches a local maximum (peak) or minimum (trough).
+    CIRCADIAN_PEAK = 'circadian_peak'
+    CIRCADIAN_TROUGH = 'circadian_trough'
     
     # Tissue events
     HYPOXIA_DETECTED = 'hypoxia_detected'
