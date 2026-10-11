@@ -264,6 +264,13 @@ class SimulationEngine:
                 module.reset()
         
         self.event_bus.clear_queue()
+        # Clear the log too, or a reset-and-rerun engine shows the previous
+        # run's trace: the retained closed-loop events survived reset, so
+        # page 42 read a MUTATION_OCCURRED from the discarded run. The
+        # monotonic counters deliberately do NOT reset -- they are lifetime
+        # counts of what this bus processed, which is what makes them a
+        # reliable denominator.
+        self.event_bus.clear_log()
         
         print("✓ Reset complete")
     

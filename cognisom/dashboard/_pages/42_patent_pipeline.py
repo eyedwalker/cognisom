@@ -18,6 +18,7 @@ Pick a driver mutation in the sidebar; the rest of the page renders
 the per-upgrade output. The patent attorney can walk through this
 one page during a disclosure call.
 """
+from collections import Counter
 from __future__ import annotations
 
 import os
@@ -387,7 +388,13 @@ with st.spinner("Running closed-loop simulation..."):
     engine.event_bus.process_events()
     engine.run(duration=duration_h - half)
     engine.event_bus.process_events()
-    log = list(engine.event_bus.event_log)
+    # The complete closed-loop trace, not the bounded recency window.
+    # This page reads the chain HEAD-FIRST (the n_peptides lookup below,
+    # the trace_targets filter, the exhaustion filter), and the head is
+    # emitted at t=0 while the kill lands later -- so a FIFO window
+    # evicts exactly the part this page reads first. get_trace() is
+    # append-ordered, which is causal order.
+    log = engine.event_bus.get_trace()
 
 
 # ── Section: Upgrade 1 (memory architecture) ─────────────────────────
@@ -561,11 +568,45 @@ trace_targets = (
     EventTypes.CELL_KILLED_BY_TCELL,
 )
 trace_entries = [(evt, data) for evt, data in log if evt in trace_targets]
+_shown_types = set()
 if trace_entries:
-    for evt, data in trace_entries[:20]:
-        st.write(f"**`{evt}`** — `{data}`")
+    # One row per event TYPE, in causal order, with that type's count and its
+    # first payload. A head slice does not work here: on a 140-cell run the
+    # first 20 closed-loop events are all `mutation_occurred`, so the chain
+    # rendered as a single step. A head-10 + tail-10 slice fails too -- it
+    # shows mutation and activation but still never reaches the kill.
+    _type_counts = Counter(evt for evt, _ in trace_entries)
+    for evt, data in trace_entries:
+        if evt in _shown_types:
+            continue
+        _shown_types.add(evt)
+        st.write(f"**`{evt}`** ×{_type_counts[evt]:,} — first: `{data}`")
 else:
     st.info("No closed-loop events fired in this run.")
+
+_bus_stats = engine.event_bus.get_statistics()
+if _bus_stats["retained_dropped"]:
+    st.error(
+        f"Trace INCOMPLETE: {_bus_stats['retained_dropped']} closed-loop "
+        f"event(s) were dropped because the retained-trace cap "
+        f"({engine.event_bus.max_retained_size:,}) was reached. What is "
+        "shown above is the head of the run, not the whole run. Do not "
+        "read a missing kill as immune escape."
+    )
+if _bus_stats["cascade_overflows"]:
+    st.error(
+        f"{_bus_stats['cascade_overflows']} event cascade(s) hit the depth "
+        "cap and were cut off. A subscriber is re-emitting its own "
+        "trigger; this run's event record is not trustworthy."
+    )
+st.caption(
+    f"{_bus_stats['total_events']:,} events processed; "
+    f"{len(trace_entries):,} closed-loop event(s) retained in full, "
+    f"{len(_shown_types)} shown (first occurrence of each type, causal "
+    f"order). "
+    "The trace is read from the retained log, not the 1,000-entry "
+    "recency window, so later traffic cannot evict the head of the chain."
+)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Peptides generated", cel.total_peptides_generated)

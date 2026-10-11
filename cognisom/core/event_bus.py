@@ -6,7 +6,11 @@ Event Bus: Inter-Module Communication
 Publish-subscribe system for modules to communicate without tight coupling.
 """
 
-from typing import Callable, Dict, List, Any
+import logging
+from collections import Counter
+from typing import Any, Callable, Dict, List, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 class EventTypes:
@@ -58,6 +62,22 @@ class EventTypes:
     METASTASIS_OCCURRED = 'metastasis_occurred'
     VESSEL_FORMED = 'vessel_formed'
 
+    # The causal chain that cognisom/dashboard/_pages/42_patent_pipeline.py
+    # reconstructs, HEAD-FIRST (lines ~390, 510, 556-562, 592). EventBus
+    # retains these in full, outside the bounded recency log, because the
+    # head of the chain is emitted at the start of a run and is therefore
+    # exactly what a FIFO recency window evicts first. Evicting the head
+    # does not blank the page -- it makes the page report 0 peptides
+    # generated and call the mutation HLA-restricted.
+    CLOSED_LOOP_TRACE_TYPES = (
+        MUTATION_OCCURRED,
+        PEPTIDE_GENERATED,
+        PEPTIDE_PRESENTED,
+        IMMUNE_ACTIVATED,
+        TCELL_EXHAUSTED,
+        CELL_KILLED_BY_TCELL,
+    )
+
 
 class EventBus:
     """
@@ -78,11 +98,45 @@ class EventBus:
     event_bus.process_events()  # Calls on_cell_divided
     """
     
-    def __init__(self):
+    def __init__(self, retain_types: Optional[Sequence[str]] = None):
         self.subscribers: Dict[str, List[Callable]] = {}
         self.event_queue: List[tuple] = []
+
+        # (a) Bounded recency window. Debugging aid. FIFO, evicts the
+        #     OLDEST entry, so it is the wrong structure for anything
+        #     read head-first. Deliberately left at 1000.
         self.event_log: List[tuple] = []
         self.max_log_size = 1000
+
+        # (b) Monotonic accounting, independent of (a). total_processed
+        #     used to be reported as len(event_log), which saturates at
+        #     max_log_size and under-reports forever after.
+        self.total_processed = 0
+        self.processed_counts: Counter = Counter()
+        self.dropped_from_log = 0
+
+        # (c) Durable trace. The causal chain the patent-evidence page
+        #     reconstructs, kept in full and in emission (= causal)
+        #     order. When this cap is hit the NEWEST entry is dropped,
+        #     not the oldest, because the head is the part that cannot
+        #     be re-derived; retained_dropped is then non-zero and the
+        #     page must say the trace is incomplete rather than read
+        #     absence as biology.
+        self.retain_types = set(
+            EventTypes.CLOSED_LOOP_TRACE_TYPES
+            if retain_types is None else retain_types
+        )
+        self.retained_log: List[tuple] = []
+        self.max_retained_size = 100_000
+        self.retained_dropped = 0
+
+        # (d) Cascade guard. A callback may emit while being delivered
+        #     and process_events drains that in the same call -- that is
+        #     load-bearing for MUTATION_OCCURRED -> PEPTIDE_GENERATED.
+        #     What was missing is a floor. Deepest cascade anywhere in
+        #     this repo, measured: 1.
+        self.max_cascade_depth = 50
+        self.cascade_overflows = 0
     
     def emit(self, event_type: str, data: Any = None):
         """
@@ -125,26 +179,119 @@ class EventBus:
         Process all queued events
         
         Called once per simulation step to deliver events to subscribers.
+
+        Events emitted by a callback are delivered in this same call --
+        the closed-loop chain depends on it. They are delivered one
+        cascade generation at a time, which is bit-for-bit the same
+        order as popping one event at a time (a FIFO drained to
+        exhaustion IS breadth-first), and which bounds the loop: a
+        callback that re-emits its own trigger is stopped after
+        max_cascade_depth generations instead of spinning forever.
         """
+        depth = 0
         while self.event_queue:
-            event_type, data = self.event_queue.pop(0)
-            
-            # Log event
-            self.event_log.append((event_type, data))
-            if len(self.event_log) > self.max_log_size:
-                self.event_log.pop(0)
-            
-            # Deliver to subscribers
-            if event_type in self.subscribers:
-                for callback in self.subscribers[event_type]:
+            if depth > self.max_cascade_depth:
+                dropped = len(self.event_queue)
+                self.event_queue = []
+                self.cascade_overflows += 1
+                logger.error(
+                    "Event cascade exceeded max_cascade_depth=%d; dropped "
+                    "%d pending event(s). A subscriber is re-emitting its "
+                    "own trigger. This run's event record is incomplete; "
+                    "see cascade_overflows in EventBus.get_statistics().",
+                    self.max_cascade_depth, dropped,
+                )
+                break
+
+            batch = self.event_queue
+            self.event_queue = []
+
+            for event_type, data in batch:
+                self._record(event_type, data)
+
+                # tuple() so a callback that subscribes or unsubscribes
+                # during delivery cannot raise "list changed size during
+                # iteration" out of this loop -- that RuntimeError comes
+                # from the for statement, outside the try below, and
+                # would escape process_events.
+                for callback in tuple(self.subscribers.get(event_type, ())):
                     try:
                         callback(data)
-                    except Exception as e:
-                        print(f"Error in event callback for {event_type}: {e}")
+                    except Exception:
+                        logger.exception(
+                            "Event callback %s failed for event %r; the "
+                            "event bus continued to the next subscriber. "
+                            "The simulation is now missing whatever this "
+                            "callback was responsible for.",
+                            getattr(callback, "__qualname__", repr(callback)),
+                            event_type,
+                        )
+
+            depth += 1
     
     def clear_queue(self):
         """Clear event queue"""
         self.event_queue.clear()
+
+    def clear_log(self):
+        """Clear the recency window and the retained trace.
+
+        The monotonic counters are NOT reset -- they count every event
+        this bus ever processed, which is the whole point of them.
+        """
+        self.event_log.clear()
+        self.retained_log.clear()
+
+    def _record(self, event_type: str, data: Any) -> None:
+        """Account for one delivered event.
+
+        Three destinations, deliberately: a monotonic count that never
+        saturates, a bounded recency window that evicts oldest-first,
+        and a durable trace that evicts newest-first.
+        """
+        self.total_processed += 1
+        self.processed_counts[event_type] += 1
+
+        self.event_log.append((event_type, data))
+        if len(self.event_log) > self.max_log_size:
+            self.event_log.pop(0)
+            self.dropped_from_log += 1
+
+        if event_type in self.retain_types:
+            if len(self.retained_log) < self.max_retained_size:
+                self.retained_log.append((event_type, data))
+            else:
+                self.retained_dropped += 1
+
+    def get_trace(self, event_types: Optional[Sequence[str]] = None):
+        """Complete causal trace, in emission order, for retained types.
+
+        Unlike get_event_log() this is not a recency window: nothing
+        here is evicted by later traffic, so a chain whose head fires at
+        t=0 and whose tail fires at t=24h survives intact. Read this,
+        not event_log, for anything reconstructed head-first.
+
+        Raises
+        ------
+        ValueError
+            If asked for a type this bus does not retain. Returning a
+            silently partial trace is how the bounded log produced
+            "0 peptides generated" for a mutation that generated seven.
+        """
+        if event_types is None:
+            return list(self.retained_log)
+
+        wanted = set(event_types)
+        missing = wanted - self.retain_types
+        if missing:
+            raise ValueError(
+                f"EventBus does not retain {sorted(missing)}, so a complete "
+                f"trace cannot be produced for them. Pass them in "
+                f"retain_types when constructing the bus, or read the "
+                f"bounded recency window via get_event_log() and accept "
+                f"that it may be missing the head of the chain."
+            )
+        return [(t, d) for t, d in self.retained_log if t in wanted]
     
     def get_event_log(self, event_type: str = None, limit: int = 100):
         """
@@ -169,17 +316,29 @@ class EventBus:
         return events[-limit:]
     
     def get_statistics(self):
-        """Get event statistics"""
-        from collections import Counter
+        """Get event statistics.
+
+        total_events and event_counts are MONOTONIC: they count every
+        event this bus ever processed. They used to be derived from
+        event_log, which means they saturated at max_log_size and
+        under-reported from then on (1000 reported against 4680
+        processed, measured on an 900-cell run). The size of the
+        recency window is reported separately as logged_events.
+        """
         
-        event_types = [event_type for event_type, _ in self.event_log]
-        counts = Counter(event_types)
+        # Counts come from the monotonic Counter, never from the
+        # bounded log -- that was the saturation bug.
         
         return {
-            'total_events': len(self.event_log),
+            'total_events': self.total_processed,
+            'logged_events': len(self.event_log),
+            'dropped_from_log': self.dropped_from_log,
             'queued_events': len(self.event_queue),
-            'event_counts': dict(counts),
-            'subscribers': {k: len(v) for k, v in self.subscribers.items()}
+            'event_counts': dict(self.processed_counts),
+            'retained_events': len(self.retained_log),
+            'retained_dropped': self.retained_dropped,
+            'cascade_overflows': self.cascade_overflows,
+            'subscribers': {k: len(v) for k, v in self.subscribers.items()},
         }
 
 
