@@ -229,29 +229,60 @@ class SU2CFileValidator:
         self.data_dir = data_dir
         self._patients: Optional[List[SU2CPatient]] = None
 
+    def _candidate_dirs(self) -> List[Path]:
+        """Where a local copy of the dataset may already live, in order.
+
+        The repo-relative location comes first and is the one worth keeping:
+        /tmp is cleared on reboot, so a dataset "pinned" there is pinned until
+        the next restart, and the 429-patient validation cited in
+        mad/model_cards.py silently stops being reproducible.
+        """
+        candidates = []
+
+        env = os.environ.get("COGNISOM_SU2C_DIR")
+        if env:
+            candidates.append(Path(env))
+
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        candidates.append(repo_root / "data" / "cbioportal" / DATA_DIR_NAME)
+        candidates.append(Path("/tmp/cbio_data") / DATA_DIR_NAME)
+        return candidates
+
     def ensure_data(self) -> str:
-        """Download and extract data if needed. Returns data directory path."""
+        """Locate, or download and extract, the dataset. Returns its path."""
         if self.data_dir and Path(self.data_dir).exists():
             return self.data_dir
 
-        # Check /tmp first
-        tmp_dir = Path("/tmp/cbio_data/prad_su2c_2019")
-        if tmp_dir.exists() and (tmp_dir / "data_mutations.txt").exists():
-            self.data_dir = str(tmp_dir)
-            return self.data_dir
+        for candidate in self._candidate_dirs():
+            if (candidate / "data_mutations.txt").exists():
+                self.data_dir = str(candidate)
+                logger.info("Using local SU2C dataset at %s", self.data_dir)
+                return self.data_dir
 
-        # Download
-        logger.info("Downloading SU2C 2019 dataset (98 MB)...")
-        tmp_dir.parent.mkdir(parents=True, exist_ok=True)
+        # Nothing local: fetch into the repo-relative location, which persists.
+        target = self._candidate_dirs()[-2]
+        logger.info(
+            "No local SU2C dataset found; downloading ~98 MB from %s to %s",
+            DOWNLOAD_URL, target.parent,
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
 
-        resp = requests.get(DOWNLOAD_URL, stream=True, timeout=120)
+        resp = requests.get(DOWNLOAD_URL, stream=True, timeout=300)
         resp.raise_for_status()
 
-        # Extract tar.gz
+        # filter="data" refuses absolute paths, parent-directory escapes,
+        # symlinks and device files, and strips set-uid bits. This archive is
+        # fetched over the network, so extracting it unfiltered would let a
+        # compromised or substituted tarball write anywhere the process can.
+        # Added in 3.12 and the default from 3.14; passed explicitly so the
+        # behaviour does not depend on the interpreter version.
         with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
-            tar.extractall(path=str(tmp_dir.parent))
+            try:
+                tar.extractall(path=str(target.parent), filter="data")
+            except TypeError:  # pragma: no cover - Python < 3.12
+                tar.extractall(path=str(target.parent))
 
-        self.data_dir = str(tmp_dir)
+        self.data_dir = str(target)
         logger.info("Extracted to %s", self.data_dir)
         return self.data_dir
 
