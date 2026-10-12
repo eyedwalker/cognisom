@@ -334,9 +334,22 @@ class IntracellularModel:
         for name, mrna in self.mrnas.items():
             mrna.age += dt
             
-            # Exponential decay
+            # Exponential decay. The survival probability over an
+            # interval dt of a molecule with half-life T is 2^(-dt/T), so
+            # the per-step degradation probability is
+            #     P = 1 - exp(-dt * ln2 / T)
+            # exactly. The linearisation `ln2/T * dt` that stood here is
+            # the first term of its expansion and is only valid for
+            # dt << T: at the default T = 2 h it over-degrades by 0.9% at
+            # dt = 0.05 h, 18.3% at dt = 1.0 h and 38.6% at dt = 2.0 h,
+            # and compounded over a 24 h run at dt = 1.0 h it leaves
+            # 0.15x the correct amount of mRNA. Worse, it EXCEEDS 1 once
+            # dt > T/ln2 = 2.885 h, and np.random.binomial then raises
+            # ValueError rather than saturating -- a timestep the user is
+            # free to choose crashed the model.
             decay_rate = np.log(2) / mrna.half_life
-            degraded = np.random.binomial(mrna.copy_number, decay_rate * dt)
+            p_degrade = -np.expm1(-decay_rate * dt)
+            degraded = np.random.binomial(mrna.copy_number, p_degrade)
             
             mrna.copy_number -= degraded
             
@@ -351,9 +364,13 @@ class IntracellularModel:
         to_remove = []
         
         for name, protein in self.proteins.items():
-            # Exponential decay
+            # Exponential decay; see degrade_mrna for the derivation.
+            # The same linearisation stood here against a default
+            # half-life of 10 h, so it exceeded 1 and raised ValueError
+            # for any dt > 10/ln2 = 14.43 h.
             decay_rate = np.log(2) / protein.half_life
-            degraded = np.random.binomial(protein.copy_number, decay_rate * dt)
+            p_degrade = -np.expm1(-decay_rate * dt)
+            degraded = np.random.binomial(protein.copy_number, p_degrade)
             
             protein.copy_number -= degraded
             

@@ -126,14 +126,32 @@ class TestDiffusion:
         assert lap[:, :, 0].sum() == 0
         assert lap[:, :, -1].sum() == 0
 
-    def test_diffuse_field_conserves_mass_approx(self, small_field):
+    def test_diffuse_field_does_not_create_mass(self, small_field):
         from cognisom.gpu.diffusion import diffuse_field
         initial_sum = small_field.sum()
         result = diffuse_field(
             small_field, diffusion_coeff=100.0, dt=0.01, resolution=10.0,
         )
-        # Mass should be approximately conserved (no sources/sinks)
-        assert abs(result.sum() - initial_sum) < 0.1
+        # Diffusion moves mass; it cannot make it. It CAN lose it here:
+        # _compute_laplacian writes interior points only, so the boundary
+        # shell stays frozen at zero and acts as a perfect absorber.
+        #
+        # This assertion used to read `abs(result.sum() - initial_sum) < 0.1`
+        # and was passing for the wrong reason -- diffuse_field treated dt as
+        # SECONDS rather than hours, understating transport 3600-fold, so
+        # nothing moved far enough to notice the boundary. dt = 0.01 h is 36 s
+        # of real transport at D = 100 um^2/s, a spread of sqrt(2*D*t) = 85 um
+        # against a 3-voxel margin on this 10x10x6 grid, so nearly all of it
+        # leaves. Whether that boundary should instead be no-flux is a real
+        # open question about what the field is meant to represent, and is
+        # deliberately not settled here.
+        #
+        # What must never happen is mass GROWING: before the stability fix
+        # this scheme ran at a diffusion number of 2.0 against a limit of 1/6
+        # and the non-negative clamp turned the oscillation into 12x mass
+        # creation per call.
+        assert result.sum() <= initial_sum + 1e-5
+        assert np.all(np.isfinite(result))
 
     def test_diffuse_field_with_source(self, small_field):
         from cognisom.gpu.diffusion import diffuse_field

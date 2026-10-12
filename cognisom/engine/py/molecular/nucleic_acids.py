@@ -229,15 +229,34 @@ class NucleicAcid:
         return genetic_code.get(codon, 'X')
     
     def update(self, dt: float):
-        """Update state (aging, degradation)"""
+        """Age this molecule by ``dt`` hours; return False once degraded.
+
+        ``dt`` used only to age the molecule: degradation was a flat 10%
+        chance per CALL, so halving the step halved the decay rate and
+        the molecule's effective half-life was a property of how often
+        the caller happened to call rather than of ``half_life``. It also
+        only degraded at all once ``age > half_life``, which is not what a
+        half-life means -- an exponentially distributed lifetime has no
+        such threshold.
+
+        A first-order process with half-life T survives an interval dt
+        with probability 2^(-dt/T), so
+
+            P(degrade) = 1 - exp(-dt * ln2 / T)
+
+        which is dt-correct by construction: splitting a step in two and
+        taking both halves gives the same survival probability as taking
+        the whole step at once.
+        """
         self.age += dt
-        
-        # Check if degraded
-        if self.age > self.half_life:
-            # Probabilistic degradation
-            if np.random.random() < 0.1:  # 10% chance per time step
-                return False  # Degraded
-        
+
+        if self.half_life <= 0 or dt <= 0:
+            return True
+
+        p_degrade = -np.expm1(-dt * np.log(2) / self.half_life)
+        if np.random.random() < p_degrade:
+            return False  # Degraded
+
         return True  # Still alive
 
 

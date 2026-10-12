@@ -136,7 +136,27 @@ class GPUOrchestrator:
         def gpu_update(dt):
             module.time_since_update += dt
             if module.time_since_update >= module.update_interval:
+                # Re-derive this step's terms from the cells and vessels
+                # first. The replacement loop below did not, so turning
+                # GPU acceleration on silently dropped the coupling the
+                # un-accelerated SpatialModule.update installs and put
+                # every field back to the identically-zero state this
+                # work removed.
+                sync = getattr(module, "_sync_sources_sinks", None)
+                if sync is not None:
+                    sync()
                 for field_obj in module.fields.values():
+                    # diffuse_field carries rate sources and sinks and
+                    # nothing else. A field with Dirichlet voxels or
+                    # first-order uptake has terms it cannot represent,
+                    # and dropping them is a WRONG answer rather than a
+                    # slow one, so such a field keeps its own solver --
+                    # which for a quasi-steady field is a cached sparse
+                    # solve, already cheaper than the explicit GPU step.
+                    if getattr(field_obj, "dirichlet", None) or getattr(
+                            field_obj, "uptake", None):
+                        field_obj.update(module.time_since_update)
+                        continue
                     field_obj.concentration = self.backend.to_numpy(
                         diffuse_field(
                             concentration=field_obj.concentration,

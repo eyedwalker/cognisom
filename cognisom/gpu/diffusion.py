@@ -89,6 +89,37 @@ def compute_laplacian(concentration: np.ndarray) -> np.ndarray:
         return _laplacian_cpu(C)
 
 
+#: Set once the explicit scheme has reported that it is under-diffusing.
+#: SpatialField rate-limits per field instance; this is a free function
+#: with no instance to hang a flag on, so it rate-limits per process.
+#: Either way the point gets made once, not 240 times a run.
+_under_diffused_warned = False
+
+
+def _warn_under_diffused(diffusion_number: float, n_sub_needed: int,
+                         max_stable: float) -> None:
+    """Report an under-diffused interval at most once per process."""
+    global _under_diffused_warned
+    if _under_diffused_warned:
+        return
+    _under_diffused_warned = True
+
+    from cognisom.modules.spatial_module import SpatialField
+
+    logger.warning(
+        "diffuse_field: D*dt/dx^2 = %.1f needs %d explicit sub-steps to stay "
+        "stable, above the cap of %d. Running %d stable sub-steps instead, so "
+        "the field is UNDER-DIFFUSED over this interval (about %.1f%% of the "
+        "transport applied). At this diffusion number the field is "
+        "effectively at steady state within one step, so an implicit or "
+        "steady-state solve is the right method here, not explicit Euler. "
+        "Logged once per process.",
+        diffusion_number, n_sub_needed, SpatialField.MAX_SUBSTEPS,
+        SpatialField.MAX_SUBSTEPS,
+        100.0 * SpatialField.MAX_SUBSTEPS * max_stable / diffusion_number,
+    )
+
+
 def diffuse_field(
     concentration: np.ndarray,
     diffusion_coeff: float,
@@ -97,9 +128,14 @@ def diffuse_field(
     sources: Optional[list] = None,
     sinks: Optional[list] = None,
 ) -> np.ndarray:
-    """Full diffusion step: Laplacian + sources/sinks + Euler update.
+    """Full diffusion step: sources/sinks + stability-limited Euler update.
 
-    Replaces SpatialField.update() with a GPU-accelerated version.
+    A GPU-accelerated stand-in for SpatialField.update(), and installed as
+    one by GPUOrchestrator._patch_spatial. It therefore has to match that
+    method's TIME semantics, not merely its signature: dt in hours against
+    a coefficient in um^2/s, and the 1/6 explicit-Euler stability limit in
+    3-D enforced by sub-division. It did neither, which made enabling GPU
+    acceleration silently replace a stable integrator with a divergent one.
 
     Args:
         concentration: 3D float32 array.
@@ -117,29 +153,73 @@ def diffuse_field(
 
     C = backend.to_device(np.array(concentration, dtype=np.float32, copy=True))
 
-    # 1. Laplacian
-    if backend.has_gpu:
-        lap = _laplacian_gpu(C, xp)
-    else:
-        lap = _laplacian_cpu(C)
+    # The time-integration policy -- the hours-to-seconds conversion and
+    # the explicit-Euler stability limit -- belongs to SpatialField, which
+    # is the one implementation in this repo that gets it right. Reading
+    # the constants from there instead of restating them is the whole
+    # point: this function is installed OVER SpatialField.update by
+    # GPUOrchestrator._patch_spatial, so the two drifting apart is
+    # precisely the failure that produced NaN fields. Imported inside the
+    # function because cognisom.modules imports the engine core and the
+    # GPU orchestrator imports this module, so a module-level import
+    # would close a cycle.
+    from cognisom.modules.spatial_module import SpatialField
 
-    # 2. Sources
+    # A field with no sources, no sinks and no content is an exact fixed
+    # point of the diffusion operator: skipping it cannot change the
+    # answer. It is also the shipped state, since nothing in the engine
+    # registers a source.
+    if not sources and not sinks and not bool(xp.any(C)):
+        return C
+
+    # 1. Sources and sinks act over the whole interval, once, and BEFORE
+    #    transport -- the same order as SpatialField.update. This used to
+    #    compute the Laplacian first, so a source contributed nothing to
+    #    transport on the step that created it.
     if sources:
         for idx, rate in sources:
             if _is_valid(idx, C.shape):
                 C[idx] += rate * dt
 
-    # 3. Sinks
+    # 2. Sinks
     if sinks:
         for idx, rate in sinks:
             if _is_valid(idx, C.shape):
                 removal = min(float(rate * dt), float(C[idx]))
                 C[idx] -= removal
 
-    # 4. Diffusion update: C += D * lap * dt / dx^2
-    C += diffusion_coeff * lap * dt / (resolution ** 2)
+    # 3. Transport. dt is in HOURS (the simulation's time unit) and
+    #    diffusion_coeff in um^2/s, so the conversion is required. Without
+    #    it this advanced dt SECONDS of diffusion and understated the
+    #    transported amount 3600-fold.
+    dt_seconds = dt * SpatialField.SECONDS_PER_HOUR
+    if diffusion_coeff > 0.0 and dt_seconds > 0.0:
+        diffusion_number = diffusion_coeff * dt_seconds / (resolution ** 2)
+        max_stable = SpatialField.CFL_LIMIT_3D * SpatialField.CFL_SAFETY
 
-    # 5. Non-negative clamp
+        n_sub = max(1, int(np.ceil(diffusion_number / max_stable)))
+        coeff = diffusion_number / n_sub
+
+        if n_sub > SpatialField.MAX_SUBSTEPS:
+            # Degrade exactly as SpatialField does: run the cap's worth of
+            # STABLE sub-steps and under-diffuse, rather than spreading an
+            # over-limit coefficient across capped sub-steps, which leaves
+            # every one of them unstable. The old single step did the
+            # latter in its purest form -- one step at a diffusion number
+            # of 2.0 against a limit of 1/6 -- and the clamp below turned
+            # the resulting oscillation into 12x mass creation per call.
+            _warn_under_diffused(diffusion_number, n_sub, max_stable)
+            n_sub = SpatialField.MAX_SUBSTEPS
+            coeff = max_stable
+
+        for _ in range(n_sub):
+            if backend.has_gpu:
+                lap = _laplacian_gpu(C, xp)
+            else:
+                lap = _laplacian_cpu(C)
+            C += coeff * lap
+
+    # 4. Non-negative clamp
     C = xp.maximum(C, 0.0)
 
     return C

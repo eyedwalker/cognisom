@@ -101,11 +101,20 @@ class MolecularModule(SimulationModule):
         self.exosome_release_rate = self.config.get('exosome_release_rate', 0.1)
         self.mutation_rate = self.config.get('mutation_rate', 0.001)
 
+        # Cap on retained full-length RNA objects per cell. The pool has
+        # exactly one consumer (_package_exosome, which reads index [0]),
+        # and nothing decays or trims it, so without a cap it grows for
+        # the whole run. 8 keeps a transcript always available for the
+        # consumer while bounding the footprint.
+        self.MAX_MRNA_PER_CELL = int(
+            self.config.get('max_mrna_per_cell', 8))
+
         # Statistics
         self.total_exosomes_released = 0
         self.total_exosomes_uptaken = 0
         self.total_mutations = 0
         self.total_transcriptions = 0
+        self.total_mrna_evicted = 0
 
     def initialize(self):
         """Initialize molecular system"""
@@ -285,7 +294,21 @@ class MolecularModule(SimulationModule):
             for gene_name in gene_names:
                 if np.random.random() < self.transcription_rate * dt:
                     mrna = self._build_mrna_from_view(view, gene_name, cell_id)
-                    self.cell_mrnas[cell_id].append(mrna)
+                    pool = self.cell_mrnas[cell_id]
+                    pool.append(mrna)
+                    # Bound the pool. Nothing decays or trims these
+                    # full-length RNA objects, and the ONLY consumer --
+                    # _package_exosome -- reads index [0] and nothing
+                    # else, so the list grew without limit: measured at
+                    # 6435 retained objects across 188 cells after a 24 h
+                    # Baseline run (median 16 per cell, max 93, ~3.9 MB
+                    # of sequence strings). Keep the most recent
+                    # MAX_MRNA_PER_CELL and drop the oldest, so the
+                    # consumer still finds a transcript and the footprint
+                    # is bounded by cells x MAX_MRNA_PER_CELL.
+                    if len(pool) > self.MAX_MRNA_PER_CELL:
+                        del pool[:-self.MAX_MRNA_PER_CELL]
+                        self.total_mrna_evicted += 1
                     self.total_transcriptions += 1
                     self.emit_event(EventTypes.GENE_EXPRESSED, {
                         'cell_id': cell_id,

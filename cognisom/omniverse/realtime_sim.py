@@ -163,17 +163,23 @@ class RealtimeSimulation:
 
     # ── Control ─────────────────────────────────────────────────────────
 
-    def start(self, mode: SimulationMode = SimulationMode.REALTIME) -> None:
+    def start(self, mode: Optional[SimulationMode] = None) -> None:
         """Start the real-time simulation loop.
 
         Args:
-            mode: Simulation execution mode
+            mode: Simulation execution mode. Omitted, the mode already
+                set on the instance is kept.
         """
         if self._running:
             log.warning("Simulation already running")
             return
 
-        self._mode = mode
+        # `mode` defaulted to REALTIME and was assigned unconditionally,
+        # so any set_mode() call before start() was silently discarded:
+        # set_mode(FAST) then start() ran at REALTIME's 60 fps cap.
+        # Default to the mode the instance already has instead.
+        if mode is not None:
+            self._mode = mode
         self._running = True
         self._paused = False
         self._stop_event.clear()
@@ -190,7 +196,8 @@ class RealtimeSimulation:
         self._thread = Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
-        log.info("Real-time simulation started in %s mode", mode.value)
+        log.info("Real-time simulation started in %s mode",
+                 self._mode.value)
 
     def stop(self) -> None:
         """Stop the simulation loop."""

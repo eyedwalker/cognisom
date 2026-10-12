@@ -43,6 +43,36 @@ class SpatialField:
         # Sources and sinks
         self.sources = []  # [(position, rate), ...]
         self.sinks = []    # [(position, rate), ...]
+
+        # First-order uptake, [(index, k), ...] with k in 1/h. This is
+        # the physically right sink for a metabolising cell -- see
+        # add_uptake -- and unlike `sinks` it keeps the steady-state
+        # operator non-singular and its solution non-negative.
+        self.uptake = []
+
+        # Dirichlet voxels, [(index, value), ...]: a capillary holds the
+        # interstitium at the plasma level it carries. This is the
+        # classical Krogh-Erlang vessel-wall condition.
+        self.dirichlet = []
+
+        # Cached sparse factorisation of the steady-state operator, with
+        # the key it was built for. The operator depends on the Dirichlet
+        # pattern (capillaries, which never move) and the uptake pattern
+        # (cells, which move only on division or death), so one
+        # factorisation serves many solves: MEASURED at 6 distinct
+        # patterns across a 240-update 24 h Baseline run.
+        self._lu = None
+        self._lu_key = None
+        self._lu_is_dir = None
+        self.lu_rebuilds = 0
+        self.last_solver = 'none'
+
+        # Each diagnostic warns ONCE per field, not once per update. The
+        # under-diffusion warning fired 720 times in a 24 h run (240
+        # updates x 3 fields), all of it describing the transport of an
+        # identically zero field.
+        self._cfl_warned = False
+        self._solver_warned = False
     
     def add_source(self, position: np.ndarray, rate: float):
         """Add source"""
@@ -54,10 +84,78 @@ class SpatialField:
         idx = self._position_to_index(position)
         self.sinks.append((idx, rate))
     
+    def add_uptake(self, position: np.ndarray, k: float):
+        """Add FIRST-ORDER uptake of strength ``k`` (1/h) at ``position``.
+
+        A metabolising cell consumes at a near-constant rate: O2 uptake is
+        Michaelis-Menten with Km ~ 1 mmHg, which is far below every
+        concentration in this model, so the kinetics are effectively
+        zeroth order. That is exactly why Krogh and Erlang (1919) assume
+        constant consumption, and why this engine's CellularModule
+        subtracts a flat rate per hour.
+
+        A zeroth-order sink cannot be used in a steady-state solve: it is
+        unbounded below, so it drives the concentration negative wherever
+        demand exceeds local supply, with no mechanism to stop it. This
+        method therefore takes the SECANT LINEARISATION of the
+        zeroth-order rate through the arterial operating point,
+
+            U(C) = k * C,    k = q_volumetric / C_arterial
+
+        so that at C = C_arterial the volumetric consumption is exactly
+        the cell's demand. Three consequences, all of them deliberate:
+
+        1. The operator stays LINEAR, so one LU factorisation serves every
+           solve that shares an occupancy pattern.
+        2. The operator is an M-matrix (see _assemble_matrix), so the
+           discrete maximum principle gives 0 <= C <= C_blood outright.
+           No clipping is applied, so the solve cannot destroy mass the
+           way the clipped explicit path did.
+        3. It UNDER-consumes wherever C < C_arterial, so it is
+           conservative: it cannot manufacture a hypoxia the zeroth-order
+           model would not show.
+
+        If the tissue extent is ever enlarged until uptake actually bites
+        (see thiele_modulus), the upgrade is Michaelis-Menten uptake under
+        a damped Newton iteration -- the standard treatment (McGuire &
+        Secomb 2001; Goldman 2008). On the shipped 200x200x100 um grid it
+        would make no difference: measured phi << 1.
+        """
+        if k <= 0.0:
+            return
+        idx = self._position_to_index(position)
+        self.uptake.append((idx, float(k)))
+
+    def add_dirichlet(self, position: np.ndarray, value: float):
+        """Pin the field at ``position`` to ``value`` (a Dirichlet voxel).
+
+        Used for capillaries: the vessel wall is held at the plasma level
+        the blood carries. This is the Krogh-Erlang inner boundary
+        condition and introduces no free parameter -- the value is the
+        arterial level the vascular module already uses.
+        """
+        idx = self._position_to_index(position)
+        self.dirichlet.append((idx, float(value)))
+
     def clear_sources_sinks(self):
-        """Clear all sources and sinks"""
+        """Clear all sources, sinks, uptake and Dirichlet voxels.
+
+        Callers that re-derive their terms from a moving cell population
+        must CLEAR THEN RE-REGISTER every step. ``add_*`` append, and
+        ``update`` applies every entry, so re-registering without
+        clearing grows the lists without bound and multiplies the
+        deposited amount by the step count -- the hazard
+        MorphogenModule._update_gradients_spatial guards against with a
+        ``_registered_sources`` set. That set-based guard is right for a
+        static organizer and WRONG for cells: it cannot retract the entry
+        of a cell that has died or changed voxel. Clearing first makes
+        the operation idempotent instead, which is what a moving
+        population needs.
+        """
         self.sources.clear()
         self.sinks.clear()
+        self.uptake.clear()
+        self.dirichlet.clear()
     
     #: Stability limit for the explicit 3D 7-point Laplacian:
     #: D*dt/dx^2 <= 1/6. Above it the scheme amplifies high-frequency
@@ -90,6 +188,30 @@ class SpatialField:
         dt_seconds = dt * self.SECONDS_PER_HOUR
         dx2 = self.resolution ** 2
 
+        # A driven field whose diffusion time across the domain is short
+        # against dt has already reached its steady state by the end of
+        # the step; integrating towards it with sub-stepped explicit
+        # Euler is both wrong (the sub-step cap applies only ~1% of the
+        # oxygen transport) and more expensive than solving for it
+        # directly. Try the steady state first.
+        # A field with no terms AND no material in it has nothing to
+        # transport. Diffusing identically zero is exactly zero, so this
+        # only skips work -- but it skips a LOT of it: the cytokine field
+        # is driven by nobody, and it was running 512 explicit sub-steps
+        # per update, 240 times a run, on an all-zero array, and emitting
+        # an under-diffusion warning about it.
+        if (not self.sources and not self.sinks and not self.uptake
+                and not self.dirichlet and not self.concentration.any()):
+            self.last_solver = 'idle'
+            return
+
+        if self._steady_state_applies(dt):
+            if self._solve_steady_state():
+                self.last_solver = 'steady_state'
+                return
+
+        self.last_solver = 'explicit'
+
         # Sources and sinks act over the whole interval, once.
         for idx, rate in self.sources:
             if self._is_valid_index(idx):
@@ -99,6 +221,21 @@ class SpatialField:
             if self._is_valid_index(idx):
                 removal = min(rate * dt, self.concentration[idx])
                 self.concentration[idx] -= removal
+
+        # First-order uptake over the interval, applied EXACTLY as
+        # exp(-k*dt) rather than as a linearised 1 - k*dt. This branch
+        # exists because the explicit path is reachable with uptake
+        # registered -- a field driven by cells but with no vessel
+        # (spatial + cellular enabled, vascular disabled) is not
+        # quasi-steady by _steady_state_applies' DRIVEN test, and
+        # without this loop its uptake was silently dropped and the
+        # field sat at its initial level for the whole run. The
+        # exponential form is unconditionally stable and cannot go
+        # negative for any k or dt, unlike the sink loop above, which
+        # needs its min() clamp.
+        for idx, rate in self.uptake:
+            if self._is_valid_index(idx) and rate > 0.0:
+                self.concentration[idx] *= np.exp(-rate * dt)
 
         if self.diffusion_coeff <= 0 or dt_seconds <= 0:
             np.maximum(self.concentration, 0, out=self.concentration)
@@ -111,8 +248,49 @@ class SpatialField:
         coeff = diffusion_number / n_sub
 
         if n_sub > self.MAX_SUBSTEPS:
-            _log.warning(
-                "Field '%s': D*dt/dx^2 = %.1f needs %d explicit sub-steps to "
+            self._warn_under_diffused(diffusion_number, n_sub, max_stable)
+            n_sub = self.MAX_SUBSTEPS
+            # Each sub-step must still satisfy the stability limit --
+            # spreading an over-limit coefficient across capped sub-steps
+            # leaves every one of them unstable, which overflows to NaN
+            # rather than merely being inaccurate.
+            coeff = max_stable
+
+        # Pin the Dirichlet voxels around the transport, not just before it.
+        # A vessel voxel held at arterial level is a boundary CONDITION: if
+        # the sub-step loop is allowed to diffuse it away, the source leaks
+        # into the field and then vanishes, and on a coarse grid (where the
+        # explicit path is actually taken) the field relaxes to identically
+        # zero -- which is exactly the symptom this coupling work set out to
+        # remove, reappearing only in explicit mode.
+        self._apply_dirichlet()
+        for _ in range(n_sub):
+            self.concentration += coeff * self._compute_laplacian()
+            self._apply_dirichlet()
+
+        # Non-negative
+        np.maximum(self.concentration, 0, out=self.concentration)
+
+    def _apply_dirichlet(self):
+        """Hold every pinned voxel at its boundary value."""
+        for idx, value in self.dirichlet:
+            if self._is_valid_index(idx):
+                self.concentration[idx] = value
+
+    def _warn_under_diffused(self, diffusion_number, n_sub, max_stable):
+        """Warn ONCE per field that the explicit path is under-diffusing.
+
+        This used to fire from inside update(), i.e. once per update: 240
+        updates x 3 fields = 720 identical records in a 24 h run. The
+        condition is a property of (D, dx, dt), which do not change
+        between updates, so one record per field says everything the 720
+        said.
+        """
+        if self._cfl_warned:
+            return
+        self._cfl_warned = True
+        _log.warning(
+            "Field '%s': D*dt/dx^2 = %.1f needs %d explicit sub-steps to "
                 "stay stable, above the cap of %d. Running %d stable "
                 "sub-steps instead, so the field is UNDER-DIFFUSED over this "
                 "interval (about %.1f%% of the transport applied). At this "
@@ -123,19 +301,273 @@ class SpatialField:
                 self.MAX_SUBSTEPS,
                 100.0 * self.MAX_SUBSTEPS * max_stable / diffusion_number,
             )
-            n_sub = self.MAX_SUBSTEPS
-            # Each sub-step must still satisfy the stability limit --
-            # spreading an over-limit coefficient across capped sub-steps
-            # leaves every one of them unstable, which overflows to NaN
-            # rather than merely being inaccurate.
-            coeff = max_stable
 
-        for _ in range(n_sub):
-            self.concentration += coeff * self._compute_laplacian()
+    # ── Quasi-steady-state solve ────────────────────────────────────
 
-        # Non-negative
-        np.maximum(self.concentration, 0, out=self.concentration)
-    
+    #: Minimum Fourier number D*dt/L^2 at which the field is treated as
+    #: having equilibrated within one update. L is the LARGEST domain
+    #: extent, because the slowest-decaying diffusive mode spans the
+    #: longest dimension and so sets the relaxation time; taking the
+    #: smallest extent would OVERstate Fo and could call an elongated
+    #: domain quasi-steady when its long axis is still relaxing.
+    #:
+    #: On the shipped configuration (dt = 0.1 h, dx = 10 um, 20x20x10
+    #: voxels so L = 200 um): oxygen Fo = 18, glucose 5.4, cytokine 0.9.
+    #: Oxygen and glucose are solved directly; cytokine's long axis is
+    #: genuinely still relaxing within a step, so it is integrated.
+    QUASI_STEADY_FOURIER = 1.0
+
+    def fourier_number(self, dt: float) -> float:
+        """D*dt / L^2 with L the largest domain extent, dimensionless."""
+        if self.diffusion_coeff <= 0 or dt <= 0:
+            return 0.0
+        extent = max(n * self.resolution for n in self.grid_size)
+        if extent <= 0:
+            return 0.0
+        return float(self.diffusion_coeff * self.SECONDS_PER_HOUR * dt
+                     / (extent * extent))
+
+    def thiele_modulus(self) -> float:
+        """L * sqrt(k_mean / D): diffusion time over uptake time.
+
+        L is the LARGEST domain extent, so phi is exactly the domain
+        length measured in diffusion lengths, L / sqrt(D/k) -- the
+        standard Thiele modulus.
+
+        This is the number that decides whether a gradient can exist at
+        all. phi << 1 means transport is far faster than consumption, so
+        the field is uniform to O(phi^2) NO MATTER how fine the grid is;
+        phi >~ 1 means the geometry is capable of producing a real
+        gradient, and therefore of producing hypoxia by geometry alone.
+
+        Reported in SpatialModule.get_state() precisely so that the
+        answer is visible rather than assumed. MEASURED on the shipped
+        200x200x100 um grid, all nine modules, 24 h Baseline: oxygen
+        phi = 0.0119, and the vessel-to-corner drop is 0.002% -- i.e.
+        this tissue extent is NOT diffusion-limited for O2 or glucose,
+        and no correct diffusion solve can produce a gradient on it.
+        That is why cell O2 stays on VascularModule's lumped Krogh
+        conductance rather than being read from this field: a
+        field-sourced cell O2 would sit at the arterial level
+        everywhere and no preset could produce hypoxia.
+        """
+        if self.diffusion_coeff <= 0 or not self.uptake:
+            return 0.0
+        n_vox = int(np.prod(self.grid_size))
+        n_dir = len({idx for idx, _ in self.dirichlet})
+        n_free = max(n_vox - n_dir, 1)
+        k_mean = sum(k for _, k in self.uptake) / n_free
+        if k_mean <= 0:
+            return 0.0
+        extent = max(n * self.resolution for n in self.grid_size)
+        return float(extent * np.sqrt(
+            k_mean / (self.diffusion_coeff * self.SECONDS_PER_HOUR)))
+
+    def _steady_state_applies(self, dt: float) -> bool:
+        """Whether the steady-state solve is both valid and wanted.
+
+        Three conditions, each necessary:
+
+        * DRIVEN. There must be a Dirichlet voxel or a rate source.
+          A field carrying only an initial blob has no steady state but
+          the trivial one, and replacing its transient with zero would
+          discard exactly the thing being modelled. (This is also what
+          keeps the shipped stability tests on the explicit path: they
+          seed a blob and register nothing.)
+        * REGULAR. There must be a Dirichlet voxel or positive uptake,
+          otherwise the pure-Neumann operator is singular -- the constant
+          vector is in its null space and the steady state is undefined.
+        * QUASI-STEADY. Fo >= QUASI_STEADY_FOURIER, i.e. the field really
+          does equilibrate within the step. Below that the transient is
+          the physical answer and explicit integration is correct.
+        """
+        driven = bool(self.dirichlet) or bool(self.sources)
+        regular = bool(self.dirichlet) or bool(self.uptake)
+        return (driven and regular
+                and self.fourier_number(dt) >= self.QUASI_STEADY_FOURIER)
+
+    def _assemble_matrix(self):
+        """Assemble the steady-state operator; return (A_csc, is_dirichlet).
+
+        Discretises, on the voxel grid,
+
+            D grad^2 C - k(x) C + s(x) = 0
+
+        with two boundary conditions:
+
+        * Homogeneous NEUMANN (no-flux) on the domain boundary. A tissue
+          sample exchanges with the body only through its vessels, and
+          this is the same outer closure as the Krogh cylinder's no-flux
+          tissue radius. It is imposed by simply omitting a boundary
+          voxel's missing neighbours from BOTH the off-diagonals and the
+          degree counted in the diagonal, which is the standard
+          ghost-node-free form of zero normal flux.
+        * DIRICHLET C = C_blood on every voxel a capillary passes
+          through (Krogh-Erlang vessel wall).
+
+        Note the explicit path's _compute_laplacian writes interior
+        points only and so leaves the boundary SHELL frozen at its
+        initial value -- a different, absorbing closure. That was
+        harmless while every field was identically zero, and the shipped
+        stability tests now pin it (test_mass_is_conserved... asserts the
+        shell stays at zero), so it is deliberately left alone. The two
+        paths differ in their boundary treatment and the docstring of
+        each says which it uses.
+
+        M-MATRIX PROPERTY, which is what makes the result trustworthy:
+        off-diagonals are +alpha >= 0, the diagonal is
+        -(alpha*degree + k) <= 0, and every row is weakly diagonally
+        dominant with STRICT dominance wherever k > 0 or the row is
+        Dirichlet. _steady_state_applies guarantees at least one such
+        row, and the 7-point grid graph is connected, so -A is an
+        irreducibly diagonally dominant M-matrix. Hence (-A)^-1 >= 0
+        entrywise and the solution obeys the discrete maximum principle:
+        0 <= C <= max(C_dirichlet, max(s/k)). Non-negativity is a
+        theorem here, not something enforced by clipping.
+        """
+        import scipy.sparse as sp
+
+        nx, ny, nz = self.grid_size
+        n = nx * ny * nz
+        ids = np.arange(n, dtype=np.int64).reshape(nx, ny, nz)
+        alpha = (self.diffusion_coeff * self.SECONDS_PER_HOUR
+                 / (self.resolution ** 2))
+
+        k = np.zeros(n, dtype=np.float64)
+        for idx, rate in self.uptake:
+            if self._is_valid_index(idx):
+                k[ids[idx]] += rate
+
+        is_dir = np.zeros(n, dtype=bool)
+        for idx, _value in self.dirichlet:
+            if self._is_valid_index(idx):
+                is_dir[ids[idx]] = True
+
+        # The six in-domain neighbour relations. A pair (a, b) means
+        # "voxel a has neighbour b"; absent pairs at the boundary are
+        # exactly homogeneous Neumann.
+        pairs = (
+            (ids[:-1, :, :], ids[1:, :, :]),
+            (ids[1:, :, :], ids[:-1, :, :]),
+            (ids[:, :-1, :], ids[:, 1:, :]),
+            (ids[:, 1:, :], ids[:, :-1, :]),
+            (ids[:, :, :-1], ids[:, :, 1:]),
+            (ids[:, :, 1:], ids[:, :, :-1]),
+        )
+        rows = np.concatenate([a.ravel() for a, _ in pairs])
+        cols = np.concatenate([b.ravel() for _, b in pairs])
+        degree = np.bincount(rows, minlength=n).astype(np.float64)
+
+        keep = ~is_dir[rows]
+        off_rows, off_cols = rows[keep], cols[keep]
+        off_vals = np.full(off_rows.size, alpha, dtype=np.float64)
+
+        diag_rows = np.arange(n, dtype=np.int64)
+        diag_vals = np.where(is_dir, 1.0, -(alpha * degree + k))
+
+        A = sp.csc_matrix(
+            (np.concatenate([off_vals, diag_vals]),
+             (np.concatenate([off_rows, diag_rows]),
+              np.concatenate([off_cols, diag_rows]))),
+            shape=(n, n),
+        )
+        return A, is_dir
+
+    def _assemble_rhs(self, is_dir):
+        """Right-hand side: the Dirichlet value on pinned rows, -s
+        elsewhere. Cheap, and rebuilt every solve, because only the
+        matrix is worth caching."""
+        nx, ny, nz = self.grid_size
+        n = nx * ny * nz
+        ids = np.arange(n, dtype=np.int64).reshape(nx, ny, nz)
+
+        s = np.zeros(n, dtype=np.float64)
+        for idx, rate in self.sources:
+            if self._is_valid_index(idx):
+                s[ids[idx]] += rate
+        for idx, rate in self.sinks:
+            if self._is_valid_index(idx):
+                s[ids[idx]] -= rate
+
+        b = -s
+        for idx, value in self.dirichlet:
+            if self._is_valid_index(idx):
+                b[ids[idx]] = value
+        return b
+
+    def _operator_key(self):
+        """Identity of the steady-state operator, so the factorisation is
+        reused whenever it has not actually changed."""
+        return (
+            tuple(sorted({(int(i), int(j), int(kk))
+                          for (i, j, kk), _ in self.dirichlet})),
+            tuple(sorted((int(i), int(j), int(kk), round(float(r), 12))
+                         for (i, j, kk), r in self.uptake)),
+            round(float(self.diffusion_coeff), 9),
+            round(float(self.resolution), 9),
+            tuple(self.grid_size),
+        )
+
+    def _solve_steady_state(self) -> bool:
+        """Solve for the steady state in place. True on success.
+
+        Returns False -- rather than writing a number nobody can trust --
+        if scipy is unavailable, the factorisation fails, or the result
+        violates the maximum principle the operator is supposed to
+        guarantee. The caller then falls back to explicit integration.
+        """
+        try:
+            import scipy.sparse.linalg as spla
+        except Exception:
+            if not self._solver_warned:
+                self._solver_warned = True
+                _log.warning(
+                    "Field '%s': scipy is unavailable, so the quasi-steady "
+                    "state cannot be solved and the field falls back to "
+                    "explicit sub-stepping, which at D*dt/dx^2 = %.1f "
+                    "applies only a few percent of the transport.",
+                    self.name, self.diffusion_coeff * self.SECONDS_PER_HOUR
+                    * 0.1 / self.resolution ** 2)
+            return False
+
+        try:
+            key = self._operator_key()
+            if self._lu is None or key != self._lu_key:
+                A, is_dir = self._assemble_matrix()
+                self._lu = spla.splu(A)
+                self._lu_is_dir = is_dir
+                self._lu_key = key
+                self.lu_rebuilds += 1
+            b = self._assemble_rhs(self._lu_is_dir)
+            c = self._lu.solve(b)
+        except Exception as exc:
+            if not self._solver_warned:
+                self._solver_warned = True
+                _log.warning(
+                    "Field '%s': the steady-state solve failed (%s); falling "
+                    "back to explicit sub-stepping.", self.name, exc)
+            self._lu = None
+            self._lu_key = None
+            return False
+
+        # The M-matrix property makes 0 <= C a theorem. Check it rather
+        # than assume it: a violation beyond round-off means the operator
+        # is not what this code believes it is, and a wrong field is worse
+        # than a slow one.
+        if not np.isfinite(c).all() or c.min() < -1e-9:
+            if not self._solver_warned:
+                self._solver_warned = True
+                _log.warning(
+                    "Field '%s': the steady-state solution violates the "
+                    "maximum principle (min %.3e, finite=%s). Refusing it "
+                    "and falling back to explicit sub-stepping.",
+                    self.name, float(np.min(c)), bool(np.isfinite(c).all()))
+            return False
+
+        self.concentration[...] = np.maximum(
+            c.reshape(self.grid_size), 0.0).astype(np.float32)
+        return True
+
     def _compute_laplacian(self) -> np.ndarray:
         """Compute Laplacian using finite differences"""
         laplacian = np.zeros_like(self.concentration)
@@ -227,6 +659,27 @@ class SpatialModule(SimulationModule):
         # Parameters
         self.update_interval = self.config.get('update_interval', 0.1)  # hours
         self.time_since_update = 0.0
+
+        # Coupled modules. Without these the module allocated three
+        # fields and diffused zeros: add_source/add_sink had no callers
+        # outside this file's own __main__, so after 24 h all three
+        # fields were identically zero while the under-diffusion warning
+        # had fired 720 times describing the transport of nothing.
+        self.cellular_module = None
+        self.vascular_module = None
+
+        # Cell radius used to turn a per-cell demand into a volumetric
+        # uptake density. 5.0 um is this project's own default --
+        # cognisom/core/tissue_config.py: cell_radius_um -- not a number
+        # invented here.
+        self.cell_radius_um = float(self.config.get('cell_radius_um', 5.0))
+
+        # Reference levels the first-order uptake coefficients are
+        # normalised by. Overridden from the vascular module when it is
+        # linked, so the two cannot drift.
+        self.arterial_O2 = float(self.config.get('arterial_O2', 0.21))
+        self.arterial_glucose = float(
+            self.config.get('arterial_glucose', 5.0))
     
     def initialize(self):
         """Initialize spatial system"""
@@ -250,15 +703,97 @@ class SpatialModule(SimulationModule):
         field = SpatialField(name, self.grid_size, self.resolution, diffusion_coeff)
         self.fields[name] = field
     
+    #: Per-cell O2 demand in field units per hour, matched to
+    #: CellularModule._update_metabolism, which hard-codes them (0.1 /h
+    #: for cancer, 0.15 /h otherwise). Glucose is read off the cellular
+    #: module instead, which exposes it as a configurable attribute.
+    O2_DEMAND_CANCER = 0.10
+    O2_DEMAND_NORMAL = 0.15
+
+    def set_cellular_module(self, cellular_module):
+        """Link the cell population that consumes from these fields."""
+        self.cellular_module = cellular_module
+
+    def set_vascular_module(self, vascular_module):
+        """Link the capillary network that supplies these fields."""
+        self.vascular_module = vascular_module
+        for name, attr in (('arterial_O2', 'arterial_O2'),
+                           ('arterial_glucose', 'arterial_glucose')):
+            value = getattr(vascular_module, attr, None)
+            if value is not None and float(value) > 0.0:
+                setattr(self, name, float(value))
+
+    def _sync_sources_sinks(self):
+        """Re-derive every field's terms from the current cell and vessel
+        state. Clear-then-register, so the operation is idempotent --
+        see SpatialField.clear_sources_sinks for why a set-based guard
+        would be wrong for a population that moves and dies.
+        """
+        if self.cellular_module is None and self.vascular_module is None:
+            return
+
+        for field in self.fields.values():
+            field.clear_sources_sinks()
+
+        oxygen = self.fields.get('oxygen')
+        glucose = self.fields.get('glucose')
+
+        # Capillaries supply the interstitium: a Dirichlet voxel wherever
+        # a vessel passes. Sampled at half-voxel spacing along the
+        # segment so no voxel it meaningfully traverses is skipped.
+        if self.vascular_module is not None:
+            caps = getattr(self.vascular_module, 'capillaries', {}) or {}
+            step = 0.5 * self.resolution
+            for cap in caps.values():
+                length = float(np.linalg.norm(
+                    np.asarray(cap.end, dtype=float)
+                    - np.asarray(cap.start, dtype=float)))
+                n_samples = max(2, int(np.ceil(length / step)) + 1)
+                for t in np.linspace(0.0, 1.0, n_samples):
+                    pos = cap.get_position(t)
+                    if oxygen is not None:
+                        oxygen.add_dirichlet(pos, float(cap.oxygen))
+                    if glucose is not None:
+                        glucose.add_dirichlet(pos, float(cap.glucose))
+
+        # Cells consume: first-order uptake, k = q_volumetric / C_arterial.
+        # See SpatialField.add_uptake for the derivation and for why the
+        # linearisation is the conservative direction.
+        if self.cellular_module is not None:
+            v_cell = (4.0 / 3.0) * np.pi * self.cell_radius_um ** 3
+            v_voxel = self.resolution ** 3
+            frac = v_cell / v_voxel if v_voxel > 0 else 0.0
+            glu_normal = float(getattr(
+                self.cellular_module, 'glucose_consumption_normal', 0.2))
+            glu_cancer = float(getattr(
+                self.cellular_module, 'glucose_consumption_cancer', 0.5))
+            cells = getattr(self.cellular_module, 'cells', {}) or {}
+            for cell in cells.values():
+                if not getattr(cell, 'alive', False):
+                    continue
+                is_cancer = getattr(cell, 'cell_type', '') == 'cancer'
+                if oxygen is not None and self.arterial_O2 > 0:
+                    q = (self.O2_DEMAND_CANCER if is_cancer
+                         else self.O2_DEMAND_NORMAL) * frac
+                    oxygen.add_uptake(cell.position, q / self.arterial_O2)
+                if glucose is not None and self.arterial_glucose > 0:
+                    q = (glu_cancer if is_cancer else glu_normal) * frac
+                    glucose.add_uptake(cell.position,
+                                       q / self.arterial_glucose)
+
     def update(self, dt: float):
         """Update spatial fields"""
         self.time_since_update += dt
-        
+
         # Update at intervals (diffusion is expensive)
         if self.time_since_update >= self.update_interval:
+            # Re-register BEFORE solving, so the field sees this step's
+            # cells and not the previous step's.
+            self._sync_sources_sinks()
+
             for field in self.fields.values():
                 field.update(self.time_since_update)
-            
+
             self.time_since_update = 0.0
     
     def get_concentration(self, field_name: str, position: np.ndarray) -> float:
@@ -292,15 +827,49 @@ class SpatialModule(SimulationModule):
                 'max': float(np.max(field.concentration)),
                 'min': float(np.min(field.concentration)),
                 'n_sources': len(field.sources),
-                'n_sinks': len(field.sinks)
+                'n_sinks': len(field.sinks),
+                # What the field is actually coupled to, and how it was
+                # solved. All three were silently absent while the fields
+                # were identically zero, which is why nothing reported
+                # that the module had no inputs at all.
+                'n_uptake': len(field.uptake),
+                'n_dirichlet': len(field.dirichlet),
+                'solver': field.last_solver,
+                'lu_rebuilds': field.lu_rebuilds,
+                # The dimensionless number that says whether a gradient
+                # can exist on this grid at all: phi << 1 means transport
+                # beats consumption and the field is uniform to O(phi^2)
+                # however fine the mesh.
+                'thiele_modulus': field.thiele_modulus(),
+                'fourier_number': field.fourier_number(self.update_interval),
             }
-        
-        return {
+
+        state = {
             'grid_size': self.grid_size,
             'resolution': self.resolution,
             'n_fields': len(self.fields),
+            'coupled_to_cells': self.cellular_module is not None,
+            'coupled_to_vessels': self.vascular_module is not None,
             'fields': field_stats
         }
+
+        # Interstitial levels sampled AT THE CELLS, which is the quantity
+        # a consumer would actually want, and the one that shows whether
+        # the field is uniform.
+        if self.cellular_module is not None:
+            cells = getattr(self.cellular_module, 'cells', {}) or {}
+            alive = [c for c in cells.values()
+                     if getattr(c, 'alive', False)]
+            for field_name, key in (('oxygen', 'interstitial_O2'),
+                                    ('glucose', 'interstitial_glucose')):
+                if field_name not in self.fields or not alive:
+                    continue
+                values = [self.get_concentration(field_name, c.position)
+                          for c in alive]
+                state[key + '_mean'] = float(np.mean(values))
+                state[key + '_min'] = float(np.min(values))
+
+        return state
     
     # Event handlers
     def on_cell_divided(self, data):

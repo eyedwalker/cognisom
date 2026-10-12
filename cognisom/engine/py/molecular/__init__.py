@@ -13,19 +13,22 @@ Features:
 - Exosome-mediated transfer
 """
 
-from .nucleic_acids import DNA, RNA, Gene
-from .proteins import Protein, MutantProtein
+# proteins.py and mutations.py held four classes with `pass` bodies --
+# Protein, MutantProtein, Mutation, OncogenicMutation -- re-exported from
+# here as though they were implementations. The Mutation stub was worse
+# than useless: it SHADOWED the real @dataclass Mutation defined in
+# nucleic_acids.py, so `from ...molecular import Mutation` returned the
+# empty placeholder. Both files are deleted and the real dataclass is
+# exported instead. Nothing outside this package imported any of the
+# four, so this removes a trap rather than a capability.
+from .nucleic_acids import DNA, RNA, Gene, Mutation
 from .exosomes import Exosome, ExosomeSystem
-from .mutations import Mutation, OncogenicMutation
 
 __all__ = [
     'DNA',
     'RNA',
     'Gene',
-    'Protein',
-    'MutantProtein',
+    'Mutation',
     'Exosome',
     'ExosomeSystem',
-    'Mutation',
-    'OncogenicMutation'
 ]

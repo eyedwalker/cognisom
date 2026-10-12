@@ -329,6 +329,7 @@ class EngineRunner:
         epigenetic = mods.get("epigenetic")
         circadian = mods.get("circadian")
         morphogen = mods.get("morphogen")
+        spatial = mods.get("spatial")
 
         if immune and cellular:
             immune.set_cellular_module(cellular)
@@ -343,6 +344,24 @@ class EngineRunner:
             # position, so without this it senses the gradient at the
             # birthplace for the whole run and never tracks a daughter.
             morphogen.set_cellular_module(cellular)
+        if spatial and cellular:
+            # SpatialModule was registered and enabled by default, so it
+            # allocated three fields and diffused them 240 times per 24 h
+            # run -- but add_source/add_sink had no callers anywhere
+            # outside spatial_module's own __main__, so all three fields
+            # stayed identically zero and the under-diffusion warning
+            # fired 720 times describing the transport of nothing.
+            # Cells are the sinks.
+            spatial.set_cellular_module(cellular)
+        if spatial and vascular:
+            # Capillaries are the sources, held at the plasma level they
+            # carry (Krogh-Erlang vessel wall). This does NOT replace
+            # VascularModule's own exchange with the cells: see the
+            # measurement in SpatialField.thiele_modulus -- at real O2
+            # diffusivity this tissue extent is not diffusion-limited, so
+            # a field-sourced cell O2 would sit at the arterial level
+            # everywhere and no preset could produce hypoxia.
+            spatial.set_vascular_module(vascular)
 
         # Register cells in supporting modules
         if cellular:
