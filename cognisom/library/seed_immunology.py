@@ -1973,6 +1973,14 @@ def _seed_adhesion_molecules(store: EntityStore) -> int:
          "Mucosal addressin cell adhesion molecule 1. Expressed on gut-associated endothelium. Dual function: mucin domain binds L-selectin (rolling), Ig domains bind α4β7 (arrest). Target of vedolizumab."),
     ]
 
+    # The kd / on_r / off_r columns above are the library's original
+    # family-level round numbers: seven distinct Kd values across
+    # fifteen molecules, none of them cited. Where a published
+    # measurement of the bond exists it replaces them here, so the
+    # dataclass fields and the provenanced parameters in physics_params
+    # cannot give two different answers for the same constant.
+    from .adhesion_kinetics import apply_curation, reconcile_legacy_fields
+
     count = 0
     for (name, family, expressed_on, ligands, kd, on_r, off_r,
          regulation, pathway, step, gene, structure, desc) in molecules:
@@ -1991,6 +1999,8 @@ def _seed_adhesion_molecules(store: EntityStore) -> int:
             gene_symbol=gene,
             structure_type=structure,
         )
+        reconcile_legacy_fields(entity)
+        apply_curation(entity)
         if store.add_entity(entity):
             count += 1
 

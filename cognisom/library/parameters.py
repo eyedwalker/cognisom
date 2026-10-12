@@ -336,6 +336,30 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         (EntityType.RECEPTOR,),
         minimum=0.0, maximum=1e9,
     ),
+
+    # ── Adhesion molecules: what the rolling/arrest model needs ──
+    #
+    # kd_nm, kon_per_nm_per_s and koff_per_s above already apply to this
+    # type. These two are the parameters the library actually carried on
+    # all fifteen adhesion molecules, as an unchecked type-level default
+    # that no spec described -- so no unit check, no range check and no
+    # applies_to check ran on either of them.
+    _spec(
+        "bond_lifetime_seconds", "s",
+        "Mean lifetime of a single adhesive bond. For a bond breaking "
+        "as a first-order process this is 1/koff, which is the model "
+        "the diapedesis solver uses, so the two must agree.",
+        (EntityType.ADHESION_MOLECULE,),
+        minimum=0.0, maximum=1e4,
+    ),
+    _spec(
+        "binding_force_pN", "pN",
+        "Rupture force of a single bond. Defined only together with a "
+        "loading rate, and selectin bonds are catch bonds, so a bare "
+        "scalar here is not a measurable quantity.",
+        (EntityType.ADHESION_MOLECULE,),
+        minimum=0.0, maximum=1e4,
+    ),
     _spec(
         "internalization_rate_per_min", "1/min",
         "Internalization rate of the bound receptor.",
@@ -445,6 +469,71 @@ def _sidecar(entity: BioEntity) -> Dict[str, Any]:
     return store
 
 
+@dataclass(frozen=True)
+class ParameterAlias:
+    """A legacy parameter name, and how to read it as a canonical one.
+
+    The spec table and the seeded data disagree on both names and
+    units. ``PARAMETER_SPECS`` declares ``diffusion_coeff_um2_s`` in
+    um^2/s, while the seeded cytokines carry
+    ``diffusion_coefficient_m2_per_s`` in m^2/s. So
+    ``get_parameter(cytokine, "diffusion_coeff_um2_s")`` returned None
+    while the value sat right there under another name, and
+    :func:`assess` reported it *missing* -- which made the curation
+    report ask for a number the library already had.
+
+    An alias is declared only where the conversion is exact and the
+    quantity is genuinely the same. ``oxygen_consumption_rate`` is
+    deliberately *not* aliased to
+    ``oxygen_consumption_fmol_per_cell_per_hour``: nothing in the
+    codebase states what unit the former is in, so no factor can be
+    asserted, and guessing one would silently rescale an oxygen sink.
+    """
+
+    legacy: str
+    canonical: str
+    #: Multiply the legacy value by this to get the canonical unit.
+    factor: float
+    #: Why the factor is what it is.
+    note: str
+
+
+#: Legacy name -> canonical name, with the exact conversion.
+PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
+    ParameterAlias(
+        "diffusion_coefficient_m2_per_s", "diffusion_coeff_um2_s", 1e12,
+        "1 m^2 = (1e6 um)^2 = 1e12 um^2, so m^2/s * 1e12 = um^2/s",
+    ),
+    ParameterAlias(
+        "ligand_kd_nm", "kd_nm", 1.0,
+        "the same quantity in the same unit under a different name",
+    ),
+)
+
+#: canonical name -> the aliases that can supply it.
+_ALIASES_BY_CANONICAL: Dict[str, Tuple[ParameterAlias, ...]] = {}
+for _alias in PARAMETER_ALIASES:
+    _ALIASES_BY_CANONICAL[_alias.canonical] = (
+        _ALIASES_BY_CANONICAL.get(_alias.canonical, ()) + (_alias,)
+    )
+
+
+def unspecced_names(entities) -> Dict[str, int]:
+    """Parameter names carried by data but declared by no spec.
+
+    A name with no spec is written with no unit check, no range check
+    and no applies_to check, so this is the list of parameters that can
+    hold anything at all. It is a worklist, not a failure.
+    """
+    counts: Dict[str, int] = {}
+    for entity in entities:
+        for name, _ in iter_parameters(entity):
+            if name in PARAMETER_SPECS:
+                continue
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
 def set_parameter(
     entity: BioEntity,
     name: str,
@@ -507,6 +596,24 @@ def get_parameter(entity: BioEntity, name: str) -> Optional[ParameterValue]:
                 "origin unknown"
             ),
         )
+
+    # Last resort: the value may be present under a legacy name. This
+    # stays PLACEHOLDER -- a unit conversion does not create evidence,
+    # it only stops the library reporting a number it holds as absent.
+    for alias in _ALIASES_BY_CANONICAL.get(name, ()):
+        legacy = entity.physics_params.get(alias.legacy)
+        if isinstance(legacy, (int, float)) and not isinstance(legacy, bool):
+            spec = PARAMETER_SPECS.get(name)
+            return ParameterValue(
+                value=float(legacy) * alias.factor,
+                unit=spec.unit if spec else "",
+                provenance=Provenance.PLACEHOLDER,
+                rationale=(
+                    f"read from the legacy parameter {alias.legacy!r} "
+                    f"(x{alias.factor:g}: {alias.note}); the underlying "
+                    "number still has no recorded provenance"
+                ),
+            )
     return None
 
 
@@ -574,25 +681,44 @@ class CoverageReport:
 
     total: int = 0
     ready: int = 0
+    #: Entities where the parameter is absent altogether.
     by_parameter_missing: Dict[str, int] = field(default_factory=dict)
+    #: Entities where a number is present but carries no evidence. A
+    #: report that calls these "missing" sends a curator looking for a
+    #: value that is already there; what they are missing is the
+    #: citation, and the two need different work.
+    by_parameter_placeholder: Dict[str, int] = field(default_factory=dict)
     not_ready: List[Readiness] = field(default_factory=list)
 
     @property
     def fraction_ready(self) -> float:
         return (self.ready / self.total) if self.total else 0.0
 
+    @property
+    def by_parameter_uncurated(self) -> Dict[str, int]:
+        """Absent plus unevidenced, per parameter: the worklist size."""
+        out = dict(self.by_parameter_missing)
+        for name, count in self.by_parameter_placeholder.items():
+            out[name] = out.get(name, 0) + count
+        return out
+
     def describe(self) -> str:
         lines = [
             f"{self.ready}/{self.total} entities ready "
             f"({self.fraction_ready:.0%})"
         ]
-        if self.by_parameter_missing:
+        uncurated = self.by_parameter_uncurated
+        if uncurated:
             lines.append("uncurated parameters, most common first:")
             for name, count in sorted(
-                self.by_parameter_missing.items(),
-                key=lambda kv: (-kv[1], kv[0]),
+                uncurated.items(), key=lambda kv: (-kv[1], kv[0]),
             ):
-                lines.append(f"  {name}: {count}")
+                absent = self.by_parameter_missing.get(name, 0)
+                unevidenced = self.by_parameter_placeholder.get(name, 0)
+                lines.append(
+                    f"  {name}: {count} "
+                    f"({absent} absent, {unevidenced} unevidenced)"
+                )
         return "\n".join(lines)
 
 
@@ -611,9 +737,13 @@ def coverage(entities) -> CoverageReport:
             report.ready += 1
         else:
             report.not_ready.append(r)
-            for name in r.missing + r.placeholder:
+            for name in r.missing:
                 report.by_parameter_missing[name] = (
                     report.by_parameter_missing.get(name, 0) + 1
+                )
+            for name in r.placeholder:
+                report.by_parameter_placeholder[name] = (
+                    report.by_parameter_placeholder.get(name, 0) + 1
                 )
     return report
 

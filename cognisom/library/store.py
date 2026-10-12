@@ -154,6 +154,28 @@ class EntityStore:
                 except Exception as e:
                     log.warning("Default enrichment failed (non-fatal): %s", e)
 
+                # Enrichment writes the type-level physics defaults,
+                # including the adhesion molecules' bond_lifetime_seconds
+                # of 2.0, which is not consistent with any measured
+                # off-rate. Curating after it means the measured values
+                # win and carry their citations; an existing database
+                # gets the same pass from
+                # `python -m cognisom.library.adhesion_kinetics`.
+                try:
+                    from .adhesion_kinetics import curate_store
+                    run = curate_store(self)
+                    log.info(
+                        "Adhesion kinetics: %d measured, %d derived, "
+                        "%d placeholder across %d entities",
+                        run.measured_parameters, run.derived_parameters,
+                        run.placeholder_parameters, len(run.entities),
+                    )
+                    for refusal in run.refusals:
+                        log.warning("Adhesion curation refused %s", refusal)
+                except Exception as e:
+                    log.warning(
+                        "Adhesion kinetics curation failed (non-fatal): %s", e)
+
                 final = self.stats()
                 log.info(
                     "Auto-seeded entity library: %d entities, %d relationships",

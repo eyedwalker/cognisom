@@ -107,6 +107,48 @@ class EnzymeKinetics:
 
 # ── SABIO-RK Client ──────────────────────────────────────────────────
 
+class KineticsSourceUnavailable(RuntimeError):
+    """The kinetics source answered, but not with an API payload.
+
+    SABIO-RK's REST paths currently return HTTP 200 with a 1182-byte
+    HTML application shell for every query, including ones that
+    certainly have records. The old code read that as an empty result
+    set, so :func:`enrich_all_enzymes` reported
+    ``{"enriched": 0, "total_params": 0, "errors": []}`` over the whole
+    library -- a retired endpoint presented as "this enzyme has no
+    kinetic data", for every enzyme at once.
+
+    A source that cannot be reached is not a source that returned
+    nothing. Raising keeps those two outcomes distinguishable, which is
+    the only way a caller can tell "look somewhere else" from "there is
+    nothing to find".
+    """
+
+
+#: Content types that can carry a SABIO-RK payload. A 200 response in
+#: anything else is the web UI, not the API.
+_API_CONTENT_TYPES = (
+    "application/json", "application/xml", "text/xml",
+    "application/sbml", "text/plain",
+)
+
+
+def _require_api_response(resp, url: str):
+    """Raise unless ``resp`` is plausibly an API payload."""
+    ctype = (resp.headers.get("content-type") or "").split(";")[0].strip()
+    if resp.status_code != 200:
+        raise KineticsSourceUnavailable(
+            f"SABIO-RK {url} answered HTTP {resp.status_code}"
+        )
+    if ctype not in _API_CONTENT_TYPES:
+        raise KineticsSourceUnavailable(
+            f"SABIO-RK {url} answered HTTP 200 with content-type "
+            f"{ctype!r} ({len(resp.content)} bytes) rather than an API "
+            "response; the REST endpoint appears to have been retired"
+        )
+    return resp
+
+
 class SABIORKClient:
     """Query SABIO-RK for reaction kinetics.
 
@@ -142,28 +184,31 @@ class SABIORKClient:
             params = {"q": query, "format": "json"}
 
             resp = self.session.get(url, params=params, timeout=15)
-            if resp.status_code != 200:
-                log.debug("SABIO-RK search failed for %s: %s", enzyme_name, resp.status_code)
-                return result
+            _require_api_response(resp, url)
 
-            # Parse response
-            data = resp.text
-            # SABIO-RK returns SBML by default, try JSON endpoint
             url2 = f"{self.base_url}/kineticLaws"
             params2 = {"q": query, "format": "json", "limit": limit}
             resp2 = self.session.get(url2, params=params2, timeout=15)
+            _require_api_response(resp2, url2)
 
-            if resp2.status_code == 200:
-                try:
-                    entries = resp2.json() if resp2.headers.get("content-type", "").startswith("application/json") else []
-                except Exception:
-                    entries = []
+            try:
+                entries = resp2.json()
+            except ValueError as e:
+                raise KineticsSourceUnavailable(
+                    f"SABIO-RK {url2} returned undecodable JSON: {e}"
+                ) from e
 
-                for entry in entries[:limit]:
-                    self._parse_entry(entry, result)
+            for entry in entries[:limit]:
+                self._parse_entry(entry, result)
 
-        except Exception as e:
-            log.debug("SABIO-RK search error for %s: %s", enzyme_name, e)
+        except KineticsSourceUnavailable:
+            # Deliberately not swallowed: an unreachable source must not
+            # look like an enzyme with no published kinetics.
+            raise
+        except requests.RequestException as e:
+            raise KineticsSourceUnavailable(
+                f"SABIO-RK request failed for {enzyme_name}: {e}"
+            ) from e
 
         return result
 
@@ -182,17 +227,23 @@ class SABIORKClient:
             url = f"{self.base_url}/kineticLaws"
             params = {"q": query, "format": "json", "limit": 10}
             resp = self.session.get(url, params=params, timeout=15)
+            _require_api_response(resp, url)
 
-            if resp.status_code == 200:
-                try:
-                    entries = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else []
-                except Exception:
-                    entries = []
-                for entry in entries:
-                    self._parse_entry(entry, result)
+            try:
+                entries = resp.json()
+            except ValueError as e:
+                raise KineticsSourceUnavailable(
+                    f"SABIO-RK {url} returned undecodable JSON: {e}"
+                ) from e
+            for entry in entries:
+                self._parse_entry(entry, result)
 
-        except Exception as e:
-            log.debug("SABIO-RK reaction search error: %s", e)
+        except KineticsSourceUnavailable:
+            raise
+        except requests.RequestException as e:
+            raise KineticsSourceUnavailable(
+                f"SABIO-RK reaction request failed: {e}"
+            ) from e
 
         return result
 
@@ -311,8 +362,18 @@ def enrich_entity_kinetics(store, entity_name: str,
 
 
 def enrich_all_enzymes(store, progress_callback=None) -> Dict:
-    """Enrich all protein/gene entities with kinetic data."""
-    results = {"enriched": 0, "total_params": 0, "errors": []}
+    """Enrich all protein/gene entities with kinetic data.
+
+    ``source_available`` is False when the kinetics source could not be
+    reached at all. Without it, a caller cannot tell a library whose
+    enzymes have no published kinetics from a library that was never
+    asked -- both used to come back as ``enriched: 0`` with an empty
+    error list.
+    """
+    results = {
+        "enriched": 0, "total_params": 0, "errors": [],
+        "source_available": True,
+    }
 
     for etype in ["gene", "protein"]:
         entities, total = store.search(entity_type=etype, limit=100)
@@ -325,6 +386,13 @@ def enrich_all_enzymes(store, progress_callback=None) -> Dict:
                 if result.get("parameters_found", 0) > 0:
                     results["enriched"] += 1
                     results["total_params"] += result["parameters_found"]
+            except KineticsSourceUnavailable as e:
+                # One unreachable source means every remaining lookup
+                # would fail the same way. Stop and say so instead of
+                # grinding through the library to report a clean zero.
+                results["source_available"] = False
+                results["errors"].append(f"kinetics source unavailable: {e}")
+                return results
             except Exception as e:
                 results["errors"].append(f"{entity.name}: {e}")
 

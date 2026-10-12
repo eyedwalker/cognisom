@@ -65,7 +65,7 @@ def build_report(
         report = coverage(entities)
         total_entities += report.total
         total_ready += report.ready
-        for name, count in report.by_parameter_missing.items():
+        for name, count in report.by_parameter_uncurated.items():
             worklist[name] = worklist.get(name, 0) + count
 
         lines.append(f"── {etype.value} ─────────────────────────")
@@ -73,12 +73,25 @@ def build_report(
             f"   {report.ready}/{report.total} simulation-ready "
             f"({report.fraction_ready:.0%})"
         )
+        # "missing" was wrong for most of these rows: the number is
+        # present and only the evidence is absent. The two gaps need
+        # different work -- find a value, versus find a citation for
+        # the value already there -- so the report names which it is.
         for name, count in sorted(
-            report.by_parameter_missing.items(), key=lambda kv: (-kv[1], kv[0])
+            report.by_parameter_uncurated.items(),
+            key=lambda kv: (-kv[1], kv[0]),
         ):
             spec = PARAMETER_SPECS.get(name)
             unit = f" [{spec.unit}]" if spec else ""
-            lines.append(f"     {count:>4} missing  {name}{unit}")
+            absent = report.by_parameter_missing.get(name, 0)
+            unevidenced = report.by_parameter_placeholder.get(name, 0)
+            if absent and unevidenced:
+                kind = f"uncurated ({absent} absent, {unevidenced} unevidenced)"
+            elif absent:
+                kind = "absent"
+            else:
+                kind = "present but unevidenced"
+            lines.append(f"     {count:>4} {kind}  {name}{unit}")
 
         if show_entities:
             for r in report.not_ready:
