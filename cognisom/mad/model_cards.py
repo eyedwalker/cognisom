@@ -14,6 +14,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+from cognisom.genomics.treatment_simulator import (
+    CALIBRATION_STATEMENT,
+    ILLUSTRATIVE_PARAMETER_COUNT,
+)
+
 
 @dataclass
 class ModelCard:
@@ -78,13 +83,12 @@ TREATMENT_SIMULATOR_CARD = ModelCard(
     purpose="Simulate immunotherapy and targeted therapy response using patient digital twin",
     model_type="rule-based + stochastic simulation",
     intended_population="Metastatic castration-resistant prostate cancer (mCRPC)",
-    training_data_equivalent=(
-        "Parameters derived from published clinical trial endpoints: "
-        "KEYNOTE-199 (NCT02787005), KEYNOTE-158 (NCT02628067), "
-        "CheckMate-650 (NCT02985957), PROfound (NCT02987543), "
-        "TRITON2 (NCT02952534), KEYNOTE-942 (NCT03897881). "
-        "Entity library physics_params for drug-specific parameters."
-    ),
+    # Read verbatim from the simulator rather than asserted here. This
+    # field used to claim the parameters were "derived from published
+    # clinical trial endpoints" and list six NCT numbers; nothing in
+    # treatment_simulator.py bore that out. The trials remain listed under
+    # `reference_trials`, which is what they are: reference, not calibration.
+    training_data_equivalent=CALIBRATION_STATEMENT,
     reference_trials=[
         "NCT02787005", "NCT02628067", "NCT02985957",
         "NCT02987543", "NCT02952534", "NCT03897881",
@@ -100,9 +104,37 @@ TREATMENT_SIMULATOR_CARD = ModelCard(
     processing_speed="0.17 seconds per patient",
     known_limitations=[
         "Based on prostate cancer; not validated for other tumor types",
-        "Stochastic simulation — results vary with random seed",
+        f"{ILLUSTRATIVE_PARAMETER_COUNT} of this model's constants are "
+        "illustrative, not fitted. One (the untreated growth rate) is derived "
+        "from a published endpoint and two are RECIST 1.1 thresholds. Every "
+        "constant is enumerated with its basis in PARAMETER_PROVENANCE, in "
+        "cognisom/genomics/treatment_simulator.py.",
+        # The old text here read "Stochastic simulation — results vary with "
+        # "random seed". They do not vary: the seed is a fixed digest, and it
+        # used to digest the drug name alone, so every patient drew the same
+        # noise.
+        "Deterministic per (patient, regimen): the trajectory is identical on "
+        "every run. The stochastic term is one fixed pseudo-random "
+        "realisation seeded from the patient and the drug, not a sampling "
+        "distribution, so this model yields no interval and no response rate.",
         "Does not model drug-drug interactions or pharmacokinetics",
-        "Does not account for prior treatment history or resistance evolution",
+        "Response followed by progression is not representable: no "
+        "acquired-resistance mechanism can reverse net growth, so "
+        "progression-free survival is either an early progression day or is "
+        "right-censored at the end of the simulated window, and a published "
+        "median rPFS such as PROfound's 7.4 months is outside the output range.",
+        "RECIST complete response is not representable: relative volume is "
+        "floored at 0.01, a 78% diameter reduction.",
+        "Effectiveness is clamped to [0, 1], so biomarker severity is "
+        "indistinguishable above the clamp — a BRCA2 carrier and any other "
+        "HRD patient both score 1.000 on olaparib.",
+        "Reported confidence scores input completeness, not accuracy. No "
+        "prediction from this model has been compared against an observed "
+        "patient outcome.",
+        "The validation cohort named below is not pinned locally: "
+        "prad_su2c_2019 is a cBioPortal download that is absent from this "
+        "checkout, so the cohort figures cannot be reproduced offline, and "
+        "that dataset carries no per-drug response outcomes in any case.",
         "9 treatment regimens only; does not cover all FDA-approved options",
     ],
     failure_modes=[

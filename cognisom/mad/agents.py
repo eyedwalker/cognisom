@@ -19,6 +19,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from cognisom.genomics.treatment_simulator import (
+    CALIBRATION_STATEMENT,
+    format_progression_free_survival,
+)
+
 from .evidence import (
     EvidenceItem,
     FeatureContribution,
@@ -752,6 +757,11 @@ class ClinicalAgent(MADAgent):
         warnings = []
         confidence = 0.70
 
+        # Said once per opinion, where a reader meets the ranking: the
+        # numbers below come from a simulator whose constants are, with two
+        # exceptions, illustrative.
+        dissenting.append(CALIBRATION_STATEMENT)
+
         if not treatment_results:
             warnings.append(MADErrorCode.SIMULATION_FAILURE.value)
             return AgentOpinion(
@@ -773,18 +783,58 @@ class ClinicalAgent(MADAgent):
             best_response = getattr(result, "best_response", 1.0)
             response_score = max(0.0, 1.0 - best_response)  # Lower volume = better
 
+            # Both units, labelled. The response curve is a relative
+            # VOLUME, while RECIST is defined on the sum of longest
+            # diameters, so an unlabelled "38% reduction" next to a RECIST
+            # category read as a 38% diameter change when it is 15%.
+            diameter_reduction = (1 - best_response ** (1.0 / 3.0)) * 100
             contribs.append(FeatureContribution(
                 "tumor_response", response_score * 0.5, "positive",
-                f"Best response: {(1-best_response)*100:.0f}% tumor reduction",
+                f"Best response: {(1-best_response)*100:.0f}% tumour volume "
+                f"reduction ({diameter_reduction:.0f}% diameter reduction, "
+                f"the RECIST-comparable figure)",
             ))
 
-            # PFS contribution
-            pfs = getattr(result, "progression_free_days", 0)
-            pfs_score = min(0.25, pfs / 720.0)  # Max contribution at 2 years
-            contribs.append(FeatureContribution(
-                "progression_free_survival", pfs_score, "positive",
-                f"PFS: {pfs} days ({pfs/30:.1f} months)",
-            ))
+            # PFS contribution, dropped when the value is right-censored --
+            # which on a 180-day run is every arm that does not progress
+            # early. 180/720 saturates the 0.25 cap, so the term was a
+            # constant 0.25 added to every arm: a fake signal that looked
+            # like evidence of durability while carrying none. A censored
+            # PFS is the length of follow-up, not a survival time.
+            pfs_days = getattr(result, "progression_free_days", 0)
+            pfs_censored = bool(
+                getattr(result, "progression_free_censored", False))
+            pfs_text = format_progression_free_survival(pfs_days, pfs_censored)
+            if pfs_censored:
+                pfs_score = 0.0
+                contribs.append(FeatureContribution(
+                    "progression_free_survival", 0.0, "neutral",
+                    f"PFS right-censored at {pfs_days} days — no progression "
+                    "was observed inside the simulated window, so no PFS "
+                    "term contributes to this score",
+                ))
+            else:
+                # An OBSERVED progression is evidence against the arm, so it
+                # enters as a penalty, not a reward. `min(0.25, pfs/720)`
+                # scored a day-110 progression at +0.153 while an arm that
+                # never progressed scored 0.0 once the censored term was
+                # dropped -- which ranks observed failure above unobserved
+                # success. The penalty scales with how early the progression
+                # came and reaches zero at the end of the window, so the two
+                # branches meet continuously at the horizon. The 0.25 is the
+                # magnitude the term already had; like almost everything in
+                # this model it is illustrative, not fitted.
+                horizon = max(int(getattr(result, "duration_days", 0) or 0),
+                              pfs_days, 1)
+                earliness = max(0.0, 1.0 - (pfs_days / horizon))
+                penalty = 0.25 * earliness
+                pfs_score = -penalty if penalty > 0.0 else 0.0
+                contribs.append(FeatureContribution(
+                    "progression_free_survival", pfs_score,
+                    "negative" if penalty > 0.0 else "neutral",
+                    f"Progression observed — PFS {pfs_text} of a "
+                    f"{horizon}-day window",
+                ))
 
             # Safety penalty (irAE risk)
             irae = getattr(result, "immune_related_adverse_events", 0.0)
@@ -818,13 +868,16 @@ class ClinicalAgent(MADAgent):
                 source_name=f"Cognisom Simulation: {result.treatment_name}",
                 source_id="cognisom-sim-v1",
                 claim=f"Simulated {response_cat} response "
-                      f"({(1-best_response)*100:.0f}% reduction, PFS {pfs}d)",
+                      f"({(1-best_response)*100:.0f}% volume reduction, "
+                      f"PFS {pfs_text})",
                 strength="simulation",
                 supporting_data={
                     "best_response": round(best_response, 3),
-                    "pfs_days": pfs,
+                    "pfs_days": pfs_days,
+                    "pfs_censored": pfs_censored,
                     "response_category": response_cat,
                     "irae_risk": round(irae, 3),
+                    "parameters": "illustrative — see CALIBRATION_STATEMENT",
                 },
             ))
 

@@ -241,8 +241,14 @@ if result:
                 mode="lines",
                 name=f"{t.treatment_name[:20]} ({t.response_category})",
             ))
-        fig.add_hline(y=0.7, line_dash="dash", line_color="gray",
-                      annotation_text="PR threshold")
+        # 0.70 is the RECIST PR threshold on DIAMETERS. This axis is a volume
+        # ratio, where the same response is 0.70^3 = 0.343, so a line at 0.70
+        # marked "PR threshold" put it at an 11.2% diameter shrink -- stable
+        # disease -- and made most arms look like responders.
+        fig.add_hline(y=0.343, line_dash="dash", line_color="gray",
+                      annotation_text="PR threshold (−30% diameter = 0.343 volume)")
+        fig.add_hline(y=1.728, line_dash="dash", line_color="#ef4444",
+                      annotation_text="PD threshold (+20% diameter = 1.728 volume)")
         fig.update_layout(
             xaxis_title="Days", yaxis_title="Tumor Volume",
             height=350, legend=dict(font=dict(size=8)),

@@ -8,6 +8,13 @@ which biomarkers contributed how much to each treatment score.
 This is deterministic decomposition (not SHAP/LIME) because the
 treatment logic is rule-based, not ML. Each if-branch becomes a
 named FeatureContribution. This is more auditable for FDA.
+
+The branch conditions must be the SAME conditions the score uses, which is
+why both dispatch on `treatment_mechanisms`. They did not: this file guarded
+its androgen-receptor branch with `"AR" in cls and "PARP" not in cls` while
+the simulator guarded it with `"AR" in cls` alone -- and `"PARP"` contains
+`"AR"` -- so on both PARP arms the decomposition disagreed with the score it
+claims to decompose by 0.20 (0.20 here against 0.40 there).
 """
 
 from __future__ import annotations
@@ -15,6 +22,15 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+
+from cognisom.genomics.treatment_simulator import (
+    MECH_AR_ANTAGONIST,
+    MECH_CTLA4,
+    MECH_PARP,
+    MECH_PD1,
+    MECH_VACCINE,
+    treatment_mechanisms,
+)
 
 from .evidence import FeatureContribution
 
@@ -78,9 +94,10 @@ def explain_effectiveness(
     contributions = []
     treatment_class = profile.get("class", "")
     treatment_key = profile.get("name", "unknown")
+    mechanisms = treatment_mechanisms(profile)
 
     # --- Anti-PD-1 branch ---
-    if "PD-1" in treatment_class or "anti-PD" in treatment_class:
+    if MECH_PD1 in mechanisms:
         # PD-L1 expression
         pd_l1 = getattr(twin, "pd_l1_expression", None)
         if pd_l1 is None:
@@ -133,7 +150,7 @@ def explain_effectiveness(
             ))
 
     # --- Anti-CTLA-4 branch ---
-    if "CTLA-4" in treatment_class:
+    if MECH_CTLA4 in mechanisms:
         treg = getattr(twin, "treg_fraction", None)
         if treg is None:
             contributions.append(FeatureContribution(
@@ -152,7 +169,7 @@ def explain_effectiveness(
         ))
 
     # --- PARP branch ---
-    if "PARP" in treatment_class:
+    if MECH_PARP in mechanisms:
         has_hrd = getattr(twin, "has_dna_repair_defect", False)
         if has_hrd:
             contributions.append(FeatureContribution(
@@ -166,7 +183,7 @@ def explain_effectiveness(
             ))
 
     # --- AR antagonist branch ---
-    if "AR" in treatment_class and "PARP" not in treatment_class:
+    if MECH_AR_ANTAGONIST in mechanisms:
         has_ar = getattr(twin, "has_ar_mutation", False)
         if has_ar:
             contributions.append(FeatureContribution(
@@ -180,7 +197,7 @@ def explain_effectiveness(
             ))
 
     # --- Vaccine branch ---
-    if "vaccine" in treatment_class:
+    if MECH_VACCINE in mechanisms:
         vac_count = getattr(twin, "vaccine_candidate_count", 0)
         if vac_count >= 10:
             contributions.append(FeatureContribution(
@@ -233,7 +250,7 @@ def explain_effectiveness(
     # --- MSI-H boost for checkpoint ---
     msi = getattr(twin, "microsatellite_instability", "unknown")
     if msi == "MSI-H":
-        if "PD-1" in treatment_class or "checkpoint" in treatment_class:
+        if MECH_PD1 in mechanisms:
             contributions.append(FeatureContribution(
                 "msi_h_checkpoint_boost", 0.20, "positive",
                 "MSI-H — FDA-approved biomarker for checkpoint inhibitor response",

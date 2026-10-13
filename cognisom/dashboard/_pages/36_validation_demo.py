@@ -188,17 +188,22 @@ with tab_demo:
             if result.treatments:
                 fig = go.Figure()
                 for t in sorted(result.treatments, key=lambda x: x.best_response)[:6]:
-                    reduction = (1 - t.best_response) * 100
+                    # Report the DIAMETER reduction RECIST is defined on, not
+                    # the volume reduction, which overstates every response:
+                    # a 30% diameter shrink is a 66% volume drop.
+                    reduction = (1 - t.best_response ** (1.0 / 3.0)) * 100
                     fig.add_trace(go.Bar(
                         x=[t.treatment_name[:25]],
                         y=[reduction],
-                        marker_color="#10b981" if t.response_category in ("CR", "PR") else "#f59e0b",
+                        # CR is never returned by the simulator, so the
+                        # ("CR", "PR") membership test was half dead code.
+                        marker_color="#10b981" if t.response_category == "PR" else "#f59e0b",
                         text=f"{reduction:.0f}%",
                         textposition="outside",
                     ))
                 fig.update_layout(
                     title="Predicted Tumor Reduction by Treatment",
-                    yaxis_title="Tumor Reduction (%)",
+                    yaxis_title="Tumor Reduction (% diameter, RECIST)",
                     height=350,
                     showlegend=False,
                 )

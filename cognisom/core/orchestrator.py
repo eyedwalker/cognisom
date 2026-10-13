@@ -648,8 +648,12 @@ class CognisomOrchestrator:
                 {
                     "name": t.treatment_name,
                     "response": t.response_category,
-                    "best_response_pct": f"{(1-t.best_response)*100:.0f}%",
+                    "best_response_volume_pct": f"{(1-t.best_response)*100:.0f}%",
+                    "best_response_diameter_pct":
+                        f"{(1 - t.best_response ** (1.0 / 3.0)) * 100:.0f}%",
                     "pfs_days": t.progression_free_days,
+                    "pfs_censored": t.progression_free_censored,
+                    "pfs": t.format_progression_free_survival(),
                     "irae_risk": round(t.immune_related_adverse_events, 2),
                 }
                 for t in treatments

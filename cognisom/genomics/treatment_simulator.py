@@ -12,6 +12,7 @@ genomic profile and immune landscape.
 
 import hashlib
 import logging
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -22,6 +23,506 @@ from .twin_config import DigitalTwinConfig
 logger = logging.getLogger(__name__)
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Response criteria, in the units the criteria are defined in
+# ─────────────────────────────────────────────────────────────────────────
+#
+# `tumor_response_curve` is a relative *volume*: `_simulate_tumor_dynamics`
+# integrates a multiplicative growth/kill law on tumour cell number, so the
+# state variable is a volume.
+#
+# RECIST 1.1 (Eisenhauer et al., Eur J Cancer 2009;45:228-247) is defined on
+# the sum of longest *diameters* of the target lesions. For a lesion that
+# changes approximately isotropically, V is proportional to D**3, so
+#
+#     D / D_0 = (V / V_0) ** (1/3)
+#
+# A -30% diameter change is therefore a volume ratio of 0.70**3 = 0.343, and
+# a +20% diameter change is a volume ratio of 1.20**3 = 1.728. Comparing the
+# volume curve directly against 0.70 and 1.20 -- which this file used to do --
+# called an 11.2% diameter shrink a partial response, and put the progression
+# threshold at a 6.3% diameter increase. Both constants below are diameter
+# ratios, and `_classify_response` applies them to the cube root of a volume.
+RECIST_PR_DIAMETER_RATIO = 0.70
+"""PR: >= 30% decrease in the sum of longest diameters, referenced to BASELINE."""
+
+RECIST_PD_DIAMETER_RATIO = 1.20
+"""PD: >= 20% increase in the sum of longest diameters, referenced to the NADIR.
+
+RECIST 1.1 references progression to the smallest sum recorded on study, not
+to baseline, and additionally requires an absolute increase of at least 5 mm.
+A relative-volume model carries no absolute sizes, so the 5 mm rule is not
+representable here; see `MODEL_CAVEATS`.
+"""
+
+DAYS_PER_MONTH = 365.25 / 12.0
+"""Average Gregorian month. Published medians are in months; this model steps in days."""
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Parameter provenance: what is calibrated, and what is not
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Exactly one parameter in this file is identified by a published endpoint.
+# Two more are fixed by a published standard. Every other number is
+# ILLUSTRATIVE -- plausible, chosen, and fitted to nothing. The model card
+# used to assert that the parameters were "derived from published clinical
+# trial endpoints", which was not borne out anywhere in this file;
+# `PARAMETER_PROVENANCE` is the file's own enumeration of which ones are, and
+# `cognisom/mad/model_cards.py` now reads it instead of asserting.
+
+PROFOUND_COHORT_A_CONTROL_RPFS_MONTHS = 3.6
+"""PROfound (NCT02987543) cohort A, enzalutamide-or-abiraterone control arm.
+
+Median radiographic PFS by blinded independent central review in men with
+BRCA1, BRCA2 or ATM alterations: 3.6 months (3.55 unrounded), against 7.4
+months (7.39) on olaparib, HR 0.34 (95% CI 0.25-0.47, p<0.0001).
+de Bono et al., N Engl J Med 2020;382:2091-2102.
+"""
+
+CALIBRATED_GROWTH_RATE_PER_DAY = math.log(
+    RECIST_PD_DIAMETER_RATIO ** 3
+) / (PROFOUND_COHORT_A_CONTROL_RPFS_MONTHS * DAYS_PER_MONTH)
+"""Untreated exponential growth rate (per day) -- derived, not chosen.
+
+Identification. Of every constant in this file, the baseline growth rate is
+the only one that acts alone on the no-effect trajectory, so one published
+control-arm endpoint pins it. Require that the median patient on the PROfound
+cohort A control arm reaches the RECIST 1.1 progression threshold exactly at
+the published median rPFS. With exponential growth V(t) = V_0 exp(g t), and
+progression at a 20% diameter increase over a nadir which -- with no
+effective therapy -- is the baseline:
+
+    exp(g T) = 1.20 ** 3    =>    g = 3 ln(1.20) / T
+
+T = 3.6 months = 109.58 days gives g = 0.004992 /day. The unrounded BICR
+median of 3.55 months gives 0.005062 /day instead -- a 1.4% spread, and the
+two bracket the value this file shipped, 0.005. The published abstract's 3.6
+is used, and the constant is computed from the citation here so that it
+cannot drift away from it silently.
+
+Assumptions a reader should weigh before calling this a fit:
+  * The control arm stands in for no therapy. Those men had already
+    progressed on a second-generation androgen-receptor pathway inhibitor and
+    were re-challenged with one, which is the closest available
+    approximation to untreated growth -- not untreated growth.
+  * A deterministic single-rate model has one trajectory, so "the median
+    patient progresses at the median rPFS" is an identifying assumption, not
+    something the published data establishes.
+  * PROfound scored progression by RECIST 1.1 in soft tissue and PCWG3 in
+    bone. Only the RECIST component is representable here.
+  * It is one parameter against one endpoint: exactly determined, with no
+    degrees of freedom left over to test the fit. There is no interval.
+  * PROfound imaged every 8 weeks (+/- 7 days), so the published median is
+    interval-censored on a 56-day grid. The continuous crossing time this
+    derivation solves for is a finer quantity than the trial could observe,
+    and the 1.4% spread quoted above understates the real uncertainty
+    accordingly.
+  * THE MODEL DOES NOT REPRODUCE THE ENDPOINT THIS CONSTANT IS FITTED TO.
+    Measured: running the shipped `enzalutamide` regimen on 245
+    cohort-A-like twins returns ORR 0.788 and 245/245 right-censored PFS at
+    180 days, against the published 2% ORR and 3.6-month median rPFS. The
+    round trip that closes below closes against a synthetic zero-effectiveness
+    arm, not against PROfound's control arm -- so this derivation is
+    self-consistent but cannot be checked against the trial it cites. Every
+    other constant in this file is declared illustrative for the same reason:
+    a calibration that cannot reproduce its own source arm is not evidence
+    that the model predicts anything.
+"""
+
+
+@dataclass(frozen=True)
+class ParameterProvenance:
+    """Where one group of this model's numbers comes from."""
+
+    name: str
+    count: int
+    status: str
+    """'derived' (fitted to a published endpoint), 'standard' (fixed by a
+    published criterion) or 'illustrative' (chosen; fitted to nothing)."""
+    basis: str
+
+
+PARAMETER_PROVENANCE: Tuple[ParameterProvenance, ...] = (
+    ParameterProvenance(
+        "growth_rate_per_day", 1, "derived",
+        "3 ln(1.20) / 109.58 d from PROfound (NCT02987543) cohort A control-arm "
+        "median rPFS 3.6 months; see CALIBRATED_GROWTH_RATE_PER_DAY.",
+    ),
+    ParameterProvenance(
+        "recist_pr_diameter_ratio, recist_pd_diameter_ratio", 2, "standard",
+        "RECIST 1.1, Eisenhauer et al., Eur J Cancer 2009;45:228-247.",
+    ),
+    ParameterProvenance(
+        "effectiveness_baseline", 1, "illustrative",
+        "The 0.5 every regimen starts from. Not a response probability and not "
+        "anchored to any arm's ORR.",
+    ),
+    ParameterProvenance(
+        "effectiveness_biomarker_deltas", 20, "illustrative",
+        "Every += / -= in _calculate_effectiveness: the PD-L1 coefficient, the "
+        "exhaustion-window bonus, the TMB term, hot/cold, the Treg coefficient "
+        "and priming bonus, the HRD reward and penalty, the AR terms, the six "
+        "vaccine terms and the MSI-H bonus.",
+    ),
+    ParameterProvenance(
+        "effectiveness_biomarker_thresholds", 7, "illustrative",
+        "The 0.2-0.8 exhaustion window, the TMB divisor 50.0, the vaccine "
+        "candidate counts 10/5/3 and the strong-binder count 5.",
+    ),
+    ParameterProvenance(
+        "max_kill_rate_coefficient", 1, "illustrative",
+        "effectiveness * 0.025 /day. Sets how fast any regimen can shrink a "
+        "tumour and is the single largest determinant of the predicted "
+        "response depth. Nothing fits it.",
+    ),
+    ParameterProvenance(
+        "effect_ramp_days", 1, "illustrative",
+        "The 21-day linear ramp from treatment onset to full kill rate.",
+    ),
+    ParameterProvenance(
+        "noise_sd_per_day", 1, "illustrative",
+        "sigma = 0.002 per day on the growth rate. Not an estimate of "
+        "measurement error or of between-visit variability.",
+    ),
+    ParameterProvenance(
+        "volume_floor", 1, "illustrative",
+        "Relative volume is floored at 0.01, which is why RECIST CR is not "
+        "representable; see MODEL_CAVEATS.",
+    ),
+    ParameterProvenance(
+        "growth_multipliers_pten_ar", 2, "illustrative",
+        "x1.3 for PTEN loss and x1.1 for an AR mutation. Directionally "
+        "supported by the literature; the magnitudes are chosen.",
+    ),
+    ParameterProvenance(
+        "resistance_ramp", 3, "illustrative",
+        "Onset day 90, divisor 500.0, coefficient 0.001. Reaches 1.8e-4 /day at "
+        "day 180 against a kill rate of about 1.2e-2 /day -- roughly 1.4% of "
+        "it -- so it cannot produce acquired resistance; see MODEL_CAVEATS.",
+    ),
+    ParameterProvenance(
+        "per_drug_constants", 36, "illustrative",
+        "9 regimens x exhaustion_reversal, treg_effect, irae_base_risk and "
+        "effect_onset_days. No regimen's four constants were fitted to that "
+        "drug's published endpoints.",
+    ),
+    ParameterProvenance(
+        "confidence_weights", 7, "illustrative",
+        "The data-completeness score in _estimate_confidence. It measures how "
+        "much input was present, not how accurate the prediction is.",
+    ),
+)
+
+DERIVED_PARAMETER_COUNT = sum(
+    p.count for p in PARAMETER_PROVENANCE if p.status == "derived")
+STANDARD_PARAMETER_COUNT = sum(
+    p.count for p in PARAMETER_PROVENANCE if p.status == "standard")
+ILLUSTRATIVE_PARAMETER_COUNT = sum(
+    p.count for p in PARAMETER_PROVENANCE if p.status == "illustrative")
+
+CALIBRATION_STATEMENT = (
+    "The constants in this simulator are illustrative, with two exceptions. "
+    f"{DERIVED_PARAMETER_COUNT} parameter is derived from a published "
+    "endpoint: the untreated growth rate, 0.00499/day, is the exponential rate "
+    "at which the median PROfound (NCT02987543) cohort A control-arm patient "
+    "reaches the RECIST 1.1 progression threshold at the published median rPFS "
+    f"of 3.6 months. {STANDARD_PARAMETER_COUNT} more are the RECIST 1.1 "
+    "response thresholds, which a published criterion fixes rather than a fit. "
+    f"The other {ILLUSTRATIVE_PARAMETER_COUNT} constants -- enumerated in "
+    "PARAMETER_PROVENANCE, and covering every per-drug parameter, every "
+    "biomarker effectiveness delta, the kill-rate coefficient, the noise "
+    "amplitude, the resistance ramp and the confidence weights -- are "
+    "ILLUSTRATIVE: plausible values that were chosen, fitted to nothing. Read "
+    "the response curves as an illustration of the model's structure, not as a "
+    "prediction of what a patient will do.\n"
+    "Calibration against the six reference trials is DEFERRED, and three "
+    "things block it. (1) Median rPFS lies outside the model's output range: "
+    "the dynamics carry no acquired-resistance mechanism able to reverse net "
+    "growth after a response, so PFS is either an early progression day or is "
+    "right-censored at the end of the simulated window, and PROfound's 7.4 "
+    "months on olaparib is unreachable. (2) ORR is a cohort statistic while "
+    "this model is deterministic per (patient, regimen), so an ORR needs a "
+    "cohort; the SU2C/PCF mCRPC 2019 set is not pinned locally and carries no "
+    "per-drug response outcomes, so a predicted ORR could only be matched "
+    "against a published ORR from a different cohort. (3) Only 3 of the 9 "
+    "regimens have a same-drug, same-population published endpoint: "
+    "pembrolizumab (KEYNOTE-199), and olaparib and enzalutamide (PROfound "
+    "cohort A). KEYNOTE-942 is adjuvant resected melanoma with no measurable "
+    "disease, so the two vaccine regimens -- which this platform treats as its "
+    "most interesting output -- have no usable endpoint at all."
+)
+"""Plain statement of what is fitted here. Read verbatim by the model card
+and by the dashboard pages that show a response table, so the claim and the
+code cannot drift apart."""
+
+
+CR_NOT_REPRESENTABLE = (
+    "RECIST complete response is never reported. The dynamics floor relative "
+    "volume at 0.01, a 78% diameter reduction, so disappearance of all target "
+    "lesions cannot be represented and a 'CR' would be an extrapolation past "
+    "the floor."
+)
+
+PD_MEANS_NEVER_RESPONDED = (
+    "PD here means the tumour progressed without ever reaching a partial "
+    "response. Response followed by progression is NOT representable: the "
+    "resistance term reaches 1.8e-4 /day by day 180 against a kill rate near "
+    "1.2e-2 /day, so an effective regimen never re-crosses its own nadir "
+    "inside any plausible horizon."
+)
+
+NO_ABSOLUTE_SIZES = (
+    "RECIST 1.1 also requires an absolute increase of at least 5 mm for "
+    "progression, and measures nodal lesions by short axis. A relative-volume "
+    "model carries neither, so both rules are omitted."
+)
+
+PD_NEEDS_A_VERY_LOW_EFFECTIVENESS = (
+    "Progressive disease requires a predicted effectiveness at or below "
+    "0.096 on a 180-day run -- 0.163 at one year, 0.201 at two -- because "
+    "the kill term has to stay under the growth rate for the whole window. "
+    "Six of the nine shipped regimens have an effectiveness floor above "
+    "that, so they cannot return PD on a 180-day run however poor the "
+    "patient's biomarkers are. PD is reachable, but it reflects the "
+    "effectiveness model's floor rather than a clinical progression rate."
+)
+
+MODEL_CAVEATS: Tuple[str, ...] = (
+    CR_NOT_REPRESENTABLE,
+    PD_MEANS_NEVER_RESPONDED,
+    PD_NEEDS_A_VERY_LOW_EFFECTIVENESS,
+    NO_ABSOLUTE_SIZES,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Mechanism dispatch
+# ─────────────────────────────────────────────────────────────────────────
+#
+# `_calculate_effectiveness` used to dispatch on substrings of the display
+# class string, which is not a classifier. `"AR" in "PARP inhibitor"` is True,
+# because "PARP" contains "AR", so both PARP arms took the androgen-receptor
+# branch: olaparib on a twin with no DNA-repair defect scored
+# 0.5 - 0.3 (no HRD) + 0.2 (wild-type AR responds well) = 0.4, a 38% volume
+# reduction reported as a partial response -- a PARP inhibitor predicted
+# active in a patient with no synthetic-lethal target. In the other direction
+# `pembro_ipi_combo` has class "combination checkpoint", which matches neither
+# "PD-1" nor "CTLA-4", so the arm the recommender escalates to for cold
+# tumours received no PD-1 and no CTLA-4 term and took exactly two values ever
+# (0.5, or 0.7 with MSI-H), invariant to every biomarker.
+#
+# Mechanisms are now declared per regimen, and both this file and
+# `cognisom/mad/explainability.py` dispatch on the same declaration -- the
+# explainer had its own hand-written guard (`"AR" in cls and "PARP" not in
+# cls`), so the audit decomposition disagreed with the score it claimed to
+# decompose by 0.20 on both PARP arms.
+MECH_PD1 = "pd1"
+MECH_CTLA4 = "ctla4"
+MECH_PARP = "parp"
+MECH_AR_ANTAGONIST = "ar_antagonist"
+MECH_VACCINE = "vaccine"
+
+KNOWN_MECHANISMS: frozenset = frozenset({
+    MECH_PD1, MECH_CTLA4, MECH_PARP, MECH_AR_ANTAGONIST, MECH_VACCINE,
+})
+
+#: Exact treatment-class string -> mechanism set, for profiles that carry no
+#: explicit `mechanisms` key. Entity-library rows are built by
+#: `parameter_resolver.get_treatment_profile`, which emits exactly these
+#: labels. Lookup is exact, never a substring test, and the classes this
+#: effectiveness model has no terms for are listed with an empty set so that
+#: "no mechanism" stays distinguishable from "class not recognised".
+CLASS_MECHANISMS: Dict[str, frozenset] = {
+    "anti-PD-1": frozenset({MECH_PD1}),
+    "anti-PD-L1": frozenset({MECH_PD1}),
+    "anti-CTLA-4": frozenset({MECH_CTLA4}),
+    "combination checkpoint": frozenset({MECH_PD1, MECH_CTLA4}),
+    "PARP inhibitor": frozenset({MECH_PARP}),
+    "AR antagonist": frozenset({MECH_AR_ANTAGONIST}),
+    "PARP + checkpoint": frozenset({MECH_PARP, MECH_PD1}),
+    "neoantigen vaccine": frozenset({MECH_VACCINE}),
+    "vaccine + checkpoint": frozenset({MECH_VACCINE, MECH_PD1}),
+    # Recognised, and this effectiveness model has no term for them.
+    "anti-LAG-3": frozenset(),
+    "anti-TIM-3": frozenset(),
+    "checkpoint inhibitor": frozenset(),
+    "chemotherapy": frozenset(),
+    "radiotherapy": frozenset(),
+    "PI3K/AKT inhibitor": frozenset(),
+    "JAK inhibitor": frozenset(),
+    "anti-TNF": frozenset(),
+    "anti-CD20": frozenset(),
+    "cytokine therapy": frozenset(),
+    "unknown": frozenset(),
+}
+
+#: Mechanisms by international nonproprietary name, consulted before the
+#: class string. The entity library's own class labels are not sufficient:
+#: `SimulationParameterResolver.get_treatment_profile` passes an unmapped
+#: `drug_class` straight through, so pembrolizumab arrives as class
+#: "immunotherapy", and `_infer_checkpoint_class` falls back to the bare
+#: "checkpoint inhibitor" for nivolumab, ipilimumab, atezolizumab and
+#: relatlimab. Neither string can be assigned a mechanism safely -- an
+#: anti-PD-1, an anti-CTLA-4 and an anti-LAG-3 all carry the second one --
+#: so the drug itself has to be named. Measured before this table existed:
+#: `TreatmentSimulator(store=EntityStore())` scored pembrolizumab,
+#: nivolumab and ipilimumab at exactly the 0.5 baseline for every patient,
+#: which is to say the documented-as-preferred parameter source was the one
+#: that ignored the twin.
+#:
+#: Lookup is on the lowercased first whitespace-separated token of the
+#: profile's display name, which is the INN for every row the library
+#: carries. Drugs whose mechanism this effectiveness model has no term for
+#: are listed with an empty set, so "recognised, not modelled" stays
+#: distinguishable from "not recognised".
+DRUG_MECHANISMS: Dict[str, frozenset] = {
+    "pembrolizumab": frozenset({MECH_PD1}),
+    "nivolumab": frozenset({MECH_PD1}),
+    "atezolizumab": frozenset({MECH_PD1}),
+    "ipilimumab": frozenset({MECH_CTLA4}),
+    "olaparib": frozenset({MECH_PARP}),
+    "rucaparib": frozenset({MECH_PARP}),
+    "talazoparib": frozenset({MECH_PARP}),
+    "enzalutamide": frozenset({MECH_AR_ANTAGONIST}),
+    "apalutamide": frozenset({MECH_AR_ANTAGONIST}),
+    "darolutamide": frozenset({MECH_AR_ANTAGONIST}),
+    "abiraterone": frozenset({MECH_AR_ANTAGONIST}),
+    # Recognised, and this effectiveness model has no term for them. An
+    # anti-LAG-3 is not an anti-PD-1 and must not inherit its terms.
+    "relatlimab": frozenset(),
+    "docetaxel": frozenset(),
+    "cabazitaxel": frozenset(),
+    "lutetium-177": frozenset(),
+    "ipatasertib": frozenset(),
+    "ruxolitinib": frozenset(),
+    "tofacitinib": frozenset(),
+    "rituximab": frozenset(),
+}
+
+
+def _inn_of(profile: Dict) -> str:
+    """The lowercased INN token of a profile's display name, or ''."""
+    name = str(profile.get("name", "")).strip().lower()
+    if not name:
+        return ""
+    return name.split()[0].strip("(),.-")
+
+
+_UNMAPPED_CLASSES_REPORTED: set = set()
+
+
+def treatment_mechanisms(profile: Dict) -> frozenset:
+    """The mechanism set this regimen's effectiveness terms dispatch on.
+
+    Resolution order, every step an exact lookup and none of them a
+    substring test: the profile's own `mechanisms` declaration, then the
+    INN (the first token of the display name, which is what the entity
+    library carries), then the full display class string. Returns the empty
+    set -- with one warning -- when none of the three resolves. An empty set
+    means the effectiveness score carries no mechanism-specific term and so
+    is not patient-specific; `simulate` says so in the result's caveats
+    rather than letting a baseline pass for a prediction.
+    """
+    declared = profile.get("mechanisms")
+    if declared is not None:
+        unknown = frozenset(declared) - KNOWN_MECHANISMS
+        if unknown:
+            raise ValueError(
+                f"Treatment profile {profile.get('name', '?')!r} declares "
+                f"unknown mechanism(s) {sorted(unknown)}; known: "
+                f"{sorted(KNOWN_MECHANISMS)}"
+            )
+        return frozenset(declared)
+
+    inn = _inn_of(profile)
+    if inn in DRUG_MECHANISMS:
+        return DRUG_MECHANISMS[inn]
+
+    treatment_class = profile.get("class", "")
+    if treatment_class in CLASS_MECHANISMS:
+        return CLASS_MECHANISMS[treatment_class]
+
+    if treatment_class not in _UNMAPPED_CLASSES_REPORTED:
+        _UNMAPPED_CLASSES_REPORTED.add(treatment_class)
+        logger.warning(
+            "Neither the drug name %r nor the treatment class %r maps to a "
+            "mechanism; no mechanism-specific effectiveness term will be "
+            "applied and the score will not be patient-specific",
+            profile.get("name", "?"), treatment_class,
+        )
+    return frozenset()
+
+
+def format_progression_free_survival(days: int, censored: bool) -> str:
+    """Render a PFS value, refusing to print a censored one as months.
+
+    A right-censored PFS is the length of the observation window, not a
+    survival time. `agents.py` used to print "PFS: 180 days (6.0 months)"
+    for every arm of a 180-day run, which is administrative end of
+    follow-up presented to a clinician as a six-month PFS.
+    """
+    if censored:
+        return (f"{days} days (right-censored: no RECIST progression within "
+                f"the {days}-day simulated window)")
+    return f"{days} days ({days / DAYS_PER_MONTH:.1f} months)"
+
+
+def progression_free_months(days: int, censored: bool) -> float:
+    """PFS in months, or ValueError when the value is right-censored.
+
+    The single days-to-months conversion in this package. A censored PFS
+    is the length of follow-up; converting it to months produces a figure
+    that reads as a clinical endpoint and is not one. `agents.py` printed
+    exactly that -- "PFS: 180 days (6.0 months)" -- for every arm of every
+    180-day run, so the failure mode is not hypothetical. Refusing here
+    means a future caller gets a traceback instead of a plausible number.
+
+    Raises:
+        ValueError: `censored` is True.
+    """
+    if censored:
+        raise ValueError(
+            f"a right-censored progression-free interval ({days} days) has "
+            "no median in months: it is the length of the observation "
+            "window, not a survival time. Report the pair (days, censored) "
+            "or use format_progression_free_survival()."
+        )
+    return days / DAYS_PER_MONTH
+
+
+def _patient_seed_key(twin) -> str:
+    """A stable per-patient key for the noise seed.
+
+    The seed used to digest the drug name alone, so the stochastic component
+    was byte-identical for every patient: two twins with different IDs and
+    different TMB drew the same five noise values. Seeding from patient and
+    regimen keeps a report reproducible while letting it differ between
+    patients.
+
+    With no PatientProfile attached, the model's entire notion of "this
+    patient" is the twin's field values, so those are digested instead. Two
+    twins that differ in any modelled field get different noise; two
+    identical twins get the same noise, which is what reproducibility means
+    here.
+    """
+    patient = getattr(twin, "patient", None)
+    patient_id = getattr(patient, "patient_id", None) if patient is not None else None
+    if patient_id:
+        return f"patient_id:{patient_id}"
+    fields = tuple(
+        repr(getattr(twin, name, None)) for name in (
+            "tumor_mutational_burden", "microsatellite_instability",
+            "has_dna_repair_defect", "has_ar_mutation", "has_pten_loss",
+            "immune_score", "t_cell_exhaustion_fraction", "mean_exhaustion",
+            "treg_fraction", "immune_cell_fraction", "pd_l1_expression",
+            "mhc1_downregulation", "vaccine_candidate_count",
+            "strong_binder_count",
+        )
+    )
+    return "twin:" + "|".join(fields)
+
+
 @dataclass
 class TreatmentResult:
     """Result of a simulated treatment."""
@@ -30,10 +531,30 @@ class TreatmentResult:
     duration_days: int
 
     # Tumor response
-    tumor_response_curve: List[float]  # Relative tumor volume over time (1.0=baseline)
-    best_response: float  # Minimum relative volume
+    tumor_response_curve: List[float]
+    #: Relative tumour VOLUME over time, 1.0 = baseline. Not a RECIST sum of
+    #: diameters: see RECIST_PR_DIAMETER_RATIO for the conversion the
+    #: classifier applies.
+
+    best_response: float
+    #: Nadir relative volume. Cannot exceed 1.0, because the curve starts at
+    #: 1.0 -- so this field cannot express progression, and never could.
+    #: Progression is reported by `response_category` and by
+    #: `progression_free_days` / `progression_free_censored`.
+
     time_to_best_response_days: int
-    progression_free_days: int  # Days until tumor grows past baseline
+
+    progression_free_days: int
+    #: Day of the first RECIST 1.1 progression event -- a 20% diameter
+    #: increase over the running nadir -- or `duration_days` when none
+    #: occurred, in which case `progression_free_censored` is True. Read the
+    #: pair together, via `progression_free_survival`; a censored value is
+    #: the length of the observation window, not a survival time.
+
+    progression_free_censored: bool
+    #: True when no progression event was observed inside the simulated
+    #: window. Required, not defaulted, so that a caller constructing a
+    #: result cannot silently omit the censoring status of its PFS.
 
     # Immune effects
     t_cell_reactivation_fraction: float  # Fraction of exhausted T-cells reactivated
@@ -41,8 +562,16 @@ class TreatmentResult:
     immune_related_adverse_events: float  # 0-1 risk score
 
     # Classification
-    response_category: str  # CR, PR, SD, PD (RECIST-like)
+    response_category: str
+    #: RECIST 1.1 best overall response, on diameter ratios: "PR", "SD" or
+    #: "PD". "CR" is never returned -- see CR_NOT_REPRESENTABLE -- and "PD"
+    #: means progression without ever reaching a PR, see
+    #: PD_MEANS_NEVER_RESPONDED.
+
     confidence: float
+    #: Input-completeness score, NOT a probability that the prediction is
+    #: right. Nothing in this model has been validated against observed
+    #: patient outcomes.
 
     # Details
     mechanism: str
@@ -54,21 +583,58 @@ class TreatmentResult:
     #: inputs the number actually rests on. Empty means all were measured.
     unmeasured_inputs: List[str] = field(default_factory=list)
 
+    #: What this prediction structurally cannot express, carried on the
+    #: result so that a reader meets the limits next to the number rather
+    #: than having to find the model card. Always non-empty: see
+    #: MODEL_CAVEATS.
+    caveats: List[str] = field(default_factory=list)
+
     @property
     def inputs_fully_measured(self) -> bool:
         """False when any immune input was absent rather than measured."""
         return not self.unmeasured_inputs
 
+    @property
+    def progression_free_survival(self) -> Tuple[int, bool]:
+        """(days, censored). The only honest way to read this quantity."""
+        return (self.progression_free_days, self.progression_free_censored)
+
+    @property
+    def best_response_diameter_ratio(self) -> float:
+        """Nadir as a RECIST-comparable diameter ratio, (V/V0) ** (1/3)."""
+        return self.best_response ** (1.0 / 3.0)
+
+    @property
+    def progression_free_months(self) -> float:
+        """PFS in months, raising when the value is right-censored."""
+        return progression_free_months(
+            self.progression_free_days, self.progression_free_censored,
+        )
+
+    def format_progression_free_survival(self) -> str:
+        """PFS as text, never printing a censored value as a months figure."""
+        return format_progression_free_survival(
+            self.progression_free_days, self.progression_free_censored,
+        )
+
     def summary(self) -> Dict:
+        diameter_reduction = (1 - self.best_response_diameter_ratio) * 100
         return {
             "treatment": self.treatment_name,
             "class": self.treatment_class,
             "response": self.response_category,
-            "best_response_pct": f"{(1 - self.best_response) * 100:.0f}% reduction",
+            # Both units, labelled. The volume figure sitting unlabelled next
+            # to a RECIST category read as a RECIST diameter change, which it
+            # is not: a 38% volume reduction is a 15% diameter reduction.
+            "best_response_volume_pct": f"{(1 - self.best_response) * 100:.0f}% volume reduction",
+            "best_response_diameter_pct": f"{diameter_reduction:.0f}% diameter reduction (RECIST)",
             "pfs_days": self.progression_free_days,
+            "pfs_censored": self.progression_free_censored,
+            "pfs": self.format_progression_free_survival(),
             "confidence": round(self.confidence, 2),
             "irae_risk": round(self.immune_related_adverse_events, 2),
             "unmeasured_inputs": list(self.unmeasured_inputs),
+            "caveats": list(self.caveats),
         }
 
 
@@ -77,6 +643,7 @@ TREATMENT_PROFILES = {
     "pembrolizumab": {
         "name": "Pembrolizumab (Keytruda)",
         "class": "anti-PD-1",
+        "mechanisms": frozenset({MECH_PD1}),
         "target": "PD-1",
         "mechanism": "Blocks PD-1/PD-L1 interaction, reactivating exhausted T-cells",
         "exhaustion_reversal": 0.55,  # Fraction of exhausted T-cells potentially reactivated
@@ -90,6 +657,7 @@ TREATMENT_PROFILES = {
     "nivolumab": {
         "name": "Nivolumab (Opdivo)",
         "class": "anti-PD-1",
+        "mechanisms": frozenset({MECH_PD1}),
         "target": "PD-1",
         "mechanism": "Blocks PD-1/PD-L1 interaction, reactivating exhausted T-cells",
         "exhaustion_reversal": 0.50,
@@ -103,6 +671,7 @@ TREATMENT_PROFILES = {
     "ipilimumab": {
         "name": "Ipilimumab (Yervoy)",
         "class": "anti-CTLA-4",
+        "mechanisms": frozenset({MECH_CTLA4}),
         "target": "CTLA-4",
         "mechanism": "Depletes Tregs and enhances T-cell priming in lymph nodes",
         "exhaustion_reversal": 0.20,
@@ -116,6 +685,7 @@ TREATMENT_PROFILES = {
     "pembro_ipi_combo": {
         "name": "Pembrolizumab + Ipilimumab",
         "class": "combination checkpoint",
+        "mechanisms": frozenset({MECH_PD1, MECH_CTLA4}),
         "target": "PD-1 + CTLA-4",
         "mechanism": "Dual checkpoint blockade: reactivate T-cells + deplete Tregs",
         "exhaustion_reversal": 0.70,
@@ -129,6 +699,7 @@ TREATMENT_PROFILES = {
     "olaparib": {
         "name": "Olaparib (Lynparza)",
         "class": "PARP inhibitor",
+        "mechanisms": frozenset({MECH_PARP}),
         "target": "PARP1/2",
         "mechanism": "Synthetic lethality in DNA repair-deficient cells (BRCA1/2, ATM)",
         "exhaustion_reversal": 0.0,
@@ -141,6 +712,7 @@ TREATMENT_PROFILES = {
     "enzalutamide": {
         "name": "Enzalutamide (Xtandi)",
         "class": "AR antagonist",
+        "mechanisms": frozenset({MECH_AR_ANTAGONIST}),
         "target": "AR",
         "mechanism": "Competitively inhibits androgen receptor signaling",
         "exhaustion_reversal": 0.0,
@@ -153,6 +725,7 @@ TREATMENT_PROFILES = {
     "olaparib_pembro_combo": {
         "name": "Olaparib + Pembrolizumab",
         "class": "PARP + checkpoint",
+        "mechanisms": frozenset({MECH_PARP, MECH_PD1}),
         "target": "PARP + PD-1",
         "mechanism": "PARP-induced DNA damage increases neoantigens + checkpoint blockade",
         "exhaustion_reversal": 0.50,
@@ -165,6 +738,7 @@ TREATMENT_PROFILES = {
     "neoantigen_vaccine": {
         "name": "Personalized mRNA Neoantigen Vaccine",
         "class": "neoantigen vaccine",
+        "mechanisms": frozenset({MECH_VACCINE}),
         "target": "Tumor neoantigens",
         "mechanism": (
             "mRNA vaccine encoding patient-specific tumor neoantigens. "
@@ -181,6 +755,7 @@ TREATMENT_PROFILES = {
     "neoantigen_vaccine_pembro": {
         "name": "Neoantigen Vaccine + Pembrolizumab",
         "class": "vaccine + checkpoint",
+        "mechanisms": frozenset({MECH_VACCINE, MECH_PD1}),
         "target": "Neoantigens + PD-1",
         "mechanism": (
             "Personalized mRNA neoantigen vaccine primes tumor-specific T-cells, "
@@ -286,15 +861,30 @@ class TreatmentSimulator:
         best_response = min(response_curve)
         best_day = response_curve.index(best_response)
 
-        # PFS: first day tumor volume > baseline after initial response
-        pfs = duration_days
-        for i in range(best_day, len(response_curve)):
-            if response_curve[i] > 1.0:
-                pfs = i
-                break
+        # PFS. The event is RECIST 1.1 progression: a 20% increase in the sum
+        # of longest diameters over the smallest sum recorded on study so
+        # far. The previous test -- first day the VOLUME exceeds baseline,
+        # scanned from the nadir -- was wrong twice over. It compared a
+        # volume against a diameter threshold, and it referenced baseline
+        # rather than the running nadir, so on a 180-day run it returned
+        # either day 1 (the growth of the first day before onset, read as
+        # progression) or exactly 180, and nothing in between.
+        progression_day = self._first_progression_day(response_curve)
+        if progression_day is None:
+            # Right-censored: the window ended with no progression event.
+            # This is the length of follow-up, not a survival time, and the
+            # flag travels with it so that no consumer can print it as a
+            # clinical months figure.
+            pfs = duration_days
+            pfs_censored = True
+        else:
+            pfs = progression_day
+            pfs_censored = False
 
-        # Classify response (RECIST-like)
-        response_category = self._classify_response(best_response)
+        # Classify response (RECIST 1.1 best overall response)
+        response_category = self._classify_response(
+            best_response, progression_day is not None,
+        )
 
         # T-cell reactivation
         reversal = profile.get("exhaustion_reversal", 0) * effectiveness
@@ -317,7 +907,18 @@ class TreatmentSimulator:
             unmeasured.append("immune_cell_fraction")
         else:
             irae = irae_base * (1 + twin.immune_cell_fraction)
-        unmeasured.extend(self._unmeasured_for_class(profile, twin))
+        unmeasured.extend(self._unmeasured_for_mechanism(profile, twin))
+
+        caveats = list(MODEL_CAVEATS)
+        if not treatment_mechanisms(profile):
+            # No mechanism-specific term fired, so the effectiveness score is
+            # the bare baseline and is identical for every patient. Saying so
+            # is the difference between a model and a constant.
+            caveats.insert(0, (
+                f"No mechanism-specific effectiveness term exists for class "
+                f"{profile.get('class', '')!r}: this score is the model "
+                f"baseline and does not depend on the patient."
+            ))
 
         return TreatmentResult(
             treatment_name=profile["name"],
@@ -327,6 +928,7 @@ class TreatmentSimulator:
             best_response=best_response,
             time_to_best_response_days=best_day,
             progression_free_days=pfs,
+            progression_free_censored=pfs_censored,
             t_cell_reactivation_fraction=reversal,
             final_exhaustion=final_exhaustion,
             immune_related_adverse_events=min(1.0, irae),
@@ -335,26 +937,30 @@ class TreatmentSimulator:
             mechanism=profile["mechanism"],
             rationale=self._generate_rationale(profile, twin, effectiveness),
             unmeasured_inputs=sorted(set(unmeasured)),
+            caveats=caveats,
         )
 
     @staticmethod
-    def _unmeasured_for_class(profile: Dict, twin) -> List[str]:
-        """Twin fields the effectiveness model for this class wanted.
+    def _unmeasured_for_mechanism(profile: Dict, twin) -> List[str]:
+        """Twin fields the effectiveness model for this regimen wanted.
 
-        Mirrors `_calculate_effectiveness`'s branch conditions, so the list
-        names inputs that genuinely would have moved this score rather than
-        every absent field.
+        Dispatches on the same mechanism set as `_calculate_effectiveness`,
+        so the list names inputs that genuinely would have moved this score.
+        The class-substring version missed `treg_fraction` for
+        `pembro_ipi_combo`, whose class string contains neither "PD-1" nor
+        "CTLA-4", and so reported a dual-checkpoint prediction built on an
+        unmeasured Treg fraction as fully measured.
         """
-        treatment_class = profile.get("class", "")
+        mechanisms = treatment_mechanisms(profile)
         missing: List[str] = []
-        if "PD-1" in treatment_class or "anti-PD" in treatment_class:
+        if MECH_PD1 in mechanisms:
             if twin.pd_l1_expression is None:
                 missing.append("pd_l1_expression")
             if twin.t_cell_exhaustion_fraction is None:
                 missing.append("t_cell_exhaustion_fraction")
-        if "CTLA-4" in treatment_class and twin.treg_fraction is None:
+        if MECH_CTLA4 in mechanisms and twin.treg_fraction is None:
             missing.append("treg_fraction")
-        if "vaccine" in treatment_class and twin.mhc1_downregulation is None:
+        if MECH_VACCINE in mechanisms and twin.mhc1_downregulation is None:
             missing.append("mhc1_downregulation")
         return missing
 
@@ -415,11 +1021,13 @@ class TreatmentSimulator:
     def _calculate_effectiveness(self, profile: Dict,
                                  twin: DigitalTwinConfig) -> float:
         """Calculate treatment effectiveness (0-1) based on twin parameters."""
-        eff = 0.5  # Baseline
+        eff = 0.5  # ILLUSTRATIVE baseline; see PARAMETER_PROVENANCE.
 
-        treatment_class = profile.get("class", "")
+        # Dispatch on the declared mechanism set, never on substrings of the
+        # display class string: `"AR" in "PARP inhibitor"` is True.
+        mechanisms = treatment_mechanisms(profile)
 
-        if "PD-1" in treatment_class or "anti-PD" in treatment_class:
+        if MECH_PD1 in mechanisms:
             # Anti-PD-1 effectiveness depends on:
             # - PD-L1 expression (higher → more responsive)
             # An unmeasured biomarker must neither raise nor lower the
@@ -438,26 +1046,26 @@ class TreatmentSimulator:
             elif twin.immune_score == "cold":
                 eff -= 0.25
 
-        if "CTLA-4" in treatment_class:
+        if MECH_CTLA4 in mechanisms:
             # Anti-CTLA-4 works by depleting Tregs
             if twin.treg_fraction is not None:
                 eff += 0.2 * twin.treg_fraction  # More Tregs → more effect
             eff += 0.1  # Priming enhancement
 
-        if "PARP" in treatment_class:
+        if MECH_PARP in mechanisms:
             if twin.has_dna_repair_defect:
                 eff += 0.35  # Major boost for HRD
             else:
                 eff -= 0.3  # Not effective without HRD
 
-        if "AR" in treatment_class:
+        if MECH_AR_ANTAGONIST in mechanisms:
             if twin.has_ar_mutation:
                 eff -= 0.1  # Resistance mutations reduce effectiveness
             else:
                 eff += 0.2  # Wild-type AR responds well
 
         # Neoantigen vaccine effectiveness
-        if "vaccine" in treatment_class:
+        if MECH_VACCINE in mechanisms:
             # Effectiveness scales with number of vaccine-quality neoantigens
             if twin.vaccine_candidate_count >= 10:
                 eff += 0.30
@@ -484,7 +1092,7 @@ class TreatmentSimulator:
 
         # MSI-H boosts checkpoint response
         if twin.microsatellite_instability == "MSI-H":
-            if "PD-1" in treatment_class or "checkpoint" in treatment_class:
+            if MECH_PD1 in mechanisms:
                 eff += 0.2
 
         return max(0.0, min(1.0, eff))
@@ -497,9 +1105,10 @@ class TreatmentSimulator:
 
         Returns list of relative tumor volumes (1.0 = baseline).
 
-        The trajectory is deterministic given the regimen name: the same
-        patient and regimen must produce the same curve on every run, or
-        two viewings of one report disagree.
+        The trajectory is deterministic given the patient AND the regimen:
+        the same pair must produce the same curve on every run, or two
+        viewings of one report disagree -- while two different patients must
+        not share a noise realisation.
         """
         # `hash()` on a str is salted per interpreter process (PYTHONHASHSEED),
         # so seeding from it produced a *different* trajectory every time the
@@ -507,9 +1116,16 @@ class TreatmentSimulator:
         # np.random.seed() mutates the global RNG, so calling this reached
         # out and changed unrelated draws elsewhere in the process.
         # A stable digest plus a local Generator fixes both.
+        #
+        # The digest covered the drug name ALONE, so the stochastic component
+        # was byte-identical for every patient -- two twins with different
+        # IDs and different TMB drew the same noise, and the model card's
+        # claim that "results vary with random seed" was false in both
+        # directions. Patient and regimen together now seed it.
         seed = int.from_bytes(
             hashlib.sha256(
-                str(profile.get("name", "")).encode("utf-8")
+                (_patient_seed_key(twin) + "\x00"
+                 + str(profile.get("name", ""))).encode("utf-8")
             ).digest()[:8],
             "big",
         )
@@ -519,14 +1135,20 @@ class TreatmentSimulator:
         volumes = [1.0]
         volume = 1.0
 
-        # Base tumor growth rate (per day)
-        growth_rate = 0.005  # ~0.5% per day baseline growth
+        # Base tumor growth rate (per day). The one calibrated parameter in
+        # this file: derived from the PROfound cohort A control-arm median
+        # rPFS, see CALIBRATED_GROWTH_RATE_PER_DAY. 0.004992/day, where the
+        # chosen value had been 0.005.
+        growth_rate = CALIBRATED_GROWTH_RATE_PER_DAY
+        # ILLUSTRATIVE multipliers: directionally supported, magnitudes chosen.
         if twin.has_pten_loss:
             growth_rate *= 1.3
         if twin.has_ar_mutation:
             growth_rate *= 1.1
 
-        # Treatment kill rate (per day, after onset)
+        # Treatment kill rate (per day, after onset). ILLUSTRATIVE, and the
+        # single largest determinant of predicted response depth: nothing
+        # fits the 0.025. See PARAMETER_PROVENANCE.
         max_kill_rate = effectiveness * 0.025  # Up to 2.5% per day
 
         for day in range(1, duration_days + 1):
@@ -556,21 +1178,63 @@ class TreatmentSimulator:
         return volumes
 
     @staticmethod
-    def _classify_response(best_response: float) -> str:
-        """Classify response using RECIST-like criteria."""
-        reduction = 1.0 - best_response
-        if reduction >= 0.95:
-            return "CR"  # Complete response
-        elif reduction >= 0.30:
-            return "PR"  # Partial response
-        elif best_response <= 1.20:
-            return "SD"  # Stable disease
-        else:
-            return "PD"  # Progressive disease
+    def _first_progression_day(curve: List[float]) -> Optional[int]:
+        """First day of a RECIST 1.1 progression event, or None.
+
+        RECIST 1.1 references progression to the smallest sum of diameters
+        recorded on study so far, not to baseline, so the comparison is
+        against a RUNNING nadir. Working in volumes, a 20% diameter increase
+        is a factor of 1.20 ** 3 on the volume ratio.
+
+        Returns None when the window ends with no event -- the caller must
+        then report the PFS as right-censored.
+        """
+        threshold = RECIST_PD_DIAMETER_RATIO ** 3
+        nadir = curve[0]
+        for day, volume in enumerate(curve):
+            if volume >= threshold * nadir:
+                return day
+            if volume < nadir:
+                nadir = volume
+        return None
+
+    @staticmethod
+    def _classify_response(best_response: float, progressed: bool) -> str:
+        """RECIST 1.1 best overall response: "PR", "SD" or "PD".
+
+        Thresholds are DIAMETER ratios applied to the cube root of a volume
+        ratio; see RECIST_PR_DIAMETER_RATIO. The previous version compared
+        volumes against diameter thresholds, so a volume ratio of 0.70 -- an
+        11.2% diameter shrink, well inside stable disease -- was reported as
+        a partial response.
+
+        PR is tested first because that is what "best overall response"
+        means: a confirmed PR followed by progression is still a PR, with
+        the progression carried by `progression_free_days`. PD is therefore
+        returned only for a tumour that progressed without ever reaching a
+        PR. The previous version could return PD for nothing at all: it
+        tested `best_response > 1.20` against a nadir that includes day 0's
+        1.0, so the branch was unreachable and a tumour 59 times its
+        baseline volume at two years was classified stable disease.
+
+        CR is never returned; see CR_NOT_REPRESENTABLE.
+        """
+        nadir_diameter_ratio = best_response ** (1.0 / 3.0)
+        if nadir_diameter_ratio <= RECIST_PR_DIAMETER_RATIO:
+            return "PR"
+        if progressed:
+            return "PD"
+        return "SD"
 
     def _estimate_confidence(self, profile: Dict,
                              twin: DigitalTwinConfig) -> float:
-        """Estimate prediction confidence based on data completeness."""
+        """Score how complete the INPUT was -- not how accurate the output is.
+
+        Every weight below is illustrative (PARAMETER_PROVENANCE), and
+        nothing in this model has been validated against observed patient
+        outcomes, so this number must not be read as a probability that the
+        prediction is correct.
+        """
         confidence = 0.5
 
         # More data → higher confidence
@@ -618,10 +1282,17 @@ class TreatmentSimulator:
         elif twin.t_cell_exhaustion_fraction > 0.3:
             parts.append(f"- {twin.t_cell_exhaustion_fraction:.0%} exhausted T-cells available for reactivation")
 
-        if twin.has_dna_repair_defect and "PARP" in profile.get("class", ""):
-            parts.append("- DNA repair deficiency — synthetic lethality with PARP inhibition")
+        mechanisms = treatment_mechanisms(profile)
 
-        if "vaccine" in profile.get("class", ""):
+        if twin.has_dna_repair_defect and MECH_PARP in mechanisms:
+            parts.append("- DNA repair deficiency — synthetic lethality with PARP inhibition")
+        elif MECH_PARP in mechanisms:
+            parts.append(
+                "- No DNA repair defect detected — PARP inhibition has no "
+                "synthetic-lethal target in this patient"
+            )
+
+        if MECH_VACCINE in mechanisms:
             parts.append(f"- {twin.vaccine_candidate_count} neoantigen vaccine targets identified")
             if twin.strong_binder_count > 0:
                 parts.append(f"- {twin.strong_binder_count} strong MHC-I binders (<50 nM)")

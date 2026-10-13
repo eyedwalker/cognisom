@@ -126,9 +126,25 @@ CHECKPOINT_TRIALS: Dict[str, EvidenceItem] = {
         source_type="clinical_trial",
         source_name="KEYNOTE-199",
         source_id="NCT02787005",
-        claim="Pembrolizumab monotherapy in mCRPC: ORR 3-5%, durable responses in PD-L1+ subset",
+        # ORR was the primary endpoint in cohorts 1 and 2 only -- RECIST-
+        # measurable, PD-L1-positive and PD-L1-negative respectively. Cohort 3
+        # enrolled bone-predominant disease, for which RECIST ORR is not the
+        # endpoint, and no cohort-3 ORR could be verified against the
+        # publication; the 0.05 recorded here was unsourced. It is replaced by
+        # the disease control rates, which are published for all three
+        # cohorts. Antonarakis et al., J Clin Oncol 2020;38:395-405.
+        claim=("Pembrolizumab monotherapy in mCRPC: ORR 5% (cohort 1, PD-L1+) "
+               "and 3% (cohort 2, PD-L1-) by central RECIST 1.1 review; "
+               "cohort 3 is bone-predominant and has no RECIST ORR"),
         strength="2B",
-        supporting_data={"ORR_cohort1": 0.05, "ORR_cohort2": 0.03, "ORR_cohort3": 0.05},
+        supporting_data={
+            "ORR_cohort1": 0.05,
+            "ORR_cohort2": 0.03,
+            "DCR_cohort1": 0.10,
+            "DCR_cohort2": 0.09,
+            "DCR_cohort3": 0.22,
+            "median_OS_months": {"cohort1": 9.5, "cohort2": 7.9, "cohort3": 14.1},
+        },
     ),
     "keynote_158": EvidenceItem(
         source_type="clinical_trial",
@@ -171,9 +187,22 @@ PARP_TRIALS: Dict[str, EvidenceItem] = {
         source_type="clinical_trial",
         source_name="PROfound",
         source_id="NCT02987543",
-        claim="Olaparib in HRR-mutated mCRPC: rPFS 7.4 vs 3.6 months (HR 0.34)",
+        claim=("Olaparib in BRCA1/BRCA2/ATM-altered mCRPC (cohort A): rPFS "
+               "7.4 vs 3.6 months (HR 0.34, 95% CI 0.25-0.47), confirmed ORR "
+               "33% vs 2%"),
         strength="1A",
-        supporting_data={"rPFS_olaparib": 7.4, "rPFS_control": 3.6, "HR": 0.34},
+        # rPFS by blinded independent central review; unrounded 7.39 vs 3.55.
+        # The control-arm median is what pins this model's one calibrated
+        # parameter; see CALIBRATED_GROWTH_RATE_PER_DAY in
+        # cognisom/genomics/treatment_simulator.py.
+        supporting_data={
+            "rPFS_olaparib": 7.4,
+            "rPFS_control": 3.6,
+            "HR": 0.34,
+            "HR_95CI": [0.25, 0.47],
+            "ORR_olaparib": 0.333,
+            "ORR_control": 0.023,
+        },
     ),
     "triton2": EvidenceItem(
         source_type="clinical_trial",
@@ -190,9 +219,23 @@ VACCINE_TRIALS: Dict[str, EvidenceItem] = {
         source_type="clinical_trial",
         source_name="KEYNOTE-942 (V940)",
         source_id="NCT03897881",
-        claim="mRNA-4157/V940 + pembrolizumab in melanoma: 44% reduction in recurrence/death",
+        # "44% reduction" is 1 - 0.561 and is a point estimate whose
+        # interval crosses 1: the randomised phase 2b result did not reach
+        # significance at the conventional threshold. Reporting the reduction
+        # alone presented it as though it had. Weber et al., Lancet 2024.
+        claim=("mRNA-4157/V940 + pembrolizumab in resected stage IIIB-IV "
+               "melanoma: RFS HR 0.561 (95% CI 0.309-1.017, two-sided "
+               "p=0.053) — not significant at 0.05"),
         strength="2A",
-        supporting_data={"HR_RFS": 0.56, "reduction_pct": 44},
+        supporting_data={
+            "HR_RFS": 0.561,
+            "HR_RFS_95CI": [0.309, 1.017],
+            "p_two_sided": 0.053,
+            "significant_at_0_05": False,
+            "RFS_18mo_combination": 0.79,
+            "RFS_18mo_pembrolizumab": 0.62,
+            "setting": "adjuvant, resected — no measurable disease, so no ORR",
+        },
     ),
 }
 

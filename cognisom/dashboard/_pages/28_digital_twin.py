@@ -200,9 +200,14 @@ if results:
 
     fig = go.Figure()
 
+    from cognisom.genomics.treatment_simulator import CALIBRATION_STATEMENT
+
+    st.warning(CALIBRATION_STATEMENT, icon="\u26a0\ufe0f")
+
+    # "CR" is never produced -- relative volume is floored at 0.01, so
+    # disappearance of all target lesions is not representable.
     response_colors = {
-        "CR": "#22cc22", "PR": "#88cc22",
-        "SD": "#cccc22", "PD": "#cc2222",
+        "PR": "#88cc22", "SD": "#cccc22", "PD": "#cc2222",
     }
 
     for result in results:
@@ -219,11 +224,14 @@ if results:
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray",
                   annotation_text="Baseline")
 
-    # RECIST thresholds
-    fig.add_hline(y=0.7, line_dash="dot", line_color="green",
-                  annotation_text="PR threshold (-30%)")
-    fig.add_hline(y=1.2, line_dash="dot", line_color="red",
-                  annotation_text="PD threshold (+20%)")
+    # RECIST thresholds, converted to the volume axis this figure plots:
+    # a -30% diameter change is a volume ratio of 0.70**3, and a +20%
+    # diameter change is 1.20**3. The lines used to sit at 0.7 and 1.2,
+    # which on a volume axis are an 11% and a 6% diameter change.
+    fig.add_hline(y=0.343, line_dash="dot", line_color="green",
+                  annotation_text="PR threshold (−30% diameter)")
+    fig.add_hline(y=1.728, line_dash="dot", line_color="red",
+                  annotation_text="PD threshold (+20% diameter, from nadir)")
 
     fig.update_layout(
         title="Predicted Tumor Volume Over Time",
@@ -247,9 +255,11 @@ if results:
             "Treatment": r.treatment_name,
             "Class": r.treatment_class,
             "Response": r.response_category,
-            "Best Response": f"{(1 - r.best_response) * 100:.0f}% reduction",
+            "Best Response (diameter)":
+                f"{(1 - r.best_response_diameter_ratio) * 100:.0f}% reduction",
+            "Best Response (volume)": f"{(1 - r.best_response) * 100:.0f}% reduction",
             "Time to Best (days)": r.time_to_best_response_days,
-            "PFS (days)": r.progression_free_days,
+            "PFS": r.format_progression_free_survival(),
             "T-cell Reactivation": f"{r.t_cell_reactivation_fraction:.0%}",
             "irAE Risk": f"{r.immune_related_adverse_events:.0%}",
             "Confidence": f"{r.confidence:.0%}",
@@ -265,7 +275,7 @@ if results:
     st.subheader("Detailed Results")
 
     for result in results:
-        resp_emoji = {"CR": "🟢", "PR": "🟡", "SD": "🟠", "PD": "🔴"}.get(result.response_category, "⚪")
+        resp_emoji = {"PR": "🟡", "SD": "🟠", "PD": "🔴"}.get(result.response_category, "⚪")
 
         with st.expander(
             f"{resp_emoji} {result.treatment_name} — {result.response_category}",
@@ -278,8 +288,15 @@ if results:
                 st.markdown(f"**Rationale:** {result.rationale}")
 
             with col_d2:
-                st.metric("Best Response", f"{(1 - result.best_response) * 100:.0f}% reduction")
-                st.metric("PFS", f"{result.progression_free_days} days")
+                st.metric(
+                    "Best Response (RECIST diameter)",
+                    f"{(1 - result.best_response_diameter_ratio) * 100:.0f}% reduction",
+                    help=f"{(1 - result.best_response) * 100:.0f}% relative "
+                         "volume reduction; RECIST is defined on diameters.",
+                )
+                st.metric("PFS", result.format_progression_free_survival())
+                for caveat in result.caveats:
+                    st.caption(caveat)
                 st.metric("Post-treatment Exhaustion",
                           "not measured" if result.final_exhaustion is None
                           else f"{result.final_exhaustion:.2f}")

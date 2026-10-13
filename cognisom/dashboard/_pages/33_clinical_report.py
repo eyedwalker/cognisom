@@ -162,19 +162,30 @@ try:
         # Treatment comparison table
         st.markdown("**Simulated Treatment Response (180 days):**")
 
+        from cognisom.genomics.treatment_simulator import CALIBRATION_STATEMENT
+
+        # The caveat sits next to the numbers, not in a model card the reader
+        # will not open.
+        st.warning(CALIBRATION_STATEMENT, icon="\u26a0\ufe0f")
+
         for r in results:
             response_color = {
-                "CR": "#10b981", "PR": "#3b82f6", "SD": "#f59e0b", "PD": "#ef4444"
+                "PR": "#3b82f6", "SD": "#f59e0b", "PD": "#ef4444"
             }.get(r.response_category, "#6b7280")
 
-            reduction = (1 - r.best_response) * 100
+            # The curve is a relative VOLUME; RECIST is a sum of diameters.
+            # Showing the volume figure unlabelled beside a RECIST category
+            # overstated the shrinkage by about a factor of two and a half.
+            volume_reduction = (1 - r.best_response) * 100
+            diameter_reduction = (1 - r.best_response_diameter_ratio) * 100
 
             st.markdown(
                 f'- **{r.treatment_name}**: '
                 f'<span style="color: {response_color}; font-weight: 700;">'
                 f'{r.response_category}</span> '
-                f'({reduction:.0f}% reduction) — '
-                f'PFS: {r.progression_free_days}d — '
+                f'({diameter_reduction:.0f}% diameter / '
+                f'{volume_reduction:.0f}% volume reduction) — '
+                f'PFS: {r.format_progression_free_survival()} — '
                 f'irAE risk: {r.immune_related_adverse_events:.0%}',
                 unsafe_allow_html=True,
             )
@@ -188,8 +199,11 @@ try:
                 name=f"{r.treatment_name} ({r.response_category})",
                 line=dict(width=2),
             ))
-        fig.add_hline(y=0.7, line_dash="dash", line_color="gray",
-                      annotation_text="PR threshold (30% reduction)")
+        # 0.70 is the RECIST PR threshold on DIAMETERS. On a volume axis it
+        # is 0.70 ** 3 = 0.343. The line used to sit at 0.70, labelling an
+        # 11% diameter shrink as a partial response.
+        fig.add_hline(y=0.343, line_dash="dash", line_color="gray",
+                      annotation_text="PR threshold (−30% diameter = 0.343 volume)")
         fig.update_layout(
             title="Tumor Response Curves",
             xaxis_title="Days",
