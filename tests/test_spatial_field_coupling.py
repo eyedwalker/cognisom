@@ -332,11 +332,27 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     normal = [c for c in alive if c.cell_type != "cancer"]
 
     assert len(normal) == 160
-    assert len([c for c in alive if c.cell_type == "cancer"]) == 28
-    assert cells.total_deaths == 4
-    assert cells.total_divisions == 102
+    # Cancer survivors moved when the immune patrol unit bug was fixed:
+    # patrol_speed is um/MIN and was converted to hours with x0.01 instead
+    # of x60, so the immune compartment was frozen at a median 0.022 um of
+    # travel per 6 h and never reached a tumour. With immune cells able to
+    # migrate, Baseline now loses 8 cancer cells to real kills.
+    #
+    # What this test exists for is unchanged and still asserted above:
+    # normal-cell survival at 160.
+    assert len([c for c in alive if c.cell_type == "cancer"]) == 20
+    # 4 before the immune-patrol fix. Immune kills are deaths, so a working
+    # immune compartment raises this; none of the extra deaths are normal
+    # cells, which is what the assertion above pins.
+    assert cells.total_deaths == 8
+    # 102 before the immune-patrol fix: cancer cells killed early never go
+    # on to divide.
+    assert cells.total_divisions == 98
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(309.056, abs=0.01)
+        pytest.approx(305.8683, abs=0.01)
+    # 309.0560 before the immune-patrol fix: 8 fewer cancer cells survive,
+    # and they are not there to be delivered oxygen. The Krogh law itself is
+    # unchanged -- normal-cell survival and mean oxygen are asserted above.
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
     assert min(c.oxygen for c in alive) == pytest.approx(0.0739, abs=1e-3)
 
@@ -352,8 +368,14 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
 
     assert vascular.hypoxic_regions == 3
     assert sum(1 for c in alive if c.oxygen < 0.05) == 3
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0143, abs=1e-3)
-    assert cells.total_deaths == 74
+    # Was 0.0143 before the immune-patrol fix; the surviving cells sit in
+    # different positions relative to the capillaries now. The hypoxia
+    # invariants themselves -- 3 hypoxic regions, 3 cells below 0.05 -- are
+    # unchanged and asserted above.
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0173, abs=1e-3)
+    # 74 before the immune-patrol fix. Slightly fewer here: cancer cells
+    # killed early by immune cells never go on to starve.
+    assert cells.total_deaths == 72
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

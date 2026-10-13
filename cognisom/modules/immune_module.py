@@ -94,6 +94,9 @@ from cognisom.engine.py.immune.macrophage_polarization import (
     polarization_target,
 )
 
+#: patrol_speed is quoted in um/min; the engine steps in hours.
+MINUTES_PER_HOUR = 60.0
+
 logger = logging.getLogger(__name__)
 
 
@@ -773,9 +776,17 @@ class ImmuneModule(SimulationModule):
                     and self.macrophage_polarization_enabled):
                 self._update_polarization(immune_cell, dt)
 
-            # Patrol (random walk)
+            # Patrol (random walk), but only when there is nothing in reach.
+            #
+            # Detection is evaluated AFTER movement in this loop, so a cell
+            # that steps away from a target it was already touching never
+            # sees it. That is also wrong biologically: a lymphocyte arrests
+            # on contact -- the synapse forms and migration stops -- it does
+            # not wander off a cell it is sitting on and come back. Cells
+            # were previously frozen by a unit bug, which hid this entirely.
             if not immune_cell.activated:
-                self._patrol(immune_cell, dt)
+                if not self._target_within_reach(immune_cell, cancer_cells):
+                    self._patrol(immune_cell, dt)
 
                 # ECM barrier (Upgrade 6): the stromal density at the
                 # T cell's position compresses its effective sensing
@@ -953,6 +964,24 @@ class ImmuneModule(SimulationModule):
             # Keep in bounds
             immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
     
+    def _target_within_reach(self, immune_cell: ImmuneCell, cancer_cells) -> bool:
+        """Is a cancer cell already inside this cell's sensing radius?
+
+        Used to arrest migration before the random walk carries a cell off a
+        target it is in contact with. Deliberately geometric and cheap: it
+        asks only "is something there", not "do I recognise it" -- a cell
+        pauses to inspect what it bumps into, and recognition is decided
+        immediately afterwards by the detection pass.
+        """
+        reach = float(getattr(immune_cell, 'detection_radius', 0.0) or 0.0)
+        if reach <= 0.0 or not cancer_cells:
+            return False
+        for cancer_cell in cancer_cells.values():
+            if np.linalg.norm(
+                    immune_cell.position - cancer_cell.position) < reach:
+                return True
+        return False
+
     def _patrol(self, immune_cell: ImmuneCell, dt: float):
         """Random patrol movement, ECM-attenuated."""
         # Random walk
@@ -971,7 +1000,30 @@ class ImmuneModule(SimulationModule):
                 self.patrol_speed, local_ecm,
             )
         immune_cell.velocity = direction * effective_speed
-        immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
+
+        # patrol_speed is um/MIN and dt is HOURS, so the conversion is x60.
+        # This read `* dt * 0.01`, which is 6,000x too slow: at the default
+        # 5 um/min and dt=0.05 h a cell stepped 0.0025 um instead of 15 um,
+        # and over a 6 h run the whole immune compartment moved a median of
+        # 0.022 um -- frozen. Nothing ever reached a tumour: the nearest
+        # NK-to-cancer gap stayed at 12.7 um against a 10 um detection
+        # radius, so recognition (which works) was never even attempted.
+        step = immune_cell.velocity * dt * MINUTES_PER_HOUR
+
+        # Do not let a cell cross more than its own sensing radius in one
+        # step. Detection is evaluated once per step, so a displacement
+        # larger than detection_radius lets a cell step clean over a target
+        # it should have found -- at dt=0.05 h the uncapped step is 15 um
+        # against a 10 um radius, which measurably broke the closed-loop
+        # trace (the T cell overshot the cancer cell it was meant to kill).
+        # This is a discretisation guard, not a speed limit: shorten dt and
+        # the cap stops binding.
+        reach = float(getattr(immune_cell, 'detection_radius', 0.0) or 0.0)
+        if reach > 0.0:
+            length = float(np.linalg.norm(step))
+            if length > reach:
+                step = step * (reach / length)
+        immune_cell.position += step
     
     def _recognize(self, immune_cell: ImmuneCell, cancer_cell):
         """Decide whether this immune cell recognizes this cancer cell.
