@@ -168,6 +168,30 @@ class CellularModule(SimulationModule):
             self.config.get('cancer_baseline_ecm', 0.0)
         )
 
+        # Initial layout of the cell population.
+        #
+        # 'ring' is the historical layout, and every preset that shipped
+        # before TissueSlab uses it: see _seed_ring, and the measurement
+        # at the top of cognisom/modules/tissue_slab.py for what it
+        # actually looks like -- 80 cells on a circle of radius 50 um
+        # with a 100 um hole in the middle, which is why the renders of
+        # this engine have always looked like a bead necklace rather
+        # than tissue.
+        #
+        # 'slab' seeds a close-packed tissue VOLUME with an embedded
+        # tumour nodule instead. Its geometry lives in
+        # cognisom.modules.tissue_slab.SLAB_SPEC, which is also what the
+        # vascular and immune modules read, so the three cannot disagree
+        # about where the tissue is. Per-parameter overrides go in a
+        # 'slab' sub-dict; unknown keys there are rejected rather than
+        # ignored.
+        self.seeding = str(self.config.get('seeding', 'ring'))
+        self.slab_overrides = dict(self.config.get('slab', {}) or {})
+        #: Populated by _seed_slab with the geometry it used (extents,
+        #: bounds, nodule centre and radius), for callers that need to
+        #: frame a camera or check perfusion against it.
+        self.slab_layout = None
+
         # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
         # neoantigen predictor uses; auto-picks up MHCflurry when
         # available, otherwise PWM fallback.
@@ -193,34 +217,16 @@ class CellularModule(SimulationModule):
     def initialize(self):
         """Initialize cellular system"""
         print("  Creating initial cell population...")
-        
+
         # Create initial cells
         n_normal = self.config.get('n_normal_cells', 80)
         n_cancer = self.config.get('n_cancer_cells', 20)
-        
-        # Normal cells (organized in circle)
-        for i in range(n_normal):
-            angle = 2 * np.pi * i / n_normal
-            radius = 50
-            x = 100 + radius * np.cos(angle)
-            y = 100 + radius * np.sin(angle)
-            z = 50 + np.random.uniform(-10, 10)
-            
-            self.add_cell(position=[x, y, z], cell_type='normal')
-        
-        # Cancer cells (clustered)
-        for i in range(n_cancer):
-            x = 120 + np.random.uniform(-15, 15)
-            y = 120 + np.random.uniform(-15, 15)
-            z = 50 + np.random.uniform(-5, 5)
 
-            cell_id = self.add_cell(position=[x, y, z], cell_type='cancer')
-            self.cells[cell_id].mutations = ['KRAS_G12D']
-            self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
-            # KRAS alone does not drive intrinsic PD-L1, so this stays
-            # at 0; PIK3CA/MYC/EGFR mutations would bump it here via
-            # _intrinsic_pdl1_for_oncogenes.
-        
+        if self.seeding == 'slab':
+            n_normal, n_cancer = self._seed_slab(n_normal, n_cancer)
+        else:
+            self._seed_ring(n_normal, n_cancer)
+
         # Initialize MHC loader (Upgrade 2). Construction reaches into
         # NeoantigenPredictor which instantiates a GeneProteinMapper;
         # this preseeds from BUILTIN_PROTEINS and does not touch the
@@ -237,6 +243,89 @@ class CellularModule(SimulationModule):
         print(f"    ✓ MHC-I display: {len(self.hla_alleles)} HLA alleles "
               f"({', '.join(self.hla_alleles)})")
     
+    def _seed_ring(self, n_normal: int, n_cancer: int):
+        """The historical layout: normal cells on a circle, cancer in a blob.
+
+        Kept byte-for-byte, including the order of the np.random draws,
+        because every preset but TissueSlab uses it and the vascular
+        module's Krogh calibration was measured on it.
+        """
+        # Normal cells (organized in circle)
+        for i in range(n_normal):
+            angle = 2 * np.pi * i / n_normal
+            radius = 50
+            x = 100 + radius * np.cos(angle)
+            y = 100 + radius * np.sin(angle)
+            z = 50 + np.random.uniform(-10, 10)
+
+            self.add_cell(position=[x, y, z], cell_type='normal')
+
+        # Cancer cells (clustered)
+        for i in range(n_cancer):
+            x = 120 + np.random.uniform(-15, 15)
+            y = 120 + np.random.uniform(-15, 15)
+            z = 50 + np.random.uniform(-5, 5)
+
+            cell_id = self.add_cell(position=[x, y, z], cell_type='cancer')
+            self.cells[cell_id].mutations = ['KRAS_G12D']
+            self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
+            # KRAS alone does not drive intrinsic PD-L1, so this stays
+            # at 0; PIK3CA/MYC/EGFR mutations would bump it here via
+            # _intrinsic_pdl1_for_oncogenes.
+
+    def _seed_slab(self, n_normal, n_cancer):
+        """A close-packed tissue slab with a solid tumour nodule in it.
+
+        ``n_normal_cells`` / ``n_cancer_cells`` are honoured when given,
+        but they default to the counts in ``SLAB_SPEC`` rather than to
+        this module's ring defaults: the slab's extent, its vessel
+        lattice and its immune scatter are all derived from the same
+        spec, and a population that disagreed with it would be a slab
+        whose periphery sits outside every Krogh cylinder. The spec is
+        the single source of truth; override ``slab`` consistently in
+        the cellular, vascular and immune configs to change the
+        geometry.
+
+        Returns the (n_normal, n_cancer) actually seeded.
+        """
+        from cognisom.modules.tissue_slab import (
+            rng_from, seed_slab, slab_spec,
+        )
+
+        spec = slab_spec(**self.slab_overrides)
+        if 'n_normal_cells' in self.config:
+            spec['n_normal'] = int(self.config['n_normal_cells'])
+        if 'n_cancer_cells' in self.config:
+            spec['n_cancer'] = int(self.config['n_cancer_cells'])
+
+        layout = seed_slab(
+            spec['n_normal'], spec['n_cancer'],
+            spacing=spec['spacing'],
+            layers=spec['layers'],
+            center=spec['center'],
+            nodule_offset=spec['nodule_offset'],
+            jitter=spec['jitter'],
+            rng=rng_from(spec['seed']),
+        )
+
+        for position in layout['normal']:
+            self.add_cell(position=position, cell_type='normal')
+        for position in layout['cancer']:
+            cell_id = self.add_cell(position=position, cell_type='cancer')
+            self.cells[cell_id].mutations = ['KRAS_G12D']
+            self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
+
+        self.slab_layout = layout
+        extents = layout['extents']
+        print(f"    \u2713 slab {extents[0]:.0f} x {extents[1]:.0f} x "
+              f"{extents[2]:.0f} um, {layout['layers']} layers at "
+              f"{layout['spacing']:.1f} um")
+        print(f"    \u2713 nodule r={layout['nodule_radius']:.1f} um at "
+              f"({layout['nodule_center'][0]:.0f}, "
+              f"{layout['nodule_center'][1]:.0f}, "
+              f"{layout['nodule_center'][2]:.0f})")
+        return len(layout['normal']), len(layout['cancer'])
+
     def add_cell(self, position, cell_type='normal'):
         """Add new cell"""
         cell_id = self.next_cell_id

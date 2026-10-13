@@ -49,6 +49,10 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
         "n_normal_cells": int, "n_cancer_cells": int,
         "division_time_normal": float, "division_time_cancer": float,
         "glucose_consumption": float, "glucose_consumption_cancer": float,
+        # Initial layout: 'ring' (the historical one) or 'slab'. 'slab'
+        # reads its geometry from tissue_slab.SLAB_SPEC, overridable
+        # per-parameter through 'slab'.
+        "seeding": str, "slab": dict,
     },
     "immune": {
         "n_t_cells": int, "n_nk_cells": int, "n_macrophages": int,
@@ -62,10 +66,15 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
         "nk_kill_probability": float,
         "macrophage_kill_probability": float,
         "patient_id": str, "patient_hla": list,
+        # Infiltrate scatter: 'window' (the historical one) or 'slab'.
+        "seeding": str, "slab": dict,
     },
     "vascular": {
         "n_capillaries": int, "arterial_O2": float,
         "arterial_glucose": float, "exchange_rate": float,
+        # Network layout: 'radial' (the historical one) or 'slab'.
+        # 'slab' ignores n_capillaries -- see VascularModule.__init__.
+        "layout": str, "slab": dict,
     },
     "lymphatic": {
         "n_vessels": int, "drainage_rate": float,

@@ -189,6 +189,25 @@ class VascularModule(SimulationModule):
         self.arterial_glucose = self.config.get('arterial_glucose', 5.0)
         self.exchange_rate = self.config.get('exchange_rate', 1.0)
         
+        # Network layout.
+        #
+        # 'radial' is the historical pattern and what every preset
+        # before TissueSlab uses: n_capillaries spokes from r=20 um to
+        # r=80 um about the domain centre, which suits the ring the
+        # cellular module seeds and nothing else.
+        #
+        # 'slab' lays a staggered lattice of vessels along the
+        # TissueSlab's long axis instead, sized from
+        # cognisom.modules.tissue_slab.SLAB_SPEC -- the same spec the
+        # cellular module fills and the immune module patrols -- at a
+        # pitch chosen against exchange_radius so that no cell in the
+        # slab is outside a Krogh cylinder. n_capillaries is IGNORED in
+        # that mode: the vessel count is fixed by the pitch and the
+        # slab's extent, because a count that did not match them would
+        # leave part of the tissue unsupplied.
+        self.layout = str(self.config.get('layout', 'radial'))
+        self.slab_overrides = dict(self.config.get('slab', {}) or {})
+
         # The per-cell O2 demand the Krogh calibration is anchored to:
         # the largest in the cellular module (normal cells, 0.15 /h).
         # Read by get_O2_at_position and by the lethal-corner test.
@@ -208,35 +227,85 @@ class VascularModule(SimulationModule):
     def initialize(self):
         """Initialize vascular network"""
         print("  Creating capillary network...")
-        
+
+        if self.layout == 'slab':
+            self._initialize_slab_lattice()
+        else:
+            self._initialize_radial()
+
+        # Subscribe to events
+        self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
+        self.subscribe(EventTypes.CELL_DIED, self.on_cell_died)
+
+    def _initialize_radial(self):
+        """Spokes about the domain centre: the historical layout.
+
+        Kept byte-for-byte, including the order of the np.random draws,
+        because the Krogh calibration in _exchange_with_tissue was
+        measured against this network and the ring the cellular module
+        seeds around it.
+        """
         # Create radial capillary pattern (from center outward)
         center = np.array([100.0, 100.0, 50.0])
-        
+
         for i in range(self.n_capillaries):
             angle = 2 * np.pi * i / self.n_capillaries
-            
+
             # Start near center
             start = center + np.array([
                 20 * np.cos(angle),
                 20 * np.sin(angle),
                 np.random.uniform(-5, 5)
             ])
-            
+
             # End at periphery
             end = center + np.array([
                 80 * np.cos(angle),
                 80 * np.sin(angle),
                 np.random.uniform(-5, 5)
             ])
-            
+
             self.add_capillary(start, end)
-        
-        # Subscribe to events
-        self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
-        self.subscribe(EventTypes.CELL_DIED, self.on_cell_died)
-        
+
         print(f"    ✓ {self.n_capillaries} capillaries")
         print(f"    ✓ Radial network pattern")
+
+    def _initialize_slab_lattice(self):
+        """A staggered vessel lattice spanning the TissueSlab.
+
+        The pitch is bounded by this module's own calibration, not
+        chosen for looks: exchange_radius is the lethal corner and the
+        zonation documented in _exchange_with_tissue puts the normoxic
+        limit at 25 um, with only the NEAREST vessel contributing. So
+        every cell has to be inside ~25 um of a vessel or it starves.
+        tissue_slab.perfusion_report measures the distribution this
+        produces, and the TissueSlab tests assert it.
+        """
+        from cognisom.modules.tissue_slab import (
+            capillary_lattice, rng_from, slab_bounds, slab_spec,
+        )
+
+        spec = slab_spec(**self.slab_overrides)
+        lo, hi = slab_bounds(
+            spec['n_normal'], spec['n_cancer'],
+            spacing=spec['spacing'],
+            layers=spec['layers'],
+            center=spec['center'],
+        )
+        segments = capillary_lattice(
+            lo, hi,
+            pitch=spec['vessel_pitch'],
+            axis=spec['vessel_axis'],
+            jitter=spec['vessel_jitter'],
+            tilt=spec['vessel_tilt'],
+            rng=rng_from(spec['seed']),
+        )
+        for start, end in segments:
+            self.add_capillary(start, end)
+
+        print(f"    ✓ {len(segments)} capillaries")
+        print(f"    ✓ Slab lattice, {spec['vessel_pitch']:.0f} um pitch "
+              f"along axis {spec['vessel_axis']}")
     
     def add_capillary(self, start, end):
         """Add capillary to network"""

@@ -201,7 +201,7 @@ class SimulationEngine:
         if len(self.step_times) > 100:
             self.step_times.pop(0)
     
-    def run(self, duration: float = None):
+    def run(self, duration: float = None, callback=None):
         """
         Run simulation for specified duration
         
@@ -209,6 +209,15 @@ class SimulationEngine:
         -----------
         duration : float
             Simulation duration in hours (uses config if None)
+        callback : callable, optional
+            Called with this engine after every step. Nothing on this
+            class records any state, so a caller that drives the engine
+            through run() -- every scenario in cognisom/scenarios/, the
+            patent-pipeline page, the module demos -- ended a run with
+            nothing to plot or render. Pass
+            EngineRunner.record_cell_snapshot here to get frames out of
+            it. TissueEngine.run has always taken a callback for exactly
+            this reason.
         """
         if not self.initialized:
             self.initialize()
@@ -230,6 +239,9 @@ class SimulationEngine:
                 break
             
             self.step()
+
+            if callback is not None:
+                callback(self)
             
             # Progress update
             if step % 100 == 0 or step == steps - 1:

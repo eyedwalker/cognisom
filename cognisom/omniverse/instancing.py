@@ -495,6 +495,71 @@ class NestedInstancingManager:
 
         return True
 
+    def set_point_instancer_primvar(
+        self,
+        prototype_name: str,
+        name: str,
+        values: "np.ndarray",
+        time_code: float = None
+    ) -> bool:
+        """
+        Author a per-instance primvar on a point instancer.
+
+        This is the point-instanced counterpart of `_apply_primvars`,
+        which can only reach scenegraph instances.  Without it a
+        PointInstancer can hold a million cells and show one colour:
+        state has to ride on a primvar, because binding a material per
+        instance is exactly what breaks instance sharing.
+
+        Args:
+            prototype_name: Name of a prototype with a point instancer
+            name: Primvar name, e.g. "displayColor" (the "primvars:"
+                prefix is optional)
+            values: (N, 3) float array -> Color3fArray, or (N,) int /
+                float array -> IntArray / FloatArray.  N must match the
+                instance count.
+            time_code: USD time code, for animated primvars
+
+        Returns:
+            True if the primvar was authored
+        """
+        if prototype_name not in self._point_instancers:
+            log.error(f"No point instancer for '{prototype_name}'")
+            return False
+
+        instancer = self._point_instancers[prototype_name]
+        arr = np.asarray(values)
+
+        if arr.ndim == 2 and arr.shape[1] == 3:
+            value = Vt.Vec3fArray.FromNumpy(np.ascontiguousarray(arr, dtype=np.float32))
+            type_name = Sdf.ValueTypeNames.Color3fArray
+        elif arr.ndim == 1 and np.issubdtype(arr.dtype, np.integer):
+            value = Vt.IntArray.FromNumpy(np.ascontiguousarray(arr, dtype=np.int32))
+            type_name = Sdf.ValueTypeNames.IntArray
+        elif arr.ndim == 1:
+            value = Vt.FloatArray.FromNumpy(np.ascontiguousarray(arr, dtype=np.float32))
+            type_name = Sdf.ValueTypeNames.FloatArray
+        else:
+            log.error(f"Unsupported primvar shape {arr.shape} for '{name}'")
+            return False
+
+        n_instances = len(instancer.GetProtoIndicesAttr().Get() or [])
+        if n_instances and len(arr) != n_instances:
+            log.error(
+                f"Primvar '{name}' has {len(arr)} values for "
+                f"{n_instances} instances"
+            )
+            return False
+
+        primvar = UsdGeom.PrimvarsAPI(instancer.GetPrim()).CreatePrimvar(
+            name, type_name, UsdGeom.Tokens.varying
+        )
+        if time_code is None:
+            primvar.Set(value)
+        else:
+            primvar.Set(value, time_code)
+        return True
+
     def get_prototype_info(self, name: str) -> Optional[Dict]:
         """Get information about a registered prototype."""
         if name not in self._prototypes:

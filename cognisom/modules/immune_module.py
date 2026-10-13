@@ -345,6 +345,20 @@ class ImmuneModule(SimulationModule):
         # precursor to PD-1-hi exhausted during this run.
         self.total_exhaustion_transitions = 0
 
+        # Where the infiltrate starts.
+        #
+        # 'window' is the historical scatter and what every preset
+        # before TissueSlab uses: uniform over a fixed
+        # 100 x 100 x 20 um box about the domain centre, chosen for the
+        # ring the cellular module seeds. On the 165 x 156 x 63 um slab
+        # that window would leave the whole periphery unpatrolled.
+        #
+        # 'slab' scatters through the slab volume instead, sized from
+        # cognisom.modules.tissue_slab.SLAB_SPEC -- the same spec the
+        # cellular module fills and the vascular module perfuses.
+        self.seeding = str(self.config.get('seeding', 'window'))
+        self.slab_overrides = dict(self.config.get('slab', {}) or {})
+
         # Reference to cellular module (for target cells)
         self.cellular_module = None
     
@@ -352,39 +366,48 @@ class ImmuneModule(SimulationModule):
         """Initialize immune system"""
         print("  Creating immune cell population...")
         
+        # One sampler for all three lineages, so 'slab' seeding reaches
+        # every one of them. The 'window' branch keeps the original
+        # three np.random.uniform draws per cell, in the original x, y, z
+        # order and the original T -> NK -> macrophage cell order, so a
+        # seeded run of any pre-existing preset is unchanged.
+        scatter = self._slab_scatter()
+        placed = 0
+
+        def _next_position():
+            nonlocal placed
+            if scatter is not None:
+                position = scatter[placed]
+            else:
+                position = [
+                    np.random.uniform(50, 150),
+                    np.random.uniform(50, 150),
+                    np.random.uniform(40, 60),
+                ]
+            placed += 1
+            return position
+
         # Create T cells (patrol tissue)
         for i in range(self.n_t_cells):
-            x = np.random.uniform(50, 150)
-            y = np.random.uniform(50, 150)
-            z = np.random.uniform(40, 60)
-            
             self.add_immune_cell(
-                position=[x, y, z],
+                position=_next_position(),
                 cell_type='T_cell'
             )
-        
+
         # Create NK cells
         for i in range(self.n_nk_cells):
-            x = np.random.uniform(50, 150)
-            y = np.random.uniform(50, 150)
-            z = np.random.uniform(40, 60)
-            
             self.add_immune_cell(
-                position=[x, y, z],
+                position=_next_position(),
                 cell_type='NK_cell'
             )
-        
+
         # Create macrophages
         for i in range(self.n_macrophages):
-            x = np.random.uniform(50, 150)
-            y = np.random.uniform(50, 150)
-            z = np.random.uniform(40, 60)
-            
             self.add_immune_cell(
-                position=[x, y, z],
+                position=_next_position(),
                 cell_type='macrophage'
             )
-        
+
         # Build the patient TCR repertoire (Upgrade 2). Same scorer the
         # closed-loop test relies on; reproducible from tcr_seed.
         self._tcr_repertoire = TCRRepertoire(
@@ -404,6 +427,34 @@ class ImmuneModule(SimulationModule):
               f"(threshold={self.tcr_recognition_threshold})")
         self._announce_nk_licensing()
     
+    def _slab_scatter(self):
+        """Seed positions spread through the TissueSlab, or None.
+
+        Returns an (N, 3) array covering all three lineages in seeding
+        order when ``seeding == 'slab'``, and None for the historical
+        window scatter.
+        """
+        if self.seeding != 'slab':
+            return None
+
+        from cognisom.modules.tissue_slab import (
+            rng_from, scatter_in_box, slab_bounds, slab_spec,
+        )
+
+        spec = slab_spec(**self.slab_overrides)
+        lo, hi = slab_bounds(
+            spec['n_normal'], spec['n_cancer'],
+            spacing=spec['spacing'],
+            layers=spec['layers'],
+            center=spec['center'],
+        )
+        n_total = self.n_t_cells + self.n_nk_cells + self.n_macrophages
+        return scatter_in_box(
+            n_total, lo, hi,
+            inset=spec['immune_inset'],
+            rng=rng_from(spec['seed']),
+        )
+
     def add_immune_cell(self, position, cell_type):
         """Add immune cell"""
         cell_id = self.next_immune_id

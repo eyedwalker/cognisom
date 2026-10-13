@@ -10,10 +10,16 @@ from .cell_renderer import CellPopulationRenderer
 from .field_renderer import SpatialFieldRenderer
 from .network_renderer import InteractionNetworkRenderer
 from .exporters import SceneExporter
+from .interaction_recorder import (
+    InteractionRecorder,
+    VisualEvent,
+)
 
 __all__ = [
     "CellPopulationRenderer",
     "SpatialFieldRenderer",
     "InteractionNetworkRenderer",
     "SceneExporter",
+    "InteractionRecorder",
+    "VisualEvent",
 ]

@@ -20,6 +20,172 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+# ── Cell colour mapping for the USD export ───────────────────────────
+#
+# Hue carries the cell TYPE; lightness carries the cell STATE.  Both are
+# authored as a per-cell/per-instance `primvars:displayColor`, which a
+# single shared UsdPreviewSurface reads through a UsdPrimvarReader_float3.
+# Per-instance *materials* would break instance sharing (see
+# `cognisom/omniverse/instancing.py`), so state never gets its own
+# material.
+#
+# The legend is written into the exported stage as well (stage `comment`
+# metadata plus `customLayerData["cognisom:colorLegend"]`), so a render
+# can always be checked against the mapping that produced it.
+
+#: Base colour per `cell_type`, linear RGB.  Lookup is case-insensitive,
+#: so the immune module's 'T_cell' / 'NK_cell' land on the same entries as
+#: the dashboard's lower-case names.  'dividing', 'stem', 'progenitor' and
+#: 'differentiated' are *types* in the dashboard's synthetic generator,
+#: which is why they appear here as well as in the state table.
+CELL_TYPE_USD_COLORS = {
+    "normal": (0.26, 0.55, 0.86),          # blue
+    "cancer": (0.88, 0.16, 0.16),          # red
+    "t_cell": (0.20, 0.78, 0.33),          # green
+    "nk_cell": (0.66, 0.31, 0.86),         # violet
+    "macrophage": (0.96, 0.60, 0.16),      # orange
+    "immune": (0.20, 0.78, 0.33),          # green (generic infiltrate)
+    "fibroblast": (0.55, 0.40, 0.28),      # brown
+    "endothelial": (0.20, 0.72, 0.74),     # teal
+    "stem": (0.93, 0.33, 0.60),            # pink
+    "progenitor": (0.56, 0.72, 0.93),      # pale blue
+    "differentiated": (0.85, 0.66, 0.36),  # tan
+    "dividing": (0.90, 0.35, 0.90),        # magenta
+    "dead": (0.32, 0.32, 0.34),            # grey
+}
+
+#: Fallback for a type the table does not know.  Deliberately a neutral
+#: grey: an unknown type must not borrow a hue that means something.
+UNKNOWN_CELL_USD_COLOR = (0.60, 0.60, 0.62)
+
+#: State tint applied over the type colour as `lerp(base, target, weight)`.
+#: Ordered by precedence -- the first matching state wins.
+CELL_STATE_USD_TINTS = {
+    "dead": ((0.32, 0.32, 0.34), 1.00),       # flat grey, type erased
+    "dying": ((0.38, 0.05, 0.05), 0.70),      # dark maroon
+    "hypoxic": ((0.07, 0.07, 0.42), 0.60),    # dark blue-violet
+    "dividing": ((1.00, 1.00, 1.00), 0.55),   # pale, bright
+    "activated": ((1.00, 0.93, 0.30), 0.50),  # hot yellow
+    "alive": ((0.0, 0.0, 0.0), 0.0),          # untinted
+}
+
+#: Integer code per state, written as `primvars:cognisom:cellState` so a
+#: downstream tool can re-colour without parsing RGB back.
+CELL_STATE_CODES = {
+    "alive": 0, "dividing": 1, "activated": 2,
+    "hypoxic": 3, "dying": 4, "dead": 5,
+}
+
+#: Oxygen below this flags a cell hypoxic.  This is the engine's own
+#: threshold -- `VascularModule._check_hypoxia` (modules/vascular_module.py)
+#: counts `cell.oxygen < 0.05` as a hypoxic region.
+HYPOXIA_O2_THRESHOLD = 0.05
+
+#: The engine's lethal thresholds: `CellularModule.update` kills a cell
+#: when `cell.oxygen < 0.02 or cell.glucose < 0.5`.  A still-alive cell
+#: past either one is drawn as 'dying'.
+DYING_O2_THRESHOLD = 0.02
+DYING_GLUCOSE_THRESHOLD = 0.5
+
+
+def _cell_field(cell, name, default=None):
+    """Read `name` off a cell that may be a dict or an engine object."""
+    if isinstance(cell, dict):
+        return cell.get(name, default)
+    return getattr(cell, name, default)
+
+
+def _cell_xyz(cell):
+    """Cell position as three plain Python floats.
+
+    `CellState.position` is a `numpy.ndarray` of float32, and
+    `Gf.Vec3d(numpy.float32, ...)` raises `ArgumentError` -- which is what
+    made this exporter work on the test fixtures and crash on every real
+    cell.  Accepts numpy arrays, lists, tuples and anything indexable.
+    """
+    pos = _cell_field(cell, "position")
+    if pos is None:
+        return (0.0, 0.0, 0.0)
+    try:
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
+    except (TypeError, IndexError, ValueError):
+        try:
+            flat = list(np.asarray(pos, dtype=float).reshape(-1))
+        except Exception:
+            return (0.0, 0.0, 0.0)
+        flat = (flat + [0.0, 0.0, 0.0])[:3]
+        return (float(flat[0]), float(flat[1]), float(flat[2]))
+
+
+def cell_state_name(cell) -> str:
+    """Classify a cell into one of CELL_STATE_USD_TINTS.
+
+    Precedence: dead > dying > hypoxic > dividing > activated > alive.
+
+    A caller that already knows the state can pass it directly as a
+    `state` field, or set the booleans `alive` / `dying` / `dividing` /
+    `activated`.  Otherwise the state is derived from the same quantities
+    the engine itself tests -- oxygen, glucose and cell-cycle phase.
+
+    Note on 'dividing': `CellularModule` never advances `CellState.phase`
+    past 'G1' (it divides on age, not on phase), so a snapshot taken from
+    a live run will contain no cells in M and none will be drawn as
+    dividing.  Demo cells and any module that does set phase will show it.
+    """
+    explicit = _cell_field(cell, "state")
+    if isinstance(explicit, str) and explicit.lower() in CELL_STATE_USD_TINTS:
+        return explicit.lower()
+
+    if not bool(_cell_field(cell, "alive", True)):
+        return "dead"
+
+    if bool(_cell_field(cell, "dying", False)) or bool(
+        _cell_field(cell, "apoptotic", False)
+    ):
+        return "dying"
+
+    oxygen = _cell_field(cell, "oxygen")
+    glucose = _cell_field(cell, "glucose")
+    try:
+        oxygen = None if oxygen is None else float(oxygen)
+        glucose = None if glucose is None else float(glucose)
+    except (TypeError, ValueError):
+        oxygen = glucose = None
+
+    if (oxygen is not None and oxygen < DYING_O2_THRESHOLD) or (
+        glucose is not None and glucose < DYING_GLUCOSE_THRESHOLD
+    ):
+        return "dying"
+    if oxygen is not None and oxygen < HYPOXIA_O2_THRESHOLD:
+        return "hypoxic"
+
+    if bool(_cell_field(cell, "dividing", False)):
+        return "dividing"
+    phase = _cell_field(cell, "phase")
+    if isinstance(phase, str) and phase.upper() == "M":
+        return "dividing"
+
+    if bool(_cell_field(cell, "activated", False)):
+        return "activated"
+
+    return "alive"
+
+
+def cell_display_color(cell):
+    """RGB for one cell: type hue, tinted by state.  Returns a 3-tuple."""
+    ctype = _cell_field(cell, "cell_type", "normal")
+    key = str(ctype).lower() if ctype is not None else "normal"
+    base = CELL_TYPE_USD_COLORS.get(key, UNKNOWN_CELL_USD_COLOR)
+
+    state = cell_state_name(cell)
+    target, weight = CELL_STATE_USD_TINTS.get(state, ((0.0, 0.0, 0.0), 0.0))
+    if weight <= 0.0:
+        return tuple(float(c) for c in base)
+    return tuple(
+        float(base[i] * (1.0 - weight) + target[i] * weight) for i in range(3)
+    )
+
+
 class SceneExporter:
     """Export cell populations and fields to standard 3D formats.
 
@@ -456,29 +622,55 @@ class SceneExporter:
 
     # ─── USD Export ─────────────────────────────────────────────
 
+    #: Above this many cells the export switches from one `UsdGeomSphere`
+    #: per cell to a single `UsdGeomPointInstancer`.  Below it, individual
+    #: prims are easier to select and inspect; above it they are what makes
+    #: a 20,000-cell stage unopenable.
+    USD_INSTANCER_THRESHOLD = 256
+
     @staticmethod
     def cells_to_usd(
-        cells: List[Dict[str, Any]],
+        cells: List[Any],
         output_path: str,
         scene_name: str = "cognisom_cells",
+        instancer_threshold: Optional[int] = None,
+        radius: Optional[float] = None,
+        add_camera: bool = True,
     ) -> str:
         """Export cells as a real USD file using OpenUSD (pxr).
 
-        Creates actual USD geometry viewable in:
-        - NVIDIA Omniverse
-        - usdview (pip install usd-core)
-        - Blender, Houdini, Maya
+        Writes a stage that renders on its own -- explicit camera, key /
+        fill / dome lights, and a colour per cell -- so
+        `usdrecord scene.usda out.png` produces a deterministic image
+        rather than relying on the viewer's auto-framing and headlight.
+        Also opens in Omniverse, Blender, Houdini and Maya.
 
         Args:
-            cells: List of cell dicts with 'position', 'cell_type'.
+            cells: Cells to export.  Each may be a dict or an engine
+                object (`CellularModule.CellState`, `ImmuneCell`, ...).
+                Read: position, cell_type, alive, phase, oxygen, glucose,
+                activated, volume/radius.  A numpy position is fine.
             output_path: Path to write .usda file.
-            scene_name: Name for the USD stage.
+            scene_name: Name recorded in the stage's documentation.
+            instancer_threshold: Cell count at or above which a single
+                PointInstancer replaces one Sphere prim per cell.
+                Defaults to `SceneExporter.USD_INSTANCER_THRESHOLD`.
+            radius: Cell radius in simulation units.  None (default)
+                derives it per cell from `volume` (femtolitres, 1 fL =
+                1 um^3) when present, otherwise from the median
+                nearest-neighbour spacing of the population, so cells
+                touch without interpenetrating at any scale.
+            add_camera: Author a framed camera and light rig.
 
         Returns:
-            Path to written file.
+            Path to written file, or "" if OpenUSD is not installed.
+
+        Colour: hue is the cell type, lightness is the state --
+        see `CELL_TYPE_USD_COLORS` / `CELL_STATE_USD_TINTS`.  The legend
+        travels with the stage in its `comment` metadata.
         """
         try:
-            from pxr import Usd, UsdGeom, UsdShade, Gf, Sdf, UsdLux
+            from pxr import Usd, UsdGeom, Gf
         except ImportError:
             logger.error("OpenUSD not available. Install with: pip install usd-core")
             return ""
@@ -486,74 +678,414 @@ class SceneExporter:
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create stage
+        cells = [] if cells is None else list(cells)
+        n = len(cells)
+        threshold = (
+            SceneExporter.USD_INSTANCER_THRESHOLD
+            if instancer_threshold is None else int(instancer_threshold)
+        )
+
+        positions = np.array(
+            [_cell_xyz(c) for c in cells], dtype=np.float64
+        ).reshape(-1, 3)
+        colors = np.array(
+            [cell_display_color(c) for c in cells], dtype=np.float32
+        ).reshape(-1, 3)
+        states = [cell_state_name(c) for c in cells]
+        radii = SceneExporter._usd_cell_radii(cells, positions, radius)
+
         stage = Usd.Stage.CreateNew(str(out))
-        stage.SetMetadata("documentation", f"Cognisom cell export: {len(cells)} cells")
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
+        # The simulation works in microns; say so rather than leaving the
+        # 1-metre default to be read as a cell the size of a room.
+        UsdGeom.SetStageMetersPerUnit(stage, 1e-6)
+        stage.SetMetadata(
+            "documentation",
+            f"Cognisom cell export '{scene_name}': {n} cells, "
+            f"{'point-instanced' if n >= threshold else 'one prim per cell'}",
+        )
+        stage.SetMetadata("comment", SceneExporter.usd_color_legend_text())
         stage.SetStartTimeCode(0)
         stage.SetEndTimeCode(1)
 
-        # Create scene hierarchy
         UsdGeom.Xform.Define(stage, "/World")
-        UsdGeom.Xform.Define(stage, "/World/Cells")
-        UsdGeom.Xform.Define(stage, "/World/Lights")
 
-        # Add dome light
-        dome = UsdLux.DomeLight.Define(stage, "/World/Lights/DomeLight")
-        dome.GetIntensityAttr().Set(500.0)
-
-        # Cell type colors
-        type_colors = {
-            "normal": (0.3, 0.6, 0.9),      # blue
-            "cancer": (0.9, 0.2, 0.2),      # red
-            "t_cell": (0.2, 0.9, 0.3),      # green
-            "nk_cell": (0.9, 0.9, 0.2),     # yellow
-            "macrophage": (0.9, 0.5, 0.2),  # orange
-            "stem": (0.4, 0.9, 0.5),        # light green
-            "progenitor": (0.5, 0.7, 0.9),  # light blue
-            "differentiated": (0.9, 0.6, 0.3), # orange
-            "dividing": (0.9, 0.3, 0.9),    # magenta
-            "immune": (0.2, 0.9, 0.3),      # green
-            "dead": (0.5, 0.5, 0.5),        # gray
+        legend = {
+            f"type:{name}": Gf.Vec3f(*rgb)
+            for name, rgb in CELL_TYPE_USD_COLORS.items()
         }
+        legend.update({
+            f"state:{name}": Gf.Vec3f(*target)
+            for name, (target, weight) in CELL_STATE_USD_TINTS.items()
+            if weight > 0.0
+        })
+        stage.SetMetadata("customLayerData", {
+            "cognisom:colorLegend": legend,
+            "cognisom:cellCount": n,
+            "cognisom:stateCounts": {
+                s: states.count(s) for s in sorted(set(states))
+            },
+        })
 
-        # Create material for each cell type used
-        used_types = set(c.get("cell_type", "normal") for c in cells)
-        materials = {}
+        material = SceneExporter._usd_cell_material(stage, "/World/Looks/CellSurface")
 
-        for ct in used_types:
-            mat_path = f"/World/Materials/{ct}_material"
-            material = UsdShade.Material.Define(stage, mat_path)
-            shader = UsdShade.Shader.Define(stage, f"{mat_path}/Shader")
-            shader.CreateIdAttr("UsdPreviewSurface")
+        if n == 0:
+            UsdGeom.Scope.Define(stage, "/World/Cells")
+        elif n >= threshold:
+            SceneExporter._usd_point_instanced_cells(
+                stage, positions, colors, states, radii, material
+            )
+        else:
+            SceneExporter._usd_individual_cells(
+                stage, positions, colors, states, radii, material
+            )
 
-            color = type_colors.get(ct, (0.5, 0.5, 0.5))
-            shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*color))
-            shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.5)
-            shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.1)
-
-            material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
-            materials[ct] = material
-
-        # Create cells
-        for i, cell in enumerate(cells):
-            pos = cell.get("position", [0, 0, 0])
-            ct = cell.get("cell_type", "normal")
-            alive = cell.get("alive", True)
-            radius = cell.get("volume", 1.0) if "volume" in cell else 1.5
-
-            cell_path = f"/World/Cells/Cell_{i:05d}"
-            sphere = UsdGeom.Sphere.Define(stage, cell_path)
-            sphere.GetRadiusAttr().Set(radius)
-
-            # Position
-            xform = UsdGeom.Xformable(sphere)
-            xform.AddTranslateOp().Set(Gf.Vec3d(pos[0], pos[1], pos[2]))
-
-            # Material
-            mat_to_use = ct if alive else "dead"
-            if mat_to_use in materials:
-                UsdShade.MaterialBindingAPI(sphere).Bind(materials[mat_to_use])
+        if add_camera:
+            SceneExporter._usd_camera_and_lights(stage, positions, radii)
 
         stage.Save()
-        logger.info(f"USD exported: {out} ({len(cells)} cells)")
+        logger.info(
+            "USD exported: %s (%d cells, %s)",
+            out, n, "point instancer" if n >= threshold else "individual prims",
+        )
         return str(out)
+
+    # ── USD helpers ──────────────────────────────────────────────
+
+    @staticmethod
+    def usd_color_legend_text() -> str:
+        """The colour mapping, as the text embedded in every exported stage."""
+        lines = [
+            "Cognisom cell colours: hue = cell type, lightness = cell state.",
+            "",
+            "  type:",
+        ]
+        for name, rgb in CELL_TYPE_USD_COLORS.items():
+            lines.append(
+                f"    {name:<16} ({rgb[0]:.2f}, {rgb[1]:.2f}, {rgb[2]:.2f})"
+            )
+        lines += [
+            "",
+            "  state (blended over the type colour, first match wins):",
+            "    dead       flat grey, type erased          (alive is False)",
+            "    dying      dark maroon, 70%                (O2 < 0.02 or glucose < 0.5)",
+            "    hypoxic    dark blue-violet, 60%           (O2 < 0.05)",
+            "    dividing   pale/bright, 55%                (phase == 'M')",
+            "    activated  hot yellow, 50%                 (activated is True)",
+            "    alive      untinted",
+            "",
+            "  CellularModule never advances phase past 'G1', so a live run",
+            "  contains no dividing cells and none will be drawn as such.",
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _usd_cell_radii(cells, positions, radius):
+        """Per-cell radius array.
+
+        An explicit `radius` wins.  Otherwise a cell's own `radius`, or a
+        `volume` in femtolitres converted as a sphere (1 fL = 1 um^3), or
+        -- when the cells carry no size at all, which is the case for
+        `CellularModule.CellState` -- 0.45x the median nearest-neighbour
+        spacing, so the population reads as tissue at any density instead
+        of as dust at one scale and a solid blob at another.
+        """
+        n = len(cells)
+        if n == 0:
+            return np.zeros(0, dtype=np.float64)
+
+        if radius is not None:
+            return np.full(n, float(radius), dtype=np.float64)
+
+        default = SceneExporter._usd_spacing_radius(positions)
+        out = np.full(n, default, dtype=np.float64)
+        for i, cell in enumerate(cells):
+            r = _cell_field(cell, "radius")
+            if r is None:
+                vol = _cell_field(cell, "volume")
+                if vol is not None:
+                    try:
+                        r = (3.0 * float(vol) / (4.0 * np.pi)) ** (1.0 / 3.0)
+                    except (TypeError, ValueError):
+                        r = None
+            if r is not None:
+                try:
+                    r = float(r)
+                except (TypeError, ValueError):
+                    continue
+                if r > 0:
+                    out[i] = r
+        return out
+
+    @staticmethod
+    def _usd_spacing_radius(positions) -> float:
+        """0.45x the median nearest-neighbour distance (1.5 if undefined).
+
+        Measured exactly, on every cell.  Subsampling is not an option
+        here even though it looks cheap: nearest-neighbour distance scales
+        as density^(-1/3), so a sample of a tenth of the cells reports a
+        spacing about twice the real one and the cells come out twice too
+        big.  scipy is a declared dependency; without it, fall back to the
+        O(n^2) measurement while it is affordable and to a fixed radius
+        above that.
+        """
+        n = len(positions)
+        if n < 2:
+            return 1.5
+        try:
+            from scipy.spatial import cKDTree
+            nearest = cKDTree(positions).query(positions, k=2)[0][:, 1]
+        except Exception:
+            if n > 3000:
+                return 1.5
+            d = np.linalg.norm(
+                positions[:, None, :] - positions[None, :, :], axis=-1
+            )
+            np.fill_diagonal(d, np.inf)
+            nearest = d.min(axis=1)
+        nearest = np.asarray(nearest)
+        nearest = nearest[np.isfinite(nearest) & (nearest > 0)]
+        if nearest.size == 0:
+            return 1.5
+        return float(np.median(nearest) * 0.45)
+
+    @staticmethod
+    def _usd_cell_material(stage, path):
+        """One UsdPreviewSurface whose diffuse colour reads displayColor.
+
+        One material for every cell, of every type, in every state: the
+        variation rides on the primvar.  A material per instance would
+        defeat instance sharing -- the point the instancing module makes
+        at length -- and a material per type could not express state.
+        """
+        from pxr import UsdShade, Sdf, Gf
+
+        material = UsdShade.Material.Define(stage, path)
+
+        reader = UsdShade.Shader.Define(stage, f"{path}/ColorReader")
+        reader.CreateIdAttr("UsdPrimvarReader_float3")
+        reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayColor")
+        reader.CreateInput("fallback", Sdf.ValueTypeNames.Float3).Set(
+            Gf.Vec3f(*UNKNOWN_CELL_USD_COLOR)
+        )
+        reader.CreateOutput("result", Sdf.ValueTypeNames.Float3)
+
+        shader = UsdShade.Shader.Define(stage, f"{path}/Surface")
+        shader.CreateIdAttr("UsdPreviewSurface")
+        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(
+            reader.ConnectableAPI(), "result"
+        )
+        shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.45)
+        shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.0)
+
+        material.CreateSurfaceOutput().ConnectToSource(
+            shader.ConnectableAPI(), "surface"
+        )
+        return material
+
+    @staticmethod
+    def _usd_individual_cells(stage, positions, colors, states, radii, material):
+        """One Sphere prim per cell -- selectable, inspectable, small N."""
+        from pxr import UsdGeom, UsdShade, Gf, Sdf
+
+        UsdGeom.Xform.Define(stage, "/World/Cells")
+        for i in range(len(positions)):
+            r = float(radii[i])
+            path = f"/World/Cells/Cell_{i:05d}"
+            sphere = UsdGeom.Sphere.Define(stage, path)
+            sphere.GetRadiusAttr().Set(r)
+            # Authoring extent matters: the fallback is the unit sphere,
+            # which makes every bounding-box query wrong for r != 1.
+            sphere.GetExtentAttr().Set([(-r, -r, -r), (r, r, r)])
+
+            UsdGeom.Xformable(sphere).AddTranslateOp().Set(
+                Gf.Vec3d(float(positions[i][0]), float(positions[i][1]),
+                         float(positions[i][2]))
+            )
+
+            pv = UsdGeom.PrimvarsAPI(sphere.GetPrim()).CreatePrimvar(
+                "displayColor", Sdf.ValueTypeNames.Color3fArray,
+                UsdGeom.Tokens.constant,
+            )
+            pv.Set([Gf.Vec3f(*(float(c) for c in colors[i]))])
+            UsdGeom.PrimvarsAPI(sphere.GetPrim()).CreatePrimvar(
+                "cognisom:cellState", Sdf.ValueTypeNames.Int,
+                UsdGeom.Tokens.constant,
+            ).Set(CELL_STATE_CODES.get(states[i], 0))
+
+            UsdShade.MaterialBindingAPI.Apply(sphere.GetPrim())
+            UsdShade.MaterialBindingAPI(sphere).Bind(material)
+
+    @staticmethod
+    def _usd_point_instanced_cells(stage, positions, colors, states, radii, material):
+        """One PointInstancer for the whole population.
+
+        Reuses `cognisom.omniverse.instancing.NestedInstancingManager`
+        rather than authoring a second instancer: it already builds the
+        prototype relationship and the bulk Vt arrays correctly.  The
+        per-instance colour goes through the primvar method added there.
+        """
+        from pxr import UsdGeom, UsdShade, Gf, Sdf
+        from cognisom.omniverse.instancing import (
+            InstanceData, NestedInstancingManager, create_sphere_prototype,
+        )
+
+        manager = NestedInstancingManager(stage)
+        # The manager's own default is 10,000; a tissue slab needs the
+        # instancer long before that.
+        manager.POINT_INSTANCER_THRESHOLD = 1
+
+        manager.register_prototype(
+            "CellBody",
+            geometry_creator=lambda s, p: create_sphere_prototype(s, p, 1.0),
+            category="cell",
+        )
+        proto = stage.GetPrimAtPath("/Prototypes/CellBody")
+        UsdGeom.Sphere(proto).GetExtentAttr().Set([(-1, -1, -1), (1, 1, 1)])
+        UsdShade.MaterialBindingAPI.Apply(proto)
+        UsdShade.MaterialBindingAPI(proto).Bind(material)
+
+        instances = [
+            InstanceData(
+                prototype_name="CellBody",
+                position=(float(p[0]), float(p[1]), float(p[2])),
+                scale=(float(r), float(r), float(r)),
+            )
+            for p, r in zip(positions, radii)
+        ]
+        manager.create_instances_batch("CellBody", instances, parent_path="/World/Cells")
+
+        # The manager always creates its own empty instance scope; drop it
+        # when nothing was put there, rather than ship a dangling prim.
+        leftover = stage.GetPrimAtPath(NestedInstancingManager.INSTANCES_PATH)
+        if leftover and not leftover.GetChildren():
+            stage.RemovePrim(leftover.GetPath())
+
+        manager.set_point_instancer_primvar("CellBody", "displayColor", colors)
+        manager.set_point_instancer_primvar(
+            "CellBody", "cognisom:cellState",
+            np.array([CELL_STATE_CODES.get(s, 0) for s in states], dtype=np.int32),
+        )
+
+        instancer = UsdGeom.PointInstancer(
+            stage.GetPrimAtPath("/World/Cells/CellBody_Instancer")
+        )
+        if instancer:
+            lo = (positions - radii[:, None]).min(axis=0)
+            hi = (positions + radii[:, None]).max(axis=0)
+            instancer.CreateExtentAttr().Set([
+                Gf.Vec3f(*(float(v) for v in lo)),
+                Gf.Vec3f(*(float(v) for v in hi)),
+            ])
+
+    #: Where the camera sits, as a direction from the cells (Z up).
+    USD_CAMERA_DIRECTION = (0.62, -1.0, 0.45)
+
+    @staticmethod
+    def _usd_camera_and_lights(stage, positions, radii):
+        """A camera framed on the cells, plus a key / fill / dome rig.
+
+        Without this the image depends on the viewer: `usdrecord`
+        auto-frames and lights with a headlight, which is neither
+        reproducible nor readable for a dense population.
+
+        The frame is fitted, not guessed: every cell is projected onto the
+        camera's own right/up axes and the distance is the smallest one
+        that still contains the furthest of them.  A bounding sphere would
+        be far looser -- a flat tissue slab seen from a corner would sit
+        in the middle third of the image.
+        """
+        from pxr import UsdGeom, UsdLux, Gf
+
+        focal, aperture = 35.0, 24.0   # 37.8 deg FOV, square -> square image
+        tan_half_fov = (aperture * 0.5) / focal
+        up_world = np.array([0.0, 0.0, 1.0])
+
+        direction = np.asarray(SceneExporter.USD_CAMERA_DIRECTION, dtype=float)
+        direction = direction / np.linalg.norm(direction)
+
+        forward = -direction
+        right = np.cross(forward, up_world)
+        if np.linalg.norm(right) < 1e-9:          # looking straight down
+            right = np.cross(forward, np.array([0.0, 1.0, 0.0]))
+        right = right / np.linalg.norm(right)
+        up_cam = np.cross(right, forward)
+
+        if len(positions) == 0:
+            center = np.zeros(3)
+            distance = 10.0
+            near, far = 0.1, 100.0
+        else:
+            lo = (positions - radii[:, None]).min(axis=0)
+            hi = (positions + radii[:, None]).max(axis=0)
+            center = (lo + hi) * 0.5
+
+            rel = positions - center
+            a, b = rel @ right, rel @ up_cam
+            # Re-centre on what is actually visible, so the population
+            # sits in the middle of the frame rather than at the midpoint
+            # of a bounding box a few outliers stretched.
+            center = center                 + 0.5 * ((a + radii).max() + (a - radii).min()) * right                 + 0.5 * ((b + radii).max() + (b - radii).min()) * up_cam
+
+            rel = positions - center
+            a, b = rel @ right, rel @ up_cam
+            depth = rel @ forward
+            need = np.maximum(np.abs(a), np.abs(b)) + radii
+            distance = float((need / tan_half_fov - depth).max()) * 1.03
+            distance = max(distance, float(radii.max()) * 4.0, 1e-3)
+
+            near = max(distance + float(depth.min()) - float(radii.max()),
+                       distance * 1e-3)
+            far = distance + float(depth.max()) + float(radii.max()) * 2.0 + 1.0
+
+        ctr = Gf.Vec3d(*(float(v) for v in center))
+        eye = center + direction * distance
+
+        def _look_at(eye_v, up_hint):
+            """Transform for a prim at `eye_v` aimed at the cells.
+
+            `Gf.Matrix4d.SetLookAt` degenerates to garbage -- a camera
+            that renders an empty frame -- when the up vector is parallel
+            to the view direction, which is exactly what a straight-down
+            view asks for.  Pick another up in that case.
+            """
+            f = np.asarray(ctr, dtype=float) - np.asarray(eye_v, dtype=float)
+            u = np.asarray(up_hint, dtype=float)
+            for candidate in (u, np.array([0.0, 1.0, 0.0]),
+                              np.array([1.0, 0.0, 0.0])):
+                if np.linalg.norm(np.cross(f, candidate)) > 1e-9:
+                    u = candidate
+                    break
+            m = Gf.Matrix4d()
+            m.SetLookAt(Gf.Vec3d(*(float(v) for v in eye_v)), ctr,
+                        Gf.Vec3d(*(float(v) for v in u)))
+            return m.GetInverse()
+
+        camera = UsdGeom.Camera.Define(stage, "/World/Camera")
+        camera.CreateFocalLengthAttr(focal)
+        camera.CreateHorizontalApertureAttr(aperture)
+        camera.CreateVerticalApertureAttr(aperture)
+        camera.CreateClippingRangeAttr(Gf.Vec2f(float(near), float(far)))
+        UsdGeom.Xformable(camera).AddTransformOp().Set(_look_at(eye, up_cam))
+
+        UsdGeom.Xform.Define(stage, "/World/Lights")
+
+        def _distant(name, from_dir, intensity):
+            """A DistantLight aimed at the centre from `from_dir`."""
+            light = UsdLux.DistantLight.Define(stage, f"/World/Lights/{name}")
+            light.CreateIntensityAttr(intensity)
+            light.CreateAngleAttr(1.5)
+            d = np.asarray(from_dir, dtype=float)
+            d = d / np.linalg.norm(d)
+            pos = center + d * (distance * 2.0)
+            UsdGeom.Xformable(light).AddTransformOp().Set(_look_at(pos, up_world))
+            return light
+
+        _distant("Key", (0.35, -0.75, 0.9), 1.6)
+        _distant("Fill", (-0.9, -0.3, 0.1), 0.45)
+
+        # Kept from the original rig for ambient fill.  usdrecord warns
+        # "Dome light has no texture asset path" -- harmless, and silencing
+        # it would mean shipping an HDRI next to every .usda.
+        dome = UsdLux.DomeLight.Define(stage, "/World/Lights/DomeLight")
+        dome.CreateIntensityAttr(0.35)

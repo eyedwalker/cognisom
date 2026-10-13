@@ -85,6 +85,49 @@ SCENARIOS = {
         "vascular": {"n_capillaries": 6},
         "lymphatic": {"n_vessels": 6, "metastasis_probability": 0.01},
     },
+    # The only preset that seeds a tissue VOLUME.
+    #
+    # Every preset above seeds a RING: CellularModule._seed_ring puts
+    # each normal cell on a circle of radius 50 um about (100, 100, 50),
+    # so the tissue is a bead necklace with a 100 um hole in it, and no
+    # cell touches another in two of the three dimensions. That is
+    # fine for the module-level dynamics those presets were calibrated
+    # on -- and it is why every render of this engine has looked like a
+    # circle of beads rather than tissue.
+    #
+    # TissueSlab seeds ~2,000 close-packed cells in a
+    # 165 x 156 x 63 um slab with a solid 80-cell tumour nodule set
+    # off-centre, immune cells spread through the stroma, and a
+    # staggered capillary lattice dense enough that the slab is
+    # genuinely perfused (measured over six seeds: every cell within
+    # 16.2-19.7 um of a vessel, median 8.8-9.0 um, against the vascular
+    # module's 25 um normoxic limit; 24 h at dt=0.05 gives 0 deaths and
+    # 0 hypoxic cells).
+    #
+    # The geometry is NOT spelled out here. All three modules read
+    # cognisom.modules.tissue_slab.SLAB_SPEC, so there is one source of
+    # truth for where the tissue is; a copy in this dict would drift
+    # from the vessel lattice and the only symptom would be a slab
+    # whose outer cells silently suffocate. Override by passing a
+    # matching 'slab' sub-dict to all three modules.
+    "TissueSlab": {
+        "desc": "A packed tissue slab (~2,000 cells) with an embedded "
+                "tumour nodule, perfused by a capillary lattice. The "
+                "other presets seed a ring 1 um thick; this one seeds a "
+                "volume, which is what makes it renderable as tissue. "
+                "Geometry: cognisom/modules/tissue_slab.py.",
+        "cellular": {"seeding": "slab"},
+        # ~3% of the population, which is the lymphocyte fraction of
+        # normal stroma. Scaling the ring presets' 12/8/6 by the 23x
+        # larger population would put 600 immune cells in the slab and
+        # make the immune module's per-cell scan the cost of the run.
+        "immune": {
+            "seeding": "slab",
+            "n_t_cells": 30, "n_nk_cells": 15, "n_macrophages": 15,
+        },
+        "vascular": {"layout": "slab"},
+        "lymphatic": {"n_vessels": 4, "metastasis_probability": 0.001},
+    },
 }
 
 
@@ -157,6 +200,12 @@ class CellSnapshot:
     immune_positions: np.ndarray = None  # (M, 3)
     immune_types: list = field(default_factory=list)       # 'T_cell' | 'NK_cell' | 'macrophage'
     immune_activated: list = field(default_factory=list)
+    # Immune identity, which was recorded only as row order. Row order is
+    # not an identity: the snapshot keeps the cells with in_blood False,
+    # so one cell entering a vessel renumbers every row after it and an
+    # animation built on row order teleports the infiltrate between
+    # frames. ImmuneModule has had cell_id on every cell all along.
+    immune_ids: list = field(default_factory=list)
 
     capillary_starts: list = field(default_factory=list)   # list of (x,y,z)
     capillary_ends: list = field(default_factory=list)
@@ -178,11 +227,25 @@ class EngineRunner:
         modules_enabled: Optional[Dict[str, bool]] = None,
         overrides: Optional[Dict[str, Dict]] = None,
         record_interval: int = 10,
+        snapshot_interval_hours: Optional[float] = 0.1,
     ):
         self.dt = dt
         self.duration = duration
         self.scenario_name = scenario
         self.record_interval = record_interval  # record snapshot every N steps
+
+        # Cell snapshots keep their own clock, in SIMULATED HOURS, because
+        # they are the frames of an animation and `record_interval` is the
+        # cadence of a time-series plot. They were the same line of code,
+        # so a caller that wanted coarse plots (record_interval=20, the
+        # spatial-coupling fixture) also threw the animation away: 25
+        # frames for a 24 h run. The default 0.1 h gives 241 frames over
+        # 24 h -- ten seconds at 24 fps -- and 17,000 fewer than one per
+        # step. None or 0 records every step, which is that 17,000.
+        self.snapshot_interval_hours = snapshot_interval_hours
+        self._next_snapshot_time: Optional[float] = None
+        self._snapshot_origin: float = 0.0
+        self._n_snapshots_taken: int = 0
 
         # Merge scenario defaults with any user overrides
         scenario_cfg = SCENARIOS.get(scenario, SCENARIOS["Baseline"])
@@ -430,10 +493,11 @@ class EngineRunner:
         self.history.clear()
         self.cell_snapshots.clear()
         self.event_log.clear()
+        self._next_snapshot_time = None   # the frame clock restarts with the run
 
         # Record initial state
         self._record_snapshot()
-        self._record_cell_snapshot()
+        self.record_cell_snapshot()
 
         buf = io.StringIO()
         with redirect_stdout(buf):
@@ -442,6 +506,12 @@ class EngineRunner:
 
                 if step_i % self.record_interval == 0 or step_i == total_steps - 1:
                     self._record_snapshot()
+
+                # Frames are on their own clock (see
+                # snapshot_interval_hours), and the final state always
+                # gets one even when it falls between frames.
+                if (not self.record_cell_snapshot()
+                        and step_i == total_steps - 1):
                     self._record_cell_snapshot()
 
                 if progress_callback and step_i % 5 == 0:
@@ -508,6 +578,49 @@ class EngineRunner:
 
         self.history.append(snap)
 
+    def record_cell_snapshot(self, *_ignored) -> bool:
+        """Record one animation frame if the frame interval has elapsed.
+
+        Returns True if a snapshot was taken.
+
+        This is public because nothing in the engine itself records
+        anything. ``SimulationEngine.run()`` steps modules and returns;
+        every caller that drives the engine that way -- the five files in
+        ``cognisom/scenarios/``, the patent-pipeline page, the module
+        demos -- finished with ``cell_snapshots`` empty, which is why a
+        6 h run through them has no frames to render. Such a caller can
+        now pass this method as that run()'s ``callback``, or call it from
+        its own ``engine.step()`` loop, and get the same frames
+        ``EngineRunner.run()`` records.
+
+        ``*_ignored`` absorbs the argument ``SimulationEngine.run``
+        passes its callback (the engine).
+        """
+        if self.engine is None:
+            return False
+
+        now = float(self.engine.time)
+        interval = float(self.snapshot_interval_hours or 0.0)
+
+        if self._next_snapshot_time is None:
+            # First frame of this recording: anchor the clock here.
+            self._snapshot_origin = now
+            self._n_snapshots_taken = 0
+        elif now < self._next_snapshot_time - 1e-9:
+            return False
+
+        self._record_cell_snapshot()
+        self._n_snapshots_taken += 1
+        if interval > 0.0:
+            # Counted from the origin rather than from the last frame, so
+            # dt's rounding cannot make the cadence drift over a long run.
+            self._next_snapshot_time = (
+                self._snapshot_origin + self._n_snapshots_taken * interval
+            )
+        else:
+            self._next_snapshot_time = now
+        return True
+
     def _record_cell_snapshot(self):
         """Capture cell and immune positions for 3D rendering."""
         snap = CellSnapshot(time=float(self.engine.time))
@@ -536,6 +649,7 @@ class EngineRunner:
                 snap.immune_positions = np.array([ic.position for ic in active])
                 snap.immune_types = [ic.cell_type for ic in active]
                 snap.immune_activated = [ic.activated for ic in active]
+                snap.immune_ids = [ic.cell_id for ic in active]
 
         # Capillaries
         vascular = mods.get("vascular")
