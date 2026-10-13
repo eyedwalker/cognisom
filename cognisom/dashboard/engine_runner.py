@@ -52,11 +52,21 @@ SCENARIOS = {
         "lymphatic": {"n_vessels": 4, "metastasis_probability": 0.005},
     },
     "Immunotherapy": {
-        "desc": "Enhanced immune surveillance (anti-PD1 effect simulated via more T cells).",
+        "desc": "Anti-PD-1: checkpoint blockade on the T-cell loop and on "
+                "macrophage phagocytosis, plus expanded infiltrate.",
         "cellular": {"n_normal_cells": 80, "n_cancer_cells": 15},
         "immune": {
             "n_t_cells": 30, "n_nk_cells": 15, "n_macrophages": 10,
-            "kill_probability": 0.95,
+            # Anti-PD-1 acts on the PD-1 axis, and `checkpoint_block` is
+            # the knob that reaches it: tcell_kill's ICB-rescue term on
+            # the T-cell branch, and the PD-1 "don't eat me" gate on
+            # macrophages (Gordon 2017). The previous
+            # `kill_probability: 0.95` was read by NK cells and
+            # macrophages only, so the anti-PD-1 scenario raised innate
+            # killing and left the T-cell closed loop -- the thing
+            # anti-PD-1 actually targets -- completely untouched. No
+            # preset in this file set checkpoint_block at all.
+            "checkpoint_block": 1.0,
         },
         "vascular": {"n_capillaries": 8},
         "lymphatic": {"n_vessels": 4, "metastasis_probability": 0.001},

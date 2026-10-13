@@ -11,6 +11,17 @@ Complete tissue simulation with:
 - Molecular exchange (exosomes, chemokines)
 
 Real-time 3D visualization showing all systems interacting!
+
+NOTE ON THE IMMUNE RULES BELOW: this demo carries its own standalone
+cell classes, and ImmuneCell.recognize_cancer is an independent copy of
+the OLD module rules -- `mhc1_expression > 0.2` for T cells and
+`mhc1_expression < 0.4` for NK cells. Neither is what the simulation
+runs any more: T-cell recognition goes through the TCR/pMHC repertoire
+(engine/py/immune/tcr_repertoire.py) and NK recognition through the
+KIR-HLA receptor balance (engine/py/immune/nk_receptor.py). The copy is
+left as-is deliberately -- it is a self-contained visualization demo
+with no CellState, no event bus and no patient HLA to resolve -- but it
+is a visualization of an older model, not of the engine.
 """
 
 import sys

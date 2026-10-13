@@ -74,7 +74,11 @@ class GPUOrchestrator:
     #: the platform's flagship capabilities, and no test would have noticed.
     _IMMUNE_SKIP_REASON = (
         "immune acceleration bypasses the TCR/pMHC recognition path, "
-        "per-target kill probability, exhaustion and the sympathetic axis; "
+        "per-target kill probability, exhaustion, the sympathetic axis, "
+        "the NK KIR-HLA receptor balance and the macrophage PD-1 gate; "
+        "its own rules are mhc > mhc1_threshold_t for T cells and "
+        "mhc < mhc1_threshold_nk for NK cells, and it reads the "
+        "lineage-blind module.kill_probability; "
         "pass accelerate_immune=True to opt in regardless"
     )
 

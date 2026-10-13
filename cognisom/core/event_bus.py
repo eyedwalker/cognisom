@@ -56,6 +56,15 @@ class EventTypes:
     # clones that have left it.
     TCELL_EXHAUSTED = 'tcell_exhausted'
 
+    # NK licensing resolved from the patient's class-I typing
+    # (engine/py/immune/nk_receptor.py). Emitted once, at immune-module
+    # initialization, when a typing is on record; the data carries the
+    # KIR ligand groups, the per-subset licensing, and the provenance of
+    # both the HLA typing and the KIR gene content. NOT emitted when
+    # there is no typing -- the absence is the signal that the innate
+    # arm is running the legacy step rule.
+    NK_LICENSING_RESOLVED = 'nk_licensing_resolved'
+
     # Circadian extrema. CircadianModule's class docstring has always
     # promised these; they were never defined, so nothing could be
     # emitted or subscribed. Emitted once per cell per clock cycle when

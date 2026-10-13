@@ -6,14 +6,28 @@ Immune Module
 Handles immune system: T cells, NK cells, macrophages.
 
 Features:
-- T cells (CD8+ cytotoxic) - MHC-I recognition
-- NK cells (natural killer) - Missing-self detection
-- Macrophages - Phagocytosis and polarization
+- T cells (CD8+ cytotoxic) - closed-loop TCR-pMHC recognition
+- NK cells (natural killer) - activating/inhibitory receptor balance:
+  KIR-HLA licensing plus missing self, resolved from the patient's
+  measured class-I typing when one is on record
+  (engine/py/immune/nk_receptor.py)
+- Macrophages - phagocytosis, gated by the PD-1 "don't eat me" signal
+  (engine/py/immune/macrophage_phagocytosis.py)
 - Immune surveillance and patrol
 - Cancer recognition and killing
 - Chemotaxis (follow gradients)
+
+NOT modelled here: M1/M2 macrophage polarization. The feature list used
+to claim it. It exists in this platform only as a transcriptomic marker
+score over *input* expression data (genomics/cell_state_classifier.py);
+ImmuneCell has no polarization field, nothing in the simulation reads
+one, and no measured M1/M2 ratio exists for any patient -- the only
+runtime path into that classifier ends at a synthetic expression
+generator that plants the M2 markers it then rediscovers. Simulating
+polarization is worth doing; seeding it from that number is not.
 """
 
+import logging
 import sys
 sys.path.insert(0, '..')
 
@@ -44,6 +58,43 @@ from cognisom.engine.py.immune.sympathetic import (
     sympathetic_attenuation,
     sympathetic_state,
 )
+from cognisom.engine.py.immune.nk_receptor import (
+    DEFAULT_ACTIVATION_THRESHOLD,
+    DEFAULT_MISSING_SELF_THRESHOLD,
+    UNLICENSED_RESPONSIVENESS,
+    NKLicensingProfile,
+    UnknownAlleleError,
+    genotyped_kir,
+    hla_ligand_profile,
+    licensing_profile,
+    draw_kir_subset,
+    missing_self_recognized,
+    nk_clone_decision,
+    nk_decision,
+)
+from cognisom.engine.py.immune.macrophage_phagocytosis import (
+    DEFAULT_PD1_MAX_SUPPRESSION,
+    phagocytosis_probability,
+)
+from cognisom.engine.py.immune.macrophage_polarization import (
+    DEFAULT_ARGINASE_MAX_SUPPRESSION,
+    DEFAULT_CYTOKINE_RADIUS_UM,
+    DEFAULT_CYTOKINE_SATURATION_COUNT,
+    DEFAULT_KILL_SPAN,
+    DEFAULT_TAU_HOURS,
+    NORMOXIC_OXYGEN,
+    arginase_attenuation,
+    cytokine_output,
+    hypoxia_signal,
+    initial_polarization,
+    kill_factor as macrophage_kill_factor,
+    local_signal,
+    polarization_label,
+    polarization_step,
+    polarization_target,
+)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -65,6 +116,25 @@ class ImmuneCell:
     # recognition.
     active_tcr_match: Optional[TCRMatch] = None
 
+    # Inhibitory-KIR identity of this clone, as a receptor name
+    # ("KIR2DL1", ...). Drawn once at creation from the patient's NK
+    # compartment and fixed for life, which is how a real NK clone's
+    # receptor repertoire works. None for T cells, macrophages, and any
+    # NK cell created with no patient class-I typing on record.
+    kir_subset: Optional[str] = None
+
+    # M1/M2 polarization axis, for macrophages, in [-1, +1] with
+    # -1 = M1 and +1 = M2 -- the same sign convention as
+    # genomics/cell2sentence._score_polarization_markers ("score:
+    # -1 = pure M1, +1 = pure M2"), so a simulated macrophage and a
+    # classified one are described on the same scale. 0.0 (M0,
+    # unpolarized) for every other lineage and for a macrophage whose
+    # polarization has not been seeded; at 0.0 the polarization-
+    # dependent kill factor is exactly 1.0, so an unseeded macrophage
+    # behaves exactly as it did before this field existed. See
+    # engine/py/immune/macrophage_polarization.py.
+    polarization: float = 0.0
+
     # Parameters
     speed: float = 10.0  # μm/min
     detection_radius: float = 10.0  # μm
@@ -73,6 +143,12 @@ class ImmuneCell:
     def __post_init__(self):
         if self.velocity is None:
             self.velocity = np.zeros(3)
+
+
+
+def _or_default(value, default):
+    """`value` unless it is None. dict.get's default does not cover a stored None."""
+    return default if value is None else value
 
 
 class ImmuneModule(SimulationModule):
@@ -105,14 +181,135 @@ class ImmuneModule(SimulationModule):
         self.next_immune_id = 0
 
         # Parameters
-        self.n_t_cells = self.config.get('n_t_cells', 15)
-        self.n_nk_cells = self.config.get('n_nk_cells', 10)
-        self.n_macrophages = self.config.get('n_macrophages', 8)
+        #
+        # These three may arrive as an explicit None, not merely absent:
+        # twin_config._scale_count returns None when the immune fraction was
+        # never measured, deliberately, so that an unmeasured tumour is
+        # distinguishable from a minimally infiltrated one. dict.get returns
+        # that stored None rather than the default, so `range(self.n_t_cells)`
+        # raised TypeError on every twin built by to_simulation_params from an
+        # unmeasured profile -- which is every production path. The seeding
+        # count falls back to the default; the fact that it was unmeasured is
+        # carried separately by self.immune_profile_measured, so nothing is
+        # lost by seeding a plausible population here.
+        self.n_t_cells = _or_default(self.config.get('n_t_cells'), 15)
+        self.n_nk_cells = _or_default(self.config.get('n_nk_cells'), 10)
+        self.n_macrophages = _or_default(self.config.get('n_macrophages'), 8)
         self.patrol_speed = self.config.get('patrol_speed', 5.0)  # μm/min
-        # Baseline kill probability used by NK / macrophage and as a
-        # fallback when a T cell engages a cancer cell that has no
-        # MHC-I-displayed neoantigens (e.g., immune-escape variants).
+        # Baseline per-encounter kill probability for the innate
+        # lineages, and the fallback for an immune cell of an
+        # unrecognized type. It is NOT a T-cell fallback: the comment
+        # here used to claim it covered "a T cell engaging a cancer cell
+        # with no MHC-I-displayed neoantigens", which is unreachable --
+        # _recognize returns True for a T cell only together with a
+        # match, and active_tcr_match is cleared only together with
+        # `activated`. Instrumenting the three branches of
+        # _target_kill_probability across the whole suite recorded 29
+        # calls, all 29 on the T-cell Hill path and none on this one.
+        # Kept as the per-lineage default (and because
+        # gpu/orchestrator's immune path reads module.kill_probability),
+        # so every existing config keeps working unchanged.
         self.kill_probability = self.config.get('kill_probability', 0.8)
+
+        # ── Innate arm: per-lineage parameters ──────────────────────
+        # NK cells and macrophages used to share this one flat number,
+        # read at a single site. They are different cells with
+        # different effector mechanisms, and validation/calibrator.py
+        # has declared `nk_kill_probability` as an immune-module
+        # parameter all along with nothing on this side reading it.
+        self.nk_kill_probability = float(
+            self.config.get('nk_kill_probability', self.kill_probability)
+        )
+        self.macrophage_kill_probability = float(
+            self.config.get(
+                'macrophage_kill_probability', self.kill_probability,
+            )
+        )
+        # The legacy NK step rule's threshold, lifted out of the middle
+        # of _recognize where it was a bare 0.4 literal. Used only when
+        # no patient class-I typing is on record. It has no source.
+        self.nk_missing_self_threshold = float(
+            self.config.get(
+                'nk_missing_self_threshold', DEFAULT_MISSING_SELF_THRESHOLD,
+            )
+        )
+        # Deadband on the integrated NK signal. 0.0 is the pure balance
+        # model: kill when activation exceeds inhibition.
+        self.nk_activation_threshold = float(
+            self.config.get(
+                'nk_activation_threshold', DEFAULT_ACTIVATION_THRESHOLD,
+            )
+        )
+        # PD-1 "don't eat me" gate on phagocytosis (Gordon et al.,
+        # Nature 2017). 0.0 restores the previous flat behaviour.
+        self.macrophage_pd1_max_suppression = float(
+            self.config.get(
+                'macrophage_pd1_max_suppression', DEFAULT_PD1_MAX_SUPPRESSION,
+            )
+        )
+        # KIR-HLA receptor balance. Resolved from the patient's class-I
+        # typing; stays None when there is none, which leaves the legacy
+        # step rule in place rather than inventing a genotype.
+        self._nk_licensing: Optional[NKLicensingProfile] = None
+        # Dedicated stream for drawing each NK clone's KIR identity. It
+        # is deliberately NOT numpy's global stream: drawing from that
+        # would shift every downstream roll and silently perturb the
+        # closed-loop T-cell test's reproducibility.
+        self._nk_rng = np.random.default_rng(int(self.config.get('nk_seed', 0)))
+        self._resolve_nk_licensing()
+
+        # ── Macrophage M1/M2 polarization ──────────────────────
+        # Driven each step by local IFN-gamma toward M1 and by local
+        # IL-10 / TGF-beta / hypoxia toward M2. Cell-grained sampling in
+        # the manner of spatial/ecm_barrier.ecm_density_at: there is no
+        # diffusion solver here, and none is claimed -- the claim is the
+        # gating, not the concentration field.
+        self.macrophage_polarization_enabled = bool(self.config.get(
+            'macrophage_polarization_enabled', True))
+        self.polarization_tau_hours = float(self.config.get(
+            'polarization_tau_hours', DEFAULT_TAU_HOURS))
+        self.macrophage_kill_span = float(self.config.get(
+            'macrophage_kill_span', DEFAULT_KILL_SPAN))
+        self.cytokine_sampling_radius = float(self.config.get(
+            'cytokine_sampling_radius', DEFAULT_CYTOKINE_RADIUS_UM))
+        self.cytokine_saturation_count = float(self.config.get(
+            'cytokine_saturation_count', DEFAULT_CYTOKINE_SATURATION_COUNT))
+        # Above this polarization a macrophage stops recognizing
+        # targets: an M2 macrophage is pro-tumour, not tumoricidal. The
+        # default is on the far side of M0, so an unpolarized macrophage
+        # still recognizes everything exactly as `return True` did.
+        self.macrophage_recognition_max_polarization = float(self.config.get(
+            'macrophage_recognition_max_polarization', 0.5))
+        # Arginase-mediated M2 suppression of T cells, composing
+        # multiplicatively with the exhaustion and sympathetic gates.
+        self.arginase_max_suppression = float(self.config.get(
+            'arginase_max_suppression', DEFAULT_ARGINASE_MAX_SUPPRESSION))
+
+        # Initial macrophage polarization. None means UNMEASURED, which
+        # is the honest default and exactly what
+        # twin_config.to_simulation_params() emits for an unmeasured
+        # immune profile. The 'm2_fraction' key that method already
+        # emits is accepted here, closing plumbing that had a producer
+        # and no consumer. A number supplied here is reported as
+        # patient-measured ONLY when the caller also passes
+        # measured=True; otherwise it is reported as a configured
+        # assumption. Note that nothing in this platform measures an
+        # M1/M2 ratio for any patient today: the only runtime path to
+        # CellStateClassifier ends at generate_synthetic_expression(),
+        # which plants the M2 markers it then rediscovers. Seeding a
+        # simulated polarization from that number would walk back the
+        # hardening that made twin_config report "unknown".
+        m2_fraction = self.config.get(
+            'macrophage_m2_fraction', self.config.get('m2_fraction', None))
+        self.macrophage_m2_fraction = (
+            None if m2_fraction is None else float(m2_fraction))
+        self.immune_profile_measured = bool(self.config.get('measured', False))
+        # 'treg_fraction' and 't_cell_initial_exhaustion' are the other
+        # two keys to_simulation_params emits. They are deliberately NOT
+        # consumed here: both would modify the flagship T-cell closed
+        # loop, which this upgrade does not touch. They stay
+        # producer-only, and that is a known gap rather than an
+        # oversight.
 
         # TCR-pMHC matching for T cells (Upgrade 2). The repertoire is
         # patient-specific; seed is stable so the closed-loop test can
@@ -205,6 +402,7 @@ class ImmuneModule(SimulationModule):
         print(f"    ✓ {self.n_macrophages} macrophages")
         print(f"    ✓ TCR repertoire: {self.tcr_repertoire_size} clones "
               f"(threshold={self.tcr_recognition_threshold})")
+        self._announce_nk_licensing()
     
     def add_immune_cell(self, position, cell_type):
         """Add immune cell"""
@@ -214,9 +412,29 @@ class ImmuneModule(SimulationModule):
         cell = ImmuneCell(
             cell_id=cell_id,
             position=np.array(position, dtype=np.float32),
-            cell_type=cell_type
+            cell_type=cell_type,
+            # Seeded here rather than in initialize() so a macrophage
+            # recruited mid-run starts from the same compartment mean.
+            # A population fraction constrains the compartment MEAN,
+            # not any individual cell; the per-cell cytokine drive then
+            # diverges them.
+            polarization=(
+                initial_polarization(self.macrophage_m2_fraction)
+                if cell_type == 'macrophage' else 0.0
+            ),
         )
-        
+
+        # Draw this NK clone's inhibitory-KIR identity once, here, from
+        # the patient's compartment. Averaging the compartment inside
+        # the per-encounter roll instead would make every NK cell the
+        # average NK cell: measured, that erased missing self end to
+        # end, because an unlicensed subset with no cognate ligand fires
+        # at any MHC-I level and so every NK cell engaged every target.
+        if cell_type == 'NK_cell' and self._nk_licensing is not None:
+            cell.kir_subset = draw_kir_subset(
+                self._nk_licensing, self._nk_rng,
+            ).receptor.value
+
         self.immune_cells[cell_id] = cell
         return cell_id
     
@@ -250,6 +468,193 @@ class ImmuneModule(SimulationModule):
             self.beta_blocker,
             max_suppression=self.sympathetic_max_suppression,
         )
+
+    # ── Innate arm: NK receptor balance ─────────────────────────────
+
+    def _resolve_nk_licensing(self) -> Optional[NKLicensingProfile]:
+        """Resolve this patient's NK licensing profile, or leave it off.
+
+        Two inputs, in order of precedence:
+
+        ``patient_hla``
+            An explicit class-I allele list. Treated as UNMEASURED
+            unless ``patient_hla_measured`` is also set, so a
+            hand-written panel never passes for a typing.
+        ``patient_id``
+            Looked up in ``hla_typer.MEASURED_HLA_TYPINGS``, which holds
+            only types actually determined from a patient's reads. An id
+            with no measured typing leaves the receptor model OFF and
+            the legacy step rule in place. It deliberately does NOT fall
+            back to a synthetic or population-default profile: an NK
+            licensing prediction built on invented alleles would be
+            indistinguishable from one built on real reads, and the
+            whole point of this path is that it is the one place a real
+            patient measurement reaches the innate simulation.
+
+        ``kir_genes`` supplies a real KIR genotype if one exists.
+        Otherwise gene content is a published carrier-frequency prior,
+        flagged ``is_patient_specific=False`` -- nothing in this
+        platform can type KIR (OptiType types HLA).
+
+        An allele on neither record raises UnknownAlleleError out of the
+        constructor rather than being dropped, because a dropped allele
+        silently removes a ligand group and so silently unlicenses an
+        NK subset.
+        """
+        alleles = self.config.get('patient_hla')
+        measured = bool(self.config.get('patient_hla_measured', False))
+        source = 'config:patient_hla'
+
+        if not alleles:
+            patient_id = self.config.get('patient_id')
+            if patient_id:
+                # Lazy import: the modules layer may depend on genomics,
+                # but engine/py must not, and nk_receptor lives there.
+                from cognisom.genomics.hla_typer import MEASURED_HLA_TYPINGS
+                typing = MEASURED_HLA_TYPINGS.get(str(patient_id))
+                if typing is None:
+                    logger.info(
+                        "no measured HLA typing for patient_id %r; the NK "
+                        "receptor balance stays off and the legacy "
+                        "missing-self step rule (threshold %.2f) applies",
+                        patient_id, self.nk_missing_self_threshold,
+                    )
+                    return None
+                alleles = list(typing.alleles)
+                measured = True
+                source = f"measured:{patient_id}:{typing.source}"
+
+        if not alleles:
+            return None
+
+        # Fail soft on an allele the ligand map does not cover. Refusing to
+        # guess a ligand group is right, but raising out of module
+        # construction turns one unrecognised allele into a dead engine --
+        # and this resolver runs for every patient, including demo ones.
+        try:
+            hla = hla_ligand_profile(
+                alleles, is_patient_specific=measured, source=source,
+            )
+        except UnknownAlleleError as exc:
+            logger.warning(
+                "NK receptor balance stays OFF: %s. The legacy missing-self "
+                "step rule (threshold %.2f) applies instead. Add the allele "
+                "to the ligand map in engine/py/immune/nk_receptor.py to "
+                "enable the receptor model for this patient.",
+                exc, self.nk_missing_self_threshold,
+            )
+            return None
+
+        kir_genes = self.config.get('kir_genes')
+        self._nk_licensing = licensing_profile(
+            hla,
+            genotyped_kir(kir_genes) if kir_genes else None,
+            unlicensed_responsiveness=float(self.config.get(
+                'nk_unlicensed_responsiveness', UNLICENSED_RESPONSIVENESS,
+            )),
+        )
+        return self._nk_licensing
+
+    def get_nk_licensing_profile(self) -> Optional[NKLicensingProfile]:
+        """The resolved NK licensing profile, or None if no HLA is known."""
+        return self._nk_licensing
+
+    def _announce_nk_licensing(self) -> None:
+        """Report the resolved licensing profile once, at initialization.
+
+        Emits NK_LICENSING_RESOLVED only when a typing exists. The
+        absence of the event is itself the signal that the innate arm is
+        running the legacy rule.
+        """
+        if self._nk_licensing is None:
+            print(f"    - NK receptor balance: OFF (no patient class-I "
+                  f"typing on record); legacy missing-self step at "
+                  f"{self.nk_missing_self_threshold}")
+            return
+        prof = self._nk_licensing
+        groups = ', '.join(g.value for g in prof.hla.groups) or 'none'
+        print(f"    ✓ NK KIR-HLA balance: ligand groups [{groups}], "
+              f"{prof.licensed_fraction:.0%} of the compartment licensed "
+              f"(HLA {'measured' if prof.hla.is_patient_specific else 'unmeasured'}, "
+              f"KIR {'genotyped' if prof.kir.is_patient_specific else 'population prior'})")
+        self.emit_event(EventTypes.NK_LICENSING_RESOLVED, prof.as_dict())
+
+    def _nk_decision(self, immune_cell, target_cell):
+        """Decompose one NK-target encounter under the receptor balance.
+
+        Per CLONE when the NK agent carries a drawn KIR identity, which
+        every NK cell created through add_immune_cell does while a
+        licensing profile is resolved. Falls back to the compartment
+        expectation for an agent built outside that path.
+
+        Activating signal runs on the target's per-cell mutation count,
+        which the simulation actually computes; MICA/MICB/ULBP induction
+        by the ATM/ATR DNA-damage response (Gasser et al., Nature 2005)
+        is the mechanism, and a DNA-damage state variable on CellState
+        would be the right driver. There isn't one yet, and the two
+        available proxies are weak: S-phase occupancy is ~0 at demo
+        timescales, and hypoxia saturates without the vascular module in
+        the run. So mutation count is the honest stand-in and is named
+        as such rather than dressed up as a stress-ligand field.
+        """
+        kwargs = dict(
+            mhc1_expression=getattr(target_cell, 'mhc1_expression', 1.0),
+            n_mutations=len(getattr(target_cell, 'mutations', None) or ()),
+            max_kill_probability=self.nk_kill_probability,
+            activation_threshold=self.nk_activation_threshold,
+        )
+        name = getattr(immune_cell, 'kir_subset', None)
+        subset = (self._nk_licensing.subset_for(name)
+                  if name is not None else None)
+        if subset is not None:
+            return nk_clone_decision(subset, **kwargs)
+        return nk_decision(self._nk_licensing, **kwargs)
+
+    def _nk_kill_probability(self, immune_cell, target_cell) -> float:
+        """Per-encounter NK kill probability for this clone and target."""
+        if self._nk_licensing is None:
+            return self.nk_kill_probability
+        return self._nk_decision(immune_cell, target_cell).kill_probability
+
+    def _macrophage_kill_probability(
+        self, target_cell, immune_cell: Optional[ImmuneCell] = None,
+    ) -> float:
+        """Per-encounter phagocytic probability: PD-1 gate x polarization.
+
+        Two independent mechanisms compose multiplicatively, one reading
+        the TARGET and one reading the EFFECTOR.
+
+        Target side -- tumour PD-L1 engaging macrophage PD-1 suppresses
+        phagocytosis, and checkpoint blockade relieves it (Gordon et
+        al., Nature 2017, 545:495-499). ``pdl1_expression`` is exactly
+        0.0 on a cell that neither IFN-gamma from an activated T cell
+        nor an oncogenic driver has touched, and the gate is then the
+        configured baseline to the bit.
+
+        Effector side -- M1 macrophages are more tumoricidal than M2
+        (Mills CD et al., J Immunol 2000; Mantovani A et al., Trends
+        Immunol 2002; Qian BZ & Pollard JW, Cell 2010). ``kill_factor``
+        is exactly 1.0 at M0, so an unpolarized macrophage keeps the
+        baseline unchanged.
+
+        Both factors are therefore exact identities at the untouched
+        default state, which is what makes this a provable no-op on the
+        existing baseline and a real effect in a PD-L1-high or
+        M2-skewed TME. ``immune_cell`` is optional so a caller with only
+        a target in hand still gets the target-side gate.
+        """
+        p = phagocytosis_probability(
+            baseline=self.macrophage_kill_probability,
+            pdl1_expression=getattr(target_cell, 'pdl1_expression', 0.0),
+            checkpoint_block=self.checkpoint_block,
+            max_suppression=self.macrophage_pd1_max_suppression,
+        )
+        if immune_cell is None:
+            return p
+        return min(1.0, p * macrophage_kill_factor(
+            getattr(immune_cell, 'polarization', 0.0),
+            span=self.macrophage_kill_span,
+        ))
 
     def classify_tme(self, **kwargs) -> TMEClassification:
         """Classify the current tumor microenvironment into Teng's
@@ -304,7 +709,19 @@ class ImmuneModule(SimulationModule):
         for immune_id, immune_cell in list(self.immune_cells.items()):
             if immune_cell.in_blood:
                 continue
-            
+
+            # M1/M2 polarization drifts toward its local cytokine set
+            # point every step, whether or not the macrophage is
+            # engaged. tau is 24 h, so at dt = 0.01 h one step closes
+            # 1/2400 of the gap: the mechanism is real but slow, and a
+            # 2 h demo run moves a macrophage only about 8% of the way
+            # to its target. That is the timescale of macrophage
+            # repolarization, not a defect -- if it needs to be visible
+            # in a demo, the run duration is what should change.
+            if (immune_cell.cell_type == 'macrophage'
+                    and self.macrophage_polarization_enabled):
+                self._update_polarization(immune_cell, dt)
+
             # Patrol (random walk)
             if not immune_cell.activated:
                 self._patrol(immune_cell, dt)
@@ -424,7 +841,9 @@ class ImmuneModule(SimulationModule):
                     
                     # Kill if close enough. T cells with a TCR match use
                     # the closed-loop kill_probability(affinity, mhc,
-                    # costim); NK / macrophage retain the baseline flat
+                    # costim); NK uses the KIR-HLA receptor balance (or
+                    # its own flat baseline with no typing on record)
+                    # and macrophages the PD-1-gated phagocytic
                     # probability.
                     if distance < immune_cell.kill_radius:
                         # Continuous-contact engagement: every step a
@@ -535,11 +954,44 @@ class ImmuneModule(SimulationModule):
             return False, None
 
         elif immune_cell.cell_type == 'NK_cell':
-            # NK cells detect MISSING MHC-I (missing-self).
-            return cancer_cell.mhc1_expression < 0.4, None
+            # Activating / inhibitory receptor balance. With the
+            # patient's class-I typing on record, engagement is decided
+            # by whether any subset of their NK compartment integrates a
+            # net activating signal -- KIR-HLA licensing (Kim 2005,
+            # Anfossi 2006) over missing self (Karre 1986). Without a
+            # typing, the legacy step rule applies, but its threshold is
+            # at least visible in config now instead of being a bare
+            # 0.4 literal here. Measured, the old rule was a hard step:
+            # identical kills at MHC-I 0.00 / 0.20 / 0.39 and none at
+            # 0.40 / 0.41 / 0.80 / 1.00.
+            if self._nk_licensing is not None:
+                return self._nk_decision(
+                    immune_cell, cancer_cell,
+                ).recognized, None
+            return missing_self_recognized(
+                cancer_cell.mhc1_expression,
+                self.nk_missing_self_threshold,
+            ), None
 
         elif immune_cell.cell_type == 'macrophage':
-            return True, None
+            # Macrophage targeting is not antigen-restricted, so there
+            # is no MHC gate to apply here -- but `return True` ignored
+            # the don't-eat-me side entirely, and macrophage-only runs
+            # measured identical kills at target MHC-I 0.0, 0.4 and 1.0.
+            # Engagement now requires the PD-1 gate to leave some
+            # phagocytic capacity; at PD-L1 = 0 that is the configured
+            # baseline, so an untouched cell behaves exactly as before.
+            # An M2 macrophage is pro-tumour, not tumoricidal, and
+            # stops recognizing targets at all past the configured
+            # polarization. The default cutoff is on the far side of
+            # M0, so an unpolarized macrophage still recognizes
+            # everything exactly as `return True` did.
+            if (getattr(immune_cell, 'polarization', 0.0)
+                    > self.macrophage_recognition_max_polarization):
+                return False, None
+            return self._macrophage_kill_probability(
+                cancer_cell, immune_cell,
+            ) > 0.0, None
 
         return False, None
 
@@ -581,11 +1033,18 @@ class ImmuneModule(SimulationModule):
             return bool(match.is_exhausted)
 
     def _target_kill_probability(self, immune_cell: ImmuneCell, target_cell) -> float:
-        """Per-encounter kill probability.
+        """Per-encounter kill probability, per lineage.
 
         T cells with an active TCR match use the affinity * MHC * costim
-        Hill rule from tcell_kill.kill_probability; NK and macrophage
-        retain the legacy flat self.kill_probability.
+        Hill rule from tcell_kill.kill_probability, then the sympathetic
+        gate. NK cells use the KIR-HLA activating/inhibitory balance
+        when the patient's class-I typing is on record and their own
+        flat baseline otherwise. Macrophages use the PD-1-gated
+        phagocytic probability. The three used to be one number.
+
+        The final `return self.kill_probability` is now reachable only
+        for an immune cell of an unrecognized type; it is not a T-cell
+        fallback. See the comment on self.kill_probability in __init__.
         """
         if (immune_cell.cell_type == 'T_cell'
                 and immune_cell.active_tcr_match is not None):
@@ -611,7 +1070,31 @@ class ImmuneModule(SimulationModule):
                 self.beta_blocker,
                 max_suppression=self.sympathetic_max_suppression,
             )
-            return outcome.kill_probability * sympathetic_mult
+            # Arginase-mediated M2 suppression: local M2 macrophages
+            # express arginase-1 and deplete extracellular L-arginine,
+            # downregulating CD3-zeta and blocking T-cell function
+            # (Rodriguez PC et al., Cancer Res 2004;64:5839-49; Bronte V
+            # & Zanovello P, Nat Rev Immunol 2005;5:641-54). A third
+            # multiplicative gate alongside exhaustion and the
+            # sympathetic axis. Exactly 1.0 when no M2 macrophage is
+            # within the sampling radius, so a configuration with no
+            # macrophages -- which is every immune configuration in the
+            # test suite, including the flagship closed loop -- is a
+            # provable no-op on the T-cell path.
+            arginase_mult = arginase_attenuation(
+                self._local_m2_burden(immune_cell.position),
+                max_suppression=self.arginase_max_suppression,
+            )
+            return (
+                outcome.kill_probability * sympathetic_mult * arginase_mult
+            )
+
+        if immune_cell.cell_type == 'NK_cell':
+            return self._nk_kill_probability(immune_cell, target_cell)
+        if immune_cell.cell_type == 'macrophage':
+            return self._macrophage_kill_probability(
+                target_cell, immune_cell,
+            )
         return self.kill_probability
 
     def _kill_target(self, immune_cell: ImmuneCell, target_cell):
@@ -651,7 +1134,205 @@ class ImmuneModule(SimulationModule):
         immune_cell.activated = False
         immune_cell.target_cell_id = None
         immune_cell.active_tcr_match = None
-    
+
+    # ---- Macrophage M1/M2 polarization -------------------------
+
+    def _immune_neighbours(self, position, exclude_id=None):
+        """Immune cells in tissue within the cytokine radius.
+
+        On-demand neighbour sampling, following the precedent of
+        spatial/ecm_barrier.ecm_density_at. O(n) per call, which is what
+        the recognition loop around it already costs.
+        """
+        out = []
+        r2 = self.cytokine_sampling_radius * self.cytokine_sampling_radius
+        for cell in self.immune_cells.values():
+            if cell.in_blood or cell.cell_id == exclude_id:
+                continue
+            d = cell.position - position
+            if float(np.dot(d, d)) <= r2:
+                out.append(cell)
+        return out
+
+    def _local_ifn_gamma(self, position, exclude_id=None,
+                         neighbours=None) -> float:
+        """Local IFN-gamma from activated T cells, in [0, 1].
+
+        Activated CD8 T cells are the IFN-gamma source. There is no
+        cytokine field and no diffusion solver here, and none is
+        claimed: the signal is counted from nearby cells on demand. The
+        30 um sampling radius is the measured effective range of
+        paracrine IFN-gamma / IL-2 signalling (Oyler-Yaniv A et al.,
+        Immunity 2017;46:609-20) rather than an arbitrary number.
+        ``neighbours`` lets a caller that already has the neighbour list
+        reuse it instead of rescanning.
+        """
+        if neighbours is None:
+            neighbours = self._immune_neighbours(position, exclude_id)
+        n = sum(
+            1 for c in neighbours
+            if c.cell_type == 'T_cell' and c.activated
+        )
+        return local_signal(
+            n, saturation_count=self.cytokine_saturation_count)
+
+    def _local_m2_secretion(self, position, species, exclude_id=None,
+                            neighbours=None) -> float:
+        """Local level of one M2 species from nearby macrophages.
+
+        Each neighbour contributes its own ``cytokine_output``, so the
+        signal is graded by how M2 each macrophage actually is rather
+        than by a label. Exactly 0.0 with no macrophage nearby.
+        """
+        if neighbours is None:
+            neighbours = self._immune_neighbours(position, exclude_id)
+        total = 0.0
+        for c in neighbours:
+            if c.cell_type != 'macrophage':
+                continue
+            total += cytokine_output(
+                getattr(c, 'polarization', 0.0))[species]
+        return local_signal(
+            total, saturation_count=self.cytokine_saturation_count)
+
+    def _local_m2_burden(self, position, exclude_id=None) -> float:
+        """Local arginase-1 burden from M2 macrophages, in [0, 1].
+
+        Exactly 0.0 when no macrophage is nearby, which is what makes
+        the arginase gate on the T-cell path a provable no-op in any
+        configuration with no macrophages -- including the flagship
+        closed loop, which configures none.
+        """
+        return self._local_m2_secretion(position, 'ARG1', exclude_id)
+
+    def _local_hypoxia(self, position) -> float:
+        """Hypoxia drive at a position, from the nearest living cell.
+
+        Returns 0.0 with no cellular module linked and 0.0 when no cell
+        is in range: absent oxygen data is not hypoxia. Hypoxia and
+        tumour-derived lactate push tumour-associated macrophages toward
+        M2 (Colegio OR et al., Nature 2014;513:559-63; Henze AT &
+        Mazzone M, J Clin Invest 2016;126:3672-9). Note this needs a
+        VascularModule in the run to read a graded field -- without one
+        the tissue dies off and oxygen stops being informative.
+        """
+        if self.cellular_module is None:
+            return 0.0
+        best = None
+        best_d2 = self.cytokine_sampling_radius ** 2
+        for cell in self.cellular_module.cells.values():
+            if not cell.alive:
+                continue
+            d = cell.position - position
+            d2 = float(np.dot(d, d))
+            if d2 <= best_d2:
+                best_d2 = d2
+                best = cell
+        if best is None:
+            return 0.0
+        return hypoxia_signal(getattr(best, 'oxygen', NORMOXIC_OXYGEN))
+
+    def _update_polarization(self, immune_cell: ImmuneCell, dt: float):
+        """One polarization relaxation step for one macrophage."""
+        pos = immune_cell.position
+        own = immune_cell.cell_id
+        # One neighbour scan feeds both cytokine arms. The recognition
+        # loop around this already pays two O(n) ecm_density_at scans
+        # per immune cell per step, so the added cost is bounded by that
+        # precedent rather than new in kind -- but there is no reason to
+        # pay it three times over. Measured: merging the scans cut the
+        # overhead at 8 macrophages from 1.34x to 1.20x, with
+        # byte-identical polarization values.
+        neighbours = self._immune_neighbours(pos, own)
+        m2_signal = self._local_m2_secretion(
+            pos, 'IL10', own, neighbours)
+        target = polarization_target(
+            ifn_gamma=self._local_ifn_gamma(pos, own, neighbours),
+            # One IL-10 / TGF-beta term, not two: the simulated M2
+            # source secretes both and they act on the same arm, so
+            # splitting them would double-count one signal.
+            il10=m2_signal,
+            tgf_beta=0.0,
+            hypoxia=self._local_hypoxia(pos),
+        )
+        immune_cell.polarization = polarization_step(
+            immune_cell.polarization,
+            target,
+            dt,
+            tau_hours=self.polarization_tau_hours,
+        )
+
+    def get_innate_state(self) -> Dict[str, Any]:
+        """Innate-arm readout: NK licensing, macrophage polarization, and
+        the provenance of each.
+
+        Both halves report provenance separately because they are
+        measured to different degrees. The NK ligand side is real
+        patient data (OptiType class-I typing from read data); the KIR
+        side is a population carrier-frequency prior, and
+        ``nk_kir_patient_specific`` says so. The macrophage seed is
+        'unmeasured' unless a caller both supplied an M2 fraction and
+        declared it measured -- and no patient in this platform has a
+        measured M1/M2 ratio today, so 'unmeasured' is the correct
+        answer and the default.
+
+        """
+        macrophages = [
+            c for c in self.immune_cells.values()
+            if c.cell_type == 'macrophage' and not c.in_blood
+        ]
+        pols = [c.polarization for c in macrophages]
+        labels: Dict[str, int] = {}
+        for c in macrophages:
+            label = polarization_label(c.polarization)
+            labels[label] = labels.get(label, 0) + 1
+
+        if self.macrophage_m2_fraction is None:
+            source = 'unmeasured'
+        elif self.immune_profile_measured:
+            source = 'patient_measured'
+        else:
+            source = 'configured_unmeasured'
+
+        lic = self._nk_licensing
+        return {
+            # NK arm
+            'nk_model': (
+                'kir_hla_balance' if lic is not None
+                else 'missing_self_threshold'
+            ),
+            'nk_kill_probability': self.nk_kill_probability,
+            'nk_missing_self_threshold': self.nk_missing_self_threshold,
+            'nk_patient_specific': (
+                lic.hla.is_patient_specific if lic is not None else False
+            ),
+            # The KIR half is a population carrier-frequency prior, not
+            # a measurement: nothing in this platform types KIR.
+            'nk_kir_patient_specific': (
+                lic.kir.is_patient_specific if lic is not None else False
+            ),
+            'nk_licensed_fraction': (
+                lic.licensed_fraction if lic is not None else None
+            ),
+            'nk_ligand_groups': (
+                [g.value for g in lic.hla.groups] if lic is not None else None
+            ),
+            # Macrophage arm
+            'macrophage_kill_probability': self.macrophage_kill_probability,
+            'n_macrophages_in_tissue': len(macrophages),
+            'mean_macrophage_polarization': (
+                float(sum(pols) / len(pols)) if pols else None
+            ),
+            'macrophage_polarization_counts': labels,
+            'macrophage_polarization_enabled':
+                self.macrophage_polarization_enabled,
+            'macrophage_m2_fraction': self.macrophage_m2_fraction,
+            'macrophage_polarization_source': source,
+            'macrophage_pd1_max_suppression':
+                self.macrophage_pd1_max_suppression,
+            'immune_profile_measured': self.immune_profile_measured,
+        }
+
     def get_state(self) -> Dict[str, Any]:
         """Return current immune state"""
         active_immune = [ic for ic in self.immune_cells.values() if not ic.in_blood]
@@ -669,7 +1350,48 @@ class ImmuneModule(SimulationModule):
             'n_macrophages': len(macrophages),
             'total_kills': self.total_kills,
             'total_activations': self.total_activations,
-            'total_recruited': self.total_recruited
+            'total_recruited': self.total_recruited,
+            # Innate arm. nk_model names the rule that actually ran.
+            # The HLA and KIR halves of patient-specificity are reported
+            # separately because only the HLA half can be measured here:
+            # the KIR half is a population carrier-frequency prior.
+            'nk_model': (
+                'kir_hla_balance' if self._nk_licensing is not None
+                else 'missing_self_threshold'
+            ),
+            'nk_patient_specific': (
+                self._nk_licensing.hla.is_patient_specific
+                if self._nk_licensing is not None else False
+            ),
+            'nk_kir_patient_specific': (
+                self._nk_licensing.kir.is_patient_specific
+                if self._nk_licensing is not None else False
+            ),
+            'nk_licensed_fraction': (
+                self._nk_licensing.licensed_fraction
+                if self._nk_licensing is not None else None
+            ),
+            'nk_ligand_groups': (
+                [g.value for g in self._nk_licensing.hla.groups]
+                if self._nk_licensing is not None else None
+            ),
+            # Macrophage arm. None when there are no macrophages in
+            # tissue -- absent, not zero, the shape twin_config now
+            # uses. The full readout with provenance is
+            # get_macrophage_state().
+            'mean_macrophage_polarization': (
+                float(sum(getattr(ic, 'polarization', 0.0)
+                          for ic in macrophages)
+                      / len(macrophages)) if macrophages else None
+            ),
+            'macrophage_polarization_source': (
+                'unmeasured' if self.macrophage_m2_fraction is None
+                else ('patient_measured' if self.immune_profile_measured
+                      else 'configured_unmeasured')
+            ),
+            # The legacy step rule's threshold, which used to be a bare
+            # 0.4 literal inside _recognize and is now visible.
+            'nk_missing_self_threshold': self.nk_missing_self_threshold,
         }
     
     # Event handlers

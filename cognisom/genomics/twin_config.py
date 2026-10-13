@@ -57,6 +57,10 @@ class DigitalTwinConfig:
 
     # Neoantigen vaccine data
     hla_alleles: List[str] = field(default_factory=list)
+    #: True only when these alleles were typed from this patient's reads.
+    #: False means they were substituted from population frequencies, which
+    #: the NK receptor model must not treat as this patient's genotype.
+    hla_is_patient_specific: bool = False
     predicted_neoantigen_count: int = 0
     strong_binder_count: int = 0
     vaccine_candidate_count: int = 0
@@ -103,6 +107,8 @@ class DigitalTwinConfig:
 
         # HLA alleles
         config.hla_alleles = profile.hla_alleles or []
+        config.hla_is_patient_specific = bool(
+            getattr(profile, 'hla_is_patient_specific', False))
 
         # MHC-I downregulation based on genomic markers (entity-driven)
         try:
@@ -190,6 +196,8 @@ class DigitalTwinConfig:
             neoantigen_count=neo_count,
             mhc1_downregulation=mhc1_down,
             hla_alleles=profile.hla_alleles or [],
+            hla_is_patient_specific=bool(
+                getattr(profile, 'hla_is_patient_specific', False)),
             predicted_neoantigen_count=len(profile.predicted_neoantigens),
             strong_binder_count=profile.strong_binder_count,
             vaccine_candidate_count=len(profile.vaccine_neoantigens),
@@ -216,6 +224,13 @@ class DigitalTwinConfig:
                 "treg_fraction": self.treg_fraction,
                 "m2_fraction": self.m2_macrophage_fraction,
                 "neoantigen_count": self.neoantigen_count,
+                # The producer the NK receptor model was missing. Without
+                # these two keys immune_module._resolve_nk_licensing finds
+                # nothing and every preset silently falls back to the legacy
+                # `mhc1 < 0.4` step rule, so the receptor model was dormant
+                # in every launchable configuration.
+                "patient_hla": list(self.hla_alleles) or None,
+                "patient_hla_measured": self.hla_is_patient_specific,
             },
             "spatial": {
                 "pd_l1_field_strength": self.pd_l1_expression,

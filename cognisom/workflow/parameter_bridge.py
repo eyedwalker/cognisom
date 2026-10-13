@@ -53,6 +53,15 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
     "immune": {
         "n_t_cells": int, "n_nk_cells": int, "n_macrophages": int,
         "patrol_speed": float, "kill_probability": float,
+        # The knobs that actually reach each arm. checkpoint_block and
+        # costimulation drive the T-cell Hill rule (and, for
+        # checkpoint_block, the macrophage PD-1 gate); the two
+        # per-lineage kill probabilities replaced the single flat
+        # kill_probability that NK cells and macrophages shared.
+        "checkpoint_block": float, "costimulation": float,
+        "nk_kill_probability": float,
+        "macrophage_kill_probability": float,
+        "patient_id": str, "patient_hla": list,
     },
     "vascular": {
         "n_capillaries": int, "arterial_O2": float,
@@ -125,11 +134,18 @@ DRUG_CLASS_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
     "chemotherapy": {
         "cellular": {"division_time_cancer": 24.0, "glucose_consumption_cancer": 0.8},
     },
+    # kill_probability was read by NK cells and macrophages only, so
+    # every checkpoint-inhibitor mapping below used to boost innate
+    # killing and leave the T-cell loop -- the target of the drug --
+    # untouched. checkpoint_block is the parameter tcell_kill actually
+    # reads, and it now also relieves the macrophage PD-1 gate.
     "immunotherapy": {
-        "immune": {"n_t_cells": 30, "kill_probability": 0.95},
+        "immune": {"n_t_cells": 30, "checkpoint_block": 1.0},
     },
     "checkpoint_inhibitor": {
-        "immune": {"n_t_cells": 30, "n_nk_cells": 15, "kill_probability": 0.95},
+        "immune": {
+            "n_t_cells": 30, "n_nk_cells": 15, "checkpoint_block": 1.0,
+        },
     },
     "parp_inhibitor": {
         "cellular": {"division_time_cancer": 20.0},
@@ -143,7 +159,9 @@ DRUG_CLASS_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         "immune": {"kill_probability": 0.6},
     },
     "tlr_agonist": {
-        "immune": {"n_macrophages": 12, "kill_probability": 0.9},
+        # TLR agonism acts on the myeloid compartment, so it names the
+        # macrophage lineage rather than raising every lineage at once.
+        "immune": {"n_macrophages": 12, "macrophage_kill_probability": 0.9},
     },
 }
 
@@ -205,13 +223,18 @@ DRUG_TARGET_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
         "ode": {"system": "ar_signaling", "k_bind": 10.0},
     },
     "PDCD1": {  # PD-1
-        "immune": {"n_t_cells": 30, "kill_probability": 0.95},
+        "immune": {"n_t_cells": 30, "checkpoint_block": 1.0},
     },
     "CD274": {  # PD-L1
-        "immune": {"n_t_cells": 25, "kill_probability": 0.92},
+        "immune": {"n_t_cells": 25, "checkpoint_block": 0.9},
     },
     "CTLA4": {
-        "immune": {"n_t_cells": 28, "kill_probability": 0.90},
+        # CTLA-4 blockade restores CD28 access to CD80/CD86, so the knob
+        # is costimulation, not the PD-1 term. Default costimulation is
+        # 0.6 (a costim-poor tumour side), and ipilimumab raising it is
+        # the mechanism; it was setting kill_probability, which neither
+        # T cells nor the checkpoint path ever read.
+        "immune": {"n_t_cells": 28, "costimulation": 1.0},
     },
     "BRCA1": {
         "molecular": {"mutation_rate": 0.005},
