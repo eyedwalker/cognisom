@@ -42,7 +42,16 @@ st.sidebar.caption(SCENARIOS[scenario]["desc"])
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Time")
-duration = st.sidebar.slider("Duration (hours)", 1.0, 24.0, 4.0, step=0.5)
+# The ceiling was 24 h and the default 4 h, which put every interesting
+# event out of reach: immune activations start around 6 h, the first T-cell
+# kills land near 24 h, and a user could not select past the point where
+# anything happens. 72 h costs about 45 s to run; the caption says so rather
+# than letting a user discover it by waiting.
+duration = st.sidebar.slider("Duration (hours)", 1.0, 72.0, 24.0, step=0.5)
+st.sidebar.caption(
+    "Immune cells need ~6 h to find a tumour and ~24 h to kill. Runs under "
+    "6 h are expected to look quiet. 24 h takes ~15 s, 72 h about ~45 s."
+)
 dt = st.sidebar.select_slider("dt (hours)", options=[0.01, 0.02, 0.05, 0.1], value=0.05)
 
 st.sidebar.markdown("---")

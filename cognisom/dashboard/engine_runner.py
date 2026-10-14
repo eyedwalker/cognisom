@@ -131,6 +131,9 @@ SCENARIOS = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 # ── Data collection ──────────────────────────────────────────────────
 
 @dataclass
@@ -404,6 +407,19 @@ class EngineRunner:
         morphogen = mods.get("morphogen")
         spatial = mods.get("spatial")
 
+        # The closed loop's first link, and the one that was missing.
+        #
+        # cellular._present_mutation_peptides returns early when
+        # molecular_module is None, so without this no cancer cell ever
+        # carries mhc1_displayed_peptides -- and immune_module._recognize
+        # returns False for every T cell on every call, at every duration.
+        # The platform's headline capability (mutation -> peptide -> MHC ->
+        # TCR -> kill) was unreachable from the dashboard because of one
+        # absent wire, while the closed-loop test passed because it does
+        # this linking by hand.
+        if cellular and molecular:
+            cellular.set_molecular_module(molecular)
+
         if immune and cellular:
             immune.set_cellular_module(cellular)
         if vascular and cellular:
@@ -441,6 +457,31 @@ class EngineRunner:
             for cell_id, cell in cellular.cells.items():
                 if molecular:
                     molecular.add_cell(cell_id)
+                    # Realise the driver the cell is already labelled with.
+                    #
+                    # Cancer cells are seeded carrying e.g. ['KRAS_G12D'], but
+                    # that label is a string on CellState -- the molecular
+                    # module never hears about it, so no MUTATION_OCCURRED is
+                    # emitted and the closed loop's first link never fires.
+                    # MolecularModule.mutation_rate is read from config and
+                    # then never used anywhere, so nothing introduces
+                    # mutations spontaneously either.
+                    #
+                    # This introduces the mutation the cell already claims to
+                    # carry. It invents nothing: the label, the gene and the
+                    # substitution all come from the preset, and
+                    # introduce_mutation validates the change against the
+                    # reference protein and refuses anything it cannot place.
+                    for label in (getattr(cell, 'mutations', None) or []):
+                        gene, _, substitution = str(label).partition('_')
+                        if gene and substitution:
+                            try:
+                                molecular.introduce_mutation(
+                                    cell_id, gene, substitution)
+                            except Exception as exc:
+                                logger.debug(
+                                    "could not realise seeded mutation %s on "
+                                    "cell %s: %s", label, cell_id, exc)
                 if epigenetic:
                     epigenetic.add_cell(cell_id, cell.cell_type)
                 if circadian:
