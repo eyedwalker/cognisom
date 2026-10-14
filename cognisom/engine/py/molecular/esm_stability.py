@@ -53,9 +53,40 @@ from dataclasses import dataclass
 from typing import Optional, Protocol
 
 
-# ESM-2 model variants. The 150M model is the default for CPU
-# inference; bumping to 650M / 3B requires a GPU to be practical.
+# ESM-2 model variants. The 150M model is the default because it is
+# practical on CPU; bumping to 650M / 3B wants a GPU.
+#
+# "GPU" here includes Apple Silicon via Metal/MPS, not just CUDA. Measured on
+# an M5 Max scoring TP53 R175 with this 150M model: 132.0 ms/score on CPU vs
+# 22.6 ms on MPS, a 5.8x difference. See _select_device below.
 DEFAULT_ESM_MODEL: str = "facebook/esm2_t30_150M_UR50D"
+
+
+def _select_device(torch, requested: Optional[str] = None) -> str:
+    """Pick the best available torch device, preferring CUDA then MPS.
+
+    CUDA comes first because the production GPU box has one and it remains the
+    fastest path. MPS is second so an Apple Silicon workstation uses its GPU
+    rather than silently pinning a 150M-parameter masked-LM to the CPU, which
+    is what this module did before: it never called `.to(device)` at all, so
+    the device was always CPU no matter what the machine had.
+
+    `requested` overrides the probe -- for tests, and for forcing CPU when
+    bit-reproducibility matters more than speed, because the backends do not
+    agree exactly. Measured over three TP53 hotspots (R175H, R273C, P36L), the
+    worst disagreement in delta_log_likelihood was 6.3e-06 -- around 1e-5, not
+    1e-6. That lands well inside the noise of this score: stability_modifier,
+    which is the only value anything downstream consumes, was identical to
+    four decimal places in every case.
+    """
+    if requested:
+        return requested
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 @dataclass(frozen=True)
@@ -195,7 +226,11 @@ class RealESMStabilityScorer:
     asked for real ESM scoring -- the caller should know.
     """
 
-    def __init__(self, model_name: str = DEFAULT_ESM_MODEL):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_ESM_MODEL,
+        device: Optional[str] = None,
+    ):
         try:
             import torch  # noqa: F401
             from transformers import AutoTokenizer, AutoModelForMaskedLM  # noqa: F401
@@ -206,6 +241,8 @@ class RealESMStabilityScorer:
                 "or use StubESMStabilityScorer for tests."
             ) from exc
         self.model_name = model_name
+        self._requested_device = device
+        self._device: Optional[str] = None  # resolved at load time
         self._tokenizer = None
         self._model = None
         self._torch = None  # cached reference
@@ -216,8 +253,10 @@ class RealESMStabilityScorer:
         import torch
         from transformers import AutoTokenizer, AutoModelForMaskedLM
         self._torch = torch
+        self._device = _select_device(torch, self._requested_device)
         self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self._model = AutoModelForMaskedLM.from_pretrained(self.model_name)
+        self._model.to(self._device)
         self._model.eval()
 
     def score_substitution(
@@ -251,6 +290,7 @@ class RealESMStabilityScorer:
             protein_sequence[:idx0] + "<mask>" + protein_sequence[idx0 + 1 :]
         )
         inputs = self._tokenizer(masked, return_tensors="pt")
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
         with torch.no_grad():
             logits = self._model(**inputs).logits
         # Tokenizer adds <cls> at index 0; the masked residue is at
