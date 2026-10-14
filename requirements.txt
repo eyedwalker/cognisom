@@ -29,16 +29,26 @@ pytest-cov>=4.1.0
 # was removed in commit 57a1cbb to unblock CI; the timeout in pytest.ini
 # is the safer version of that fix.
 pytest-timeout>=2.1.0
-# Parallel test execution. The suite is parallel-safe -- verified identical at
-# 1865 passed / 8 skipped with 1, 6, 12 and 18 workers -- and the wall clock on
-# an 18-core M5 Max goes 49.5s -> 11.5s.
+# Parallel test execution. Wall clock on an 18-core M5 Max: 49.5s -> ~13s.
 #
-# Deliberately NOT in addopts. The sweet spot is `-n 12`, not `-n auto`: this
-# machine has 6 performance and 12 efficiency cores, and 18 workers measured
-# SLOWER than 12 (13.2s vs 11.5s) because the extra workers land on efficiency
-# cores and the whole run waits on them. `auto` would pick 18 here and
-# oversubscribe a 2-4 core CI runner, so the worker count stays a local choice:
-#     ./venv/bin/python -m pytest tests/ -n 12
+#     ./venv/bin/python -m pytest tests/ -n 12 --dist loadfile
+#
+# BOTH flags matter.
+#
+# `--dist loadfile` because the suite is NOT parallel-safe at test
+# granularity: tests/test_registry.py shares a process-wide RegistryManager
+# singleton (see the note above about the deleted duplicate suite), so
+# splitting that class across workers fails 2-4 of its tests. It passes
+# serially and passes under loadfile, which keeps a file on one worker. An
+# earlier run of the full suite at -n 6/12/18 came out green and was taken as
+# proof of parallel-safety; it was luck of distribution -- adding one test file
+# shifted the assignment and the failures appeared.
+#
+# `-n 12`, not `-n auto`: this machine has 6 performance and 12 efficiency
+# cores, and 18 workers measured SLOWER than 12 (13.2s vs 11.5s) because the
+# surplus workers land on efficiency cores and the run waits on them. `auto`
+# resolves to 18 here and would oversubscribe a 2-4 core CI runner, so the
+# worker count stays an explicit local choice rather than going in addopts.
 pytest-xdist>=3.5.0
 
 # Development
@@ -81,6 +91,16 @@ boto3>=1.34.0  # AWS SDK for Secrets Manager
 
 # GPU-accelerated physics (Warp bundles its own CUDA runtime)
 warp-lang>=1.0.0
+
+# Compiled stencil/tridiagonal kernels for cognisom/gpu/implicit_diffusion.py.
+# Was already present transitively (scanpy -> umap-learn -> numba) and is now
+# declared because core code imports it directly.
+#
+# The solver has a NumPy fallback and is bit-identical without numba, so this
+# is a performance dependency, not a correctness one -- but the gap is 45x at
+# 500^3 (134 ms vs 6.0 s per field-step), which is the difference between the
+# 1M-cell preset finishing in 0.25 h and in 12 h.
+numba>=0.59.0
 
 # Neoantigen MHC-I binding prediction. The patent pipeline's MHCLoader
 # (engine/py/immune/mhc_loading.py) and the MAD pipeline's
