@@ -7,6 +7,15 @@ scipy>=1.10.0
 # Visualization
 matplotlib>=3.7.0
 
+# OpenUSD. Undeclared until now, although 102 tests import `pxr`
+# (test_interaction_visualization, test_cell_usd_export,
+# test_usd_animation_has_time, test_usda_files_are_loadable) along with the
+# whole cognisom/visualization package. Those tests skip at module level when
+# pxr is absent, which collapses all 102 into four skip lines and still exits
+# 0 -- so a clean install lost the entire USD surface silently. Pinned exactly
+# because the USD tests assert on emitted .usda structure.
+usd-core==25.11
+
 # Data handling
 pandas>=2.0.0
 anndata>=0.10.0
@@ -45,7 +54,12 @@ igraph>=0.11.0
 leidenalg>=0.10.0
 
 # Chemistry
-rdkit-pypi>=2022.9.2
+# rdkit, not rdkit-pypi. rdkit-pypi was the unofficial build from before the
+# RDKit project shipped its own wheels; it stopped publishing after 2022.9.5
+# and has NO wheel for Python 3.13 on any architecture, so `pip install -r`
+# simply fails. Every working install here already carries the official
+# `rdkit` distribution -- the pin named a package nobody had.
+rdkit>=2024.3.1
 
 # Environment
 python-dotenv>=1.0.0
@@ -74,7 +88,7 @@ warp-lang>=1.0.0
 #
 # Requires Python <= 3.12: mhcflurry 2.0.6 imports the stdlib `pipes` module,
 # which was removed in 3.13. CI and the production image are both 3.11.
-mhcflurry==2.0.6
+mhcflurry==2.0.6; python_version < "3.13"
 # MHCflurry's class1 predictors run on TensorFlow and it is NOT pulled in by
 # `pip install mhcflurry`. Without it the package imports and its weights
 # download, but Class1PresentationPredictor.load() dies inside
@@ -87,7 +101,13 @@ mhcflurry==2.0.6
 # tensorflow.compat.v1.keras.backend.set_session -- giving
 # "module 'keras._tf_keras.keras.backend' has no attribute 'set_session'".
 # 2.15 is the last release that ships Keras 2 by default.
-tensorflow-cpu>=2.13,<2.16
+#
+# The marker is the arch constraint, not a preference: no tensorflow-cpu in the
+# 2.13-2.15 range publishes an arm64 macOS wheel (that line was tensorflow-macos,
+# and mainline TF only returns at 2.16+, which breaks the Keras 2 shim above).
+# So on Apple Silicon the real MHCflurry predictor can only run under Rosetta.
+# Production and CI are x86_64 Linux on 3.11 and are unaffected by this marker.
+tensorflow-cpu>=2.13,<2.16; python_version < "3.13" and (sys_platform != "darwin" or platform_machine != "arm64")
 #
 # Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
 # default; the real path requires transformers + torch.
