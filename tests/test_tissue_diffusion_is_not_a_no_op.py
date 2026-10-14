@@ -102,12 +102,34 @@ def test_depletion_tracks_the_diffusion_length():
     non-zero. lambda = sqrt(D/k) falls as k rises, so more of the domain sits
     beyond supply range and the minimum drops monotonically.
 
-    It is also how the shipped rate was shown to be too low to produce
-    hypoxia: at the configured k = 0.714/h, lambda is ~3.2 mm against a 1 mm
-    domain, giving under 1% depletion. Physiological oxygen penetration is
-    100-200 um, which this model reaches only near k = 714/h -- roughly 1000x
-    the configured value. Calibrating that is a biology decision, not a solver
-    one, so this test asserts the ordering rather than any particular depth.
+    CORRECTION, measured 2026-10-14. An earlier version of this note claimed
+    that k = 714/h (~1000x the configured rate) reaches physiological 100-200 um
+    penetration, citing ~81% depletion. That figure was an artefact of the
+    DEFAULT 5 substeps, where k*dt = 1.43 and the operator split grossly
+    over-consumes. Converged, the same k gives 9.9%, not 81%:
+
+        substeps   k*dt     O2 min    depleted
+               5   1.4286   0.05306      74.7%
+              20   0.3571   0.11722      44.2%
+             150   0.0476   0.18139      13.6%
+
+    Raising k alone then SATURATES near 10%, because the sinks are too sparse
+    to drain a slab: 10,000 cells in a 100^3 grid is 1% voxel occupancy, and
+    oxygen refills each isolated sink from its neighbours faster than one cell
+    can empty it. Density is the dominant lever. Holding k at 71.4/h and
+    varying only cell count:
+
+        cells      occupancy   O2 min    depleted
+         10,000         1.0%   0.19072       9.2%
+         50,000         5.0%   0.17849      15.0%
+        200,000        20.0%   0.15994      23.8%
+        600,000        60.0%   0.12500      40.5%
+
+    Real tissue at a 10 um voxel is about one cell per voxel -- 100% occupancy
+    -- so the preset is ~100x too sparse. Also note sqrt(D/k) is the uniform-
+    consumption diffusion length and overstates depletion here by ~1/sqrt(occupancy).
+    Calibrating density and rate is a biology decision, not a solver one, so
+    this test asserts the ordering rather than any particular depth.
     """
     depths = []
     for mult in (1.0, 10.0, 100.0):
