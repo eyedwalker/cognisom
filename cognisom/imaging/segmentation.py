@@ -409,13 +409,22 @@ class CellSegmenter:
             from skimage.feature import peak_local_max
             from skimage.filters import gaussian
 
+            from skimage.filters import threshold_otsu
+
             # Smooth image
             smoothed = gaussian(image, sigma=2)
 
+            # Foreground by Otsu, not by the 50th percentile. The median splits
+            # the histogram in half whatever is in the image, so on a frame that
+            # is mostly background it called half the field foreground.
+            try:
+                binary = smoothed > threshold_otsu(smoothed)
+            except ValueError:            # a flat image has no Otsu threshold
+                binary = np.zeros(image.shape, dtype=bool)
+            binary = ndimage.binary_fill_holes(binary)
+
             # If no markers provided, generate from local maxima
             if markers is None:
-                # Distance transform for seeds
-                binary = image > np.percentile(image, 50)
                 distance = ndimage.distance_transform_edt(binary)
 
                 # Find local maxima as markers
@@ -425,11 +434,16 @@ class CellSegmenter:
                     threshold_abs=0.1,
                     labels=binary.astype(int),
                 )
-                markers = np.zeros_like(binary, dtype=np.int32)
+                markers = np.zeros(image.shape, dtype=np.int32)
                 markers[tuple(coords.T)] = np.arange(1, len(coords) + 1)
 
-            # Watershed
-            labels = watershed(-smoothed, markers, mask=image > 0)
+            # Flood only the foreground. `mask=image > 0` admitted every pixel
+            # the moment an image carried any noise floor, so the watershed
+            # partitioned the whole frame and handed background to the nearest
+            # object: 5 blobs came back as 15 regions, and on a confocal stack
+            # each "nucleus" came back at ~4,300 um^3 spanning the full z-range
+            # against a real 200-500 um^3.
+            labels = watershed(-smoothed, markers, mask=binary)
 
             self._ran = SegmentationMethod.WATERSHED
             return labels.astype(np.int32)
