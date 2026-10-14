@@ -519,18 +519,49 @@ class CellSegmenter:
 
             regions = regionprops(labels, intensity_image=intensity_image)
 
+            # `hasattr` is not a usable guard here. A RegionProperties object
+            # HAS `eccentricity` in 3-D -- accessing it is what raises
+            # NotImplementedError, so the old hasattr check never fired and a
+            # 3-D stack died inside this loop. The segmenter is reachable with
+            # 3-D input by design: the importers read z-stacks and
+            # MeshGenerator takes (D, H, W).
+            unavailable = set()
+
+            def _prop(region, name, default):
+                try:
+                    return getattr(region, name)
+                except (NotImplementedError, AttributeError):
+                    unavailable.add(name)
+                    return default
+
             for region in regions:
+                # 2-D-only shape descriptors come back NaN rather than 0.0 and
+                # 1.0 in 3-D. Those defaults are not neutral: 0.0 eccentricity
+                # reads as a perfect circle and 1.0 solidity as a perfectly
+                # convex object, so a reader plotting them would see a
+                # flawlessly round population that was never measured. NaN
+                # cannot be mistaken for a measurement.
                 props = CellProperties(
                     label=region.label,
                     centroid=tuple(region.centroid),
                     area=region.area,
                     bbox=region.bbox,
-                    equivalent_diameter=region.equivalent_diameter,
-                    eccentricity=region.eccentricity if hasattr(region, 'eccentricity') else 0.0,
-                    solidity=region.solidity if hasattr(region, 'solidity') else 1.0,
-                    mean_intensity=region.mean_intensity if intensity_image is not None else None,
+                    equivalent_diameter=_prop(
+                        region, 'equivalent_diameter_area',
+                        _prop(region, 'equivalent_diameter', float('nan'))),
+                    eccentricity=_prop(region, 'eccentricity', float('nan')),
+                    solidity=_prop(region, 'solidity', float('nan')),
+                    mean_intensity=(region.mean_intensity
+                                    if intensity_image is not None else None),
                 )
                 properties.append(props)
+
+            if unavailable:
+                log.warning(
+                    "%s not defined for %d-D input; left as NaN rather than a "
+                    "default that would read as a measurement",
+                    ", ".join(sorted(unavailable)), labels.ndim,
+                )
             self._morphology_measured = True
 
         except ImportError:

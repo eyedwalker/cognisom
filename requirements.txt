@@ -74,6 +74,15 @@ networkx>=3.0
 igraph>=0.11.0
 leidenalg>=0.10.0
 
+# Microscopy -> segmentation -> simulation mesh (cognisom/imaging).
+# Imported directly by segmentation.py and mesh_generation.py and undeclared
+# until now, so `labels_to_mesh` and every segmentation method raised
+# ImportError on a clean install -- the same defect usd-core had. pooch is what
+# scikit-image uses to fetch its sample stacks; without it `skimage.data` raises
+# rather than returning an image.
+scikit-image>=0.22.0
+pooch>=1.8.0
+
 # Chemistry
 # rdkit, not rdkit-pypi. rdkit-pypi was the unofficial build from before the
 # RDKit project shipped its own wheels; it stopped publishing after 2022.9.5
