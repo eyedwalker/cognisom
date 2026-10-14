@@ -297,12 +297,49 @@ def _sweep_numpy(C: np.ndarray, axis: int, r: float, cp, den) -> np.ndarray:
     return C
 
 
+@njit(parallel=True, cache=True, fastmath=False)
+def _apply_uptake_field(C, K, dt, i0, i1, j0, j1, k0, k1):
+    for i in prange(i0, i1):
+        for j in range(j0, j1):
+            for kk in range(k0, k1):
+                C[i, j, kk] = C[i, j, kk] / (1.0 + K[i, j, kk] * dt)
+
+
+def _uptake_field_step(C, uptake, dt_seconds) -> None:
+    """Backward Euler on dC/dt = -k(x)*C, interior only, in place.
+
+    A per-voxel rate cannot go on the tridiagonal diagonal without making the
+    coefficients vary line by line, which would defeat the cached
+    factorisation that makes this solver affordable. So a spatially varying
+    uptake is operator-split instead, and that costs accuracy the scalar path
+    does not pay: the scalar version folds k onto the diagonal and is EXACT at
+    steady state in 1-D, while this one carries the usual reaction-diffusion
+    splitting error of order k*dt.
+
+    Measured against an exact sparse solve of the discrete operator, the error
+    is roughly k*dt: ~2.5% at k*dt = 0.025, ~0.7% at the engine's operating
+    point (k = 0.714/h, dt = 36 s, k*dt = 0.0071). Interior only, so pinned
+    vessel and arterial voxels keep their values -- scaling those was what
+    produced an error of exactly k*dt at the centre of a cosh profile.
+    """
+    si, sj, sk = _interior_slices(C)
+    if si.stop <= si.start or sj.stop <= sj.start or sk.stop <= sk.start:
+        return
+    if _HAVE_NUMBA and C.flags["C_CONTIGUOUS"] and uptake.flags["C_CONTIGUOUS"]:
+        _apply_uptake_field(C, uptake, float(dt_seconds),
+                            si.start, si.stop, sj.start, sj.stop,
+                            sk.start, sk.stop)
+    else:
+        sub = C[si, sj, sk]
+        C[si, sj, sk] = sub / (1.0 + uptake[si, sj, sk] * dt_seconds)
+
+
 def adi_step(
     field: np.ndarray,
     diffusion_coeff: float,
     dt_seconds: float,
     resolution_um: float,
-    uptake_k: float = 0.0,
+    uptake_k: Any = 0.0,
     cache: Optional[Dict] = None,
     use_numba: Optional[bool] = None,
 ) -> np.ndarray:
@@ -318,6 +355,14 @@ def adi_step(
         uptake_k: first-order uptake in 1/s, as ``spatial_module.add_uptake``
             defines it (k = q_volumetric / C_arterial). Zeroth-order sinks
             cannot be used in a steady-state solve; see that module.
+
+            A float goes onto the tridiagonal diagonal and is exact at steady
+            state in 1-D. An array of the field's shape -- which is what cell
+            consumption actually looks like, since cells are discrete -- is
+            operator-split instead, because a varying diagonal would force the
+            Thomas factorisation to be recomputed per line. That split costs
+            an error of order k*dt (~0.7% at this engine's operating point);
+            see ``_uptake_field_step``.
         cache: reusable Thomas-coefficient cache. Pass the same dict across
             steps -- recomputing the factorisation every step is pure waste
             since the coefficients only depend on (length, r, k*dt).
@@ -336,19 +381,38 @@ def adi_step(
     if use_numba is None:
         use_numba = _HAVE_NUMBA
 
+    uptake_is_field = isinstance(uptake_k, np.ndarray)
+    if uptake_is_field:
+        if uptake_k.shape != field.shape:
+            raise ValueError(
+                f"uptake_k array shape {uptake_k.shape} does not match the "
+                f"field shape {field.shape}"
+            )
+        if (uptake_k < 0).any():
+            raise ValueError("uptake_k must be non-negative")
+        scalar_k = 0.0
+    else:
+        if uptake_k < 0:
+            raise ValueError(f"uptake_k must be non-negative, got {uptake_k}")
+        scalar_k = float(uptake_k)
+
     r = diffusion_coeff * dt_seconds / (resolution_um * resolution_um)
     active = [ax for ax in (0, 1, 2) if field.shape[ax] >= 3]
 
     if not active:
         # Nothing to diffuse: no axis has an interior. Only uptake applies, and
         # it goes on implicitly so it stays stable at any dt.
-        out = field / (1.0 + uptake_k * dt_seconds)
+        out = np.array(field, copy=True)
+        if uptake_is_field:
+            _uptake_field_step(out, uptake_k, dt_seconds)
+        else:
+            out /= (1.0 + scalar_k * dt_seconds)
         _clamp_interior(out)
         return out
 
     # The divisor is the number of sweeps that RUN, not 3 -- see the module
     # docstring; using 3 here under-applies uptake on degenerate grids.
-    kterm = uptake_k * dt_seconds / len(active)
+    kterm = scalar_k * dt_seconds / len(active)
 
     if use_numba and _HAVE_NUMBA:
         C = field if field.flags["C_CONTIGUOUS"] else np.ascontiguousarray(field)
@@ -363,6 +427,8 @@ def adi_step(
                 continue
             (_sweep0, _sweep1, _sweep2)[ax](
                 C, C.dtype.type(r), cp, den, a0, a1, b0, b1)
+        if uptake_is_field:
+            _uptake_field_step(C, uptake_k, dt_seconds)
         _clamp_interior(C)
         if C is not field:
             field[...] = C
@@ -377,5 +443,7 @@ def adi_step(
             cache[key] = thomas_coefficients(m, r, kterm, out.dtype.type)
         cp, den = cache[key]
         out = np.ascontiguousarray(_sweep_numpy(out, ax, r, cp, den))
+    if uptake_is_field:
+        _uptake_field_step(out, uptake_k, dt_seconds)
     _clamp_interior(out)
     return out

@@ -18,20 +18,50 @@ class DiffusionFieldConfig:
     name: str
     diffusion_coeff: float    # um^2/s
     initial_value: float      # Initial uniform concentration
-    boundary_type: str = "neumann"  # neumann or dirichlet
-    degradation_rate: float = 0.0   # 1/s, exponential decay
+    # NOTE: neither of the next two is read by any solver -- they are declared
+    # here and only ever serialised by to_dict. The diffusion solvers write the
+    # interior and leave every face at its current value, which is a Dirichlet
+    # condition, not the Neumann this claims. Left as-is rather than silently
+    # reinterpreted; changing the boundary condition is a modelling decision.
+    boundary_type: str = "neumann"  # neumann or dirichlet -- NOT IMPLEMENTED
+    degradation_rate: float = 0.0   # 1/s, exponential decay -- NOT IMPLEMENTED
+
+    #: First-order uptake per cell, in 1/h, following the convention
+    #: ``spatial_module.add_uptake`` argues for: k = q_volumetric / C_arterial,
+    #: so that at the arterial concentration the consumption equals the
+    #: measured zeroth-order rate. A zeroth-order sink cannot be used in a
+    #: steady-state solve -- it drives the concentration negative wherever
+    #: demand exceeds supply -- which is why this is first order.
+    #:
+    #: Rates accumulate within a voxel, so a voxel holding several cells
+    #: consumes proportionally more.
+    #:
+    #: Only used by the implicit solver. The explicit ``step()`` ignores
+    #: sources and sinks entirely, which is why tissue diffusion was a no-op:
+    #: uniform initial fields with nothing consuming leave the Laplacian
+    #: identically zero at every step.
+    uptake_per_cell_per_hour: float = 0.0
 
     @staticmethod
     def oxygen() -> DiffusionFieldConfig:
-        return DiffusionFieldConfig("oxygen", diffusion_coeff=2000.0, initial_value=0.21)
+        # q = 0.15 (the archetypes' highest oxygen_consumption), C_art = 0.21.
+        return DiffusionFieldConfig(
+            "oxygen", diffusion_coeff=2000.0, initial_value=0.21,
+            uptake_per_cell_per_hour=0.15 / 0.21)
 
     @staticmethod
     def glucose() -> DiffusionFieldConfig:
-        return DiffusionFieldConfig("glucose", diffusion_coeff=600.0, initial_value=5.0)
+        # q = 0.2 (archetypes' glucose_consumption), C_art = 5.0.
+        return DiffusionFieldConfig(
+            "glucose", diffusion_coeff=600.0, initial_value=5.0,
+            uptake_per_cell_per_hour=0.2 / 5.0)
 
     @staticmethod
     def cxcl12() -> DiffusionFieldConfig:
-        return DiffusionFieldConfig("cxcl12", diffusion_coeff=100.0, initial_value=0.0)
+        # A chemokine is secreted, not consumed, so it carries no uptake. The
+        # secretion side is still not modelled, so this field stays uniform.
+        return DiffusionFieldConfig(
+            "cxcl12", diffusion_coeff=100.0, initial_value=0.0)
 
 
 # Default prostate tissue cell type composition
@@ -68,6 +98,21 @@ class TissueScaleConfig:
     dt: float = 0.01                   # hours per step
     duration: float = 24.0             # total simulation hours
     diffusion_substeps: int = 5        # per main step
+
+    #: Use the unconditionally stable implicit (ADI) diffusion solver.
+    #:
+    #: The explicit scheme cannot integrate this configuration correctly at
+    #: any cost: with dt converted to seconds as the coefficients require,
+    #: D*dt/dx^2 = 720 for oxygen against an explicit 3-D limit of 1/6, so
+    #: stability needs 4320 substeps per step rather than 5 -- about 1286 h
+    #: for a 24 h run against max_runtime_hours below. See
+    #: cognisom/gpu/implicit_diffusion.py.
+    #:
+    #: With the implicit solver, diffusion_substeps above is an ACCURACY knob
+    #: rather than a stability requirement: per-voxel uptake is operator-split
+    #: and carries an error of order k*dt, measured at 0.71% with one substep
+    #: and 0.14% with five.
+    implicit_diffusion: bool = True
     mechanics_substeps: int = 10       # per main step
 
     # ── Diffusion fields ───────────────────────────────────────
@@ -128,6 +173,7 @@ class TissueScaleConfig:
             "dt": self.dt,
             "duration": self.duration,
             "diffusion_substeps": self.diffusion_substeps,
+            "implicit_diffusion": self.implicit_diffusion,
             "mechanics_substeps": self.mechanics_substeps,
             "fields": {
                 name: {
@@ -135,6 +181,7 @@ class TissueScaleConfig:
                     "diffusion_coeff": fc.diffusion_coeff,
                     "initial_value": fc.initial_value,
                     "boundary_type": fc.boundary_type,
+                    "uptake_per_cell_per_hour": fc.uptake_per_cell_per_hour,
                     "degradation_rate": fc.degradation_rate,
                 }
                 for name, fc in self.fields.items()
@@ -171,6 +218,7 @@ class TissueScaleConfig:
             dt=d.get("dt", 0.01),
             duration=d.get("duration", 24.0),
             diffusion_substeps=d.get("diffusion_substeps", 5),
+            implicit_diffusion=d.get("implicit_diffusion", True),
             mechanics_substeps=d.get("mechanics_substeps", 10),
             initial_composition=d.get("initial_composition", dict(DEFAULT_COMPOSITION)),
             cell_radius_um=d.get("cell_radius_um", 5.0),

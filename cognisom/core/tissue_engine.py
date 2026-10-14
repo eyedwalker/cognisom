@@ -42,6 +42,9 @@ from cognisom.gpu.multi_gpu_backend import MultiGPUBackend
 from cognisom.gpu.nccl_ghost_exchange import GhostExchanger
 from cognisom.gpu.tissue_distributor import TissueDistributor, TissueCellArrays
 from cognisom.gpu.multi_gpu_diffusion import MultiGPUDiffusionSolver
+
+#: cfg.dt is hours; diffusion coefficients are um^2/s.
+_SECONDS_PER_HOUR = 3600.0
 from cognisom.gpu.multi_gpu_mechanics import MultiGPUCellMechanics, MechanicsConfig
 
 log = logging.getLogger(__name__)
@@ -208,11 +211,43 @@ class TissueSimulationEngine:
 
         # ── 1. Diffusion substeps ────────────────────────────────
         if cfg.enable_diffusion and self._diffusion is not None:
-            diff_dt = dt / cfg.diffusion_substeps
-            for _ in range(cfg.diffusion_substeps):
-                self._diffusion.step(
-                    diff_dt, cfg.resolution_um,
-                )
+            if cfg.implicit_diffusion:
+                # cfg.dt is in HOURS; the field coefficients are in um^2/s.
+                # The explicit branch below passes hours straight through, so
+                # it advances 0.01 SECONDS of diffusion per step -- 3600x too
+                # slow, a 60x short diffusion length for oxygen. Converting
+                # here is the fix; it is also why the explicit branch cannot
+                # simply be corrected in place (see implicit_diffusion.py:
+                # correct units put D*dt/dx^2 at 720 against a limit of 1/6).
+                dt_seconds = dt * _SECONDS_PER_HOUR
+
+                # Cells consume. Without this the fields stay at their uniform
+                # initial values, the Laplacian is identically zero, and the
+                # whole diffusion stage is a no-op that still costs ~0.4-1.5 h
+                # per run. Rebuilt every step because cells move, divide and
+                # die.
+                uptake = {}
+                for name, fc in cfg.fields.items():
+                    if fc.uptake_per_cell_per_hour > 0.0:
+                        uptake[name] = self._diffusion.build_uptake_from_cells(
+                            self._cell_arrays,
+                            fc.uptake_per_cell_per_hour / _SECONDS_PER_HOUR,
+                            cfg.resolution_um,
+                        )
+                self._diffusion.set_uptake(uptake or None)
+
+                # Unconditionally stable, so substeps buy accuracy only: the
+                # per-voxel uptake split carries an error of order k*dt,
+                # measured 0.71% at one substep and 0.14% at five.
+                sub_dt = dt_seconds / cfg.diffusion_substeps
+                for _ in range(cfg.diffusion_substeps):
+                    self._diffusion.step_implicit(sub_dt, cfg.resolution_um)
+            else:
+                diff_dt = dt / cfg.diffusion_substeps
+                for _ in range(cfg.diffusion_substeps):
+                    self._diffusion.step(
+                        diff_dt, cfg.resolution_um,
+                    )
 
         # ── 2. Sample concentrations at cell positions ───────────
         concentrations = {}

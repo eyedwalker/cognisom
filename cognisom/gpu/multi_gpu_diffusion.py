@@ -140,6 +140,12 @@ class MultiGPUDiffusionSolver:
         # Reused stencil scratch, keyed by (device, thread).
         self._scratch_pool: Dict[Tuple[int, int], Tuple[Any, Any]] = {}
         self._n_threads = _default_thread_count(multi_gpu)
+        #: Per-field, per-partition per-voxel uptake (1/s), implicit scheme.
+        self._uptake: Optional[Dict[str, List[Any]]] = None
+        #: Thomas factorisations, keyed by (length, r, k*dt, dtype) inside
+        #: adi_step. Shared across fields and partitions on purpose -- the key
+        #: already distinguishes everything that changes the coefficients.
+        self._thomas_cache: Dict = {}
         self._thread_min_voxels = _THREAD_MIN_VOXELS
         self._pool: Optional[ThreadPoolExecutor] = None
         self._warned_sources = False
@@ -235,6 +241,125 @@ class MultiGPUDiffusionSolver:
         else:
             for name, gpu_id, D in tasks:
                 self._update_partition(name, gpu_id, D, dt, resolution)
+
+    # ── implicit scheme ─────────────────────────────────────────────
+
+    def set_uptake(self, uptake: Optional[Dict[str, List[Any]]]) -> None:
+        """Per-voxel first-order uptake in **1/s**, per field, per partition.
+
+        Keyed by field name because the fields are not consumed alike: oxygen
+        and glucose are taken up by cells, while a chemokine like CXCL12 is
+        secreted rather than consumed and carries no uptake at all. ``None``
+        clears it.
+        """
+        if uptake is None:
+            self._uptake = None
+            return
+        for name, per_gpu in uptake.items():
+            if name not in self._fields:
+                raise ValueError(f"uptake given for unknown field {name!r}")
+            for gpu_id, arr in enumerate(per_gpu):
+                want = self._fields[name][gpu_id].shape
+                if arr is not None and arr.shape != want:
+                    raise ValueError(
+                        f"uptake[{name!r}][{gpu_id}] shape {arr.shape} does "
+                        f"not match field shape {want}"
+                    )
+        self._uptake = dict(uptake)
+
+    def build_uptake_from_cells(
+        self,
+        cell_arrays: List[Any],
+        k_per_cell: Any,
+        resolution: float = _DEFAULT_RESOLUTION_UM,
+    ) -> List[Any]:
+        """Bin per-cell uptake rates onto the voxel grid, one array per partition.
+
+        Rates ACCUMULATE within a voxel, which is the convention
+        ``spatial_module`` uses (``k[ids[idx]] += rate``) and the behaviour
+        wanted here: more cells in a voxel consume more. ``k_per_cell`` is in
+        1/s and may be a scalar or one value per real cell.
+
+        Only living real cells contribute; ghosts are excluded because the
+        partition that owns them already counts them, and counting them twice
+        would double the consumption in the overlap.
+        """
+        out: List[Any] = []
+        for gpu_id, ca in enumerate(cell_arrays):
+            field0 = next(iter(self._fields.values()))[gpu_id]
+            xp = _xp_for(field0)
+            uptake = xp.zeros(field0.shape, dtype=field0.dtype)
+            n_real = int(getattr(ca, "n_real", 0) or 0)
+            if n_real and ca.positions is not None:
+                positions = ca.positions[:n_real]
+                alive = getattr(ca, "alive", None)
+                if alive is not None:
+                    keep = xp.asarray(self._mgpu.to_numpy(alive[:n_real])).astype(bool)
+                else:
+                    keep = xp.ones(n_real, dtype=bool)
+                if keep.any():
+                    positions = xp.asarray(
+                        self._mgpu.to_numpy(positions))[keep]
+                    rates = (xp.full(int(keep.sum()), float(k_per_cell),
+                                     dtype=field0.dtype)
+                             if np.isscalar(k_per_cell) else
+                             xp.asarray(self._mgpu.to_numpy(k_per_cell))[:n_real][keep]
+                             .astype(field0.dtype))
+                    idx = self._voxel_indices(
+                        positions.copy(), uptake, gpu_id, resolution, margin=0)
+                    try:
+                        xp.add.at(uptake, (idx[0], idx[1], idx[2]), rates)
+                    except AttributeError:   # pragma: no cover - cupy path
+                        uptake[idx[0], idx[1], idx[2]] += rates
+            out.append(uptake)
+        return out
+
+    def step_implicit(
+        self,
+        dt_seconds: float,
+        resolution: float = _DEFAULT_RESOLUTION_UM,
+    ) -> None:
+        """Advance every field by ``dt_seconds`` with the ADI solver.
+
+        ``dt_seconds`` is SECONDS, unlike :meth:`step`, which the engine calls
+        with hours while the coefficients are in um^2/s -- the 3600x unit bug
+        described in ``implicit_diffusion``. Naming the unit in the parameter
+        is deliberate: the old signature made the mistake invisible.
+
+        Unconditionally stable, so one call covers a whole engine step. The
+        explicit :meth:`step` would need 4320 substeps for the same dt at the
+        shipped configuration.
+
+        Partitions are NOT handed to the thread pool here. The ADI kernels are
+        already parallel over every voxel line, so adding outer threads
+        oversubscribes the machine rather than using it; :meth:`step` threads
+        because single-threaded NumPy ufuncs cannot use more than one core.
+        """
+        from cognisom.gpu.implicit_diffusion import adi_step
+
+        if dt_seconds < 0:
+            raise ValueError(f"dt_seconds must be non-negative, got {dt_seconds}")
+
+        for name, device_fields in self._fields.items():
+            D = self._diff_coeffs[name]
+            if D <= 0:
+                continue
+            self._ghost_ex.exchange_field_ghosts(device_fields)
+            for gpu_id, field in enumerate(device_fields):
+                uptake = None
+                if self._uptake is not None:
+                    per_gpu = self._uptake.get(name)
+                    if per_gpu is not None and gpu_id < len(per_gpu):
+                        uptake = per_gpu[gpu_id]
+                with self._device_scope(gpu_id):
+                    device_fields[gpu_id] = adi_step(
+                        field,
+                        D,
+                        dt_seconds,
+                        resolution,
+                        uptake_k=uptake if uptake is not None else 0.0,
+                        cache=self._thomas_cache,
+                    )
 
     def sample_at_positions(
         self,
