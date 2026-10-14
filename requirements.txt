@@ -29,6 +29,17 @@ pytest-cov>=4.1.0
 # was removed in commit 57a1cbb to unblock CI; the timeout in pytest.ini
 # is the safer version of that fix.
 pytest-timeout>=2.1.0
+# Parallel test execution. The suite is parallel-safe -- verified identical at
+# 1865 passed / 8 skipped with 1, 6, 12 and 18 workers -- and the wall clock on
+# an 18-core M5 Max goes 49.5s -> 11.5s.
+#
+# Deliberately NOT in addopts. The sweet spot is `-n 12`, not `-n auto`: this
+# machine has 6 performance and 12 efficiency cores, and 18 workers measured
+# SLOWER than 12 (13.2s vs 11.5s) because the extra workers land on efficiency
+# cores and the whole run waits on them. `auto` would pick 18 here and
+# oversubscribe a 2-4 core CI runner, so the worker count stays a local choice:
+#     ./venv/bin/python -m pytest tests/ -n 12
+pytest-xdist>=3.5.0
 
 # Development
 jupyter>=1.0.0
