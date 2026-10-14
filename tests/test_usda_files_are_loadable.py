@@ -35,8 +35,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 #: Committed .usda files, excluding build output, vendored trees and
 #: .claude/worktrees, which holds detached checkouts of other branches.
+#:
+#: Virtualenv names and site-packages are excluded because .gitignore places
+#: `venv/` inside the repo, and an in-tree environment makes this glob collect
+#: its dependencies' own assets. Measured: a venv built from requirements.txt
+#: added 15 parameters -- 14 of OpenUSD's generatedSchema.usda pluginfo files
+#: plus warp's tests/assets/torus.usda -- which this test then asserted on as
+#: though they were ours. They pass, which is the problem: the count silently
+#: grew from 1873 to 1888 and every added case validated a library's own
+#: shipped data, not anything this repo wrote.
 _EXCLUDE_PARTS = {
     "node_modules", "dist", "build", ".git", ".claude", "PhysiCell",
+    "venv", ".venv", "env", ".env", "site-packages", "__pypackages__",
 }
 
 
