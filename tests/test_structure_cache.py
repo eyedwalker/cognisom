@@ -244,3 +244,84 @@ def test_the_summary_reports_the_median_and_the_confident_fraction():
 
     assert out["median"] == pytest.approx(62.5)
     assert out["confident_fraction"] == pytest.approx(0.5)
+
+
+# ── relative placement ───────────────────────────────────────────────────
+#
+# pLDDT says how sure the model is of a residue's own position. It says nothing
+# about whether two confident regions are correctly placed relative to each
+# other, and that second uncertainty is often the larger one. Measured on the
+# live AlphaFold PAE matrices:
+#
+#     AR    three confident segments, pairwise mean PAE 26.5-28.9 A
+#     TP53  DNA-binding halves 3.45 A, DBD to tetramerisation 20.1 A
+#     TLR4  ectodomain halves 7.44 A, ectodomain to TIR 25-28 A
+#
+# So AR's domains are each confidently folded while their arrangement is not
+# claimed at all. Rendering them in one coordinate frame asserts a quaternary
+# structure the model declines to assert -- the same overclaim as drawing a
+# disordered tail solid, one level up.
+
+def test_segments_need_a_run_not_a_lucky_residue():
+    from cognisom.library.structure_cache import confident_segments
+
+    plddt = [95.0] * 30 + [20.0] * 10 + [95.0] * 5 + [20.0] * 10
+    segs = confident_segments(plddt, min_length=20)
+
+    assert segs == [(1, 30)], "a 5-residue blip must not become a segment"
+
+
+def test_a_trailing_confident_run_is_not_lost():
+    from cognisom.library.structure_cache import confident_segments
+
+    assert confident_segments([20.0] * 10 + [95.0] * 25) == [(11, 35)]
+
+
+def test_segments_placed_confidently_relative_to_each_other_are_one_group():
+    from cognisom.library.structure_cache import rigid_groups
+
+    pae = np.full((60, 60), 2.0)
+    groups = rigid_groups([(1, 25), (31, 60)], pae)
+
+    assert groups == [[(1, 25), (31, 60)]]
+
+
+def test_segments_the_model_will_not_place_stay_apart():
+    """AR's case: each domain confident, their arrangement unclaimed."""
+    from cognisom.library.structure_cache import rigid_groups
+
+    pae = np.full((60, 60), 27.0)
+    groups = rigid_groups([(1, 25), (31, 60)], pae)
+
+    assert len(groups) == 2, (
+        "segments at 27 A mean PAE must not share a coordinate frame")
+
+
+def test_grouping_is_transitive():
+    """A rigid with B and B rigid with C puts all three in one frame."""
+    from cognisom.library.structure_cache import rigid_groups
+
+    pae = np.full((90, 90), 30.0)
+    pae[0:25, 30:55] = pae[30:55, 0:25] = 2.0      # A-B close
+    pae[30:55, 60:90] = pae[60:90, 30:55] = 2.0    # B-C close
+    groups = rigid_groups([(1, 25), (31, 55), (61, 90)], pae)
+
+    assert len(groups) == 1 and len(groups[0]) == 3
+
+
+def test_the_threshold_is_documented_as_a_choice_not_a_fact():
+    """5 A splits TLR4's own solenoid; the default is 8 A for that reason."""
+    from cognisom.library.structure_cache import RIGID_PAE_MAX, rigid_groups
+
+    assert RIGID_PAE_MAX == 8.0
+    pae = np.full((60, 60), 7.44)      # TLR4's measured ectodomain value
+    assert len(rigid_groups([(1, 25), (31, 60)], pae)) == 1, (
+        "at the default, TLR4's continuous ectodomain stays in one group")
+    assert len(rigid_groups([(1, 25), (31, 60)], pae, max_pae=5.0)) == 2, (
+        "at the conventional 5 A it splits, which is why 5 A is not the default")
+
+
+def test_no_segments_means_no_groups_rather_than_an_error():
+    from cognisom.library.structure_cache import rigid_groups
+
+    assert rigid_groups([], np.zeros((10, 10))) == []

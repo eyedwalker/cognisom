@@ -243,6 +243,142 @@ def confidence_bands(structure: Structure) -> Dict[str, int]:
     }
 
 
+#: Mean PAE below which AlphaFold is taken to assert the relative placement of
+#: two confident segments. 5 A is the conventional reading of "same rigid body".
+#:
+#: 5 A is the conventional reading of "same rigid body", and measured here it
+#: is too strict: TLR4's leucine-rich-repeat ectodomain splits at 7.44 A
+#: although it is one continuous solenoid. 8 A joins it and still separates
+#: the ectodomain from the TIR domain across the membrane, which sits at
+#: 25-28 A.
+#:
+#: The choice barely matters for the cases that matter, which is the real
+#: reassurance. Measured at both 5 and 8 A:
+#:
+#:     AR     3 groups either way -- placement never asserted
+#:     TP53   2 groups either way -- DBD halves together, tetramerisation apart
+#:     TLR4   5 groups at 5 A, 3 at 8 A -- only this one moves
+#:
+#: Treat a split as "the model does not assert this placement", never as
+#: "these are separate domains". The first is what PAE measures; the second is
+#: a biological claim it cannot make.
+RIGID_PAE_MAX = 8.0
+
+
+def confident_segments(
+    plddt, threshold: float = PLDDT_CONFIDENT, min_length: int = 20
+) -> List[Tuple[int, int]]:
+    """Runs of confidently predicted residues, as 1-based inclusive spans.
+
+    Short dips below the threshold split a run, so a continuous domain can
+    arrive as several segments. That is why :func:`rigid_groups` exists -- the
+    segments are a starting partition, not a domain assignment.
+    """
+    out: List[Tuple[int, int]] = []
+    start = None
+    for i, p in enumerate(plddt):
+        if p >= threshold and start is None:
+            start = i
+        elif p < threshold and start is not None:
+            if i - start >= min_length:
+                out.append((start + 1, i))
+            start = None
+    if start is not None and len(plddt) - start >= min_length:
+        out.append((start + 1, len(plddt)))
+    return out
+
+
+def fetch_pae(accession: str, session: object = None, cache_dir: str = DEFAULT_CACHE):
+    """The predicted aligned error matrix, (n_res, n_res), or None.
+
+    pLDDT says how sure the model is of a residue's own position. It says
+    nothing about whether two confident regions are correctly placed relative
+    to each other, and that is a separate and often worse uncertainty.
+    Measured on this library:
+
+        AR    three confident segments, pairwise PAE 26.5-28.9 A
+        TP53  DNA-binding halves 3.45 A, but DBD to tetramerisation 20.1 A
+
+    So AR's domains are each confidently folded and their arrangement is not
+    claimed at all. Drawing them in one coordinate frame asserts a quaternary
+    structure the model declines to assert -- the same class of overclaim as
+    rendering a disordered tail solid, one level up.
+    """
+    import json as _json
+    import os as _os
+
+    _os.makedirs(cache_dir, exist_ok=True)
+    path = _os.path.join(cache_dir, f"PAE-{accession}.json.gz")
+    if _os.path.exists(path):
+        with gzip.open(path, "rt") as fh:
+            return np.array(_json.load(fh), dtype=float)
+
+    if session is None:
+        import requests
+        session = requests.Session()
+        session.headers["User-Agent"] = "cognisom-library/1.0"
+    text, _version, absent = None, "", False
+    try:
+        meta = session.get(f"{ALPHAFOLD_API}/{accession}", timeout=30)
+        if meta.status_code != 200 or not meta.json():
+            return None
+        url = meta.json()[0].get("paeDocUrl")
+        if not url:
+            return None
+        resp = session.get(url, timeout=180)
+        if resp.status_code != 200:
+            raise StructureFetchError(
+                f"PAE fetch for {accession} returned {resp.status_code}")
+        payload = resp.json()
+        block = payload[0] if isinstance(payload, list) else payload
+        matrix = block.get("predicted_aligned_error")
+        if matrix is None:
+            return None
+    except StructureFetchError:
+        raise
+    except Exception as exc:
+        raise StructureFetchError(f"PAE fetch for {accession} failed: {exc}")
+
+    with gzip.open(path, "wt") as fh:
+        _json.dump(matrix, fh)
+    return np.array(matrix, dtype=float)
+
+
+def rigid_groups(
+    segments: List[Tuple[int, int]],
+    pae: "np.ndarray",
+    max_pae: float = RIGID_PAE_MAX,
+) -> List[List[Tuple[int, int]]]:
+    """Group segments whose relative placement the model does assert.
+
+    Segments land in one group when their mean inter-segment PAE is at or
+    below ``max_pae``, transitively. Separate groups must not be drawn in one
+    shared frame as though their arrangement were meaningful.
+    """
+    n = len(segments)
+    if n == 0:
+        return []
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            a0, a1 = segments[i]
+            b0, b1 = segments[j]
+            if float(pae[a0 - 1:a1, b0 - 1:b1].mean()) <= max_pae:
+                parent[find(i)] = find(j)
+
+    buckets: Dict[int, List[Tuple[int, int]]] = {}
+    for i, seg in enumerate(segments):
+        buckets.setdefault(find(i), []).append(seg)
+    return [sorted(v) for _, v in sorted(buckets.items())]
+
+
 def pdb_entry_count(accession: str, session: object = None) -> Optional[int]:
     """How many experimental entries exist for an accession.
 

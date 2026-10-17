@@ -1005,16 +1005,31 @@ class AlphaFoldClient:
                 cif_url=entry_data.get("cifUrl", ""),
                 pae_url=entry_data.get("paeImageUrl", ""),
                 confidence_url=entry_data.get("confidenceUrl", ""),
-                mean_plddt=entry_data.get("globalMetrics", {}).get("globalMetricValue", 0.0)
-                           if entry_data.get("globalMetrics") else 0.0,
+                # `globalMetricValue` is TOP LEVEL in the AlphaFold response.
+                # There is no `globalMetrics` object, so the previous nested
+                # read resolved to None and mean_plddt was silently 0.0 for
+                # every protein ever fetched. Verified against the live API:
+                # P10275 returns globalMetricValue = 57.25 at the top level.
+                mean_plddt=float(entry_data.get("globalMetricValue") or 0.0),
             )
         except Exception as e:
             log.error("AlphaFold prediction for %s failed: %s", uniprot_id, e)
             return None
 
     def get_model_url(self, uniprot_id: str) -> str:
-        """Get direct URL to AlphaFold PDB model file."""
-        return f"https://alphafold.ebi.ac.uk/files/AF-{uniprot_id}-F1-model_v4.pdb"
+        """Deprecated: construct nothing, use the URL the API returns.
+
+        This hardcoded a v4 .pdb path, and AlphaFold is now on v6 -- verified
+        against the live service, that URL is a hard 404, so this method has
+        been serving nothing. Version numbers belong to the API, not to us:
+        take `cifUrl` (or `pdbUrl`) off the prediction response, which
+        :meth:`get_prediction` already returns.
+        """
+        raise NotImplementedError(
+            "construct no AlphaFold URL: the hardcoded v4 path 404s now that "
+            "the database is on v6. Use get_prediction(uniprot_id).cif_url, "
+            "which the API supplies with the current version."
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════
