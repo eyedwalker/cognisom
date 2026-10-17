@@ -75,15 +75,27 @@ def test_a_per_minute_turnover_reaches_the_solver_converted(entities):
 
 
 def test_the_michaelis_constant_is_read_at_all(entities):
-    """Eleven were stored and none was consulted."""
+    """Eleven were stored and none was consulted.
+
+    The target passed here is each entity's own recorded substrate, which
+    is the only reaction the stored constant describes. Passing an
+    arbitrary target instead would exercise the substrate guard rather
+    than the read, and would pass for the wrong reason.
+    """
+    from cognisom.library.parameters import km_substrate
+
     checked = 0
     for entity in entities:
         pv = get_parameter(entity, "km_um")
         if pv is None or pv.value <= 0:
             continue
-        assert _km_um(entity, "x", kd_nm=999.0) == pytest.approx(pv.value), (
+        substrate = km_substrate(entity)
+        assert substrate, (
+            f"{entity.name} holds a km_um whose substrate is unrecorded, so "
+            "nothing can tell which reaction it belongs to")
+        assert _km_um(entity, substrate, kd_nm=999.0) == pytest.approx(pv.value), (
             f"{entity.name} records a Michaelis constant of {pv.value} uM "
-            "but a dissociation constant was used instead")
+            f"against {substrate} and it was not used for that substrate")
         checked += 1
 
     assert checked >= 11, f"only {checked} Michaelis constants were found"
@@ -133,3 +145,67 @@ def test_the_fallback_is_the_value_atm_stores(entities):
     assert atm.physics_params.get("kinase_kcat_per_s") == DEFAULT_VMAX_PER_S, (
         "ATM no longer stores exactly the fallback value -- if it has been "
         "given an evidenced number, delete this test")
+
+
+# ── a Km is only a Km for the substrate it was measured against ──────────
+
+def test_a_km_is_not_used_for_a_different_substrate(entities):
+    """The hazard created by aliasing eleven substrate-specific key names.
+
+    ``km_amp_um``, ``cdk1_km_um`` and the rest all alias onto one
+    ``km_um``, which loses the substrate. Reading that value for any
+    reaction turns a lost label into a wrong number: measured on this
+    library, none of the nine entities holding both a Michaelis constant
+    and an ``activates`` edge has a matching substrate. CD73's Km is for
+    AMP while it activates A2AR; IDO1's is for tryptophan while it
+    activates AhR through kynurenine.
+    """
+    from cognisom.genomics.reaction_builder import resolve_kd_nm
+    from cognisom.library.parameters import km_substrate
+
+    misapplied = []
+    for entity in entities:
+        substrate = km_substrate(entity)
+        if not substrate:
+            continue
+        stored = get_parameter(entity, "km_um")
+        if stored is None:
+            continue
+        for inter in (entity.interacts_with or []):
+            if inter.get("type") != "activates":
+                continue
+            target = inter.get("target", "")
+            if substrate.lower() in target.lower():
+                continue
+            used = _km_um(entity, target, resolve_kd_nm(inter))
+            if abs(used - stored.value) < 1e-9:
+                misapplied.append((entity.name, substrate, target, used))
+
+    assert not misapplied, (
+        "a catalytic Michaelis constant was applied to a reaction with a "
+        f"different substrate: {misapplied}")
+
+
+def test_a_matching_substrate_is_still_used():
+    """The check must not reject the case it exists to allow."""
+    from cognisom.genomics.reaction_builder import _same_substrate
+
+    assert _same_substrate("CDK1", "CDK1")
+    assert _same_substrate("RB1", "RB1")
+    assert _same_substrate("PIP2", "PIP2 membrane pool")
+    assert not _same_substrate("AMP", "A2AR")
+    assert not _same_substrate("L-tryptophan", "AhR")
+    assert not _same_substrate("", "anything"), (
+        "an unrecorded substrate must not match, or the check is vacuous")
+
+
+def test_every_km_alias_records_its_substrate():
+    """An alias with no substrate silently re-opens the misapplication."""
+    from cognisom.library.parameters import PARAMETER_ALIASES
+
+    for alias in PARAMETER_ALIASES:
+        if alias.canonical != "km_um":
+            continue
+        assert alias.substrate, (
+            f"{alias.legacy} aliases onto km_um without recording which "
+            "substrate it was measured against")

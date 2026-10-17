@@ -535,6 +535,22 @@ def _catalytic_not_a_receptor(entity) -> Optional[str]:
     return _CATALYTIC_NOT_A_RECEPTOR.get(getattr(entity, "name", ""))
 
 
+def km_substrate(entity) -> str:
+    """The substrate this entity's ``km_um`` was measured against.
+
+    Empty when the entity carries no recognised Michaelis constant, or
+    when one was written directly under ``km_um`` with the substrate in
+    the ParameterValue conditions rather than in the key name.
+    """
+    params = getattr(entity, "physics_params", None) or {}
+    for alias in PARAMETER_ALIASES:
+        if alias.canonical != "km_um" or not alias.substrate:
+            continue
+        if params.get(alias.legacy):
+            return alias.substrate
+    return ""
+
+
 def _lineage(entity) -> Tuple[str, str]:
     return (getattr(entity, "immune_type", "") or "",
             getattr(entity, "immune_subtype", "") or "")
@@ -828,6 +844,13 @@ class ParameterAlias:
     factor: float
     #: Why the factor is what it is.
     note: str
+    #: For a catalytic constant, the substrate it was measured against.
+    #: The legacy Km names bake the substrate into the key
+    #: (``km_amp_um``, ``cdk1_km_um``), and aliasing them all onto one
+    #: ``km_um`` would throw that away -- after which a Km for AMP could be
+    #: applied to a reaction with an entirely different substrate. It is
+    #: recorded here so a caller can check before using the value.
+    substrate: str = ""
     #: Read ``legacy`` from a top-level attribute of the entity rather
     #: than from ``physics_params``. The seeded cell types carry their
     #: size as the dataclass field ``scale_um``, not as a parameter, so
@@ -878,40 +901,51 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
     # set_parameter is the supported way to add one with its substrate.
     ParameterAlias(
         "km_amp_um", "km_um", 1.0, "Km for AMP, in micromolar",
+        substrate="AMP",
     ),
     ParameterAlias(
         "km_tryptophan_um", "km_um", 1.0, "Km for tryptophan, in micromolar",
+        substrate="L-tryptophan",
     ),
     ParameterAlias(
         "km_devd_um", "km_um", 1.0,
         "Km for the DEVD peptide substrate, in micromolar",
+        substrate="DEVD peptide",
     ),
     ParameterAlias(
         "km_collagen_iv_um", "km_um", 1.0,
         "Km for collagen IV, in micromolar",
+        substrate="collagen IV",
     ),
     ParameterAlias(
         "km_gelatin_um", "km_um", 1.0, "Km for gelatin, in micromolar",
+        substrate="gelatin",
     ),
     ParameterAlias(
         "km_pip2_um", "km_um", 1.0, "Km for PIP2, in micromolar",
+        substrate="PIP2",
     ),
     ParameterAlias(
         "km_pip3_um", "km_um", 1.0, "Km for PIP3, in micromolar",
+        substrate="PIP3",
     ),
     ParameterAlias(
         "ctd_km_um", "km_um", 1.0,
         "Km for the RNA polymerase II C-terminal domain, in micromolar",
+        substrate="RNA Pol II CTD",
     ),
     ParameterAlias(
         "rb_km_um", "km_um", 1.0, "Km for RB1, in micromolar",
+        substrate="RB1",
     ),
     ParameterAlias(
         "cdk1_km_um", "km_um", 1.0, "Km for CDK1, in micromolar",
+        substrate="CDK1",
     ),
     ParameterAlias(
         "cdk4_km_um", "km_um", 1.0,
         "Km of CDK4 for this substrate, in micromolar",
+        substrate="CDK4",
     ),
     ParameterAlias(
         "scale_um", "radius_um", 0.5,

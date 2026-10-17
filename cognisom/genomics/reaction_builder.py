@@ -510,6 +510,30 @@ def degradation_rate_per_hour(physics_params: Dict) -> Optional[float]:
     return 0.6931471805599453 / half_life
 
 
+def _same_substrate(substrate: str, target: str) -> bool:
+    """Whether a catalytic constant's substrate is this reaction's target.
+
+    Measured on the current library, none of the nine entities holding both
+    a Michaelis constant and an ``activates`` edge matches: CD73's Km is for
+    AMP while it activates A2AR, IDO1's is for tryptophan while it activates
+    AhR and GCN2, WEE1's is for CDK1 while it activates TP53. That is not an
+    accident of naming -- an ``activates`` edge here is a signalling
+    relationship, and the target is a downstream receptor or kinase rather
+    than the chemical the enzyme turns over. IDO1 activates AhR through
+    kynurenine; AhR is not its substrate.
+
+    So a stored catalytic Km is almost never the half-saturation constant
+    these reactions need, and using it because the names both say "km" is
+    the error this check exists to prevent. Without it, aliasing eleven
+    substrate-specific key names onto one ``km_um`` turns a lost label into
+    a wrong number.
+    """
+    if not substrate or not target:
+        return False
+    a, b = substrate.strip().lower(), target.strip().lower()
+    return a == b or a in b or b in a
+
+
 def _vmax_per_s(entity, target: str) -> float:
     """Turnover number for an activation, in per-second.
 
@@ -557,11 +581,19 @@ def _km_um(entity, target: str, kd_nm: Optional[float]) -> float:
     being indistinguishable from a measured Km. Note the unit change --
     Kd is carried in nM and this returns uM.
     """
-    from cognisom.library.parameters import get_parameter
+    from cognisom.library.parameters import get_parameter, km_substrate
 
     pv = get_parameter(entity, "km_um")
     if pv is not None and pv.value > 0:
-        return float(pv.value)
+        substrate = km_substrate(entity)
+        if _same_substrate(substrate, target):
+            return float(pv.value)
+        log.warning(
+            "%s records a Michaelis constant of %.4g uM measured against "
+            "%s, which is not %s; not using it for this reaction",
+            getattr(entity, "name", "?"), pv.value,
+            substrate or "an unrecorded substrate", target,
+        )
     if kd_nm:
         log.warning(
             "no Michaelis constant for %s activating %s; approximating it "
