@@ -17,6 +17,7 @@ if _project_root not in sys.path:
 
 import streamlit as st
 from cognisom.dashboard.page_config import safe_set_page_config
+from cognisom.genomics.reaction_builder import resolve_kd_nm
 
 safe_set_page_config(page_title="Entity Library | Cognisom", page_icon="\U0001f4da", layout="wide")
 
@@ -206,7 +207,9 @@ if entities:
                         target = inter.get("target", "?")
                         itype = inter.get("type", "?")
                         note = inter.get("note", "")
-                        kd = inter.get("kd_nm", "")
+                        # Via the resolver: a bare kd_nm read showed blank
+                        # for every interaction that records kd_um or kd_pm.
+                        kd = resolve_kd_nm(inter) or ""
                         detail = f" (Kd: {kd} nM)" if kd else (f" — {note}" if note else "")
                         st.markdown(f"- **{itype}** → {target}{detail}")
 

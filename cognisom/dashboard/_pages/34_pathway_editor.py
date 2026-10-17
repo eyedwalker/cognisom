@@ -15,6 +15,7 @@ Features:
 
 import streamlit as st
 from cognisom.dashboard.page_config import safe_set_page_config
+from cognisom.genomics.reaction_builder import resolve_kd_nm
 
 safe_set_page_config(page_title="Pathway Editor | Cognisom", page_icon="\U0001f310", layout="wide")
 
@@ -114,7 +115,11 @@ for i, e in enumerate(entities):
                 "source": e.name,
                 "target": target,
                 "type": inter.get("type", "unknown"),
-                "kd": inter.get("kd_nm", inter.get("kd_um", "")),
+                # resolve_kd_nm, not inter.get("kd_nm", inter.get("kd_um")):
+                # that expression shows a micromolar number as if it were
+                # nanomolar, understating Kd 1000x. It was fixed in
+                # reaction_builder and survived here.
+                "kd": resolve_kd_nm(inter) or "",
                 "note": inter.get("note", ""),
             })
 

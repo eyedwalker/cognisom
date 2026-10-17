@@ -230,7 +230,15 @@ class ReactionNetworkBuilder:
         system.parameters = {
             # AR transcription/translation/degradation
             "k_ar_tx": ar_pp.get("transcription_rate_mrna_per_hour", 5.0),
-            "k_ar_m_deg": 0.693 / ar_pp.get("half_life_hours", 3.0) if ar_pp.get("half_life_hours") else 0.5,
+            # Via the resolver, not ar_pp["half_life_hours"] directly: the
+            # library writes half-lives under several unit-suffixed names
+            # and this read saw only one of them. The previous expression
+            # was also `0.693/x if x else 0.5`, so its own 3.0 default was
+            # unreachable -- an entity with no half-life took 0.5 and the
+            # stated fallback never applied.
+            "k_ar_m_deg": (degradation_rate_per_hour(ar_pp)
+                           if degradation_rate_per_hour(ar_pp) is not None
+                           else 0.5),
             "k_ar_tl": 20.0,  # translation rate
             "k_ar_deg": 0.1,  # protein degradation
 
@@ -281,11 +289,18 @@ class ReactionNetworkBuilder:
                      {"rate_key": "k_psa_deg"}, source_entity="PSA"),
         ]
 
+        # Reported from the parameters the system will actually integrate.
+        # Re-reading ar_pp here with its own defaults logged numbers the run
+        # was not using, and logged 0.0 for an absent value while the system
+        # quietly used a fallback.
+        k_on = system.parameters["k_bind"]
         log.info(
             "Built AR signaling ODE: %d species, %d reactions, %d parameters "
-            "(entity-driven: AR kd=%.1f nM, half-life=%.1f hr)",
+            "(AR-DHT Kd=%.3g nM, PSA induction Km=%.3g nM, "
+            "AR mRNA k_deg=%.3g /h)",
             system.n_species, len(system.reactions), len(system.parameters),
-            ar_pp.get("dna_binding_kd_nm", 0), ar_pp.get("half_life_hours", 0),
+            (system.parameters["k_unbind"] / k_on) if k_on else float("nan"),
+            system.parameters["K_psa"], system.parameters["k_ar_m_deg"],
         )
         return system
 
