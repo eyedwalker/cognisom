@@ -384,8 +384,8 @@ class ReactionNetworkBuilder:
                 elif itype == "activates":
                     vmax_key = f"vmax_{e.name}_to_{target}"
                     km_key = f"km_{e.name}_to_{target}"
-                    system.parameters[vmax_key] = pp.get("kinase_kcat_per_s", 2.0)
-                    system.parameters[km_key] = kd if kd else 10.0
+                    system.parameters[vmax_key] = _vmax_per_s(e, target)
+                    system.parameters[km_key] = _km_um(e, target, kd)
 
                     system.reactions.append(Reaction(
                         f"{e.name}_activates_{target}", "michaelis_menten",
@@ -431,6 +431,14 @@ class ReactionNetworkBuilder:
 # 109:839-860, 2009), and this is the middle of it. It is used as the
 # reference k_on so that k_off can be *derived* rather than guessed.
 DEFAULT_K_ON_PER_NM_PER_HOUR = 3.6
+
+#: Fallbacks used when an entity records no kinetics. They are uniform
+#: across every enzyme that reaches them, so they cannot be right for more
+#: than one, and reaching one is logged. ATM's stored kinase_kcat_per_s is
+#: 2.0 -- exactly this value -- which is the clearest sign in the library
+#: that a fallback has been copied back into the data as if measured.
+DEFAULT_VMAX_PER_S = 2.0
+DEFAULT_KM_UM = 10.0
 
 
 def resolve_kd_nm(interaction: Dict) -> Optional[float]:
@@ -500,6 +508,75 @@ def degradation_rate_per_hour(physics_params: Dict) -> Optional[float]:
     if half_life is None:
         return None
     return 0.6931471805599453 / half_life
+
+
+def _vmax_per_s(entity, target: str) -> float:
+    """Turnover number for an activation, in per-second.
+
+    Reads through :func:`get_parameter` so the alias table is honoured.
+    The previous expression was ``pp.get("kinase_kcat_per_s", 2.0)``, a
+    literal-key read: the library writes kcat under six names and in two
+    time units, so every entity storing it as ``kcat_per_s``,
+    ``catalytic_kcat_per_s``, ``protease_kcat_per_s`` or either
+    ``_per_min`` variant silently fell to 2.0 while the library displayed
+    something else. Measured on the current library, nine of the thirteen
+    entities with an ``activates`` edge diverged that way, EZH2 worst at a
+    stored 0.025 /s against a used 2.0 -- 240x, in the direction that makes
+    a slow methyltransferase as fast as everything else.
+
+    A missing value is logged rather than quietly defaulted. The fallback
+    is uniform across every enzyme that hits it, so it cannot be right for
+    more than one of them, and a silent uniform rate is the failure this
+    whole module keeps rediscovering.
+    """
+    from cognisom.library.parameters import get_parameter
+
+    pv = get_parameter(entity, "kcat_per_s")
+    if pv is not None and pv.value > 0:
+        return float(pv.value)
+    log.warning(
+        "no turnover number for %s activating %s; using the uniform "
+        "fallback %.3g /s, which is not a measurement of this enzyme",
+        getattr(entity, "name", "?"), target, DEFAULT_VMAX_PER_S,
+    )
+    return DEFAULT_VMAX_PER_S
+
+
+def _km_um(entity, target: str, kd_nm: Optional[float]) -> float:
+    """Half-saturation constant for an activation, in micromolar.
+
+    Prefers the entity's own Michaelis constant. The previous expression
+    was ``kd if kd else 10.0``, which never consulted any ``km_*`` field,
+    so all eleven Michaelis constants in the library were unread, and
+    substituted a dissociation constant for a Michaelis constant.
+
+    Those are different quantities: Kd is k_off/k_on at binding
+    equilibrium, Km is (k_off + k_cat)/k_on, so they agree only when
+    turnover is slow against unbinding. Falling back to a Kd is defensible
+    as an approximation and is kept, but it is now said out loud instead of
+    being indistinguishable from a measured Km. Note the unit change --
+    Kd is carried in nM and this returns uM.
+    """
+    from cognisom.library.parameters import get_parameter
+
+    pv = get_parameter(entity, "km_um")
+    if pv is not None and pv.value > 0:
+        return float(pv.value)
+    if kd_nm:
+        log.warning(
+            "no Michaelis constant for %s activating %s; approximating it "
+            "with the dissociation constant %.4g nM = %.4g uM. Km is "
+            "(k_off + k_cat)/k_on and Kd is k_off/k_on, so this holds only "
+            "while turnover is slow against unbinding",
+            getattr(entity, "name", "?"), target, kd_nm, kd_nm / 1e3,
+        )
+        return float(kd_nm) / 1e3
+    log.warning(
+        "no Michaelis constant and no dissociation constant for %s "
+        "activating %s; using the uniform fallback %.3g uM",
+        getattr(entity, "name", "?"), target, DEFAULT_KM_UM,
+    )
+    return DEFAULT_KM_UM
 
 
 def rates_from_kd(kd_nm: float,
