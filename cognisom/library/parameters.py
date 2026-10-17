@@ -496,6 +496,12 @@ class ParameterAlias:
     factor: float
     #: Why the factor is what it is.
     note: str
+    #: Read ``legacy`` from a top-level attribute of the entity rather
+    #: than from ``physics_params``. The seeded cell types carry their
+    #: size as the dataclass field ``scale_um``, not as a parameter, so
+    #: an aliasing reader that only consults ``physics_params`` reports
+    #: ``radius_um`` absent on forty entities that state their size.
+    attribute: bool = False
 
 
 #: Legacy name -> canonical name, with the exact conversion.
@@ -507,6 +513,19 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
     ParameterAlias(
         "ligand_kd_nm", "kd_nm", 1.0,
         "the same quantity in the same unit under a different name",
+    ),
+    ParameterAlias(
+        "scale_um", "radius_um", 0.5,
+        "scale_um is the cell's full extent, not its radius: "
+        "morphology.build() lays a scale_um-wide box over the grid "
+        "(resolution = scale_um / grid) and test_morphology asserts a "
+        "scale_um=20 cell measures ~20 um across. The seeded values read "
+        "as diameters against textbook sizes -- erythrocyte 7.5, naive "
+        "CD8 T cell 7, naive B cell 8, NK cell 12, neutrophil 13, "
+        "eosinophil 13, plasma cell 14, M1 macrophage 20 -- so radius is "
+        "half of it. Taking scale_um as a radius would double every cell "
+        "and eightfold every cell volume",
+        attribute=True,
     ),
 )
 
@@ -601,7 +620,16 @@ def get_parameter(entity: BioEntity, name: str) -> Optional[ParameterValue]:
     # stays PLACEHOLDER -- a unit conversion does not create evidence,
     # it only stops the library reporting a number it holds as absent.
     for alias in _ALIASES_BY_CANONICAL.get(name, ()):
-        legacy = entity.physics_params.get(alias.legacy)
+        if alias.attribute:
+            legacy = getattr(entity, alias.legacy, None)
+            # A dataclass size field defaults to 0.0, so an unset one is
+            # indistinguishable from a measurement of zero by type alone.
+            # Reporting radius_um=0 would hand a solver a dimensionless
+            # cell; reporting it absent sends a curator to fill it in.
+            if legacy == 0:
+                continue
+        else:
+            legacy = entity.physics_params.get(alias.legacy)
         if isinstance(legacy, (int, float)) and not isinstance(legacy, bool):
             spec = PARAMETER_SPECS.get(name)
             return ParameterValue(
