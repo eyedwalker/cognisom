@@ -183,6 +183,14 @@ if entities:
                             f"Not yet simulation-ready. Uncurated: "
                             f"{', '.join(gaps)}"
                         )
+                    if readiness.not_applicable:
+                        # Shown apart from the gaps above: these need no
+                        # value, and listing them as uncurated is what made
+                        # sixteen non-cytotoxic cells look under-curated.
+                        for name, why in sorted(
+                            readiness.not_applicable.items()
+                        ):
+                            st.caption(f"{name}: not applicable — {why}")
 
                 # Compartments
                 if hasattr(entity, "compartments") and entity.compartments:

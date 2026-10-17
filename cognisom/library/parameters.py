@@ -67,13 +67,58 @@ The flat ``physics_params`` scalar is written alongside the record, so
 every existing reader keeps working unchanged. The provenance lives in a
 sidecar keyed by the same name, and :func:`set_parameter` is the only
 supported way to write either, so the two cannot drift apart.
+
+What a single scalar per entity cannot say
+------------------------------------------
+
+``inapplicable_when`` removes the parameters a lineage does not have, but
+several rows that keep a parameter still cannot be described honestly by
+one number, and that is a property of the schema rather than of the
+curation. Recording it here because the alternative is a curated value
+that looks settled:
+
+* **Activation state is unrepresentable.** Nearly every immune effector
+  quantity is conditional -- a resting eosinophil releases nothing, a
+  pDC kills only via TLR7/9-induced TRAIL, a memory T cell's progeny kill
+  while the resting cell does not. Entities carry ``activated``,
+  ``activation_state`` and ``phase``, but no solver reads them; they are
+  only serialized. So "only when activated" cannot be stored at all.
+* **One row per lineage lumps distinct subsets.** ``CD8+ Memory T cell``
+  spans Tcm, Tem and Trm, whose cytotoxicity differs; its recorded
+  markers (CCR7+) are the least cytotoxic of the three while its
+  description claims rapid killing. ``Gamma-delta T cell`` spans
+  cytotoxic Vg9Vd2 and pro-tumour IL-17+ subsets, and its own
+  ``cytokines_secreting`` lists both IFN-g and IL-17A. ``NK cell``
+  lumps CD56bright and CD56dim.
+* **Context can invert the sign.** Tumour-associated neutrophils and M2
+  macrophages are net pro-tumour; ILC3's IL-22 is tumour-promoting in
+  colitis-associated cancer; Treg granzyme-B killing targets effector
+  lymphocytes and so suppresses clearance. A kill probability has no
+  sign, so these cannot be expressed as a smaller kill probability.
+* **Restriction elements are missing.** CD4 killing is MHC class II
+  restricted and NKT recognition is CD1d restricted. The model has only
+  ``mhc1_expression``, so a kill licence on those rows is enforced
+  against the wrong molecule.
+* **No lifespan parameter exists for a cell.** Marking
+  ``division_time_hours`` inapplicable for the six post-mitotic rows
+  leaves them with no temporal parameter at all: a neutrophil that
+  neither divides nor clears. ``half_life_hours`` applies only to
+  CYTOKINE, LIGAND and PROTEIN, and ``apoptosis_rate_per_hour`` is unset
+  on all 28. The plasma-cell span -- days for a plasmablast against
+  years for a marrow resident -- is a lifespan bimodality with nowhere
+  to live.
+* **Secreted-mediator fields are not a cytotoxicity signal.**
+  ``cytokines_secreting`` is used as "secreted mediators" and carries
+  perforin, granzyme_B, NO, histamine and MBP, none of which are
+  cytokines. That is why the exclusion tables key on lineage and not on
+  this field.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 from .models import BioEntity, EntityType
 
@@ -246,6 +291,32 @@ class ParameterSpec:
     maximum: Optional[float] = None
     #: True if a simulation cannot meaningfully use the entity without it.
     required_for_simulation: bool = False
+    #: Returns a reason this parameter does not apply to a particular entity,
+    #: or None when it does. A reason rather than a bool, because an
+    #: exclusion that cannot say why is the same defect as an uncited number
+    #: and harder to notice: it leaves nothing behind to review.
+    #:
+    #: ``applies_to`` is a tuple of EntityType, which is too coarse to carry
+    #: this. A plasma cell and a CD8 effector T cell are both
+    #: ``EntityType.IMMUNE_CELL``, but only one of them kills, so asking both
+    #: for a kill radius put sixteen rows on a curation worklist where the
+    #: correct answer was that the question does not arise.
+    inapplicable_when: Optional[Callable[[Any], Optional[str]]] = None
+
+    def inapplicable_to(self, entity) -> Optional[str]:
+        """Why this parameter does not apply to ``entity``, or None.
+
+        An empty string from the predicate reads as "applies", never as an
+        unexplained exclusion.
+        """
+        if self.inapplicable_when is None:
+            return None
+        return self.inapplicable_when(entity) or None
+
+    def applies(self, entity) -> bool:
+        """True if the parameter is both declared for the type and applicable."""
+        return (entity.entity_type in self.applies_to
+                and self.inapplicable_to(entity) is None)
 
     def check(self, pv: ParameterValue) -> List[str]:
         problems: List[str] = []
@@ -281,6 +352,157 @@ def _spec(*args, **kwargs) -> Tuple[str, ParameterSpec]:
 #: Ranges are deliberately generous. Their job is to catch unit errors
 #: and typos, not to encode biology: a kill probability above 1 or a
 #: half-life of a century is a mistake regardless of cell type.
+# ── Which immune lineages the killing parameters actually describe ────
+#
+# The kill parameters and the division time are declared for
+# EntityType.IMMUNE_CELL, which lumps a CD8 effector T cell with a plasma
+# cell, a Treg and three rows of vascular endothelium. Requiring all five
+# parameters of all twenty-eight put thirty-eight rows on a curation
+# worklist where the honest answer was that the question does not arise.
+#
+# Both tables are deliberately ASYMMETRIC, and the asymmetry is the whole
+# design: only defensible exclusions are listed, and anything absent stays
+# applicable. A false inclusion leaves a row on a worklist where somebody
+# eventually reads it. A false exclusion deletes the question, and nobody
+# looks again. So where the biology was contested, the row is NOT excluded.
+#
+# The keys are (immune_type, immune_subtype) and not surface_markers. The
+# NKT and gamma-delta rows record no perforin, granzyme or FasL yet both
+# are cytotoxic, so a marker-derived predicate would silently exclude them.
+# ``cytokines_secreting`` is no better: it is being used as "secreted
+# mediators" and carries perforin, granzyme_B, NO, histamine and MBP, none
+# of which are cytokines, so it is not trustworthy as a lytic signal.
+
+#: Lineages for which a contact kill radius and a per-contact kill
+#: probability do not describe anything the cell does.
+_NO_CONTACT_CYTOTOXICITY: Dict[Tuple[str, str], str] = {
+    ("B_cell", "plasma_cell"):
+        "a plasma cell is a dedicated antibody factory with no lytic "
+        "granules; its effect on a target is mediated by secreted "
+        "immunoglobulin, not by contact",
+    ("B_cell", "naive"):
+        "a naive B cell presents and secretes; it has no cytolytic "
+        "machinery",
+    ("B_cell", "memory"):
+        "a memory B cell's effector route is differentiation into an "
+        "antibody-secreting plasma cell, not cytolysis",
+    ("dendritic", "cDC"):
+        "a conventional DC is an antigen-presenting cell; its contribution "
+        "to killing is priming a cytotoxic lymphocyte elsewhere",
+    ("dendritic", "pDC"):
+        "a plasmacytoid DC acts through type I interferon. It can acquire "
+        "a TRAIL-mediated kill pathway on TLR7/9 stimulation (Imiquimod is "
+        "already a seeded entity), so this is a statement about the "
+        "baseline row and not a claim that pDCs never kill",
+    ("T_cell", "Th2"):
+        "a Th2 cell acts through IL-4/IL-5/IL-13; it carries no lytic "
+        "granule programme",
+    ("T_cell", "Th17"):
+        "a Th17 cell acts through IL-17; it carries no lytic granule "
+        "programme",
+    ("T_cell", "Tfh"):
+        "a Tfh cell licenses B cells in the germinal centre; it does not "
+        "lyse targets",
+    ("T_cell", "naive"):
+        "a naive CD8 T cell has no preformed perforin or granzyme and "
+        "cannot kill until it is primed and differentiates; the kill "
+        "belongs to its effector progeny",
+    ("mast_cell", "mast_cell"):
+        "a mast cell degranulates histamine and proteases into the "
+        "surrounding tissue; it does not form a cytotoxic synapse with a "
+        "target cell",
+    ("basophil", "basophil"):
+        "a basophil degranulates into the surrounding tissue; it forms no "
+        "lytic synapse",
+    ("ILC", "ILC2"):
+        "ILC2s act through IL-5/IL-13; they are non-cytotoxic",
+    ("ILC", "ILC3"):
+        "ILC3s act through IL-22/IL-17 and are non-cytotoxic. NKp44 "
+        "appears in this row's surface_markers and the library elsewhere "
+        "calls NKp44 a natural cytotoxicity receptor, but on ILC3 it marks "
+        "the IL-22-producing subset and confers no lytic function",
+    ("endothelial", ""):
+        "vascular endothelium does not kill tumour cells. This row is "
+        "typed IMMUNE_CELL but its own immune_type says endothelial; it "
+        "belongs to the vessel wall, and its role here is leukocyte "
+        "adhesion and transmigration",
+}
+
+#: Lineages that are terminally differentiated: a division time is not a
+#: quantity they have.
+_NOT_CYCLING: Dict[Tuple[str, str], str] = {
+    ("neutrophil", "neutrophil"):
+        "a circulating neutrophil is post-mitotic; it leaves the marrow "
+        "fully differentiated and dies without dividing. The governing "
+        "quantity is its lifespan, and the seeded 48 h division time is "
+        "shorter than the cell's own recorded 5-90 h life",
+    ("eosinophil", "eosinophil"):
+        "a tissue eosinophil is post-mitotic; it is replaced by marrow "
+        "output rather than by local division",
+    ("basophil", "basophil"):
+        "a circulating basophil is post-mitotic",
+    ("B_cell", "plasma_cell"):
+        "a plasma cell is terminally differentiated and does not divide. "
+        "What varies is lifespan -- days for a plasmablast against years "
+        "for a bone-marrow resident -- and the library has no lifespan "
+        "parameter for a cell at all",
+    ("dendritic", "cDC"):
+        "a differentiated cDC does not divide; the population is "
+        "maintained by influx of marrow-derived precursors. Short-lived, "
+        "not long-lived: there is no recruitment or residence-time "
+        "parameter to carry that influx",
+    ("dendritic", "pDC"):
+        "a differentiated pDC does not divide; its population is "
+        "maintained by precursor influx",
+}
+
+# Deliberately NOT excluded from the kill parameters, each for a stated
+# reason, because excluding them would delete a live question:
+#   Treg            its own description lists granzyme-B/perforin killing of
+#                   effector cells. That is real, but the target is an
+#                   effector lymphocyte and the effect SUPPRESSES tumour
+#                   clearance, so it needs its own parameter with its own
+#                   target class rather than a kill probability that would
+#                   invert the sign.
+#   ILC1            the library states ILC1s lack perforin, but the ILC1/NK
+#                   boundary is contested (intraepithelial CD103+ ILC1
+#                   granzyme B, liver ILC1 TRAIL).
+#   CD4+ Th1        granzyme-B+ CD4 CTLs arise from Th1-like cells under
+#                   chronic antigen. All CD4 killing is MHC class II
+#                   restricted and the model has no MHC-II field at all.
+#   Macrophage M1   antibody-dependent cellular phagocytosis is contact
+#                   killing, though it is near zero without an opsonising
+#                   IgG and relief of CD47-SIRPalpha.
+#   Macrophage M2   retains ADCP under therapeutic antibody or CD47/PD-1
+#                   blockade, so "non-cytotoxic" here would mean "no
+#                   contact cytolysis", not "no effect".
+#   Neutrophil      trogocytic killing is CD11b/CD18-dependent sustained
+#                   contact, not purely extracellular. Baseline killing
+#                   without a therapeutic antibody is near zero, and
+#                   tumour-associated neutrophils are net pro-tumour, so
+#                   the SIGN here is context-dependent.
+#   Eosinophil      kills by discharging MBP/EPO/ECP and EETs. Real, but
+#                   spatially non-targeted, so a contact radius is the
+#                   wrong abstraction rather than an inapplicable one. Do
+#                   not read its inclusion as licence to fill in a radius.
+#   CD8+ Memory     its progeny kill; a resting CCR7+ central-memory cell
+#                   does not. One row cannot hold Tcm, Tem and Trm.
+#   NKT, gamma-delta, NK, CD8+ Effector  cytotoxic, uncontested.
+
+
+def _lineage(entity) -> Tuple[str, str]:
+    return (getattr(entity, "immune_type", "") or "",
+            getattr(entity, "immune_subtype", "") or "")
+
+
+def _not_contact_cytotoxic(entity) -> Optional[str]:
+    return _NO_CONTACT_CYTOTOXICITY.get(_lineage(entity))
+
+
+def _not_cycling(entity) -> Optional[str]:
+    return _NOT_CYCLING.get(_lineage(entity))
+
+
 PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
     # ── Cytokines: what a diffusible-factor field needs ──
     _spec(
@@ -374,6 +596,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
         minimum=0.0, maximum=24.0 * 365,
         required_for_simulation=True,
+        inapplicable_when=_not_cycling,
     ),
     _spec(
         "apoptosis_rate_per_hour", "1/h",
@@ -421,14 +644,29 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         (EntityType.IMMUNE_CELL,),
         minimum=0.0, maximum=1e3,
         required_for_simulation=True,
+        inapplicable_when=_not_contact_cytotoxic,
     ),
     _spec(
         "kill_probability", "dimensionless",
-        "Per-contact probability of killing a recognized target. Zero is "
-        "meaningful and correct for non-cytotoxic types.",
+        "Per-contact probability of killing a recognized target. For a "
+        "lineage that forms no lytic synapse the parameter is reported "
+        "not-applicable with a reason rather than curated as zero: a "
+        "sentence cannot be mistaken for a measurement, and it lets "
+        "set_parameter refuse a later non-zero write.",
         (EntityType.IMMUNE_CELL,),
         minimum=0.0, maximum=1.0,
         required_for_simulation=True,
+        inapplicable_when=_not_contact_cytotoxic,
+    ),
+    _spec(
+        "exhaustion_rate", "1/h",
+        "Rate at which an engaged effector accumulates exhaustion. Declared "
+        "so the value carries a unit and a range: it was the only parameter "
+        "the immune rows carried that no spec described, and it is one of "
+        "the three fields parameter_resolver tie-breaks the cell_type / "
+        "immune_cell name collision on.",
+        (EntityType.IMMUNE_CELL,),
+        minimum=0.0, maximum=1.0,
     ),
     _spec(
         "mhc1_expression", "dimensionless",
@@ -444,6 +682,21 @@ def specs_for(entity_type: EntityType) -> Dict[str, ParameterSpec]:
     return {
         name: spec for name, spec in PARAMETER_SPECS.items()
         if entity_type in spec.applies_to
+    }
+
+
+def required_for_entity(entity) -> Dict[str, ParameterSpec]:
+    """Required parameters that actually apply to this particular entity.
+
+    :func:`required_for` answers at the level of the type, which is what
+    the curation report needs as a skip guard. This answers at the level
+    of the entity, which is what deciding whether one row is ready needs:
+    a plasma cell and a CD8 effector T cell share a type but not a kill
+    radius.
+    """
+    return {
+        name: spec for name, spec in required_for(entity.entity_type).items()
+        if spec.inapplicable_to(entity) is None
     }
 
 
@@ -577,6 +830,17 @@ def set_parameter(
             f"{name} is not declared for {entity.entity_type.value}; it "
             f"applies to {[t.value for t in spec.applies_to]}"
         ]
+    elif spec is not None and spec.inapplicable_to(entity) is not None:
+        # Without this, set_parameter(plasma_cell, "kill_probability", ...)
+        # succeeded and the curation report went on calling the parameter
+        # not-applicable -- the stored number and the report disagreeing is
+        # exactly the drift the single-writer rule exists to prevent.
+        problems = [
+            f"{name} does not apply to {entity.name!r}: "
+            f"{spec.inapplicable_to(entity)}. If that is wrong, widen the "
+            "spec rather than storing a value the curation report will go "
+            "on calling not-applicable"
+        ]
     else:
         problems = pv.validate(spec)
 
@@ -672,10 +936,37 @@ class Readiness:
     missing: List[str] = field(default_factory=list)
     placeholder: List[str] = field(default_factory=list)
     curated: List[str] = field(default_factory=list)
+    #: Required parameters that do not apply to this entity, mapped to the
+    #: reason. A dict rather than a list so that "not applicable" can never
+    #: reach a report without the reason that justifies it.
+    not_applicable: Dict[str, str] = field(default_factory=dict)
+
+    #: False when the entity's type declares no required parameter at all,
+    #: so there is nothing to be ready or unready about. Twelve of the
+    #: library's types are like this -- gene, drug, pathway, mutation,
+    #: complement, mhc, prr, virus, bacterium, antibody, tissue_type,
+    #: organ -- covering 148 of 294 entities. They cannot fail the check,
+    #: and counting them as ready reported the library as 157/294
+    #: simulation-ready when nine entities had actually been assessed.
+    assessable: bool = True
 
     @property
     def is_ready(self) -> bool:
-        """No required parameter is missing or merely a placeholder."""
+        """No *applicable* required parameter is missing or a placeholder.
+
+        An entity nothing is required of is not "ready"; it is outside the
+        question, which :attr:`assessable` records separately.
+
+        Where a type does require parameters and every one of them is
+        inapplicable to this entity, "ready" would be vacuous, and the
+        likely cause is that the entity is typed wrongly. That is not a
+        live case in the library today -- no entity has an entirely
+        inapplicable required set -- so this is a guard, not a fix.
+        """
+        if not self.assessable:
+            return False
+        if not (self.curated or self.missing or self.placeholder):
+            return False
         return not self.missing and not self.placeholder
 
     def describe(self) -> str:
@@ -686,13 +977,31 @@ class Readiness:
             bits.append(f"missing {sorted(self.missing)}")
         if self.placeholder:
             bits.append(f"placeholder-only {sorted(self.placeholder)}")
+        if self.not_applicable:
+            bits.append(
+                f"not applicable {sorted(self.not_applicable)}")
+        if not self.assessable:
+            return (
+                f"{self.entity_name}: no simulation parameter is required "
+                f"of a {self.entity_type.value}, so readiness does not apply")
+        if not bits:
+            return (
+                f"{self.entity_name}: every required parameter of "
+                f"{self.entity_type.value} is inapplicable to it -- the "
+                "entity is probably typed wrongly")
         return f"{self.entity_name}: " + ", ".join(bits)
 
 
 def assess(entity: BioEntity) -> Readiness:
     """Check one entity against the required parameters for its type."""
-    result = Readiness(entity_name=entity.name, entity_type=entity.entity_type)
-    for name in required_for(entity.entity_type):
+    required = required_for(entity.entity_type)
+    result = Readiness(entity_name=entity.name, entity_type=entity.entity_type,
+                       assessable=bool(required))
+    for name, spec in required.items():
+        why = spec.inapplicable_to(entity)
+        if why is not None:
+            result.not_applicable[name] = why
+            continue
         pv = get_parameter(entity, name)
         if pv is None:
             result.missing.append(name)
@@ -709,6 +1018,10 @@ class CoverageReport:
 
     total: int = 0
     ready: int = 0
+    #: Entities whose type requires no simulation parameter, so they are
+    #: neither ready nor unready. Reported separately because folding them
+    #: into ``ready`` is what made the library look half-curated.
+    not_assessable: int = 0
     #: Entities where the parameter is absent altogether.
     by_parameter_missing: Dict[str, int] = field(default_factory=dict)
     #: Entities where a number is present but carries no evidence. A
@@ -716,11 +1029,27 @@ class CoverageReport:
     #: value that is already there; what they are missing is the
     #: citation, and the two need different work.
     by_parameter_placeholder: Dict[str, int] = field(default_factory=dict)
+    #: Entities the parameter does not apply to. Deliberately NOT part of
+    #: :attr:`by_parameter_uncurated`: a not-applicable parameter is not a
+    #: gap, and folding the two together is what produced reports reading
+    #: "28 entities need kill_radius_um" when sixteen of them do not kill.
+    by_parameter_not_applicable: Dict[str, int] = field(default_factory=dict)
     not_ready: List[Readiness] = field(default_factory=list)
 
     @property
+    def assessable(self) -> int:
+        """Entities the readiness question actually applies to."""
+        return self.total - self.not_assessable
+
+    @property
     def fraction_ready(self) -> float:
-        return (self.ready / self.total) if self.total else 0.0
+        """Ready as a fraction of the entities that can be assessed.
+
+        Over ``total`` this read 0.53 for a library in which nine entities
+        were curated, because 148 entities of types with no required
+        parameters cannot fail.
+        """
+        return (self.ready / self.assessable) if self.assessable else 0.0
 
     @property
     def by_parameter_uncurated(self) -> Dict[str, int]:
@@ -761,7 +1090,15 @@ def coverage(entities) -> CoverageReport:
     for entity in entities:
         report.total += 1
         r = assess(entity)
-        if r.is_ready:
+        # Tallied for every entity, not only the not-ready ones, or the
+        # per-parameter counts stop summing to the entity total.
+        for name in r.not_applicable:
+            report.by_parameter_not_applicable[name] = (
+                report.by_parameter_not_applicable.get(name, 0) + 1
+            )
+        if not r.assessable:
+            report.not_assessable += 1
+        elif r.is_ready:
             report.ready += 1
         else:
             report.not_ready.append(r)

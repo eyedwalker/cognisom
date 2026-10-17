@@ -53,6 +53,9 @@ def build_report(
     lines: List[str] = []
     total_entities = total_ready = 0
     worklist: Dict[str, int] = {}
+    #: Kept apart from ``worklist`` on purpose: these are not numbers
+    #: anybody needs to find.
+    inapplicable: Dict[str, int] = {}
 
     for etype in entity_types:
         required = required_for(etype)
@@ -67,6 +70,8 @@ def build_report(
         total_ready += report.ready
         for name, count in report.by_parameter_uncurated.items():
             worklist[name] = worklist.get(name, 0) + count
+        for name, count in report.by_parameter_not_applicable.items():
+            inapplicable[name] = inapplicable.get(name, 0) + count
 
         lines.append(f"── {etype.value} ─────────────────────────")
         lines.append(
@@ -103,6 +108,23 @@ def build_report(
         f"Entity library curation status: "
         f"{total_ready}/{total_entities} entities simulation-ready"
     ))
+
+    if inapplicable:
+        lines.append("── not applicable, so not on the worklist ─")
+        for name, count in sorted(
+            inapplicable.items(), key=lambda kv: (-kv[1], kv[0])
+        ):
+            lines.append(
+                f"   {count:>4} entities do not have a {name} to curate")
+        lines.append("")
+        lines.append(
+            "These are not missing numbers. A parameter is reported here "
+            "when the entity's lineage means the quantity does not arise "
+            "-- a plasma cell has no kill radius, a neutrophil no division "
+            "time. Each carries a stated reason; see Readiness."
+            "not_applicable. They are excluded from the targets below."
+        )
+        lines.append("")
 
     if worklist:
         lines.append("── highest-value curation targets ─────────")
