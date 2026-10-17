@@ -35,6 +35,13 @@ from .spatial_ops import pairwise_distances, find_neighbors, immune_detection_ba
 
 logger = logging.getLogger(__name__)
 
+#: Type code for an immune lineage the accelerated recognition kernel has no
+#: rule for. It deliberately matches no branch in
+#: :func:`spatial_ops.immune_detection_batch`, so such a cell never recognizes
+#: a target. The previous default was 2, the macrophage code, which that kernel
+#: treats as recognizing every target unconditionally.
+UNMODELLED_LINEAGE = 3
+
 
 @dataclass
 class AccelerationReport:
@@ -224,6 +231,11 @@ class GPUOrchestrator:
         """Replace nested detection loop with batch distance computation."""
         module._original_update = module.update
 
+        #: Lineages already reported as having no recognition rule. Warning
+        #: once per lineage rather than once per step keeps the log readable
+        #: without hiding the condition.
+        warned: set = set()
+
         def gpu_update(dt):
             if not module.cellular_module:
                 return
@@ -260,8 +272,30 @@ class GPUOrchestrator:
             # ── Inactive: batch detection ────────────────────────
             if inactive:
                 immune_pos = np.array([ic.position for _, ic in inactive], dtype=np.float32)
+                # A lineage the batch kernel has no rule for must not inherit
+                # the macrophage rule. spatial_ops treats code 2 as "recognizes
+                # every target unconditionally", so .get(..., 2) handed a Treg,
+                # a plasma cell, a B cell or an endothelial cell a macrophage's
+                # kill licence against an MHC-I-intact target -- verified
+                # directly: cell_type "Treg", "B_cell", "endothelial" and
+                # "plasma_cell" all produced the same detection as
+                # "macrophage". Code 3 matches no branch in
+                # immune_detection_batch, and `recognized` starts False, so an
+                # unmodelled lineage patrols and never engages.
                 type_map = {"T_cell": 0, "NK_cell": 1, "macrophage": 2}
-                immune_types = np.array([type_map.get(ic.cell_type, 2) for _, ic in inactive], dtype=np.int8)
+                for _, ic in inactive:
+                    if ic.cell_type not in type_map and ic.cell_type not in warned:
+                        warned.add(ic.cell_type)
+                        logger.warning(
+                            "immune acceleration has no recognition rule for "
+                            "lineage %r; it will patrol and never engage",
+                            ic.cell_type,
+                        )
+                immune_types = np.array(
+                    [type_map.get(ic.cell_type, UNMODELLED_LINEAGE)
+                     for _, ic in inactive],
+                    dtype=np.int8,
+                )
 
                 detections = immune_detection_batch(
                     immune_pos, cancer_pos,

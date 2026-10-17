@@ -199,6 +199,9 @@ def immune_detection_batch(
         detection_radius: Detection range in um.
         cancer_mhc1: (N,) MHC-I expression levels of cancer cells.
         immune_types: (M,) type codes (0=T_cell, 1=NK_cell, 2=macrophage).
+            Any other code matches no recognition rule and never recognizes a
+            target -- that is how a lineage this kernel does not model is kept
+            out of the kill loop rather than defaulting into one.
         mhc1_threshold_t: MHC-I threshold for T cell recognition.
         mhc1_threshold_nk: MHC-I threshold for NK cell recognition.
 
