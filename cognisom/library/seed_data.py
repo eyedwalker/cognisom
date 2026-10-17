@@ -768,7 +768,12 @@ def _seed_drugs(loader: EntityLoader) -> int:
          "enzalutamide to agonist), AR-V7 splice variant (lacks LBD), AR amplification, "
          "glucocorticoid receptor bypass, and lineage plasticity to AR-null NEPC.",
          ["AR"], "approved",
-         "CC1(C2CCC3(C(=O)NC(=C3C2CC(C1)(F)F)C#N)C)C4=CC(=C(C=C4)F)C(=O)NC5=CC=C(C=N5)C(F)(F)F"),
+         # Enzalutamide, PubChem CID 15951529. The previous string here was a
+         # different molecule entirely -- C28H24F6N4O2 against enzalutamide's
+         # C21H16F4N4O2S, 40 atoms against 32, and no thiohydantoin sulfur.
+         # tests/test_library_structures.py recomputes every SMILES against
+         # its own recorded formula so this cannot recur silently.
+         "CC1(C(=O)N(C(=S)N1C2=CC(=C(C=C2)C(=O)NC)F)C3=CC(=C(C=C3)C#N)C(F)(F)F)C"),
 
         ("Abiraterone", "anti-androgen",
          "Irreversible inhibitor of cytochrome P450 17A1 (CYP17A1), the enzyme catalyzing "
