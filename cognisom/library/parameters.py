@@ -490,6 +490,36 @@ _NOT_CYCLING: Dict[Tuple[str, str], str] = {
 #   NKT, gamma-delta, NK, CD8+ Effector  cytotoxic, uncontested.
 
 
+#: Entities typed RECEPTOR whose own description says they catalyse a
+#: reaction. A turnover number and a Michaelis constant describe what these
+#: do; a ligand dissociation constant does not, and both already carry
+#: kcat_per_s and km_um. Keyed on name because a receptor row has no
+#: lineage field to key on, and listed explicitly so the claim is auditable
+#: rather than inferred from a description by pattern match -- a regex over
+#: descriptions also catches CD47, CTLA-4, TIGIT and TIM-3, which recruit
+#: phosphatases but are not themselves enzymes.
+_CATALYTIC_NOT_A_RECEPTOR: Dict[str, str] = {
+    "IDO1":
+        "indoleamine 2,3-dioxygenase 1 is an enzyme, not a receptor -- its "
+        "own description calls it 'a 403-amino acid heme-containing enzyme "
+        "that catalyzes the rate-limiting step of tryptophan catabolism'. "
+        "It is characterised by kcat_per_s and km_um, both of which it "
+        "carries. This row is typed RECEPTOR and the library has no enzyme "
+        "type; a Ki against an inhibitor such as epacadostat would be a "
+        "different quantity from this spec's ligand Kd",
+    "CD73 (NT5E)":
+        "ecto-5'-nucleotidase is an enzyme, not a receptor -- its own "
+        "description calls it an 'Ecto-5'-nucleotidase ... that converts "
+        "extracellular AMP to adenosine'. It is characterised by kcat_per_s "
+        "and km_um for AMP, both of which it carries. This row is typed "
+        "RECEPTOR and the library has no enzyme type",
+}
+
+
+def _catalytic_not_a_receptor(entity) -> Optional[str]:
+    return _CATALYTIC_NOT_A_RECEPTOR.get(getattr(entity, "name", ""))
+
+
 def _lineage(entity) -> Tuple[str, str]:
     return (getattr(entity, "immune_type", "") or "",
             getattr(entity, "immune_subtype", "") or "")
@@ -539,6 +569,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         (EntityType.RECEPTOR, EntityType.ADHESION_MOLECULE),
         minimum=0.0, maximum=1e9,
         required_for_simulation=True,
+        inapplicable_when=_catalytic_not_a_receptor,
     ),
     _spec(
         "kon_per_nm_per_s", "1/(nM*s)",
@@ -658,6 +689,29 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         required_for_simulation=True,
         inapplicable_when=_not_contact_cytotoxic,
     ),
+    # ── Enzyme kinetics ──
+    # 26 entities carry a turnover number or a Michaelis constant and no
+    # spec described either, so both were written with no unit check. The
+    # bounds below are physical rather than biological: the diffusion limit
+    # for an enzyme-substrate encounter caps kcat near 1e7 /s, and a Km of
+    # 1 M is past any cellular concentration. They reject a misplaced
+    # decimal or a per-minute value read as per-second without pretending
+    # to know the right value for any particular enzyme.
+    _spec(
+        "kcat_per_s", "1/s",
+        "Catalytic turnover number: substrate molecules converted per "
+        "active site per second.",
+        (EntityType.GENE, EntityType.PROTEIN, EntityType.RECEPTOR),
+        minimum=0.0, maximum=1e7,
+    ),
+    _spec(
+        "km_um", "uM",
+        "Michaelis constant: substrate concentration at half-maximal "
+        "rate. The substrate it was measured against belongs in the "
+        "ParameterValue conditions, not in the parameter name.",
+        (EntityType.GENE, EntityType.PROTEIN, EntityType.RECEPTOR),
+        minimum=0.0, maximum=1e6,
+    ),
     _spec(
         "exhaustion_rate", "1/h",
         "Rate at which an engaged effector accumulates exhaustion. Declared "
@@ -767,6 +821,73 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
         "ligand_kd_nm", "kd_nm", 1.0,
         "the same quantity in the same unit under a different name",
     ),
+    # kcat, written under six names and in two different time units. The
+    # per-minute pair is the hazard: `methyltransferase_kcat_per_min` 1.5
+    # beside `kinase_kcat_per_s` 15 means a reader assuming seconds is 60x
+    # out, in whichever direction it guesses.
+    ParameterAlias(
+        "kinase_kcat_per_s", "kcat_per_s", 1.0,
+        "the same quantity in the same unit, qualified by enzyme class",
+    ),
+    ParameterAlias(
+        "catalytic_kcat_per_s", "kcat_per_s", 1.0,
+        "the same quantity in the same unit under a different name",
+    ),
+    ParameterAlias(
+        "protease_kcat_per_s", "kcat_per_s", 1.0,
+        "the same quantity in the same unit, qualified by enzyme class",
+    ),
+    ParameterAlias(
+        "ubiquitin_ligase_kcat_per_min", "kcat_per_s", 1.0 / 60.0,
+        "per minute to per second: 1/min = (1/60)/s",
+    ),
+    ParameterAlias(
+        "methyltransferase_kcat_per_min", "kcat_per_s", 1.0 / 60.0,
+        "per minute to per second: 1/min = (1/60)/s",
+    ),
+    # Km, written under eleven names that each bake in the substrate. All
+    # are micromolar, so the conversion is exact and only the substrate is
+    # lost -- which is why the spec says to record it in `conditions`.
+    # Two Km values on one entity cannot both be read through this alias;
+    # no entity in the library carries two, and a write through
+    # set_parameter is the supported way to add one with its substrate.
+    ParameterAlias(
+        "km_amp_um", "km_um", 1.0, "Km for AMP, in micromolar",
+    ),
+    ParameterAlias(
+        "km_tryptophan_um", "km_um", 1.0, "Km for tryptophan, in micromolar",
+    ),
+    ParameterAlias(
+        "km_devd_um", "km_um", 1.0,
+        "Km for the DEVD peptide substrate, in micromolar",
+    ),
+    ParameterAlias(
+        "km_collagen_iv_um", "km_um", 1.0,
+        "Km for collagen IV, in micromolar",
+    ),
+    ParameterAlias(
+        "km_gelatin_um", "km_um", 1.0, "Km for gelatin, in micromolar",
+    ),
+    ParameterAlias(
+        "km_pip2_um", "km_um", 1.0, "Km for PIP2, in micromolar",
+    ),
+    ParameterAlias(
+        "km_pip3_um", "km_um", 1.0, "Km for PIP3, in micromolar",
+    ),
+    ParameterAlias(
+        "ctd_km_um", "km_um", 1.0,
+        "Km for the RNA polymerase II C-terminal domain, in micromolar",
+    ),
+    ParameterAlias(
+        "rb_km_um", "km_um", 1.0, "Km for RB1, in micromolar",
+    ),
+    ParameterAlias(
+        "cdk1_km_um", "km_um", 1.0, "Km for CDK1, in micromolar",
+    ),
+    ParameterAlias(
+        "cdk4_km_um", "km_um", 1.0,
+        "Km of CDK4 for this substrate, in micromolar",
+    ),
     ParameterAlias(
         "scale_um", "radius_um", 0.5,
         "scale_um is the cell's full extent, not its radius: "
@@ -790,17 +911,28 @@ for _alias in PARAMETER_ALIASES:
     )
 
 
-def unspecced_names(entities) -> Dict[str, int]:
+def unspecced_names(entities, *, include_aliased: bool = False) -> Dict[str, int]:
     """Parameter names carried by data but declared by no spec.
 
     A name with no spec is written with no unit check, no range check
     and no applies_to check, so this is the list of parameters that can
     hold anything at all. It is a worklist, not a failure.
+
+    A legacy name that :data:`PARAMETER_ALIASES` maps onto a specced
+    parameter is excluded by default. It is still unvalidated on write,
+    but it is readable in a known unit by an exact declared factor, which
+    is a materially weaker problem than a name nothing can interpret --
+    and counting the two together made declaring an alias look like it
+    had achieved nothing. Pass ``include_aliased=True`` for the full set.
     """
+    aliased = set() if include_aliased else {
+        alias.legacy for alias in PARAMETER_ALIASES
+        if alias.canonical in PARAMETER_SPECS
+    }
     counts: Dict[str, int] = {}
     for entity in entities:
         for name, _ in iter_parameters(entity):
-            if name in PARAMETER_SPECS:
+            if name in PARAMETER_SPECS or name in aliased:
                 continue
             counts[name] = counts.get(name, 0) + 1
     return counts

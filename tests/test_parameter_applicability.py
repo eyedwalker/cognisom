@@ -257,3 +257,104 @@ def test_the_read_path_still_returns_the_stored_number(immune_rows):
 def test_no_immune_parameter_is_carried_without_a_spec(immune_rows):
     """exhaustion_rate was the only one, and it now has a unit and a range."""
     assert unspecced_names(immune_rows) == {}
+
+
+# ── enzymes typed as receptors ───────────────────────────────────────────
+
+def test_an_enzyme_is_not_asked_for_a_ligand_kd(all_rows):
+    """The same category error a third time, on a different axis.
+
+    IDO1 and CD73 are enzymes by the library's own descriptions but are
+    typed RECEPTOR, so kd_nm was required of them. Both carry a turnover
+    number and a Michaelis constant, which is what actually describes them.
+    """
+    by_name = {e.name: e for e in all_rows}
+
+    for name in ("IDO1", "CD73 (NT5E)"):
+        entity = by_name[name]
+        r = assess(entity)
+        assert "kd_nm" in r.not_applicable, f"{name} still asked for a kd_nm"
+        assert "enzyme" in r.not_applicable["kd_nm"]
+        assert get_parameter(entity, "kcat_per_s") is not None, (
+            f"{name} is excluded from kd_nm on the grounds that kcat "
+            "describes it, so kcat had better be readable")
+        assert get_parameter(entity, "km_um") is not None
+
+
+def test_a_genuine_receptor_is_still_asked_for_its_kd(all_rows):
+    """A regex over descriptions would have excluded these four too.
+
+    They recruit phosphatases; they are not themselves enzymes.
+    """
+    by_name = {e.name: e for e in all_rows}
+
+    for name in ("CD47", "CTLA-4 (CD152)", "TIGIT", "TIM-3 (HAVCR2)"):
+        entity = by_name.get(name)
+        if entity is None:
+            continue
+        assert "kd_nm" not in assess(entity).not_applicable, (
+            f"{name} is a receptor and a Kd is exactly what it needs")
+
+
+def test_the_catalytic_table_names_only_real_entities(all_rows):
+    from cognisom.library.parameters import _CATALYTIC_NOT_A_RECEPTOR
+
+    names = {e.name for e in all_rows}
+    spurious = set(_CATALYTIC_NOT_A_RECEPTOR) - names
+    assert not spurious, (
+        f"these rows exclude nothing because no entity has the name: "
+        f"{sorted(spurious)}")
+
+
+# ── enzyme kinetics now carry a unit ─────────────────────────────────────
+
+def test_a_per_minute_turnover_is_not_read_as_per_second(all_rows):
+    """The 60x hazard: kcat was written in two different time units."""
+    by_name = {e.name: e for e in all_rows}
+
+    ezh2 = by_name["EZH2"]
+    raw = ezh2.physics_params["methyltransferase_kcat_per_min"]
+    pv = get_parameter(ezh2, "kcat_per_s")
+
+    assert pv.value == pytest.approx(raw / 60.0), (
+        f"EZH2 records {raw}/min; read as {pv.value}/s it should be "
+        f"{raw / 60.0}/s, not {raw}/s")
+    assert pv.unit == "1/s"
+
+
+def test_every_entity_carrying_kinetics_resolves_to_the_canonical_names(all_rows):
+    """Six kcat names and eleven Km names, all readable as two."""
+    resolved = sum(
+        1 for e in all_rows
+        if get_parameter(e, "kcat_per_s") or get_parameter(e, "km_um")
+    )
+
+    assert resolved >= 26, (
+        f"only {resolved} entities resolve a turnover or Michaelis "
+        "constant; an alias has been dropped")
+
+
+def test_the_kinetic_bounds_reject_a_misplaced_decimal():
+    """Physical bounds, not biological guesses: they catch a unit slip."""
+    from cognisom.library.parameters import PARAMETER_SPECS
+
+    kcat, km = PARAMETER_SPECS["kcat_per_s"], PARAMETER_SPECS["km_um"]
+    assert kcat.unit == "1/s" and km.unit == "uM"
+
+    for spec, bad in ((kcat, 1e9), (km, 1e9)):
+        pv = ParameterValue(value=bad, unit=spec.unit,
+                            provenance=Provenance.ESTIMATED,
+                            rationale="deliberately out of range")
+        assert spec.check(pv), (
+            f"{spec.name}={bad} {spec.unit} was accepted; the range check "
+            "is not doing anything")
+
+
+def test_aliased_names_are_not_counted_as_uninterpretable(all_rows):
+    """Otherwise declaring an alias looks like it achieved nothing."""
+    narrow = unspecced_names(all_rows)
+    full = unspecced_names(all_rows, include_aliased=True)
+
+    assert len(full) > len(narrow)
+    assert "kinase_kcat_per_s" in full
+    assert "kinase_kcat_per_s" not in narrow

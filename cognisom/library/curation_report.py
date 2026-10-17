@@ -119,10 +119,11 @@ def build_report(
         lines.append("")
         lines.append(
             "These are not missing numbers. A parameter is reported here "
-            "when the entity's lineage means the quantity does not arise "
-            "-- a plasma cell has no kill radius, a neutrophil no division "
-            "time. Each carries a stated reason; see Readiness."
-            "not_applicable. They are excluded from the targets below."
+            "when the quantity does not arise for that entity -- a plasma "
+            "cell has no kill radius, a neutrophil no division time, an "
+            "enzyme no ligand Kd. Each carries a stated reason; see "
+            "Readiness.not_applicable. They are excluded from the targets "
+            "below."
         )
         lines.append("")
 
