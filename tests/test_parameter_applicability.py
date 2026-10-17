@@ -358,3 +358,59 @@ def test_aliased_names_are_not_counted_as_uninterpretable(all_rows):
     assert len(full) > len(narrow)
     assert "kinase_kcat_per_s" in full
     assert "kinase_kcat_per_s" not in narrow
+
+
+# ── gaps the exclusions expose, pinned so they are not forgotten ─────────
+
+def test_the_post_mitotic_rows_have_no_temporal_parameter(immune_rows):
+    """Excluding their division time leaves them nothing. Pinned, not fixed.
+
+    The right fix is a per-lineage lifespan, not a uniform default: a
+    circulating neutrophil lives hours and a memory T cell years.
+    ``apoptosis_rate_per_hour`` already applies to IMMUNE_CELL, so the
+    parameter exists and only the values are missing. This test exists so
+    that stays visible, and should be rewritten when they are supplied.
+    """
+    by_name = {e.name: e for e in immune_rows}
+
+    for name in ("Neutrophil", "Eosinophil", "Basophil", "Plasma cell"):
+        entity = by_name[name]
+        assert "division_time_hours" in assess(entity).not_applicable
+        assert get_parameter(entity, "apoptosis_rate_per_hour") is None, (
+            f"{name} now has an apoptosis rate -- supply the rest and "
+            "rewrite this test rather than leaving it asserting the gap")
+
+
+def test_the_defaults_are_inverted_for_lifespan(immune_rows, all_rows):
+    """immune_cell gets a division time; cell_type gets both. Backwards."""
+    from cognisom.library.models import EntityType
+
+    cells = [e for e in all_rows if e.entity_type == EntityType.CELL_TYPE]
+    immune_apoptosis = sum(
+        1 for e in immune_rows
+        if (e.physics_params or {}).get("apoptosis_rate_per_hour"))
+    cell_apoptosis = sum(
+        1 for e in cells
+        if (e.physics_params or {}).get("apoptosis_rate_per_hour"))
+
+    assert immune_apoptosis == 0 and cell_apoptosis == len(cells), (
+        f"the asymmetry has changed ({immune_apoptosis} immune, "
+        f"{cell_apoptosis}/{len(cells)} cell_type); update the note on "
+        "_NOT_CYCLING")
+
+
+def test_the_unitless_consumption_rate_is_still_one_default(all_rows):
+    """Guards the reason oxygen_consumption_rate must not be aliased.
+
+    If these ever become distinct per-cell measurements, a unit can be
+    established and the alias becomes possible -- but not before.
+    """
+    values = {(e.physics_params or {}).get("oxygen_consumption_rate")
+              for e in all_rows}
+    values.discard(None)
+
+    assert values == {0.05}, (
+        f"oxygen_consumption_rate now holds {sorted(values)}. If these are "
+        "real measurements, establish the unit and alias it to "
+        "oxygen_consumption_fmol_per_cell_per_hour; until then no factor "
+        "can be asserted")

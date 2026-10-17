@@ -430,6 +430,21 @@ _NO_CONTACT_CYTOTOXICITY: Dict[Tuple[str, str], str] = {
 
 #: Lineages that are terminally differentiated: a division time is not a
 #: quantity they have.
+#:
+#: Excluding these six leaves them with no temporal parameter at all -- a
+#: gap this table exposes rather than creates, and the defaults are exactly
+#: inverted for it. ``_PHYSICS_DEFAULTS["immune_cell"]`` supplies a division
+#: time and no clearance term while ``["cell_type"]`` supplies both:
+#: measured, 28 immune rows carry a division time and 0 carry an apoptosis
+#: rate, against 12 and 12 for cell types. So the cells whose defining
+#: temporal property is their lifespan are the ones with no way to say it.
+#:
+#: The fix is not a uniform apoptosis rate across 28 rows. A circulating
+#: neutrophil lives hours and a memory T cell years, so one default would
+#: be meaningless in the same way the 48 h division time already was. It
+#: needs per-lineage values, and ``apoptosis_rate_per_hour`` already
+#: applies to IMMUNE_CELL, so the parameter exists and only the numbers are
+#: missing.
 _NOT_CYCLING: Dict[Tuple[str, str], str] = {
     ("neutrophil", "neutrophil"):
         "a circulating neutrophil is post-mitotic; it leaves the marrow "
@@ -795,6 +810,16 @@ class ParameterAlias:
     ``oxygen_consumption_fmol_per_cell_per_hour``: nothing in the
     codebase states what unit the former is in, so no factor can be
     asserted, and guessing one would silently rescale an oxygen sink.
+
+    Measured since, which settles it: that field holds 0.05 on all twelve
+    entities carrying it -- one distinct value, written by
+    ``enrichment._PHYSICS_DEFAULTS["cell_type"]`` onto a fibroblast, an
+    endothelial cell and a cancer stem cell alike. So it is not a
+    measurement whose unit was lost; it is a default that never had one,
+    and there is nothing to convert. An alias would manufacture a unit for
+    a number that has none, and the twelve values would then read as
+    twelve measurements. ``glucose_consumption_rate`` is referenced by
+    ``parameter_resolver`` and carried by no entity at all.
     """
 
     legacy: str
