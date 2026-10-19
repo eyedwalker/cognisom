@@ -160,3 +160,80 @@ def test_the_millimolar_to_micromolar_boundary_is_not_crossed_silently():
     assert stored.value == pytest.approx(0.0095), (
         "accept() must not convert on its own; the caller passes the "
         "converted value so the factor is deliberate and recorded")
+
+
+# ── what BRENDA says when it refuses ─────────────────────────────────────
+
+class _Response:
+    """Shaped like requests' response, for the fault paths."""
+
+    def __init__(self, status_code, text):
+        self.status_code = status_code
+        self.text = text
+        self.content = text.encode("utf-8")
+
+
+def _fault(code, message):
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'
+        f"<SOAP-ENV:Body><SOAP-ENV:Fault><faultcode>{code}</faultcode>"
+        f"<faultstring>{message}</faultstring>"
+        "</SOAP-ENV:Fault></SOAP-ENV:Body></SOAP-ENV:Envelope>"
+    )
+
+
+def _call_with(monkeypatch, response):
+    import cognisom.library.brenda_sourcing as mod
+
+    class _Session:
+        headers: dict = {}
+
+        def post(self, *a, **kw):
+            return response
+
+    monkeypatch.setenv("BRENDA_EMAIL", "someone@example.org")
+    monkeypatch.setenv("BRENDA_PASSWORD", "x")
+    monkeypatch.setattr(mod.time, "sleep", lambda *_: None)
+    return mod._call("getKmValue", "3.4.22.56", "Homo sapiens", _Session())
+
+
+def test_a_rejected_password_is_reported_as_a_credentials_problem(monkeypatch):
+    """BRENDA returns this inside an HTTP 500.
+
+    Judging the status before parsing the body threw away the only line
+    that says what to do, and reported a bad password as a server error.
+    """
+    response = _Response(500, _fault(
+        "401", "Username or password is wrong, or account was not activated."))
+
+    with pytest.raises(BrendaCredentialsMissing) as exc:
+        _call_with(monkeypatch, response)
+
+    message = str(exc.value)
+    assert "not activated" in message
+    assert "confirmation email" in message, (
+        "the commonest cause is an unactivated account; the error should "
+        "say so rather than leaving it to be guessed")
+
+
+def test_another_fault_is_reported_with_its_own_message(monkeypatch):
+    from cognisom.library.brenda_sourcing import BrendaError
+
+    response = _Response(500, _fault("500", "EC number not found"))
+
+    with pytest.raises(BrendaError) as exc:
+        _call_with(monkeypatch, response)
+
+    assert "EC number not found" in str(exc.value)
+
+
+def test_a_status_error_with_no_fault_still_reports_the_body(monkeypatch):
+    from cognisom.library.brenda_sourcing import BrendaError
+
+    response = _Response(503, "<html>temporarily unavailable</html>")
+
+    with pytest.raises(BrendaError) as exc:
+        _call_with(monkeypatch, response)
+
+    assert "503" in str(exc.value)

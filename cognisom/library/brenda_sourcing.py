@@ -204,16 +204,38 @@ def _call(method: str, ec_number: str, organism: str,
     payload = _envelope(method, [email, password_hash, ec_number, organism])
     response = s.post(ENDPOINT, data=payload.encode("utf-8"), timeout=60)
     time.sleep(POLITE_PAUSE_S)
-    if response.status_code != 200:
-        raise BrendaError(f"{method} answered HTTP {response.status_code}")
+    # The fault is parsed before the status is judged. BRENDA returns its
+    # most useful messages with HTTP 500 -- a bad password comes back as a
+    # SOAP fault saying so, inside a 500 -- and reporting only the status
+    # throws away the one line that says what to do about it.
+    tree = None
     try:
         tree = ElementTree.fromstring(response.content)
-    except ElementTree.ParseError as exc:
-        raise BrendaError(f"{method} returned unparseable XML: {exc}") from exc
-    fault = tree.find(".//{http://schemas.xmlsoap.org/soap/envelope/}Fault")
-    if fault is not None:
-        detail = "".join(fault.itertext()).strip()[:200]
-        raise BrendaError(f"{method}: {detail}")
+    except ElementTree.ParseError:
+        tree = None
+
+    if tree is not None:
+        fault = tree.find(".//{http://schemas.xmlsoap.org/soap/envelope/}Fault")
+        if fault is not None:
+            code = fault.findtext("faultcode", "").strip()
+            message = fault.findtext("faultstring", "").strip()
+            detail = message or "".join(fault.itertext()).strip()[:200]
+            if code == "401" or "password" in detail.lower():
+                raise BrendaCredentialsMissing(
+                    f"BRENDA rejected the credentials: {detail} "
+                    f"A new account must be activated from the confirmation "
+                    f"email before the web service accepts it; registration "
+                    f"alone is not enough."
+                )
+            raise BrendaError(f"{method}: {detail}")
+
+    if response.status_code != 200:
+        raise BrendaError(
+            f"{method} answered HTTP {response.status_code} with no SOAP "
+            f"fault: {response.text[:200]}"
+        )
+    if tree is None:
+        raise BrendaError(f"{method} returned unparseable XML")
     return [el.text or "" for el in tree.iter() if el.text and "*" in el.text]
 
 
