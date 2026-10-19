@@ -578,17 +578,55 @@ def km_substrate(entity) -> str:
 #: lifespan statements the repository holds and whoever fills lifespan_hours
 #: should start from them rather than from recall. Two of the six are
 #: covered; the other four say nothing about lifespan at all.
-_LIFESPAN_EVIDENCE: Dict[Tuple[str, str], str] = {
-    ("neutrophil", "neutrophil"):
+#: lineage -> (hours or None, note). A value is present only where the
+#: repository's own record supports one number; where the record describes
+#: two populations it is None, because choosing between them is a modelling
+#: decision and not a lookup -- the same bar the UniProt sourcing applies to
+#: a protein that declares several chains.
+_LIFESPAN_EVIDENCE: Dict[Tuple[str, str], Tuple[Optional[float], str]] = {
+    ("neutrophil", "neutrophil"): (
+        21.2,
         "its own description: 'Neutrophils are short-lived (~5-90 hours in "
-        "circulation) and undergo constitutive apoptosis'. The range spans "
-        "18-fold, so a single scalar needs the range recorded in conditions",
-    ("B_cell", "plasma_cell"):
+        "circulation) and undergo constitutive apoptosis'. 21.2 h is the "
+        "geometric centre of that stated 5-90 h range, which is the "
+        "defensible single value for a span covering eighteenfold; the "
+        "range travels with it in the conditions",
+    ),
+    ("B_cell", "plasma_cell"): (
+        None,
         "its own description gives two populations, not one: short-lived "
         "plasmablasts '(~3-5 days)' and long-lived bone-marrow residents "
         "that 'persist for decades'. Roughly three orders of magnitude "
-        "apart, so one scalar misrepresents this row until it is split",
+        "apart, so no single scalar represents this row and none is "
+        "written until the entity is split",
+    ),
 }
+
+
+def apply_recorded_lifespans(entities) -> Dict[str, str]:
+    """Write the lifespans the repository's own descriptions support.
+
+    Returns a name -> outcome map. Entities whose lineage the evidence
+    table does not cover are untouched and left on the curation worklist,
+    which is where a missing number belongs.
+    """
+    written: Dict[str, str] = {}
+    for entity in entities:
+        record = _LIFESPAN_EVIDENCE.get(_lineage(entity))
+        if record is None:
+            continue
+        hours, note = record
+        if hours is None:
+            written[entity.name] = f"left unwritten: {note}"
+            continue
+        problems = set_parameter(entity, "lifespan_hours", ParameterValue(
+            value=float(hours), unit="h", provenance=Provenance.ESTIMATED,
+            source="the entity's own curated description in this library",
+            conditions="circulating lifespan; the description states a 5-90 h range",
+            rationale=note,
+        ), strict=False)
+        written[entity.name] = "; ".join(problems) if problems else "written"
+    return written
 
 
 def _cycles(entity) -> Optional[str]:
@@ -855,10 +893,27 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
     _spec(
         "molecular_weight_kda", "kDa",
         "Molecular mass. Declared in kilodaltons because that is the unit "
-        "the library already writes; mass_daltons is absent on every entity.",
+        "the library already writes; mass_daltons is absent on every entity. "
+        "For a secreted protein this is the mature chain, not the translated "
+        "precursor -- the two differ twenty-two-fold for EGF -- and the "
+        "ParameterValue conditions say which was used.",
         (EntityType.PROTEIN, EntityType.CYTOKINE, EntityType.LIGAND,
-         EntityType.RECEPTOR, EntityType.ANTIBODY, EntityType.GENE),
+         EntityType.RECEPTOR, EntityType.ANTIBODY, EntityType.GENE,
+         EntityType.ADHESION_MOLECULE, EntityType.COMPLEMENT_COMPONENT,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR),
         minimum=0.0, maximum=1e5,
+    ),
+    _spec(
+        "sequence_length_aa", "aa",
+        "Residues in the mature chain. Sourced from the same UniProt record "
+        "as the mass, so the two always describe the same molecule, and "
+        "cross-checked against the cached structure's residue count where "
+        "one exists.",
+        (EntityType.PROTEIN, EntityType.CYTOKINE, EntityType.LIGAND,
+         EntityType.RECEPTOR, EntityType.ANTIBODY, EntityType.GENE,
+         EntityType.ADHESION_MOLECULE, EntityType.COMPLEMENT_COMPONENT,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR),
+        minimum=1.0, maximum=4e4,
     ),
     _spec(
         "normal_concentration_mM", "mM",

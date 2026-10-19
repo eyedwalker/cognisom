@@ -476,6 +476,12 @@ class Protein(BioEntity):
     entity_type: EntityType = EntityType.PROTEIN
     gene_source: str = ""
     uniprot_id: str = ""
+    #: The gene symbol the accession was resolved from, and how. Without
+    #: them an accession cannot be re-verified later, and a wrong one is
+    #: indistinguishable from a right one -- which is why the library
+    #: refuses to carry an accession without both.
+    gene_symbol: str = ""
+    uniprot_resolved_by: str = ""
     pdb_ids: List[str] = field(default_factory=list)
     amino_acid_length: int = 0
     sequence_preview: str = ""  # first 100 residues
@@ -500,6 +506,8 @@ class Protein(BioEntity):
         return {
             "gene_source": self.gene_source,
             "uniprot_id": self.uniprot_id,
+            "gene_symbol": self.gene_symbol,
+            "uniprot_resolved_by": self.uniprot_resolved_by,
             "pdb_ids": self.pdb_ids,
             "amino_acid_length": self.amino_acid_length,
             "sequence_preview": self.sequence_preview,
@@ -522,6 +530,8 @@ class Protein(BioEntity):
     def _apply_properties(self, props: dict):
         self.gene_source = props.get("gene_source", "")
         self.uniprot_id = props.get("uniprot_id", "")
+        self.gene_symbol = props.get("gene_symbol", "")
+        self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
         self.pdb_ids = props.get("pdb_ids", [])
         self.amino_acid_length = props.get("amino_acid_length", 0)
         self.sequence_preview = props.get("sequence_preview", "")
