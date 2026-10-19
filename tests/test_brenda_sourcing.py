@@ -70,17 +70,22 @@ def test_the_password_is_hashed_and_never_sent_in_the_clear(monkeypatch):
 def test_the_request_envelope_is_well_formed():
     from xml.etree import ElementTree
 
-    xml = _envelope("getKmValue", ["a@b.c", "d" * 64, "1.1.1.1", "Homo sapiens"])
+    xml = _envelope("getKmValue",
+                    "a@b.c," + "d" * 64 + ",ecNumber*1.1.1.1#organism*Homo sapiens#")
 
     root = ElementTree.fromstring(xml)
     assert root.tag.endswith("Envelope")
     assert "getKmValue" in xml
+    assert "ecNumber*1.1.1.1" in xml, (
+        "BRENDA reads one comma-separated string, not separate XML parts; "
+        "sending parts made it answer that the credentials were wrong "
+        "because it had read none")
 
 
 def test_an_ampersand_in_a_field_does_not_break_the_envelope():
     from xml.etree import ElementTree
 
-    xml = _envelope("getKmValue", ["a&b@c.d", "x", "1.1.1.1", "Homo & sapiens"])
+    xml = _envelope("getKmValue", "a&b@c.d,x,ecNumber*1.1.1.1#organism*Homo & sapiens#")
 
     ElementTree.fromstring(xml)   # would raise if unescaped
 
@@ -204,7 +209,7 @@ def _call_with(monkeypatch, response):
     monkeypatch.setenv("BRENDA_EMAIL", "someone@example.org")
     monkeypatch.setenv("BRENDA_PASSWORD", "x")
     monkeypatch.setattr(mod.time, "sleep", lambda *_: None)
-    return mod._call("getKmValue", "3.4.22.56", "Homo sapiens", _Session())
+    return mod._call("getKmValue", "ecNumber*3.4.22.56#", _Session())
 
 
 def test_a_rejected_password_is_reported_as_a_credentials_problem(monkeypatch):
@@ -246,3 +251,71 @@ def test_a_status_error_with_no_fault_still_reports_the_body(monkeypatch):
         _call_with(monkeypatch, response)
 
     assert "503" in str(exc.value)
+
+
+# ── the response is one blob of many records ─────────────────────────────
+
+def test_many_records_are_split_out_of_one_response(monkeypatch):
+    """BRENDA concatenates every record into a single <return> element.
+
+    Records are joined by "!" and fields by "#". Reading the blob as one
+    record -- which the element structure invites, since there is only ever
+    one element -- returned a single row where caspase-3 has fifty-three,
+    and the next record's first field showed up as a key called
+    "!ecNumber", which is the tell.
+    """
+    blob = ("ecNumber*3.4.22.56#kmValue*0.0337#substrate*Ac-DEVD-AMC"
+            "#organism*Homo sapiens#literature*700001"
+            "!ecNumber*3.4.22.56#kmValue*0.0625#substrate*DEVD-pNA"
+            "#organism*Homo sapiens#literature*700002")
+    envelope = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'
+        f"<SOAP-ENV:Body><return>{blob}</return></SOAP-ENV:Body></SOAP-ENV:Envelope>"
+    )
+
+    records = _call_with(monkeypatch, _Response(200, envelope))
+
+    assert len(records) == 2
+    assert records[0]["substrate"] == "Ac-DEVD-AMC"
+    assert records[1]["kmValue"] == "0.0625"
+    assert not any(k.startswith("!") for r in records for k in r), (
+        "a leading '!' in a key means the record separator was not applied")
+
+
+def test_the_no_value_sentinel_is_not_read_as_a_number():
+    """BRENDA writes -999 where the paper gave no number."""
+    from cognisom.library.brenda_sourcing import NO_VALUE, _records
+
+    rows = [{"kmValue": "-999", "substrate": "more", "organism": "Homo sapiens",
+             "literature": "1"},
+            {"kmValue": "0.0337", "substrate": "Ac-DEVD-AMC",
+             "organism": "Homo sapiens", "literature": "1"}]
+
+    out = _records(rows, "3.4.22.56", "km", "kmValue", "mM")
+
+    assert out[0].value is None, f"-999 was read as {out[0].value} mM"
+    assert out[1].value == pytest.approx(0.0337)
+    assert NO_VALUE == -999.0
+
+
+def test_a_brenda_reference_id_is_not_treated_as_a_pubmed_id():
+    """`literature` is BRENDA-internal; the PMID comes from getReference.
+
+    Citing the reference number as a PMID would resolve to an unrelated
+    paper, or to nothing at all.
+    """
+    from cognisom.library.brenda_sourcing import _records
+
+    rows = [{"kmValue": "0.0337", "substrate": "Ac-DEVD-AMC",
+             "organism": "Homo sapiens", "literature": "647471"}]
+
+    without = _records(rows, "3.4.22.56", "km", "kmValue", "mM")
+    assert without[0].pmid == "", "the BRENDA reference id leaked in as a PMID"
+    assert not without[0].citable
+
+    with_refs = _records(rows, "3.4.22.56", "km", "kmValue", "mM",
+                         {"647471": {"pubmedId": "20580860",
+                                     "title": "A paper", "year": "2010"}})
+    assert with_refs[0].pmid == "20580860"
+    assert with_refs[0].citable

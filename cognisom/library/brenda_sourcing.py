@@ -40,8 +40,23 @@ from .parameters import PARAMETER_SPECS, ParameterValue, Provenance, set_paramet
 
 log = logging.getLogger(__name__)
 
-ENDPOINT = "https://www.brenda-enzymes.org/soap/brenda_server_zeep.php"
-NAMESPACE = "ws.brenda"
+#: The documented classic endpoint. The zeep variant exists and accepts the
+#: same envelope, but BRENDA's own client examples use this one, and its
+#: calling convention is what the service actually reads.
+ENDPOINT = "https://www.brenda-enzymes.org/soap/brenda_server.php"
+NAMESPACE = "https://www.brenda-enzymes.org/soap"
+
+#: BRENDA packs every record of a response into one string: fields are
+#: `name*value` joined by `#`, and records are joined by `!`. Reading the
+#: blob as a single record -- which the element structure invites, since
+#: there is only ever one <return> element -- silently returns one row of
+#: fifty-three.
+RECORD_SEPARATOR = "!"
+FIELD_SEPARATOR = "#"
+
+#: BRENDA writes this where a paper gave no number. Treating it as a value
+#: would record a Km of minus one thousand millimolar.
+NO_VALUE = -999.0
 POLITE_PAUSE_S = 1.0        # BRENDA asks callers not to hammer a shared pool
 
 #: Where the two credentials come from. Registration is at
@@ -71,6 +86,8 @@ class KineticRecord:
     commentary: str = ""
     literature: str = ""
     pmid: str = ""
+    title: str = ""
+    year: str = ""
 
     @property
     def is_wild_type(self) -> bool:
@@ -97,6 +114,8 @@ class KineticRecord:
             bits.append("MUTANT")
         if self.pmid:
             bits.append(f"PMID:{self.pmid}")
+        if self.year:
+            bits.append(str(self.year))
         return " | ".join(bits)
 
 
@@ -175,17 +194,27 @@ def ec_numbers_for(accession: str,
     return out
 
 
-def _envelope(method: str, parts: List[str]) -> str:
-    body = "".join(
-        f"<{name}>{_escape(value)}</{name}>" for name, value in
-        zip(("email", "password", "ecNumber", "organism"), parts)
-    )
+def _envelope(method: str, parameters: str) -> str:
+    """BRENDA takes one comma-separated string, not separate XML parts.
+
+    The zeep WSDL describes the arguments as separate message parts, which
+    is what an earlier version of this module sent. The service parsed that
+    envelope and answered with a fault saying the credentials were wrong --
+    it had read no credentials at all -- which is a confusing way to learn
+    that the convention is the one in BRENDA's own examples:
+    ``email,sha256hash,key*value#key*value#``.
+    """
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"'
-        f' xmlns:ws="{NAMESPACE}">'
-        f"<soapenv:Body><ws:{method}>{body}</ws:{method}></soapenv:Body>"
-        "</soapenv:Envelope>"
+        '<soapenv:Envelope '
+        'xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" '
+        f'xmlns:ws="{NAMESPACE}">'
+        f"<soapenv:Body><ws:{method}>"
+        '<parameters xsi:type="xsd:string" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+        'xmlns:xsd="http://www.w3.org/2001/XMLSchema">'
+        f"{_escape(parameters)}</parameters>"
+        f"</ws:{method}></soapenv:Body></soapenv:Envelope>"
     )
 
 
@@ -194,20 +223,18 @@ def _escape(text: str) -> str:
             .replace(">", "&gt;"))
 
 
-def _call(method: str, ec_number: str, organism: str,
-          session: Optional[requests.Session] = None) -> List[str]:
+def _call(method: str, arguments: str,
+          session: Optional[requests.Session] = None) -> List[Dict[str, str]]:
+    """Call a BRENDA method and return its records as dicts."""
     email, password_hash = credentials()
     s = session or requests.Session()
     s.headers.update({"User-Agent": "Cognisom/1.0 (cognisom.com; research)",
                       "Content-Type": "text/xml; charset=utf-8",
                       "SOAPAction": f"{NAMESPACE}#{method}"})
-    payload = _envelope(method, [email, password_hash, ec_number, organism])
-    response = s.post(ENDPOINT, data=payload.encode("utf-8"), timeout=60)
+    payload = _envelope(method, f"{email},{password_hash},{arguments}")
+    response = s.post(ENDPOINT, data=payload.encode("utf-8"), timeout=90)
     time.sleep(POLITE_PAUSE_S)
-    # The fault is parsed before the status is judged. BRENDA returns its
-    # most useful messages with HTTP 500 -- a bad password comes back as a
-    # SOAP fault saying so, inside a 500 -- and reporting only the status
-    # throws away the one line that says what to do about it.
+
     tree = None
     try:
         tree = ElementTree.fromstring(response.content)
@@ -236,7 +263,10 @@ def _call(method: str, ec_number: str, organism: str,
         )
     if tree is None:
         raise BrendaError(f"{method} returned unparseable XML")
-    return [el.text or "" for el in tree.iter() if el.text and "*" in el.text]
+
+    blob = "".join(el.text or "" for el in tree.iter()
+                   if el.text and FIELD_SEPARATOR in el.text)
+    return [d for d in (_parse(rec) for rec in blob.split(RECORD_SEPARATOR)) if d]
 
 
 #: BRENDA packs a record as "field*value#field*value#...".
@@ -249,41 +279,78 @@ def _parse(row: str) -> Dict[str, str]:
     return out
 
 
-def _records(rows: List[str], ec_number: str, parameter: str,
-             value_key: str, unit: str) -> List[KineticRecord]:
+def _references(ec_number: str,
+                session: Optional[requests.Session] = None) -> Dict[str, Dict[str, str]]:
+    """BRENDA reference id -> its bibliography, including the PubMed id.
+
+    A measurement's ``literature`` field is a BRENDA-internal reference
+    number, not a PubMed id. Writing it as one would produce a citation
+    that resolves to an unrelated paper, or to nothing.
+    """
+    out: Dict[str, Dict[str, str]] = {}
+    for record in _call("getReference", f"ecNumber*{ec_number}#", session):
+        ref_id = record.get("reference", "").strip()
+        if ref_id:
+            out[ref_id] = record
+    return out
+
+
+def _records(rows: List[Dict[str, str]], ec_number: str, parameter: str,
+             value_key: str, unit: str,
+             references: Optional[Dict[str, Dict[str, str]]] = None
+             ) -> List[KineticRecord]:
+    references = references or {}
     out = []
-    for row in rows:
-        fields = _parse(row)
+    for fields in rows:
         raw = fields.get(value_key, "")
         try:
             value = float(raw)
         except (TypeError, ValueError):
             value = None
-        literature = fields.get("literature", "")
-        pmid = literature.split(",")[0].strip() if literature else ""
+        # BRENDA writes -999 where the paper gave no number.
+        if value is not None and value <= NO_VALUE:
+            value = None
+        literature = fields.get("literature", "").strip()
+        bibliography = references.get(literature, {})
+        pmid = str(bibliography.get("pubmedId", "")).strip()
         out.append(KineticRecord(
             ec_number=ec_number, parameter=parameter, value=value, unit=unit,
             substrate=fields.get("substrate", ""),
             organism=fields.get("organism", ""),
             commentary=fields.get("commentary", ""),
             literature=literature,
-            pmid=pmid if pmid.isdigit() else "",
+            pmid=pmid if pmid.isdigit() and pmid != "0" else "",
+            title=bibliography.get("title", ""),
+            year=bibliography.get("year", ""),
         ))
     return out
 
 
 def km_values(ec_number: str, organism: str = "Homo sapiens",
               session: Optional[requests.Session] = None) -> List[KineticRecord]:
-    """Michaelis constants BRENDA holds for an enzyme, in mM as BRENDA reports."""
-    rows = _call("getKmValue", ec_number, organism, session)
-    return _records(rows, ec_number, "km", "kmValue", "mM")
+    """Michaelis constants BRENDA holds for an enzyme, in mM as BRENDA reports.
+
+    The unit is BRENDA's, not the library's: ``km_um`` is micromolar, a
+    factor of a thousand away, and :func:`accept` requires the caller to
+    apply it rather than doing so silently.
+    """
+    arguments = f"ecNumber*{ec_number}#"
+    if organism:
+        arguments += f"organism*{organism}#"
+    rows = _call("getKmValue", arguments, session)
+    return _records(rows, ec_number, "km", "kmValue", "mM",
+                    _references(ec_number, session))
 
 
 def turnover_numbers(ec_number: str, organism: str = "Homo sapiens",
                      session: Optional[requests.Session] = None) -> List[KineticRecord]:
     """Turnover numbers BRENDA holds for an enzyme, per second."""
-    rows = _call("getTurnoverNumber", ec_number, organism, session)
-    return _records(rows, ec_number, "kcat", "turnoverNumber", "1/s")
+    arguments = f"ecNumber*{ec_number}#"
+    if organism:
+        arguments += f"organism*{organism}#"
+    rows = _call("getTurnoverNumber", arguments, session)
+    return _records(rows, ec_number, "kcat", "turnoverNumber", "1/s",
+                    _references(ec_number, session))
 
 
 def candidates(ec_number: str, parameter: str = "km",
