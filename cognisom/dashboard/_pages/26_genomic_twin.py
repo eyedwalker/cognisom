@@ -105,25 +105,50 @@ st.caption(
 with st.sidebar:
     st.header("Data Source")
 
+    # A patient loaded from the global sidebar must be the default here.
+    # Without it this page rebuilt its own synthetic prostate demo and wrote
+    # it over st.session_state["patient_profile"], so loading
+    # SEQC2-HCC1395 (breast) and then opening this page silently replaced
+    # the session's patient: the Clinical Report that followed was issued
+    # for COGNISOM-DEMO-001 and described prostate cancer, under a sidebar
+    # still naming the patient the user had loaded.
+    _loaded = st.session_state.get("patient_profile")
+    if not isinstance(_loaded, PatientProfile):
+        _loaded = None
+
+    _sources = [
+        "Synthetic Demo (Prostate Cancer)",
+        "SEQC2 Breast Cancer (Real Somatic)",
+        "Upload VCF File",
+        "Paste VCF Text",
+    ]
+    _loaded_label = (
+        f"Loaded patient ({_loaded.patient_id})" if _loaded else None
+    )
+    if _loaded_label:
+        _sources.insert(0, _loaded_label)
+
     data_source = st.radio(
         "Choose data source:",
-        [
-            "Synthetic Demo (Prostate Cancer)",
-            "SEQC2 Breast Cancer (Real Somatic)",
-            "Upload VCF File",
-            "Paste VCF Text",
-        ],
+        _sources,
         index=0,
     )
+    _use_loaded = data_source == _loaded_label
 
-    patient_id = st.text_input(
-        "Patient ID",
-        value="SEQC2-HCC1395" if "SEQC2" in data_source else "COGNISOM-DEMO-001",
-    )
+    _types = ["prostate", "breast", "lung", "colorectal", "melanoma", "pan-cancer"]
+    if _use_loaded:
+        _default_id = _loaded.patient_id
+        _default_type = (_loaded.cancer_type or "pan-cancer").lower()
+    else:
+        _default_id = "SEQC2-HCC1395" if "SEQC2" in data_source else "COGNISOM-DEMO-001"
+        _default_type = "breast" if "SEQC2" in data_source else "prostate"
+
+    patient_id = st.text_input("Patient ID", value=_default_id,
+                               disabled=_use_loaded)
     cancer_type = st.selectbox(
-        "Cancer Type",
-        ["prostate", "breast", "lung", "colorectal", "melanoma", "pan-cancer"],
-        index=1 if "SEQC2" in data_source else 0,
+        "Cancer Type", _types,
+        index=_types.index(_default_type) if _default_type in _types else 0,
+        disabled=_use_loaded,
     )
 
     st.divider()
@@ -192,14 +217,34 @@ elif data_source == "Paste VCF Text":
 # BUILD PROFILE
 # ─────────────────────────────────────────────────────────────────────────
 
-if vcf_text:
-    with st.spinner("Building genomic profile..."):
-        builder = PatientProfileBuilder(cancer_type=cancer_type)
-        profile = builder.from_vcf_text(vcf_text, patient_id=patient_id)
+# A patient loaded from the sidebar is already a built profile. Without
+# this branch the page only ever wrote patient_profile and never read it, so
+# it rendered its "upload a VCF" prompt and nothing else while a patient with
+# 26 drivers sat in session state -- the page a user reaches first after
+# loading one told them to load one.
+if _use_loaded or vcf_text:
+    if _use_loaded:
+        profile = _loaded
+        st.info(
+            f"Showing **{profile.patient_id}**, the patient loaded from the "
+            "sidebar. Pick another data source to analyse a different VCF — "
+            "doing so replaces the loaded patient for every other page."
+        )
+    else:
+        with st.spinner("Building genomic profile..."):
+            builder = PatientProfileBuilder(cancer_type=cancer_type)
+            profile = builder.from_vcf_text(vcf_text, patient_id=patient_id)
 
-    # Store in session state for other pages
-    st.session_state["patient_profile"] = profile
-    st.session_state["patient_profile_dict"] = profile.to_dict()
+        if _loaded is not None and _loaded.patient_id != profile.patient_id:
+            st.warning(
+                f"This replaces the loaded patient **{_loaded.patient_id}** "
+                f"with **{profile.patient_id}** everywhere, including the "
+                "Clinical Report."
+            )
+
+        # Store in session state for other pages
+        st.session_state["patient_profile"] = profile
+        st.session_state["patient_profile_dict"] = profile.to_dict()
 
     # ─────────────────────────────────────────────────────────────────
     # OVERVIEW METRICS

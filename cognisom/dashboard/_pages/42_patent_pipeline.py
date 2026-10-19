@@ -18,11 +18,11 @@ Pick a driver mutation in the sidebar; the rest of the page renders
 the per-upgrade output. The patent attorney can walk through this
 one page during a disclosure call.
 """
-from collections import Counter
 from __future__ import annotations
 
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 

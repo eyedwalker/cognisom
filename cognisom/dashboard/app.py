@@ -143,7 +143,12 @@ if user is not None:
 
                     if "SEQC2" in _demo_choice:
                         import json
-                        _json_path = _pages_dir.parent / "genomics" / "seqc2_precomputed.json"
+                        # _pages_dir is cognisom/dashboard/_pages, so the
+                        # package root is two levels up, not one: .parent
+                        # alone pointed at cognisom/dashboard/genomics and
+                        # the real-data demo died with FileNotFoundError.
+                        _json_path = (_pages_dir.parent.parent / "genomics"
+                                      / "seqc2_precomputed.json")
                         _data = json.loads(_json_path.read_text())
                         _profile = PatientProfile(
                             patient_id=_data["patient_id"], cancer_type=_data["cancer_type"],
