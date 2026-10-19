@@ -188,9 +188,18 @@ def test_an_entity_nothing_is_required_of_is_not_reported_ready(all_rows):
 
     assert report.not_assessable > 0
     assert report.assessable == report.total - report.not_assessable
-    assert report.ready < 20, (
-        "the ready count has returned to counting entities that were never "
-        "assessed")
+    # The invariant, not a magic number: nothing counts as ready without at
+    # least one curated parameter, and nothing of a type that requires no
+    # parameter counts at all. (A fixed "< 20" guard tripped the moment
+    # seventeen drugs gained an evidenced half-life and became genuinely
+    # ready -- which was the point.)
+    ready_rows = [assess(e) for e in all_rows]
+    ready_rows = [r for r in ready_rows if r.is_ready]
+    assert len(ready_rows) == report.ready
+    assert all(r.assessable for r in ready_rows), (
+        "an entity of a type that requires nothing was counted as ready")
+    assert all(r.curated for r in ready_rows), (
+        "an entity with no curated parameter was counted as ready")
     assert report.fraction_ready == pytest.approx(
         report.ready / report.assessable)
 

@@ -702,7 +702,8 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
     _spec(
         "half_life_hours", "h",
         "Serum or interstitial half-life.",
-        (EntityType.CYTOKINE, EntityType.LIGAND, EntityType.PROTEIN),
+        (EntityType.CYTOKINE, EntityType.LIGAND, EntityType.PROTEIN,
+         EntityType.DRUG),
         minimum=0.0, maximum=24.0 * 365,
         required_for_simulation=True,
     ),
@@ -914,8 +915,11 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
     ),
     _spec(
         "volume_of_distribution_L", "L",
-        "Apparent volume of distribution for a standard adult.",
-        (EntityType.DRUG,), minimum=0.0, maximum=1e4,
+        "Apparent volume of distribution for a standard adult. The cap is "
+        "generous on purpose: abiraterone's label states 19,669 L, because "
+        "an apparent volume counts tissue binding and is not a physical "
+        "volume at all.",
+        (EntityType.DRUG,), minimum=0.0, maximum=1e5,
     ),
 
     # ── Mutation and gene-level effects ──
