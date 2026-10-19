@@ -100,14 +100,46 @@ class KineticRecord:
         return " | ".join(bits)
 
 
+def _from_env_file(key: str) -> str:
+    """Read one key from the project's gitignored .env.
+
+    The library's other credentials live there, and requiring an export in
+    every shell is how a working setup becomes a broken one three weeks
+    later. Nothing is logged from this file.
+    """
+    for directory in (os.getcwd(),
+                      os.path.dirname(os.path.dirname(os.path.dirname(
+                          os.path.abspath(__file__))))):
+        path = os.path.join(directory, ".env")
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    name, _, value = line.partition("=")
+                    if name.strip() == key:
+                        return value.strip().strip("'\"")
+        except OSError:                                 # pragma: no cover
+            continue
+    return ""
+
+
 def credentials() -> tuple:
-    """``(email, sha256_of_password)``, or raise with how to supply them."""
-    email = os.environ.get(EMAIL_ENV, "").strip()
-    password = os.environ.get(PASSWORD_ENV, "")
+    """``(email, sha256_of_password)``, or raise with how to supply them.
+
+    The environment wins over ``.env``, so a shell export can override the
+    file without editing it.
+    """
+    email = (os.environ.get(EMAIL_ENV, "") or _from_env_file(EMAIL_ENV)).strip()
+    password = os.environ.get(PASSWORD_ENV, "") or _from_env_file(PASSWORD_ENV)
     if not email or not password:
         raise BrendaCredentialsMissing(
-            f"BRENDA needs a registered account. Set {EMAIL_ENV} and "
-            f"{PASSWORD_ENV}; registration is free at "
+            f"BRENDA needs a registered account. Put {EMAIL_ENV} and "
+            f"{PASSWORD_ENV} in the project's .env (which is gitignored), "
+            f"or export them. Registration is free at "
             f"https://www.brenda-enzymes.org/register.php. Nothing was "
             f"requested."
         )
