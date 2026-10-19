@@ -279,6 +279,9 @@ def _parse(row: str) -> Dict[str, str]:
     return out
 
 
+_REFERENCE_CACHE: Dict[str, Dict[str, Dict[str, str]]] = {}
+
+
 def _references(ec_number: str,
                 session: Optional[requests.Session] = None) -> Dict[str, Dict[str, str]]:
     """BRENDA reference id -> its bibliography, including the PubMed id.
@@ -287,11 +290,14 @@ def _references(ec_number: str,
     number, not a PubMed id. Writing it as one would produce a citation
     that resolves to an unrelated paper, or to nothing.
     """
+    if ec_number in _REFERENCE_CACHE:
+        return _REFERENCE_CACHE[ec_number]
     out: Dict[str, Dict[str, str]] = {}
     for record in _call("getReference", f"ecNumber*{ec_number}#", session):
         ref_id = record.get("reference", "").strip()
         if ref_id:
             out[ref_id] = record
+    _REFERENCE_CACHE[ec_number] = out
     return out
 
 
@@ -326,6 +332,50 @@ def _records(rows: List[Dict[str, str]], ec_number: str, parameter: str,
     return out
 
 
+_EC_SHARE_CACHE: Dict[str, int] = {}
+
+
+def proteins_sharing_ec(ec_number: str,
+                        session: Optional[requests.Session] = None) -> int:
+    """How many reviewed human proteins carry this EC number.
+
+    BRENDA indexes measurements by EC, not by protein, so for a broad class
+    its records belong to the class and not to any member of it. EC 2.7.10.2
+    is "non-specific protein-tyrosine kinase" and 44 reviewed human proteins
+    carry it: JAK1, JAK2, SRC and BTK all return the same nine turnover
+    numbers, every one of them measured on ATP rather than on the protein
+    substrate each kinase actually acts on. Writing those as JAK1's kcat
+    would attach four real papers to a number that is not JAK1's.
+
+    One protein means the records are attributable. More than one means
+    they are not.
+    """
+    if ec_number in _EC_SHARE_CACHE:
+        return _EC_SHARE_CACHE[ec_number]
+    s = session or requests.Session()
+    s.headers.setdefault("User-Agent", "Cognisom/1.0 (cognisom.com; research)")
+    try:
+        response = s.get(
+            "https://rest.uniprot.org/uniprotkb/search",
+            params={"query": f"ec:{ec_number} AND reviewed:true AND "
+                             f"organism_id:9606",
+                    "fields": "accession", "size": "500", "format": "list"},
+            timeout=30)
+        response.raise_for_status()
+        count = len([line for line in response.text.splitlines() if line.strip()])
+    except Exception as exc:                            # pragma: no cover
+        log.warning("could not count proteins for EC %s: %s", ec_number, exc)
+        return 0
+    _EC_SHARE_CACHE[ec_number] = count
+    return count
+
+
+def ec_is_specific(ec_number: str,
+                   session: Optional[requests.Session] = None) -> bool:
+    """True when exactly one reviewed human protein carries this EC."""
+    return proteins_sharing_ec(ec_number, session) == 1
+
+
 def km_values(ec_number: str, organism: str = "Homo sapiens",
               session: Optional[requests.Session] = None) -> List[KineticRecord]:
     """Michaelis constants BRENDA holds for an enzyme, in mM as BRENDA reports.
@@ -355,6 +405,7 @@ def turnover_numbers(ec_number: str, organism: str = "Homo sapiens",
 
 def candidates(ec_number: str, parameter: str = "km",
                human_only: bool = True, wild_type_only: bool = True,
+               specific_ec_only: bool = True,
                session: Optional[requests.Session] = None) -> List[KineticRecord]:
     """Records for one enzyme, filtered and ranked, for a caller to choose from.
 
@@ -362,6 +413,13 @@ def candidates(ec_number: str, parameter: str = "km",
     real measurement of the wrong protein, and BRENDA reports both without
     distinguishing them in any field but the commentary.
     """
+    if specific_ec_only and not ec_is_specific(ec_number, session):
+        shared = proteins_sharing_ec(ec_number, session)
+        raise BrendaError(
+            f"EC {ec_number} is carried by {shared} reviewed human proteins, "
+            f"so BRENDA's records for it belong to the class and not to any "
+            f"one of them. Pass specific_ec_only=False to see them anyway."
+        )
     fetch = km_values if parameter == "km" else turnover_numbers
     records = fetch(ec_number, "Homo sapiens" if human_only else "", session)
     out = [r for r in records
@@ -402,4 +460,66 @@ def accept(entity: BioEntity, parameter: str, record: KineticRecord,
         citation=f"PMID:{record.pmid}",
         source=f"BRENDA EC {record.ec_number} (CC BY 4.0)",
         conditions=conditions,
+    ), strict=False)
+
+
+def accept_median(entity: BioEntity, parameter: str,
+                  records: List[KineticRecord], factor: float = 1.0,
+                  note: str = "") -> List[str]:
+    """Write the median of several records as a DERIVED value.
+
+    A single BRENDA record is one assay in one paper, and the spread across
+    papers is usually wider than the difference the library cares about:
+    IDO1's Michaelis constant for L-tryptophan runs from 0.72 to 6809 uM
+    across 41 measurements. Picking one of those and calling it MEASURED
+    would attach a real citation to an arbitrary choice.
+
+    So the median is written as DERIVED, with the count, the paper count and
+    the range in the rationale, and the most-represented paper as the
+    citation. That is a statement someone can check and disagree with, which
+    a cherry-picked record is not.
+
+    ``factor`` converts BRENDA's unit to the spec's -- 1000 for millimolar
+    to micromolar -- and is applied to the median, never assumed.
+    """
+    usable = [r for r in records if r.citable and r.value is not None]
+    if not usable:
+        return ["no citable records to aggregate"]
+
+    values = sorted(r.value * factor for r in usable)
+    middle = len(values) // 2
+    median = (values[middle] if len(values) % 2
+              else (values[middle - 1] + values[middle]) / 2.0)
+
+    papers: Dict[str, int] = {}
+    for record in usable:
+        papers[record.pmid] = papers.get(record.pmid, 0) + 1
+    dominant = max(papers.items(), key=lambda kv: kv[1])[0]
+    substrates = sorted({r.substrate for r in usable})
+    spec = PARAMETER_SPECS.get(parameter)
+
+    # With one record there is no aggregation to describe: it is a single
+    # measurement from a single paper, which is what MEASURED means.
+    single = len(usable) == 1
+    return set_parameter(entity, parameter, ParameterValue(
+        value=float(median),
+        unit=spec.unit if spec else usable[0].unit,
+        provenance=Provenance.MEASURED if single else Provenance.DERIVED,
+        citation=f"PMID:{dominant}",
+        source=f"BRENDA EC {usable[0].ec_number} (CC BY 4.0), "
+               f"{len(usable)} records across {len(papers)} papers",
+        conditions="; ".join(p for p in (
+            f"substrate: {substrates[0]}" if len(substrates) == 1
+            else f"substrates: {', '.join(s[:28] for s in substrates[:3])}",
+            "Homo sapiens, wild-type",
+            note,
+        ) if p),
+        rationale="" if single else (
+            f"median of {len(usable)} BRENDA measurements across "
+            f"{len(papers)} papers, spanning {values[0]:.4g} to "
+            f"{values[-1]:.4g} {spec.unit if spec else usable[0].unit}. "
+            f"The citation names the paper contributing most records "
+            f"({papers[dominant]} of {len(usable)}); a single record would "
+            f"have been an arbitrary pick from that spread"
+        ),
     ), strict=False)

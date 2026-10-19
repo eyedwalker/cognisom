@@ -319,3 +319,94 @@ def test_a_brenda_reference_id_is_not_treated_as_a_pubmed_id():
                                      "title": "A paper", "year": "2010"}})
     assert with_refs[0].pmid == "20580860"
     assert with_refs[0].citable
+
+
+# ── a shared EC number is not a protein ──────────────────────────────────
+
+def test_a_shared_ec_number_is_refused(monkeypatch):
+    """EC 2.7.10.2 is carried by 44 reviewed human proteins.
+
+    JAK1, JAK2, SRC and BTK all map to it and BRENDA returns the same nine
+    turnover numbers for each, every one measured on ATP rather than on the
+    protein substrate the kinase acts on. Writing those as JAK1's kcat
+    would attach four real papers to a number that is not JAK1's. This is
+    the check that stops it, and it is the difference between mining a
+    database and manufacturing citations from one.
+    """
+    import cognisom.library.brenda_sourcing as mod
+    from cognisom.library.brenda_sourcing import BrendaError
+
+    monkeypatch.setattr(mod, "proteins_sharing_ec", lambda ec, s=None: 44)
+
+    with pytest.raises(BrendaError) as exc:
+        mod.candidates("2.7.10.2", "kcat")
+
+    assert "44" in str(exc.value)
+    assert "class" in str(exc.value)
+
+
+def test_a_single_protein_ec_is_allowed(monkeypatch):
+    import cognisom.library.brenda_sourcing as mod
+
+    monkeypatch.setattr(mod, "proteins_sharing_ec", lambda ec, s=None: 1)
+    monkeypatch.setattr(mod, "km_values", lambda *a, **k: [])
+
+    assert mod.candidates("3.4.22.56", "km") == []
+
+
+# ── aggregating across papers ────────────────────────────────────────────
+
+def _k(value, pmid, substrate="L-tryptophan"):
+    return KineticRecord(ec_number="1.13.11.52", parameter="km", value=value,
+                         unit="mM", substrate=substrate,
+                         organism="Homo sapiens", literature="1", pmid=pmid)
+
+
+def test_the_median_is_written_as_derived_with_the_spread_recorded():
+    """One record out of forty-one would be an arbitrary pick."""
+    from cognisom.library.brenda_sourcing import accept_median
+
+    enzyme = Protein(name="IDO1")
+    records = [_k(0.001, "111"), _k(0.02, "111"), _k(0.02, "222"),
+               _k(0.5, "222"), _k(6.8, "333")]
+
+    problems = accept_median(enzyme, "km_um", records, factor=1000.0)
+
+    assert problems == []
+    stored = get_parameter(enzyme, "km_um")
+    assert stored.value == pytest.approx(20.0), "median of the five, in uM"
+    assert stored.provenance is Provenance.DERIVED
+    assert "median of 5" in stored.rationale
+    assert "3 papers" in stored.rationale
+    assert stored.citation in ("PMID:111", "PMID:222")
+
+
+def test_a_single_record_is_measured_not_derived():
+    """With one record there is no aggregation to describe."""
+    from cognisom.library.brenda_sourcing import accept_median
+
+    enzyme = Protein(name="TMPRSS2")
+
+    accept_median(enzyme, "kcat_per_s", [_k(18.0, "35676539", "Boc-LGR-AMC")])
+
+    stored = get_parameter(enzyme, "kcat_per_s")
+    assert stored.provenance is Provenance.MEASURED
+    assert stored.citation == "PMID:35676539"
+
+
+def test_the_unit_factor_is_applied_to_the_median_not_assumed():
+    from cognisom.library.brenda_sourcing import accept_median
+
+    enzyme = Protein(name="IDO1")
+
+    accept_median(enzyme, "km_um", [_k(0.02, "111")], factor=1000.0)
+
+    assert get_parameter(enzyme, "km_um").value == pytest.approx(20.0), (
+        "BRENDA reports mM and km_um is micromolar; without the factor the "
+        "value is a thousandfold wrong")
+
+
+def test_aggregating_nothing_is_refused():
+    from cognisom.library.brenda_sourcing import accept_median
+
+    assert accept_median(Protein(name="x"), "km_um", [])
