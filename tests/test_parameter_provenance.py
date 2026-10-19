@@ -31,6 +31,7 @@ from cognisom.library.parameters import (
     get_parameter,
     iter_parameters,
     required_for,
+    required_for_entity,
     set_parameter,
     specs_for,
 )
@@ -213,14 +214,17 @@ def test_iter_parameters_skips_bookkeeping_keys():
 def test_entity_is_not_ready_until_required_parameters_are_curated():
     cell = ImmuneCellEntity(name="NK cell")
     assert not assess(cell).is_ready
-    assert set(assess(cell).missing) == set(required_for(EntityType.IMMUNE_CELL))
+    # required_for_entity, not required_for: the type-level set now includes
+    # lifespan_hours, which applies only to post-mitotic lineages and is
+    # reported not-applicable for an NK cell rather than missing.
+    assert set(assess(cell).missing) == set(required_for_entity(cell))
 
 
 def test_placeholder_values_do_not_make_an_entity_ready():
     """The whole point: a number present but unevidenced still counts as
     uncurated."""
     cell = ImmuneCellEntity(name="NK cell")
-    for name in required_for(EntityType.IMMUNE_CELL):
+    for name in required_for_entity(cell):
         cell.physics_params[name] = 1.0
 
     readiness = assess(cell)
@@ -231,7 +235,7 @@ def test_placeholder_values_do_not_make_an_entity_ready():
 
 def test_curating_every_required_parameter_makes_an_entity_ready():
     cell = ImmuneCellEntity(name="NK cell")
-    for name, spec in required_for(EntityType.IMMUNE_CELL).items():
+    for name, spec in required_for_entity(cell).items():
         set_parameter(cell, name, ParameterValue(
             value=1.0, unit=spec.unit, provenance=Provenance.ESTIMATED,
             rationale="test fixture",
@@ -241,7 +245,7 @@ def test_curating_every_required_parameter_makes_an_entity_ready():
 
 def test_coverage_counts_and_prioritizes():
     ready = ImmuneCellEntity(name="curated")
-    for name, spec in required_for(EntityType.IMMUNE_CELL).items():
+    for name, spec in required_for_entity(ready).items():
         set_parameter(ready, name, ParameterValue(
             value=1.0, unit=spec.unit, provenance=Provenance.ESTIMATED,
             rationale="test fixture",

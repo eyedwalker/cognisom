@@ -135,8 +135,12 @@ def test_an_unknown_lineage_stays_applicable():
 
     r = assess(entity)
 
-    assert not r.not_applicable
-    assert set(r.missing) == set(required_for(EntityType.IMMUNE_CELL))
+    # A lineage nothing knows about is assumed to divide, so it owes a
+    # division time and not a lifespan. Nothing else is excused.
+    assert set(r.not_applicable) == {"lifespan_hours"}
+    assert set(r.missing) == set(required_for_entity(entity))
+    for p in KILL_PARAMS:
+        assert p in r.missing, f"{p} was excused for an unknown lineage"
 
 
 # ── honesty of the headline numbers ──────────────────────────────────────
@@ -228,7 +232,7 @@ def test_required_for_is_still_type_level():
     """curation_report uses it as a skip guard and a test pins its keys."""
     assert set(required_for(EntityType.IMMUNE_CELL)) == {
         "detection_radius_um", "division_time_hours", "kill_probability",
-        "kill_radius_um", "radius_um",
+        "kill_radius_um", "radius_um", "lifespan_hours",
     }
 
 
@@ -393,10 +397,14 @@ def test_the_defaults_are_inverted_for_lifespan(immune_rows, all_rows):
         1 for e in cells
         if (e.physics_params or {}).get("apoptosis_rate_per_hour"))
 
-    assert immune_apoptosis == 0 and cell_apoptosis == len(cells), (
-        f"the asymmetry has changed ({immune_apoptosis} immune, "
-        f"{cell_apoptosis}/{len(cells)} cell_type); update the note on "
-        "_NOT_CYCLING")
+    # The three retyped endothelial rows are cell_types that carry no
+    # apoptosis rate, so the count is now 12 of 15 rather than all of them.
+    assert immune_apoptosis == 0, (
+        f"{immune_apoptosis} immune rows now carry an apoptosis rate; the "
+        "asymmetry described on _NOT_CYCLING has changed")
+    assert cell_apoptosis >= 12, (
+        f"only {cell_apoptosis}/{len(cells)} cell_types carry an apoptosis "
+        "rate; update the note on _NOT_CYCLING")
 
 
 def test_the_unitless_consumption_rate_is_still_one_default(all_rows):

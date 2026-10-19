@@ -647,6 +647,13 @@ class CellTypeEntity(BioEntity):
     tissue_origin: str = ""
     markers: List[str] = field(default_factory=list)  # surface markers
     lineage: str = ""  # epithelial, mesenchymal, etc.
+    #: Mediators this cell releases. Present so that a row retyped here
+    #: from IMMUNE_CELL keeps them: that class stores the same information
+    #: under cytokines_secreting, and without this field a retype silently
+    #: dropped it. The HEV row's CCL21 and CCL19 are the CCR7 ligands that
+    #: arrest lymphocytes, so losing them would delete the mechanism the
+    #: row exists to describe.
+    cytokines_secreting: List[str] = field(default_factory=list)
 
     def _extra_properties(self) -> dict:
         return {
@@ -654,13 +661,17 @@ class CellTypeEntity(BioEntity):
             "tissue_origin": self.tissue_origin,
             "markers": self.markers,
             "lineage": self.lineage,
+            "cytokines_secreting": self.cytokines_secreting,
         }
 
     def _apply_properties(self, props: dict):
         self.cell_ontology_id = props.get("cell_ontology_id", "")
         self.tissue_origin = props.get("tissue_origin", "")
-        self.markers = props.get("markers", [])
+        # surface_markers is what ImmuneCellEntity calls the same list, so
+        # a row retyped from there keeps its markers instead of losing them.
+        self.markers = props.get("markers") or props.get("surface_markers") or []
         self.lineage = props.get("lineage", "")
+        self.cytokines_secreting = props.get("cytokines_secreting", [])
 
 
 @dataclass

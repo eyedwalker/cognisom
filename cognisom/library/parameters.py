@@ -421,11 +421,6 @@ _NO_CONTACT_CYTOTOXICITY: Dict[Tuple[str, str], str] = {
         "appears in this row's surface_markers and the library elsewhere "
         "calls NKp44 a natural cytotoxicity receptor, but on ILC3 it marks "
         "the IL-22-producing subset and confers no lytic function",
-    ("endothelial", ""):
-        "vascular endothelium does not kill tumour cells. This row is "
-        "typed IMMUNE_CELL but its own immune_type says endothelial; it "
-        "belongs to the vessel wall, and its role here is leukocyte "
-        "adhesion and transmigration",
 }
 
 #: Lineages that are terminally differentiated: a division time is not a
@@ -471,6 +466,12 @@ _NOT_CYCLING: Dict[Tuple[str, str], str] = {
         "maintained by precursor influx",
 }
 
+# ("endothelial", "") was here until the three vessel-wall rows were retyped
+# to CELL_TYPE, which is the real fix: they are no longer immune cells, so
+# the kill parameters are not declared for them at all and nothing needs to
+# exclude them. The key is gone rather than kept, because a table entry that
+# can never match is config that looks like a safeguard and is not one.
+#
 # Deliberately NOT excluded from the kill parameters, each for a stated
 # reason, because excluding them would delete a live question:
 #   Treg            its own description lists granzyme-B/perforin killing of
@@ -535,20 +536,77 @@ def _catalytic_not_a_receptor(entity) -> Optional[str]:
     return _CATALYTIC_NOT_A_RECEPTOR.get(getattr(entity, "name", ""))
 
 
-def km_substrate(entity) -> str:
-    """The substrate this entity's ``km_um`` was measured against.
+def alias_sources(entity, canonical: str) -> List[Tuple[str, float, str]]:
+    """Every legacy key on ``entity`` that can supply ``canonical``.
 
-    Empty when the entity carries no recognised Michaelis constant, or
-    when one was written directly under ``km_um`` with the substrate in
-    the ParameterValue conditions rather than in the key name.
+    Returns ``(legacy_name, converted_value, partner)`` per source, so a
+    caller can see when more than one exists. That is not hypothetical:
+    TP53 carries both ``dna_binding_kd_nm`` (0.5) and
+    ``tetramerization_kd_nm`` (5.0), and a plain read of
+    ``binding_kd_nm`` returns whichever alias is declared first, which is
+    an arbitrary answer to a question that has two.
     """
     params = getattr(entity, "physics_params", None) or {}
+    out: List[Tuple[str, float, str]] = []
     for alias in PARAMETER_ALIASES:
-        if alias.canonical != "km_um" or not alias.substrate:
+        if alias.canonical != canonical or alias.attribute:
             continue
-        if params.get(alias.legacy):
-            return alias.substrate
-    return ""
+        raw = params.get(alias.legacy)
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw:
+            out.append((alias.legacy, float(raw) * alias.factor, alias.substrate))
+    return out
+
+
+def parameter_partner(entity, canonical: str) -> str:
+    """The partner or substrate ``canonical`` was measured against.
+
+    Empty when nothing recorded one, and empty when the entity carries
+    more than one source, because in that case there is no single answer
+    and returning one of them would hide the ambiguity.
+    """
+    sources = [p for _, _, p in alias_sources(entity, canonical) if p]
+    return sources[0] if len(sources) == 1 else ""
+
+
+def km_substrate(entity) -> str:
+    """The substrate this entity's ``km_um`` was measured against."""
+    return parameter_partner(entity, "km_um")
+
+
+#: What the library's own descriptions say about how long the post-mitotic
+#: lineages live. Quoted rather than paraphrased, because these are the only
+#: lifespan statements the repository holds and whoever fills lifespan_hours
+#: should start from them rather than from recall. Two of the six are
+#: covered; the other four say nothing about lifespan at all.
+_LIFESPAN_EVIDENCE: Dict[Tuple[str, str], str] = {
+    ("neutrophil", "neutrophil"):
+        "its own description: 'Neutrophils are short-lived (~5-90 hours in "
+        "circulation) and undergo constitutive apoptosis'. The range spans "
+        "18-fold, so a single scalar needs the range recorded in conditions",
+    ("B_cell", "plasma_cell"):
+        "its own description gives two populations, not one: short-lived "
+        "plasmablasts '(~3-5 days)' and long-lived bone-marrow residents "
+        "that 'persist for decades'. Roughly three orders of magnitude "
+        "apart, so one scalar misrepresents this row until it is split",
+}
+
+
+def _cycles(entity) -> Optional[str]:
+    """Why a lifespan is not the temporal parameter for this lineage.
+
+    The inverse of :data:`_NOT_CYCLING`. A cell either divides or it does
+    not, and whichever is true decides which temporal parameter it owes:
+    a cycling lineage is described by its division time, a post-mitotic
+    one only by how long it lives. Declaring it this way means the six
+    post-mitotic rows are asked for a lifespan and nothing else is.
+    """
+    if _lineage(entity) in _NOT_CYCLING:
+        return None
+    return (
+        "this lineage divides, so its temporal parameter is "
+        "division_time_hours; a lifespan is the parameter for a cell that "
+        "cannot divide"
+    )
 
 
 def _lineage(entity) -> Tuple[str, str]:
@@ -720,6 +778,126 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         required_for_simulation=True,
         inapplicable_when=_not_contact_cytotoxic,
     ),
+    # ── Binding constants beyond the receptor path ──
+    # Eighteen key spellings carry a dissociation constant, most of them
+    # naming their partner (vegfr2_kd_pm, sirpa_kd_nm, dna_binding_kd_nm).
+    # kd_nm is deliberately not widened to cover them: it is
+    # required_for_simulation, so extending its applies_to would put a
+    # hundred new rows on the curation worklist for a parameter those types
+    # are not simulated through. This is the same quantity under a spec that
+    # describes rather than demands.
+    _spec(
+        "binding_kd_nm", "nM",
+        "Dissociation constant for a named binding partner. The partner "
+        "belongs in the ParameterValue conditions, not in the parameter "
+        "name; the alias table records which partner each legacy spelling "
+        "referred to.",
+        (EntityType.GENE, EntityType.PROTEIN, EntityType.CYTOKINE,
+         EntityType.LIGAND, EntityType.RECEPTOR, EntityType.METABOLITE),
+        minimum=0.0, maximum=1e9,
+    ),
+
+    # ── Drug response ──
+    # Nineteen drug rows carry these five. They are bounded fractions and
+    # multipliers whose range is the only check available, since a
+    # dimensionless effect has no unit to validate against.
+    _spec(
+        "exhaustion_reversal", "dimensionless",
+        "Fraction of T-cell exhaustion this agent reverses, 0 to 1.",
+        (EntityType.DRUG,), minimum=0.0, maximum=1.0,
+    ),
+    _spec(
+        "treg_effect", "dimensionless",
+        "Signed effect on regulatory T-cell activity: negative depletes, "
+        "positive expands.",
+        (EntityType.DRUG,), minimum=-1.0, maximum=1.0,
+    ),
+    _spec(
+        "irae_base_risk", "dimensionless",
+        "Baseline probability of an immune-related adverse event, 0 to 1.",
+        (EntityType.DRUG,), minimum=0.0, maximum=1.0,
+    ),
+    _spec(
+        "effect_onset_days", "d",
+        "Days from first dose until an effect is measurable.",
+        (EntityType.DRUG,), minimum=0.0, maximum=3650.0,
+    ),
+    _spec(
+        "effect_ramp_days", "d",
+        "Days from onset to full effect.",
+        (EntityType.DRUG,), minimum=0.0, maximum=3650.0,
+    ),
+    _spec(
+        "bioavailability", "dimensionless",
+        "Fraction of an administered dose reaching systemic circulation.",
+        (EntityType.DRUG,), minimum=0.0, maximum=1.0,
+    ),
+    _spec(
+        "volume_of_distribution_L", "L",
+        "Apparent volume of distribution for a standard adult.",
+        (EntityType.DRUG,), minimum=0.0, maximum=1e4,
+    ),
+
+    # ── Mutation and gene-level effects ──
+    _spec(
+        "mhc1_downregulation_effect", "dimensionless",
+        "Fraction by which this lesion lowers MHC class I surface "
+        "presentation, 0 to 1.",
+        (EntityType.GENE, EntityType.MUTATION), minimum=0.0, maximum=1.0,
+    ),
+    _spec(
+        "tumor_growth_multiplier", "dimensionless",
+        "Multiplier on baseline tumour growth rate; 1.0 is no effect.",
+        (EntityType.GENE, EntityType.MUTATION), minimum=0.0, maximum=100.0,
+    ),
+
+    # ── Molecular properties ──
+    _spec(
+        "molecular_weight_kda", "kDa",
+        "Molecular mass. Declared in kilodaltons because that is the unit "
+        "the library already writes; mass_daltons is absent on every entity.",
+        (EntityType.PROTEIN, EntityType.CYTOKINE, EntityType.LIGAND,
+         EntityType.RECEPTOR, EntityType.ANTIBODY, EntityType.GENE),
+        minimum=0.0, maximum=1e5,
+    ),
+    _spec(
+        "normal_concentration_mM", "mM",
+        "Physiological concentration in the compartment this metabolite "
+        "is modelled in.",
+        (EntityType.METABOLITE,), minimum=0.0, maximum=1e4,
+    ),
+    _spec(
+        "production_rate_pg_per_cell_per_hour", "pg/cell/h",
+        "Mass secreted per cell per hour. Distinct from "
+        "secretion_rate_molecules_per_cell_per_hour: converting between "
+        "them needs the molecular weight, so they are separate parameters "
+        "rather than aliases.",
+        (EntityType.CYTOKINE, EntityType.LIGAND),
+        minimum=0.0, maximum=1e6,
+    ),
+    _spec(
+        "transcription_rate_mrna_per_hour", "mRNA/h",
+        "Transcripts produced per hour per active gene copy.",
+        (EntityType.GENE,), minimum=0.0, maximum=1e5,
+    ),
+    _spec(
+        "endocytosis_rate_per_min", "1/min",
+        "Rate constant for receptor internalisation.",
+        (EntityType.RECEPTOR,), minimum=0.0, maximum=10.0,
+    ),
+
+    # ── Viral replication ──
+    _spec(
+        "replication_cycle_hours", "h",
+        "Time from cell entry to release of progeny virions.",
+        (EntityType.VIRUS,), minimum=0.0, maximum=1e4,
+    ),
+    _spec(
+        "burst_size", "virions/cell",
+        "Progeny virions released per infected cell.",
+        (EntityType.VIRUS,), minimum=0.0, maximum=1e6,
+    ),
+
     # ── Enzyme kinetics ──
     # 26 entities carry a turnover number or a Michaelis constant and no
     # spec described either, so both were written with no unit check. The
@@ -742,6 +920,20 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         "ParameterValue conditions, not in the parameter name.",
         (EntityType.GENE, EntityType.PROTEIN, EntityType.RECEPTOR),
         minimum=0.0, maximum=1e6,
+    ),
+    _spec(
+        "lifespan_hours", "h",
+        "How long a post-mitotic cell survives before clearance. Required "
+        "of exactly the lineages division_time_hours does not apply to, so "
+        "every cell owes one temporal parameter and no cell owes both. "
+        "Where a lineage's span is a range or is bimodal -- a neutrophil's "
+        "5-90 h, a plasma cell's days against decades -- record the range "
+        "in the ParameterValue conditions; see _LIFESPAN_EVIDENCE for what "
+        "the library's own descriptions already state.",
+        (EntityType.IMMUNE_CELL, EntityType.CELL_TYPE),
+        minimum=0.0, maximum=1e6,
+        required_for_simulation=True,
+        inapplicable_when=_cycles,
     ),
     _spec(
         "exhaustion_rate", "1/h",
@@ -868,6 +1060,102 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
     ParameterAlias(
         "ligand_kd_nm", "kd_nm", 1.0,
         "the same quantity in the same unit under a different name",
+    ),
+    # Dissociation constants, written under sixteen further spellings that
+    # each name their binding partner. They alias onto one binding_kd_nm and
+    # record the partner, because a Kd is only a Kd for the pair it was
+    # measured on -- the same rule the Km aliases follow. Only TP53 carries
+    # two of these (its DNA-binding and tetramerization constants), which is
+    # exactly why the partner has to travel with the number.
+    ParameterAlias(
+        "dna_binding_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="its DNA response element",
+    ),
+    ParameterAlias(
+        "p53_binding_kd_um", "binding_kd_nm", 1000.0,
+        "micromolar to nanomolar: 1 uM = 1000 nM",
+        substrate="p53",
+    ),
+    ParameterAlias(
+        "tetramerization_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="itself (tetramer assembly)",
+    ),
+    ParameterAlias(
+        "e2f_binding_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="E2F",
+    ),
+    ParameterAlias(
+        "substrate_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="its substrate",
+    ),
+    ParameterAlias(
+        "bh3_groove_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="a BH3 domain",
+    ),
+    ParameterAlias(
+        "vegfr2_kd_pm", "binding_kd_nm", 0.001,
+        "picomolar to nanomolar: 1 pM = 0.001 nM",
+        substrate="VEGFR2",
+    ),
+    ParameterAlias(
+        "met_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="MET",
+    ),
+    ParameterAlias(
+        "egfr_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="EGFR",
+    ),
+    ParameterAlias(
+        "bmpr1a_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="BMPR1A",
+    ),
+    ParameterAlias(
+        "sirpa_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="SIRP-alpha",
+    ),
+    ParameterAlias(
+        "kit_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="KIT",
+    ),
+    ParameterAlias(
+        "igf1r_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="IGF1R",
+    ),
+    ParameterAlias(
+        "fgfr1_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="FGFR1",
+    ),
+    ParameterAlias(
+        "il2rb_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="IL2RB",
+    ),
+    ParameterAlias(
+        "pdgfrb_kd_nm", "binding_kd_nm", 1.0,
+        "the same quantity in nanomolar, qualified by partner",
+        substrate="PDGFRB",
+    ),
+    # Two more exact conversions, each the same quantity under a spelling
+    # that states a different unit.
+    ParameterAlias(
+        "molecular_weight_da", "molecular_weight_kda", 1e-3,
+        "daltons to kilodaltons: 1 Da = 0.001 kDa",
+    ),
+    ParameterAlias(
+        "half_life_min", "half_life_hours", 1.0 / 60.0,
+        "minutes to hours: 1 min = 1/60 h",
     ),
     # kcat, written under six names and in two different time units. The
     # per-minute pair is the hazard: `methyltransferase_kcat_per_min` 1.5

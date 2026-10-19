@@ -25,6 +25,7 @@ from .models import (
     Antibody,
     Antigen,
     Bacterium,
+    CellTypeEntity,
     ComplementComponent,
     Cytokine,
     Drug,
@@ -2037,15 +2038,31 @@ def _seed_endothelial_cells(store: EntityStore) -> int:
         name, immune_type, subtype, markers, cytokines, desc = row[:6]
         params = row[6] if len(row) > 6 else {}
 
-        entity = ImmuneCellEntity(
-            name=name,
-            description=desc,
-            immune_type=immune_type,
-            immune_subtype=subtype,
-            surface_markers=markers,
-            cytokines_secreting=cytokines,
-            **params,
-        )
+        if immune_type == "endothelial":
+            # Vessel wall, not a leukocyte. These rows belong here because
+            # leukocytes adhere to and cross them, but typing them
+            # IMMUNE_CELL made the parameter specs demand a kill radius and
+            # a kill probability of a blood vessel, and put a lymphocyte
+            # crawling speed on a junction-anchored sessile cell. Their own
+            # immune_type field has always said endothelial.
+            entity = CellTypeEntity(
+                name=name,
+                description=desc,
+                markers=markers,
+                cytokines_secreting=cytokines,
+                lineage="endothelial",
+                **params,
+            )
+        else:
+            entity = ImmuneCellEntity(
+                name=name,
+                description=desc,
+                immune_type=immune_type,
+                immune_subtype=subtype,
+                surface_markers=markers,
+                cytokines_secreting=cytokines,
+                **params,
+            )
         if store.add_entity(entity):
             count += 1
 
