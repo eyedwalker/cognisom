@@ -32,8 +32,17 @@ from cognisom.library.parameters import Provenance, get_parameter
 
 @pytest.fixture
 def no_credentials(monkeypatch):
+    """Neither the environment nor the project's .env supplies them.
+
+    Both have to be neutralised: credentials() falls back to the .env file
+    the library's other secrets live in, so clearing the environment alone
+    leaves a developer's real credentials in play and the test passes or
+    fails depending on whose machine it runs on.
+    """
+    import cognisom.library.brenda_sourcing as mod
     monkeypatch.delenv("BRENDA_EMAIL", raising=False)
     monkeypatch.delenv("BRENDA_PASSWORD", raising=False)
+    monkeypatch.setattr(mod, "_from_env_file", lambda key: "")
 
 
 # ── access, and refusing without it ──────────────────────────────────────
