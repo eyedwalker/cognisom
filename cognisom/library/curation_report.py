@@ -127,6 +127,30 @@ def build_report(
         )
         lines.append("")
 
+    # A model construct cannot be sourced, only calibrated, so listing it
+    # beside a protein mass sends a curator looking for a paper that does
+    # not exist. Split rather than hidden: these still need work, but a
+    # different kind.
+    constructs = {n: c for n, c in worklist.items()
+                  if (PARAMETER_SPECS.get(n) is not None
+                      and PARAMETER_SPECS[n].model_construct)}
+    worklist = {n: c for n, c in worklist.items() if n not in constructs}
+
+    if constructs:
+        lines.append("── to calibrate, not to source ───────────")
+        for name, count in sorted(constructs.items(), key=lambda kv: (-kv[1], kv[0])):
+            spec = PARAMETER_SPECS.get(name)
+            desc = f" — {spec.description}" if spec else ""
+            lines.append(f"   {count:>4} entities need {name}{desc}")
+        lines.append("")
+        lines.append(
+            "These are abstractions over a process, not quantities anybody "
+            "measures, so no literature search will close them. They are "
+            "fitted until the model reproduces a stated observable and "
+            "recorded as CALIBRATED, which requires naming that observable."
+        )
+        lines.append("")
+
     if worklist:
         lines.append("── highest-value curation targets ─────────")
         for name, count in sorted(

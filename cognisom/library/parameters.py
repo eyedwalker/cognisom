@@ -131,6 +131,14 @@ class Provenance(str, Enum):
 
     PLACEHOLDER = "placeholder"
     ESTIMATED = "estimated"
+    #: Fitted so that the model reproduces a stated observable. Not a
+    #: measurement of the quantity itself -- nobody measures "the
+    #: per-contact kill probability of a CD8 T cell", because it is an
+    #: abstraction over a process -- but not a guess either, because it is
+    #: constrained by something real. Without this grade such values sit
+    #: as placeholders forever, counted as missing citations that no
+    #: database will ever supply.
+    CALIBRATED = "calibrated"
     DERIVED = "derived"
     MEASURED = "measured"
 
@@ -140,17 +148,24 @@ class Provenance(str, Enum):
 _PROVENANCE_RANK: Dict[Provenance, int] = {
     Provenance.PLACEHOLDER: 0,
     Provenance.ESTIMATED: 1,
-    Provenance.DERIVED: 2,
-    Provenance.MEASURED: 3,
+    Provenance.CALIBRATED: 2,
+    Provenance.DERIVED: 3,
+    Provenance.MEASURED: 4,
 }
 
 #: Provenance levels a simulation may legitimately consume.
 SIMULATION_GRADE = frozenset(
-    {Provenance.ESTIMATED, Provenance.DERIVED, Provenance.MEASURED}
+    {Provenance.ESTIMATED, Provenance.CALIBRATED, Provenance.DERIVED,
+     Provenance.MEASURED}
 )
 
 #: The stricter bar: values defensible in a paper or a patent filing.
-PUBLICATION_GRADE = frozenset({Provenance.DERIVED, Provenance.MEASURED})
+#: Defensible in a paper. A calibrated value qualifies only because it is
+#: required to name the observable it was fitted to, which is the thing a
+#: reviewer would ask for.
+PUBLICATION_GRADE = frozenset(
+    {Provenance.CALIBRATED, Provenance.DERIVED, Provenance.MEASURED}
+)
 
 
 @dataclass
@@ -171,6 +186,10 @@ class ParameterValue:
     #: Why this number, for values that are not straight measurements.
     #: Required for ESTIMATED and DERIVED.
     rationale: str = ""
+    #: What a CALIBRATED value was fitted to reproduce: the observable,
+    #: its source, and the tolerance. Required for that provenance, because
+    #: a calibration nobody can re-run is not evidence.
+    calibrated_against: str = ""
     #: Optional subjective confidence in [0, 1].
     confidence: Optional[float] = None
 
@@ -229,6 +248,12 @@ class ParameterValue:
                 "ESTIMATED requires a rationale saying what the estimate "
                 "is based on"
             )
+        if self.provenance is Provenance.CALIBRATED and not self.calibrated_against:
+            problems.append(
+                "CALIBRATED requires calibrated_against: the observable the "
+                "value was fitted to reproduce. A fit with no stated target "
+                "is a guess wearing a better word"
+            )
 
         if self.confidence is not None and not (0.0 <= self.confidence <= 1.0):
             problems.append(f"confidence must be in [0, 1], got {self.confidence}")
@@ -246,7 +271,8 @@ class ParameterValue:
             "unit": self.unit,
             "provenance": self.provenance.value,
         }
-        for key in ("citation", "source", "conditions", "rationale"):
+        for key in ("citation", "source", "conditions", "rationale",
+                    "calibrated_against"):
             val = getattr(self, key)
             if val:
                 d[key] = val
@@ -264,12 +290,14 @@ class ParameterValue:
             source=d.get("source", ""),
             conditions=d.get("conditions", ""),
             rationale=d.get("rationale", ""),
+            calibrated_against=d.get("calibrated_against", ""),
             confidence=d.get("confidence"),
         )
 
     def describe(self) -> str:
         """One-line human summary, for reports and dashboards."""
-        evidence = self.citation or self.source or self.rationale or "no evidence"
+        evidence = (self.citation or self.calibrated_against or self.source
+                    or self.rationale or "no evidence")
         return f"{self.value} {self.unit} [{self.provenance.value}: {evidence}]"
 
 
@@ -291,6 +319,15 @@ class ParameterSpec:
     maximum: Optional[float] = None
     #: True if a simulation cannot meaningfully use the entity without it.
     required_for_simulation: bool = False
+    #: True when the quantity is an abstraction over a process rather than
+    #: something anyone measures. Nobody reports "the per-contact kill
+    #: probability of a CD8 T cell": it stands in for synapse formation,
+    #: granule delivery and target resistance together, at whatever
+    #: timestep the model runs. Such a parameter can be calibrated against
+    #: an observable but never sourced, so a curation report that lists it
+    #: beside a protein mass is sending someone to look for a paper that
+    #: does not exist.
+    model_construct: bool = False
     #: Returns a reason this parameter does not apply to a particular entity,
     #: or None when it does. A reason rather than a bool, because an
     #: exclusion that cannot say why is the same defect as an uncited number
@@ -795,6 +832,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         (EntityType.IMMUNE_CELL,),
         minimum=0.0, maximum=1e3,
         required_for_simulation=True,
+        model_construct=True,
     ),
     _spec(
         "kill_radius_um", "um",
@@ -803,6 +841,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         minimum=0.0, maximum=1e3,
         required_for_simulation=True,
         inapplicable_when=_not_contact_cytotoxic,
+        model_construct=True,
     ),
     _spec(
         "kill_probability", "dimensionless",
@@ -815,6 +854,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         minimum=0.0, maximum=1.0,
         required_for_simulation=True,
         inapplicable_when=_not_contact_cytotoxic,
+        model_construct=True,
     ),
     # ── Binding constants beyond the receptor path ──
     # Eighteen key spellings carry a dissociation constant, most of them
@@ -843,12 +883,14 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         "exhaustion_reversal", "dimensionless",
         "Fraction of T-cell exhaustion this agent reverses, 0 to 1.",
         (EntityType.DRUG,), minimum=0.0, maximum=1.0,
+        model_construct=True,
     ),
     _spec(
         "treg_effect", "dimensionless",
         "Signed effect on regulatory T-cell activity: negative depletes, "
         "positive expands.",
         (EntityType.DRUG,), minimum=-1.0, maximum=1.0,
+        model_construct=True,
     ),
     _spec(
         "irae_base_risk", "dimensionless",
@@ -882,11 +924,13 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         "Fraction by which this lesion lowers MHC class I surface "
         "presentation, 0 to 1.",
         (EntityType.GENE, EntityType.MUTATION), minimum=0.0, maximum=1.0,
+        model_construct=True,
     ),
     _spec(
         "tumor_growth_multiplier", "dimensionless",
         "Multiplier on baseline tumour growth rate; 1.0 is no effect.",
         (EntityType.GENE, EntityType.MUTATION), minimum=0.0, maximum=100.0,
+        model_construct=True,
     ),
 
     # ── Molecular properties ──
@@ -999,6 +1043,7 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         "immune_cell name collision on.",
         (EntityType.IMMUNE_CELL,),
         minimum=0.0, maximum=1.0,
+        model_construct=True,
     ),
     _spec(
         "mhc1_expression", "dimensionless",
