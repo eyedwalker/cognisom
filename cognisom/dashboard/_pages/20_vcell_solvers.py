@@ -188,7 +188,12 @@ with tab_mol3d:
         show_trails = st.checkbox("Show molecule trails", False, key="show_trails")
         show_bonds = st.checkbox("Show molecular bonds", True, key="show_bonds")
 
-        run_mol3d = st.button("▶ Run Visualization", type="primary", key="run_mol3d")
+        # No button here: the viewer beside this column renders
+        # unconditionally (see "Always show the visualization" below), so a
+        # primary-styled "Run Visualization" control was assigned to
+        # run_mol3d and never read -- it was the only button in the whole
+        # dashboard that did nothing when pressed.
+        st.caption("The 3-D view updates with the scenario above.")
 
     with col_view3d:
         # Always show the visualization

@@ -323,7 +323,18 @@ st.caption("Look up experimentally measured rate constants from SABIO-RK databas
 
 enrich_entity = st.selectbox("Select entity to enrich", selected_names)
 
-if st.button("Query SABIO-RK", type="secondary"):
+# SABIO-RK retired its REST API: every path now redirects to an HTML 404
+# shell, which kinetics_client detects and reports as
+# KineticsSourceUnavailable rather than as "this enzyme has no data". The
+# button is kept so the capability is still visible and re-enables the day
+# the endpoint returns, but it is disabled rather than sending the user into
+# a guaranteed failure.
+st.caption(
+    "SABIO-RK's REST API has been retired — its paths redirect to an HTML "
+    "error page. Kinetic enrichment from this source is unavailable until "
+    "the endpoint returns or another source is wired in."
+)
+if st.button("Query SABIO-RK", type="secondary", disabled=True):
     with st.spinner(f"Querying SABIO-RK for {enrich_entity}..."):
         try:
             from cognisom.library.kinetics_client import SABIORKClient, enrich_entity_kinetics
