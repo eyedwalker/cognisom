@@ -16,9 +16,13 @@ non-lethal (contact to release). The durations come from the library:
     CD8+ T cell, lethal       75 min    human, PMID:23935904 (range midpoint)
     CD8+ T cell, non-lethal   8.5 min   mouse in vivo, PMID:26872694
     NK cell, lethal           19 min    human, PMID:31270246
+    NK cell, non-lethal       29 min    human resting NK, PMID:24639676
 
-and an illustrative default for the rest. Cancer cells starving below the
-hypoxia threshold die at a rate per hour rather than a probability per step.
+The macrophage has no sourced contact time and falls back to an
+illustrative default: it kills a tumour cell by nibbling over hours rather
+than by one timed engulfment, so no comparable measurement exists. Cancer
+cells starving below the hypoxia threshold die at a rate per hour rather
+than a probability per step.
 """
 from __future__ import annotations
 
@@ -40,6 +44,7 @@ from cognisom.modules.immune_module import (
 
 TARGET = 7
 NK_LETHAL_MIN = 19.0
+NK_NONLETHAL_MIN = 29.0
 
 
 class _Tissue:
@@ -104,8 +109,7 @@ def test_a_contact_that_does_not_kill_releases_the_cell_after_its_duration():
     times = [_one_contact(m, nk, 0.01)[0] * MINUTES_PER_HOUR for _ in range(400)]
     assert m.total_kills == 0
     assert nk.activated is False and nk.contact_ends_at is None
-    # The NK non-lethal contact has no library value yet: the default.
-    assert np.mean(times) == pytest.approx(DEFAULT_NONLETHAL_CONTACT_MIN + 0.3, abs=2.5)
+    assert np.mean(times) == pytest.approx(NK_NONLETHAL_MIN + 0.3, abs=4.0)
 
 
 # ── where the durations come from ───────────────────────────────────────
@@ -116,10 +120,17 @@ def test_each_contact_time_says_where_it_came_from():
     assert src["T_cell"]["lethal_contact_minutes"] == "CD8+ Effector T cell: derived:PMID:23935904"
     assert src["T_cell"]["nonlethal_contact_minutes"] == "CD8+ Effector T cell: estimated:PMID:26872694"
     assert src["NK_cell"]["lethal_contact_minutes"] == "NK cell: measured:PMID:31270246"
-    assert src["NK_cell"]["nonlethal_contact_minutes"].startswith("default (illustrative)")
-    assert src["macrophage"]["lethal_contact_minutes"].startswith("default (illustrative)")
+    assert src["NK_cell"]["nonlethal_contact_minutes"] == "NK cell: derived:PMID:24639676"
     assert m._contact_minutes_for("T_cell", True) == 75.0
+    assert m._contact_minutes_for("NK_cell", False) == NK_NONLETHAL_MIN
+    # The macrophage has no sourced contact time, and that is a gap in the
+    # literature: it kills by nibbling over hours, not by one timed
+    # engulfment. Both its contacts fall back, and say so.
+    for lethal, field in ((True, "lethal_contact_minutes"),
+                          (False, "nonlethal_contact_minutes")):
+        assert src["macrophage"][field].startswith("default (illustrative)")
     assert m._contact_minutes_for("macrophage", True) == DEFAULT_LETHAL_CONTACT_MIN
+    assert m._contact_minutes_for("macrophage", False) == DEFAULT_NONLETHAL_CONTACT_MIN
 
 
 def test_config_outranks_the_library():

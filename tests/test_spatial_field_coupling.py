@@ -347,23 +347,25 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     #
     # Cancer: 22 survived while the chase step was frozen (x0.01 for x60);
     # 0 once chasing cells moved but every contact rolled its kill
-    # probability each step and killed within a step or two; 7 now that a
+    # probability each step and killed within a step or two; 6 now that a
     # contact has one outcome and lasts a measured time (a lethal NK
-    # contact averages 19 min, a T cell's 75), so some tumour cells divide
-    # before they are killed. Every death is still an immune kill.
-    assert len([c for c in alive if c.cell_type == "cancer"]) == 7
-    assert cells.total_deaths == 10
-    assert _deaths(runner, "immune_killed", "cancer") == 10
+    # contact averages 19 min, a T cell's 75, and a failed NK contact ties
+    # the cell up for 29), so some tumour cells divide before they are
+    # killed. Every death is still an immune kill.
+    assert len([c for c in alive if c.cell_type == "cancer"]) == 6
+    assert cells.total_deaths == 9
+    assert _deaths(runner, "immune_killed", "cancer") == 9
     # 80 normal divisions -- each normal cell divides once, now at a time
-    # staggered over the day rather than all on the final step -- plus 7
+    # staggered over the day rather than all on the final step -- plus 5
     # cancer divisions that come before the kill.
-    assert cells.total_divisions == 87
+    assert cells.total_divisions == 85
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(425.7635, abs=0.01)
-    # The oxygen floor: no normal cell hypoxic, none near death.
+        pytest.approx(423.5066, abs=0.01)
+    # The oxygen floor. One daughter sits near the edge of its capillary's
+    # reach, hypoxic but alive; no normal cell is near death.
     assert min(c.oxygen for c in alive) > 0.02          # the death threshold
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0585, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0550, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -384,19 +386,21 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     alive = [c for c in cells.cells.values() if c.alive]
 
     # The mechanism: normal cells starve in this preset and in no other.
-    assert _deaths(runner, "hypoxia", "normal") == 59
+    assert _deaths(runner, "hypoxia", "normal") == 60
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
     # Cancer cells starve here too when the immune compartment does not
     # reach them first: 16 while the chase step was frozen, 0 while every
-    # contact killed within a step or two, 3 now that a kill takes a
-    # measured contact time.
-    assert _deaths(runner, "hypoxia", "cancer") == 3
-    assert _deaths(runner, "immune_killed", "cancer") == 24
-    assert cells.total_deaths == 86
-    # The 24 h snapshot: the survivors are the 11 best-perfused normal cells.
+    # contact killed within a step or two, 7 now that a kill takes a
+    # measured contact time and a failed one ties the effector up for
+    # another 29 min.
+    assert _deaths(runner, "hypoxia", "cancer") == 7
+    assert _deaths(runner, "immune_killed", "cancer") == 20
+    assert cells.total_deaths == 87
+    # The 24 h snapshot: the survivors are the 10 best-perfused normal
+    # cells, and 3 cancer cells the compartment never got to.
     assert vascular.hypoxic_regions == 0
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0611, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0734, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

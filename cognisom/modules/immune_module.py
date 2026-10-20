@@ -112,11 +112,18 @@ LINEAGE_ENTITY = {
 
 
 #: Contact durations in minutes, for a lineage the library has no
-#: simulation-grade value for. ILLUSTRATIVE: chosen, not measured. Today the
-#: library supplies the T cell's lethal (75 min) and non-lethal (8.5 min)
-#: contacts and the NK cell's lethal contact (19 min); the macrophage's
-#: and the NK cell's non-lethal contact fall back to these. See
-#: ImmuneModule._engage.
+#: simulation-grade value for. ILLUSTRATIVE: chosen, not measured. The
+#: library supplies both T-cell contacts (75 and 8.5 min) and both NK
+#: contacts (19 and 29 min); the MACROPHAGE falls back to these, and that
+#: is a gap in the literature rather than an unsearched one. A macrophage
+#: does not kill a tumour cell by one timed engulfment: it nibbles, and
+#: whole-cell clearance takes hours of repeated trogocytosis (~25% of
+#: targets phagocytosed in 3 h at an effector:target ratio of 10:1,
+#: PMID:27226489; macrophage clusters need ~24 h on a tumouroid,
+#: PMID:37095318). The engulfment times that ARE measured per event are
+#: for beads and red cells (under 20 min, PMID:39453740), not tumour
+#: cells. So no contact-to-death time comparable to the CTL and NK ones
+#: was found, and none is invented here. See ImmuneModule._engage.
 DEFAULT_LETHAL_CONTACT_MIN = 60.0
 DEFAULT_NONLETHAL_CONTACT_MIN = 15.0
 CONTACT_FIELDS = ('lethal_contact_minutes', 'nonlethal_contact_minutes')

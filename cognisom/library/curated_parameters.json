@@ -2506,6 +2506,15 @@
      "source": "Prager I et al., J Exp Med 2019 (PMC6719417)",
      "unit": "min",
      "value": 19.0
+    },
+    "nonlethal_contact_minutes": {
+     "citation": "PMID:24639676",
+     "conditions": "Human: resting NK cells from healthy-donor buffy coats, on HEK293T targets, time-lapse microscopy over 8 h. Conjugation is scored as \"the NK cell assumes a rounded morphology with membrane flattening at the site of intercellular contact\", distinct from a following \"attachment\" phase in which it \"remains attached to the target cell but visibly seeks to migrate away\". \"On average, activated NK cells remained conjugated to target cells twice as long (65 vs. 29 min, p < 0.005) ... as resting NK cells.\"",
+     "provenance": "derived",
+     "rationale": "The 29 min is the mean conjugation of RESTING NK cells, which in this assay \"showed a significantly lower ability to kill HEK293T cells than activated cells\" -- so their conjugations are predominantly the non-lethal ones, which is the quantity wanted. It is the committed conjugate, not any touch: a study scoring contact as bare co-localization of the two cells reports most NK-target interactions as transient, under 4 min (PMID:27323411), and those brushes are encounters a simulation filters out at recognition rather than contacts it times. Longer than the 19 min lethal contact, as expected -- a synapse that fails to kill is the more stable one (perforin-null CTL synapses persist for hours, PMID:37500886). In 3D collagen the comparable activated-NK figure is 47.9 min against 65 min in 2D (PMID:31337806), so a value in tissue is likely somewhat lower than this 2D one.",
+     "source": "Olofsson PE et al., Front Immunol 2014 (PMC3945532)",
+     "unit": "min",
+     "value": 29.0
     }
    }
   },
