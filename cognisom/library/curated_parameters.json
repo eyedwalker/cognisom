@@ -1,0 +1,3941 @@
+{
+ "about": "Evidenced entity-library parameters, applied to any library on open; see cognisom/library/curated.py.",
+ "entities": [
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "PECAM1"
+   },
+   "name": "CD31/PECAM-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P16284",
+     "conditions": "UniProt P16284, Platelet endothelial cell adhesion molecule, residues 28-738 of 738; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 79.56462478000002
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P16284",
+     "conditions": "UniProt P16284, Platelet endothelial cell adhesion molecule, residues 28-738 of 738; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 711.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "CD99"
+   },
+   "name": "CD99",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P14209",
+     "conditions": "UniProt P14209, CD99 antigen, residues 23-185 of 185; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 16.72819468
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P14209",
+     "conditions": "UniProt P14209, CD99 antigen, residues 23-185 of 185; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 163.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "SELE"
+   },
+   "name": "E-selectin (CD62E)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:11404363",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/4.6 1/s",
+     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "unit": "s",
+     "value": 0.217391304348
+    },
+    "kd_nm": {
+     "citation": "PMID:11404363",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "unit": "nM",
+     "value": 62000.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:11404363",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "unit": "1/s",
+     "value": 4.6
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:11404363",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "kon = koff/Kd = 4.6/6.2e+04 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
+     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "unit": "1/(nM*s)",
+     "value": 7.4e-05
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P16581",
+     "conditions": "UniProt P16581, E-selectin, residues 22-610 of 610; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 64.46746258
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P16581",
+     "conditions": "UniProt P16581, E-selectin, residues 22-610 of 610; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 589.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "ICAM1"
+   },
+   "name": "ICAM-1 (CD54)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:9780171",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "provenance": "derived",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/0.1 1/s",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "s",
+     "value": 10.0
+    },
+    "kd_nm": {
+     "citation": "PMID:9780171",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "provenance": "measured",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "nM",
+     "value": 500.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:9780171",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "provenance": "measured",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "1/s",
+     "value": 0.1
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:9780171",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "provenance": "derived",
+     "rationale": "kon = koff/Kd = 0.1/500 nM; the cited paper reports only Kd and koff",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "1/(nM*s)",
+     "value": 0.0002
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P05362",
+     "conditions": "UniProt P05362, Intercellular adhesion molecule 1, residues 28-532 of 532; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 55.21506688
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P05362",
+     "conditions": "UniProt P05362, Intercellular adhesion molecule 1, residues 28-532 of 532; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 505.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "ICAM2"
+   },
+   "name": "ICAM-2 (CD102)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P13598",
+     "conditions": "UniProt P13598, Intercellular adhesion molecule 2, residues 25-275 of 275; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 28.06030078
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P13598",
+     "conditions": "UniProt P13598, Intercellular adhesion molecule 2, residues 25-275 of 275; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 251.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "F11R"
+   },
+   "name": "JAM-A",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9Y624",
+     "conditions": "UniProt Q9Y624, Junctional adhesion molecule A, residues 28-299 of 299; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 29.68245628
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9Y624",
+     "conditions": "UniProt Q9Y624, Junctional adhesion molecule A, residues 28-299 of 299; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 272.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "SELL"
+   },
+   "name": "L-selectin (CD62L)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:9422729",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "estimated",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/10.0 1/s; an upper bound, because the cited koff is a lower bound; an upper bound, inherited from a cited off-rate that is itself only a lower bound",
+     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "unit": "s",
+     "value": 0.1
+    },
+    "kd_nm": {
+     "citation": "PMID:9422729",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "unit": "nM",
+     "value": 108000.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:9422729",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "estimated",
+     "rationale": "the cited paper gives this only as a lower bound (koff >= 10 1/s); dissociation was faster than the method could resolve, so the stored number is the bound, not a fitted value",
+     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "unit": "1/s",
+     "value": 10.0
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:9422729",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "estimated",
+     "rationale": "kon = koff/Kd = 10.0/1.08e+05 nM. The cited paper reports this as a calculated rather than a directly fitted constant; a lower bound, following koff",
+     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "unit": "1/(nM*s)",
+     "value": 0.0001
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P14151",
+     "conditions": "UniProt P14151, L-selectin, residues 39-372 of 372; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 37.57166768
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P14151",
+     "conditions": "UniProt P14151, L-selectin, residues 39-372 of 372; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 334.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "ITGAL/ITGB2"
+   },
+   "name": "LFA-1 (CD11a/CD18)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:9780171",
+     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "provenance": "derived",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/0.1 1/s",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "s",
+     "value": 10.0
+    },
+    "kd_nm": {
+     "citation": "PMID:9780171",
+     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "provenance": "measured",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "nM",
+     "value": 500.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:9780171",
+     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "provenance": "measured",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "1/s",
+     "value": 0.1
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:9780171",
+     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "provenance": "derived",
+     "rationale": "kon = koff/Kd = 0.1/500 nM; the cited paper reports only Kd and koff",
+     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "unit": "1/(nM*s)",
+     "value": 0.0002
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "MADCAM1"
+   },
+   "name": "MAdCAM-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q13477",
+     "conditions": "UniProt Q13477, Mucosal addressin cell adhesion molecule 1, residues 19-382 of 382; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 38.37301768
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q13477",
+     "conditions": "UniProt Q13477, Mucosal addressin cell adhesion molecule 1, residues 19-382 of 382; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 364.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "SELP"
+   },
+   "name": "P-selectin (CD62P)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:9829984",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/1.4 1/s",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "s",
+     "value": 0.714285714286
+    },
+    "kd_nm": {
+     "citation": "PMID:9829984",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "nM",
+     "value": 320.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:9829984",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "1/s",
+     "value": 1.4
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:9829984",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "kon = koff/Kd = 1.4/320 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "1/(nM*s)",
+     "value": 0.0044
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P16109",
+     "conditions": "UniProt P16109, P-selectin, residues 42-830 of 830; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 86.21942678
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P16109",
+     "conditions": "UniProt P16109, P-selectin, residues 42-830 of 830; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 789.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "SELPLG"
+   },
+   "name": "PSGL-1 (CD162)",
+   "parameters": {
+    "bond_lifetime_seconds": {
+     "citation": "PMID:9829984",
+     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/1.4 1/s",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "s",
+     "value": 0.714285714286
+    },
+    "kd_nm": {
+     "citation": "PMID:9829984",
+     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "nM",
+     "value": 320.0
+    },
+    "koff_per_s": {
+     "citation": "PMID:9829984",
+     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "measured",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "1/s",
+     "value": 1.4
+    },
+    "kon_per_nm_per_s": {
+     "citation": "PMID:9829984",
+     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "provenance": "derived",
+     "rationale": "kon = koff/Kd = 1.4/320 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
+     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "unit": "1/(nM*s)",
+     "value": 0.0044
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q14242",
+     "conditions": "UniProt Q14242, P-selectin glycoprotein ligand 1, residues 42-412 of 412; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 38.60800088
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q14242",
+     "conditions": "UniProt Q14242, P-selectin glycoprotein ligand 1, residues 42-412 of 412; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 371.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "VCAM1"
+   },
+   "name": "VCAM-1 (CD106)",
+   "parameters": {
+    "kd_nm": {
+     "citation": "PMID:25793408",
+     "conditions": "VCAM-1 (CD106) / VLA-4 (\u03b14\u03b21); surface plasmon resonance; human; in-solution quantitative FRET on the same pair gave 41.82 +/- 2.36 nM; no rate constants were reported. VCAM-1 also binds alpha4beta7, for which no affinity could be sourced",
+     "provenance": "measured",
+     "source": "Chakraborty et al., PLoS One 2015;10:e0121399 (doi:10.1371/journal.pone.0121399)",
+     "unit": "nM",
+     "value": 39.6
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P19320",
+     "conditions": "UniProt P19320, Vascular cell adhesion protein 1, residues 25-739 of 739; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 78.74504228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P19320",
+     "conditions": "UniProt P19320, Vascular cell adhesion protein 1, residues 25-739 of 739; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 715.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "CDH5"
+   },
+   "name": "VE-cadherin (CD144)",
+   "parameters": {
+    "kd_nm": {
+     "citation": "PMID:12451422",
+     "conditions": "VE-cadherin (CD144) / VE-cadherin (homophilic); affinity-column mobility shift; mouse; trans interaction of soluble dimeric VE-cadherin ectodomains; measured alongside a surface density of 5e3 dimers/um2, the pair of numbers the authors' cooperative-linkage argument rests on",
+     "provenance": "measured",
+     "rationale": "reported as approximate in the cited paper",
+     "source": "Baumgartner & Drenckhahn, Eur Biophys J 2002;31:532-8 (doi:10.1007/s00249-002-0248-9)",
+     "unit": "nM",
+     "value": 80000.0
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P33151",
+     "conditions": "UniProt P33151, Cadherin-5, residues 48-784 of 784; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 82.57752718
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P33151",
+     "conditions": "UniProt P33151, Cadherin-5, residues 48-784 of 784; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 737.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "ITGA4"
+   },
+   "name": "VLA-4 (\u03b14\u03b21)",
+   "parameters": {
+    "kd_nm": {
+     "citation": "PMID:25793408",
+     "conditions": "VLA-4 (\u03b14\u03b21) / VCAM-1; surface plasmon resonance; human; in-solution quantitative FRET on the same pair gave 41.82 +/- 2.36 nM; no rate constants were reported. alpha4beta1 affinity is activation-state dependent (Mn2+, chemokine-triggered inside-out signalling)",
+     "provenance": "measured",
+     "source": "Chakraborty et al., PLoS One 2015;10:e0121399 (doi:10.1371/journal.pone.0121399)",
+     "unit": "nM",
+     "value": 39.6
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P13612",
+     "conditions": "UniProt P13612, Integrin alpha-4, residues 34-1032 of 1032; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 111.22726278
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P13612",
+     "conditions": "UniProt P13612, Integrin alpha-4, residues 34-1032 of 1032; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 999.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgA1 (secretory)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01876",
+     "conditions": "UniProt P01876, Immunoglobulin heavy constant alpha 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 42.84851228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01876",
+     "conditions": "UniProt P01876, Immunoglobulin heavy constant alpha 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 398.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgD",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01880",
+     "conditions": "UniProt P01880, Immunoglobulin heavy constant delta; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 47.49979088
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01880",
+     "conditions": "UniProt P01880, Immunoglobulin heavy constant delta; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 430.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgE",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01854",
+     "conditions": "UniProt P01854, Immunoglobulin heavy constant epsilon; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 59.53916818
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01854",
+     "conditions": "UniProt P01854, Immunoglobulin heavy constant epsilon; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 546.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01857",
+     "conditions": "UniProt P01857, Immunoglobulin heavy constant gamma 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.911908579999995
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01857",
+     "conditions": "UniProt P01857, Immunoglobulin heavy constant gamma 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 399.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01859",
+     "conditions": "UniProt P01859, Immunoglobulin heavy constant gamma 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.80576968
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01859",
+     "conditions": "UniProt P01859, Immunoglobulin heavy constant gamma 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 395.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG3",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01860",
+     "conditions": "UniProt P01860, Immunoglobulin heavy constant gamma 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 49.09295088
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01860",
+     "conditions": "UniProt P01860, Immunoglobulin heavy constant gamma 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 446.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG4",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01861",
+     "conditions": "UniProt P01861, Immunoglobulin heavy constant gamma 4; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.83166408
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01861",
+     "conditions": "UniProt P01861, Immunoglobulin heavy constant gamma 4; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 396.0
+    }
+   }
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgM (pentameric)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01871",
+     "conditions": "UniProt P01871, Immunoglobulin heavy constant mu; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 51.923554779999996
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01871",
+     "conditions": "UniProt P01871, Immunoglobulin heavy constant mu; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 474.0
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "Macrophage",
+   "parameters": {
+    "radius_um": {
+     "citation": "PMID:9400735",
+     "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of alveolar macrophage cell; range \u00b10.3 Table - link \u00b5m; method: Abstract: \"Resident AM [Alveolar Macrophage] from CD rats, Syrian golden hamsters, cynomolgus monkeys, and nonsmoking, healthy human volunteers were harvested b; diameter 21.2 um x0.5; healthy human alveolar macrophages, not tumour-associated",
+     "provenance": "measured",
+     "rationale": "Abstract: \"Comparatively, the AM [Alveolar Macrophage] from monkeys (15.3 \u00b1 0.5 \u00b5m, n = 7) and human volunteers (21.2 \u00b1 0.3 \u00b5m, n = 10) were larger than those from rats and hamsters.\" P.1262 middle column bottom paragraph: \"Table 2 summarizes the morphometric data obtained by selective Coulter-type flow cytometric analysis of unfixed cells in suspension. The cell sizes of hamster and rat AM were n",
+     "source": "BioNumbers BNID:103565 (Krombach F, M\u00fcnzing S, Allmeling AM, Gerlach JT, Behr J, D\u00f6rger M. Cell size of alveolar macrophages: an interspecies co)",
+     "unit": "um",
+     "value": 10.6
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "Stromal fibroblast",
+   "parameters": {
+    "migration_speed_um_per_min": {
+     "citation": "PMID:25679760",
+     "conditions": "Human Homo sapiens; BioNumbers quantity: Speed of NHDF [normal human dermal fibroblast] mesenchymal cell; range \u00b10.09 \u00b5m/min; method: P.663 left column 2nd paragraph:\"To test whether this microenvironment-dependent switch in the mode of migration was restricted to NHDF cells, [researchers] inv; normal human dermal fibroblasts in mesenchymal migration mode, x1",
+     "provenance": "measured",
+     "rationale": "P.663 left column 3rd paragraph:\"For all cell types, with the exception of normal epithelial cells, [researchers] found a sub-fraction of spontaneously polarizing cells moving fast with an amoeboid-like morphology (Figures 4A and 4B). Unexpectedly, [they] found two distinct types of fast-migrating cells (Figures 4A and S4A\u2013S4C). The first type, which [they] named A1, was similar to what was observ",
+     "source": "BioNumbers BNID:112237 (Liu YJ et al., Confinement and low adhesion induce fast amoeboid migration of slow mesenchymal cells. Cell. 2015 Feb 12 )",
+     "unit": "um/min",
+     "value": 0.234
+    }
+   }
+  },
+  {
+   "entity_type": "complement",
+   "identity": {
+    "gene_symbol": "CFD"
+   },
+   "name": "Factor D",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P00746",
+     "conditions": "UniProt P00746, Complement factor D, residues 26-253 of 253; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 24.40477798
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P00746",
+     "conditions": "UniProt P00746, Complement factor D, residues 26-253 of 253; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 228.0
+    }
+   }
+  },
+  {
+   "entity_type": "complement",
+   "identity": {
+    "gene_symbol": "MBL2"
+   },
+   "name": "MBL",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P11226",
+     "conditions": "UniProt P11226, Mannose-binding protein C, residues 21-248 of 248; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 24.02092378
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P11226",
+     "conditions": "UniProt P11226, Mannose-binding protein C, residues 21-248 of 248; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 228.0
+    }
+   }
+  },
+  {
+   "entity_type": "complement",
+   "identity": {
+    "gene_symbol": "CFP"
+   },
+   "name": "Properdin",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P27918",
+     "conditions": "UniProt P27918, Properdin, residues 28-469 of 469; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 48.493953479999995
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P27918",
+     "conditions": "UniProt P27918, Properdin, residues 28-469 of 469; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 442.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "BMP4"
+   },
+   "name": "BMP4",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P12644",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 13.13 kDa giving a hydrodynamic radius of 2.11 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 155.37405887708243
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P12644",
+     "conditions": "UniProt P12644, Bone morphogenetic protein 4, residues 293-408 of 408; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 13.128919179999999
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P12644",
+     "conditions": "UniProt P12644, Bone morphogenetic protein 4, residues 293-408 of 408; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 116.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "CCL2"
+   },
+   "name": "CCL2 (MCP-1)",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P13500",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 8.69 kDa giving a hydrodynamic radius of 1.80 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 182.69468172450394
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P13500",
+     "conditions": "UniProt P13500, C-C motif chemokine 2, residues 24-99 of 99; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 8.68503028
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P13500",
+     "conditions": "UniProt P13500, C-C motif chemokine 2, residues 24-99 of 99; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 76.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "CXCL10"
+   },
+   "name": "CXCL10 (IP-10)",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P02778",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 8.65 kDa giving a hydrodynamic radius of 1.80 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 183.01503545033341
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P02778",
+     "conditions": "UniProt P02778, C-X-C motif chemokine 10, residues 22-98 of 98; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 8.646301079999999
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P02778",
+     "conditions": "UniProt P02778, C-X-C motif chemokine 10, residues 22-98 of 98; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 77.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "EGF"
+   },
+   "name": "EGF",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P01133",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 6.22 kDa giving a hydrodynamic radius of 1.58 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 208.2108420155494
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01133",
+     "conditions": "UniProt P01133, Epidermal growth factor, residues 971-1023 of 1207; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 6.222013379999999
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01133",
+     "conditions": "UniProt P01133, Epidermal growth factor, residues 971-1023 of 1207; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 53.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "FGF2"
+   },
+   "name": "FGF2 (bFGF)",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P09038",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 16.41 kDa giving a hydrodynamic radius of 2.31 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 142.37196016262604
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P09038",
+     "conditions": "UniProt P09038, Fibroblast growth factor 2, residues 143-288 of 288; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 16.407806379999997
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P09038",
+     "conditions": "UniProt P09038, Fibroblast growth factor 2, residues 143-288 of 288; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 146.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "CSF2"
+   },
+   "name": "GM-CSF",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P04141",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 14.48 kDa giving a hydrodynamic radius of 2.20 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 149.53126184714344
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P04141",
+     "conditions": "UniProt P04141, Granulocyte-macrophage colony-stimulating factor, residues 18-144 of 144; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 14.47753318
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P04141",
+     "conditions": "UniProt P04141, Granulocyte-macrophage colony-stimulating factor, residues 18-144 of 144; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 127.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IFNB1"
+   },
+   "name": "IFN-beta",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P01574",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 20.03 kDa giving a hydrodynamic radius of 2.50 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 131.67099578076247
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01574",
+     "conditions": "UniProt P01574, Interferon beta, residues 22-187 of 187; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 20.02708438
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01574",
+     "conditions": "UniProt P01574, Interferon beta, residues 22-187 of 187; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 166.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IFNG"
+   },
+   "name": "IFN-gamma",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P01579",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 16.18 kDa giving a hydrodynamic radius of 2.30 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 143.16310355176165
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01579",
+     "conditions": "UniProt P01579, Interferon gamma, residues 24-161 of 166; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 16.17748978
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01579",
+     "conditions": "UniProt P01579, Interferon gamma, residues 24-161 of 166; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 138.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IGF1"
+   },
+   "name": "IGF-1",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P05019",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 7.65 kDa giving a hydrodynamic radius of 1.71 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 191.96562082215286
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P05019",
+     "conditions": "UniProt P05019, Insulin-like growth factor 1, residues 49-118 of 195; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 7.65474348
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P05019",
+     "conditions": "UniProt P05019, Insulin-like growth factor 1, residues 49-118 of 195; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 70.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL10"
+   },
+   "name": "IL-10",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P22301",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 18.65 kDa giving a hydrodynamic radius of 2.43 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 135.40715273146105
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P22301",
+     "conditions": "UniProt P22301, Interleukin-10, residues 19-178 of 178; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 18.64743228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P22301",
+     "conditions": "UniProt P22301, Interleukin-10, residues 19-178 of 178; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 160.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL15"
+   },
+   "name": "IL-15",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P40933",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 12.77 kDa giving a hydrodynamic radius of 2.09 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 157.0546636901924
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P40933",
+     "conditions": "UniProt P40933, Interleukin-15, residues 49-162 of 162; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 12.77349598
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P40933",
+     "conditions": "UniProt P40933, Interleukin-15, residues 49-162 of 162; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 114.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL17A"
+   },
+   "name": "IL-17A",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:Q16552",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 15.12 kDa giving a hydrodynamic radius of 2.24 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 146.9920424015363
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q16552",
+     "conditions": "UniProt Q16552, Interleukin-17A, residues 24-155 of 155; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 15.12409868
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q16552",
+     "conditions": "UniProt Q16552, Interleukin-17A, residues 24-155 of 155; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 132.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL1B"
+   },
+   "name": "IL-1beta",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P01584",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 17.38 kDa giving a hydrodynamic radius of 2.36 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 139.20519767902297
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01584",
+     "conditions": "UniProt P01584, Interleukin-1 beta, residues 117-269 of 269; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 17.37686688
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01584",
+     "conditions": "UniProt P01584, Interleukin-1 beta, residues 117-269 of 269; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 153.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL2"
+   },
+   "name": "IL-2",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P60568",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 15.42 kDa giving a hydrodynamic radius of 2.25 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 145.88720553474806
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P60568",
+     "conditions": "UniProt P60568, Interleukin-2, residues 21-153 of 153; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 15.41800648
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P60568",
+     "conditions": "UniProt P60568, Interleukin-2, residues 21-153 of 153; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 133.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL21"
+   },
+   "name": "IL-21",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:Q9HBE4",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 15.99 kDa giving a hydrodynamic radius of 2.28 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 143.81814147521283
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9HBE4",
+     "conditions": "UniProt Q9HBE4, Interleukin-21, residues 25-162 of 162; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 15.99018778
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9HBE4",
+     "conditions": "UniProt Q9HBE4, Interleukin-21, residues 25-162 of 162; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 138.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL33"
+   },
+   "name": "IL-33",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:O95760",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 30.76 kDa giving a hydrodynamic radius of 2.95 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 111.28510535529064
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:O95760",
+     "conditions": "UniProt O95760, Interleukin-33; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 30.75938318
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O95760",
+     "conditions": "UniProt O95760, Interleukin-33; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 270.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL4"
+   },
+   "name": "IL-4",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P05112",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 14.96 kDa giving a hydrodynamic radius of 2.23 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 147.60960703107185
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P05112",
+     "conditions": "UniProt P05112, Interleukin-4, residues 25-153 of 153; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 14.96320428
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P05112",
+     "conditions": "UniProt P05112, Interleukin-4, residues 25-153 of 153; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 129.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL6"
+   },
+   "name": "IL-6",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P05231",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 20.81 kDa giving a hydrodynamic radius of 2.53 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 129.69968513915836
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P05231",
+     "conditions": "UniProt P05231, Interleukin-6, residues 30-212 of 212; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 20.81277398
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P05231",
+     "conditions": "UniProt P05231, Interleukin-6, residues 30-212 of 212; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 183.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "PDGFB"
+   },
+   "name": "PDGF-BB",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P01127",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 12.29 kDa giving a hydrodynamic radius of 2.06 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 159.42559311206645
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01127",
+     "conditions": "UniProt P01127, Platelet-derived growth factor subunit B, residues 82-190 of 241; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 12.29446868
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01127",
+     "conditions": "UniProt P01127, Platelet-derived growth factor subunit B, residues 82-190 of 241; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 109.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "VEGFA"
+   },
+   "name": "VEGF-A",
+   "parameters": {
+    "diffusion_coeff_um2_s": {
+     "citation": "UniProt:P15692",
+     "conditions": "dilute aqueous solution at 37 C (water viscosity 0.6913 mPa.s); derived from a mature-chain mass of 43.60 kDa giving a hydrodynamic radius of 3.39 nm. Effective diffusivity in tissue is lower, by roughly two- to threefold once tortuosity and binding are included",
+     "provenance": "derived",
+     "rationale": "computed from the entity's own evidenced mass rather than assumed or fitted to the library's existing values. Stokes-Einstein with a Tyn-Gusek hydrodynamic radius reproduces published aqueous diffusion coefficients to within 0.78-0.92x (median 0.83) across lysozyme, ribonuclease A, chymotrypsinogen, ovalbumin, serum albumin and catalase, 14-250 kDa",
+     "source": "Stokes-Einstein from the UniProt mature-chain mass",
+     "unit": "um^2/s",
+     "value": 97.06357735156507
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P15692",
+     "conditions": "UniProt P15692, Vascular endothelial growth factor A, long form; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.59725258
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P15692",
+     "conditions": "UniProt P15692, Vascular endothelial growth factor A, long form; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 395.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Abiraterone",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "conditions": "Abiraterone Acetate prescribing information, effective 20250317; label states: \"Elimination In patients with metastatic CRPC, the mean terminal half-life of abiraterone in plasma (mean \u00b1 SD) is 12 \u00b1 5 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "unit": "h",
+     "value": 12.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "conditions": "Abiraterone Acetate prescribing information, effective 20250317; label states: \"The apparent steady-state volume of distribution (mean \u00b1 SD) is 19,669 \u00b1 13,358 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "unit": "L",
+     "value": 19669.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Adalimumab",
+   "parameters": {
+    "bioavailability": {
+     "citation": "FDA-SPL:1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "conditions": "HYRIMOZ prescribing information, effective 20251017; label states: \"Absorption The average absolute bioavailability of adalimumab following a single 40 mg subcutaneous dose was 64%.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "unit": "dimensionless",
+     "value": 0.64
+    },
+    "half_life_hours": {
+     "citation": "FDA-SPL:1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "conditions": "HYRIMOZ prescribing information, effective 20251017; label states: \"The mean terminal half-life was approximately 2 weeks, ranging from 10 to 20 days across studies.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "unit": "h",
+     "value": 336.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Aldesleukin (IL-2)",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:f3c516ad-d405-4fbe-af6a-962080dbfa7d",
+     "conditions": "PROLEUKIN prescribing information, effective 20241220; label states: \"Elimination The serum elimination half-life aldesleukin is 85 minutes in patients with cancer following a 5-minute intravenous infusion of Proleukin.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f3c516ad-d405-4fbe-af6a-962080dbfa7d",
+     "unit": "h",
+     "value": 1.4166666666666667
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Apalutamide",
+   "parameters": {
+    "bioavailability": {
+     "citation": "FDA-SPL:d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "conditions": "ERLEADA prescribing information, effective 20260702; label states: \"Absorption Apalutamide absolute oral bioavailability is approximately 100%.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "unit": "dimensionless",
+     "value": 1.0
+    },
+    "half_life_hours": {
+     "citation": "FDA-SPL:d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "conditions": "ERLEADA prescribing information, effective 20260702; label states: \"Elimination Apalutamide half-life is approximately 3 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "unit": "h",
+     "value": 72.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "conditions": "ERLEADA prescribing information, effective 20260702; label states: \"Distribution Apalutamide apparent volume of distribution is approximately 276 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "unit": "L",
+     "value": 276.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Atezolizumab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:a617b089-ce66-464b-987b-b45d029b4d6f",
+     "conditions": " prescribing information, effective 20260520; label states: \"Elimination The atezolizumab clearance (CV%) was 0.2 L/day (29%) and the terminal half-life was 27 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set a617b089-ce66-464b-987b-b45d029b4d6f",
+     "unit": "h",
+     "value": 648.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:a617b089-ce66-464b-987b-b45d029b4d6f",
+     "conditions": " prescribing information, effective 20260520; label states: \"Distribution The volume of distribution of atezolizumab at steady state was 6.9 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set a617b089-ce66-464b-987b-b45d029b4d6f",
+     "unit": "L",
+     "value": 6.9
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Cabazitaxel",
+   "parameters": {
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:de3d9c26-572b-4ea4-9b2d-dd58a2b3e8fa",
+     "conditions": "Jevtana prescribing information, effective 20251007; label states: \"Distribution The volume of distribution (V ss ) was 4,864 L (2,643 L/m 2 for a patient with a median BSA of 1.84 m 2 ) at steady state.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set de3d9c26-572b-4ea4-9b2d-dd58a2b3e8fa",
+     "unit": "L",
+     "value": 4864.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Darolutamide",
+   "parameters": {
+    "bioavailability": {
+     "citation": "FDA-SPL:1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "conditions": " prescribing information, effective 20250603; label states: \"The absolute bioavailability is approximately 30% following oral administration of a NUBEQA tablet containing 300 mg darolutamide under fasted conditions.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "unit": "dimensionless",
+     "value": 0.3
+    },
+    "half_life_hours": {
+     "citation": "FDA-SPL:1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "conditions": " prescribing information, effective 20250603; label states: \"Elimination The effective half-life of darolutamide and ketodarolutamide is approximately 20 hours in patients.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "unit": "h",
+     "value": 20.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "conditions": " prescribing information, effective 20250603; label states: \"Distribution The apparent volume of distribution of darolutamide after intravenous administration is 119 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "unit": "L",
+     "value": 119.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Docetaxel",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:2992d633-08fa-44f3-b14d-41700f24686b",
+     "conditions": "Docetaxel prescribing information, effective 20260415; label states: \"Elimination With extended plasma sampling up to 8 to 22 days post infusion, the estimated mean total body clearance was 18 L/h/m 2 (range of means: 14 to 23) and mean terminal elimination half-life was 116 hours (range o\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 2992d633-08fa-44f3-b14d-41700f24686b",
+     "unit": "h",
+     "value": 116.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:2992d633-08fa-44f3-b14d-41700f24686b",
+     "conditions": "Docetaxel prescribing information, effective 20260415; label states: \"Distribution Mean steady state volume of distribution was 113 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 2992d633-08fa-44f3-b14d-41700f24686b",
+     "unit": "L",
+     "value": 113.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Eculizumab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:002f9748-b0e8-4b6e-a38b-56930a839491",
+     "conditions": "BKEMV prescribing information, effective 20260702; label states: \"Elimination The half-life of eculizumab ranged between 141 hours and 882 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 002f9748-b0e8-4b6e-a38b-56930a839491",
+     "unit": "h",
+     "value": 511.5
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:002f9748-b0e8-4b6e-a38b-56930a839491",
+     "conditions": "BKEMV prescribing information, effective 20260702; label states: \"Distribution The eculizumab volume of distribution for a typical 70 kg patient was 5 L to 8 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 002f9748-b0e8-4b6e-a38b-56930a839491",
+     "unit": "L",
+     "value": 5.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Enzalutamide",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "conditions": "Xtandi prescribing information, effective 20260728; label states: \"The mean terminal half-life (t 1/2 ) for enzalutamide after a single oral dose is 5.8 days (2.8 to 10.2 days).\"; 5.8 days is enzalutamide itself; 8.2 days is its active metabolite N-desmethyl enzalutamide",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "unit": "h",
+     "value": 139.2
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "conditions": "Xtandi prescribing information, effective 20260728; label states: \"Distribution The mean (%CV) volume of distribution after a single oral dose is 110 L (29%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "unit": "L",
+     "value": 110.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Infliximab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:a0a046c1-056d-45a9-bfd9-13b47c24f257",
+     "conditions": "REMICADE prescribing information, effective 20250603; label states: \"Pharmacokinetic results for single doses of 3 mg/kg to 10 mg/kg in RA, 5 mg/kg in CD, and 3 mg/kg to 5 mg/kg in Ps indicate that the median terminal half-life of infliximab is 7.7 to 9.5 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set a0a046c1-056d-45a9-bfd9-13b47c24f257",
+     "unit": "h",
+     "value": 206.39999999999998
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Interferon alfa-2b",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:30789790-8317-49f9-b97b-8c5ba17b53d2",
+     "conditions": " prescribing information, effective 20240123; label states: \"The elimination half-life was approximately 2 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 30789790-8317-49f9-b97b-8c5ba17b53d2",
+     "unit": "h",
+     "value": 2.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Ipilimumab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:2265ef30-253e-11df-8a39-0800200c9a66",
+     "conditions": "YERVOY prescribing information, effective 20260820; label states: \"Elimination The mean (percent coefficient of variation) terminal half-life (t 1/2 ) was 15.4 days (34%) and then mean (percent coefficient of variation) clearance (CL) was 16.8 mL/h (38%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 2265ef30-253e-11df-8a39-0800200c9a66",
+     "unit": "h",
+     "value": 369.6
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Lutetium-177 PSMA",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:14908037-2892-4d98-a053-253ce35afb1a",
+     "conditions": "PLUVICTO prescribing information, effective 20260812; label states: \"Elimination The lutetium Lu 177 vipivotide tetraxetan terminal elimination half-life is 41.6 hours (68.8%) and the clearance (CL) is 2.04 L/h (31.5%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 14908037-2892-4d98-a053-253ce35afb1a",
+     "unit": "h",
+     "value": 41.6
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:14908037-2892-4d98-a053-253ce35afb1a",
+     "conditions": "PLUVICTO prescribing information, effective 20260812; label states: \"Distribution Lutetium Lu 177 vipivotide tetraxetan volume of distribution is 123 L (78.1%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 14908037-2892-4d98-a053-253ce35afb1a",
+     "unit": "L",
+     "value": 123.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Nivolumab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "conditions": "OPDIVO prescribing information, effective 20260812; label states: \"The geometric mean elimination half-life (t 1/2 ) is 25 days (77.5%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "unit": "h",
+     "value": 600.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "conditions": "OPDIVO prescribing information, effective 20260812; label states: \"Distribution The geometric mean volume of distribution at steady state (Vss) and coefficient of variation (CV%) is 6.8 L (27.3%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "unit": "L",
+     "value": 6.8
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Olaparib",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "conditions": "Lynparza prescribing information, effective 20250710; label states: \"Elimination The mean (\u00b1 standard deviation) terminal plasma half-life of olaparib is 14.9 \u00b1 8.2 hours and the apparent plasma clearance is 7.4 \u00b1 3.9 L/h following a single 300 mg dose of Lynparza.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "unit": "h",
+     "value": 14.9
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "conditions": "Lynparza prescribing information, effective 20250710; label states: \"Distribution The mean (\u00b1 standard deviation) apparent volume of distribution of olaparib is 158 \u00b1 136 L following a single 300 mg dose of Lynparza.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "unit": "L",
+     "value": 158.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Pembrolizumab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "conditions": "KEYTRUDA QLEX prescribing information, effective 20260731; label states: \"The terminal half-life is 22 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "unit": "h",
+     "value": 528.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "conditions": "KEYTRUDA QLEX prescribing information, effective 20260731; label states: \"Distribution The volume of distribution is 6 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "unit": "L",
+     "value": 6.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Relatlimab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "conditions": "OPDUALAG prescribing information, effective 20260608; label states: \"The geometric mean (CV%) clearance of nivolumab is 7.6 mL/h (40%) at steady state, 21% lower than after the first dose [9.6 mL/h (40%)] and the terminal t 1/2 is 26.5 days (36%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "unit": "h",
+     "value": 636.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "conditions": "OPDUALAG prescribing information, effective 20260608; label states: \"Distribution The geometric mean (CV%) volume of distribution at steady state of relatlimab is 6.6 L (20%) and 6.6 L (19%) of nivolumab.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "unit": "L",
+     "value": 6.6
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Rituximab",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:b172773b-3905-4a1c-ad95-bab4b6126563",
+     "conditions": "Rituxan prescribing information, effective 20250106; label states: \"The estimated median terminal half-life of rituximab was 32 days (range, 14 to 62 days).\"; 32 days is the label's own 'estimated median terminal half-life' across all patients; the 22- and 18-day figures are the NHL and RA population-PK subsets",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b172773b-3905-4a1c-ad95-bab4b6126563",
+     "unit": "h",
+     "value": 768.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:b172773b-3905-4a1c-ad95-bab4b6126563",
+     "conditions": "Rituxan prescribing information, effective 20250106; label states: \"Based on a population pharmacokinetic analysis of data from 2005 RA patients who received RITUXAN, the estimated clearance of rituximab was 0.335 L/day; volume of distribution was 3.1 L and mean terminal elimination half\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b172773b-3905-4a1c-ad95-bab4b6126563",
+     "unit": "L",
+     "value": 3.1
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Rucaparib",
+   "parameters": {
+    "bioavailability": {
+     "citation": "FDA-SPL:0295d202-1cfe-7659-e063-6294a90a476e",
+     "conditions": "Rubraca prescribing information, effective 20251231; label states: \"The mean (min, max) absolute bioavailability is 36% (30%, 45%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0295d202-1cfe-7659-e063-6294a90a476e",
+     "unit": "dimensionless",
+     "value": 0.36
+    },
+    "half_life_hours": {
+     "citation": "FDA-SPL:0295d202-1cfe-7659-e063-6294a90a476e",
+     "conditions": "Rubraca prescribing information, effective 20251231; label states: \"Elimination The mean apparent total clearance at steady state is 44.2 L/h (45%) and the mean terminal elimination half-life is 26 (39%) hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0295d202-1cfe-7659-e063-6294a90a476e",
+     "unit": "h",
+     "value": 26.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:0295d202-1cfe-7659-e063-6294a90a476e",
+     "conditions": "Rubraca prescribing information, effective 20251231; label states: \"Distribution The mean apparent volume of distribution is 2300 L (21%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0295d202-1cfe-7659-e063-6294a90a476e",
+     "unit": "L",
+     "value": 2300.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Ruxolitinib",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "conditions": "JAKAFI prescribing information, effective 20260720; label states: \"Elimination JAKAFI The mean elimination half-life of ruxolitinib is approximately 3 hours and the mean elimination half-life of ruxolitinib and its metabolites is approximately 5.8 hours in healthy volunteers.\"; 3 hours is the parent drug; 5.8 hours is 'ruxolitinib plus metabolites' in the same sentence, 5 hours is the extended-release product, 3.7 hours is under ketoconazole",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "unit": "h",
+     "value": 3.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "conditions": "JAKAFI prescribing information, effective 20260720; label states: \"Distribution The mean ruxolitinib volume of distribution at steady-state is 72 L (coefficient of variation [CV] 29%) in patients with MF and 75 L (23%) in patients with PV.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "unit": "L",
+     "value": 72.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Talazoparib",
+   "parameters": {
+    "half_life_hours": {
+     "citation": "FDA-SPL:b653221e-971f-4452-92d4-797924f1ff59",
+     "conditions": "Talzenna prescribing information, effective 20240709; label states: \"Elimination The mean terminal plasma half-life (\u00b1standard deviation) is 90 (\u00b158) hours and the mean apparent oral clearance (inter-subject variability) is 6.5 L/h (31%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b653221e-971f-4452-92d4-797924f1ff59",
+     "unit": "h",
+     "value": 90.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:b653221e-971f-4452-92d4-797924f1ff59",
+     "conditions": "Talzenna prescribing information, effective 20240709; label states: \"Distribution The mean apparent volume of distribution of talazoparib is 420 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b653221e-971f-4452-92d4-797924f1ff59",
+     "unit": "L",
+     "value": 420.0
+    }
+   }
+  },
+  {
+   "entity_type": "drug",
+   "name": "Tofacitinib",
+   "parameters": {
+    "bioavailability": {
+     "citation": "FDA-SPL:253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "conditions": "Tofacitinib prescribing information, effective 20260901; label states: \"Absorption Tofacitinib tablets The absolute oral bioavailability of tofacitinib tablets is 74%.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "unit": "dimensionless",
+     "value": 0.74
+    },
+    "half_life_hours": {
+     "citation": "FDA-SPL:253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "conditions": "Tofacitinib prescribing information, effective 20260901; label states: \"12.3 Pharmacokinetics Following oral administration of tofacitinib tablets, peak plasma concentrations were reached within 0.5 hour -1 hour, elimination half-life was about 3 hours and a dose-proportional increase in sys\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "unit": "h",
+     "value": 3.0
+    },
+    "volume_of_distribution_L": {
+     "citation": "FDA-SPL:253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "conditions": "Tofacitinib prescribing information, effective 20260901; label states: \"Distribution After intravenous administration, the volume of distribution was 87 L.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "unit": "L",
+     "value": 87.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "AKT1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P31749",
+     "conditions": "UniProt P31749, RAC-alpha serine/threonine-protein kinase; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 55.68641778
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P31749",
+     "conditions": "UniProt P31749, RAC-alpha serine/threonine-protein kinase; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 480.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "AR",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P10275",
+     "conditions": "UniProt P10275, Androgen receptor; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 99.18783918000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P10275",
+     "conditions": "UniProt P10275, Androgen receptor; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 920.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "ATM",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q13315",
+     "conditions": "UniProt Q13315, Serine-protein kinase ATM, residues 2-3056 of 3056; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 350.55627228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q13315",
+     "conditions": "UniProt Q13315, Serine-protein kinase ATM, residues 2-3056 of 3056; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 3055.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "BRCA2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P51587",
+     "conditions": "UniProt P51587, Breast cancer type 2 susceptibility protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 384.23028478
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P51587",
+     "conditions": "UniProt P51587, Breast cancer type 2 susceptibility protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 3418.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "CDK12",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9NYV4",
+     "conditions": "UniProt Q9NYV4, Cyclin-dependent kinase 12; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 164.15460077999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9NYV4",
+     "conditions": "UniProt Q9NYV4, Cyclin-dependent kinase 12; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1490.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "CHD1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O14646",
+     "conditions": "UniProt O14646, ATP-dependent chromatin remodeler CHD1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 196.68753098
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O14646",
+     "conditions": "UniProt O14646, ATP-dependent chromatin remodeler CHD1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1710.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "ERG",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P11308",
+     "conditions": "UniProt P11308, Transcriptional regulator ERG; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 53.83750718
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P11308",
+     "conditions": "UniProt P11308, Transcriptional regulator ERG; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 479.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "EZH2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q15910",
+     "conditions": "UniProt Q15910, Histone-lysine N-methyltransferase EZH2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 85.36317828000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q15910",
+     "conditions": "UniProt Q15910, Histone-lysine N-methyltransferase EZH2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 746.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "FOXA1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P55317",
+     "conditions": "UniProt P55317, Hepatocyte nuclear factor 3-alpha; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 49.14783308
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P55317",
+     "conditions": "UniProt P55317, Hepatocyte nuclear factor 3-alpha; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 472.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "HOXB13",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q92826",
+     "conditions": "UniProt Q92826, Homeobox protein Hox-B13; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 30.67566678
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q92826",
+     "conditions": "UniProt Q92826, Homeobox protein Hox-B13; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 284.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "KMT2D",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O14686",
+     "conditions": "UniProt O14686, Histone-lysine N-methyltransferase 2D; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 593.3894095800001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O14686",
+     "conditions": "UniProt O14686, Histone-lysine N-methyltransferase 2D; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 5537.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "MDM2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q00987",
+     "conditions": "UniProt Q00987, E3 ubiquitin-protein ligase Mdm2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 55.23289378
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q00987",
+     "conditions": "UniProt Q00987, E3 ubiquitin-protein ligase Mdm2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 491.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "MYC",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01106",
+     "conditions": "UniProt P01106, Myc proto-oncogene protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 50.56506948
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01106",
+     "conditions": "UniProt P01106, Myc proto-oncogene protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 454.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "NKX3-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q99801",
+     "conditions": "UniProt Q99801, Homeobox protein Nkx-3.1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 26.350479879999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q99801",
+     "conditions": "UniProt Q99801, Homeobox protein Nkx-3.1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 234.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "PIK3CA",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P42336",
+     "conditions": "UniProt P42336, Phosphatidylinositol 4,5-bisphosphate 3-kinase catalytic subunit alpha isoform; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 124.28409518000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P42336",
+     "conditions": "UniProt P42336, Phosphatidylinositol 4,5-bisphosphate 3-kinase catalytic subunit alpha isoform; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1068.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "PTEN",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P60484",
+     "conditions": "UniProt P60484, Phosphatidylinositol 3,4,5-trisphosphate 3-phosphatase and dual-specificity protein phosphatase PTEN, residues 2-403 of 403; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 47.03510088
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P60484",
+     "conditions": "UniProt P60484, Phosphatidylinositol 3,4,5-trisphosphate 3-phosphatase and dual-specificity protein phosphatase PTEN, residues 2-403 of 403; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 402.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "RB1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P06400",
+     "conditions": "UniProt P06400, Retinoblastoma-associated protein, residues 2-928 of 928; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 106.02822018
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P06400",
+     "conditions": "UniProt P06400, Retinoblastoma-associated protein, residues 2-928 of 928; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 927.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "SPOP",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O43791",
+     "conditions": "UniProt O43791, Speckle-type POZ protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 42.13239498
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O43791",
+     "conditions": "UniProt O43791, Speckle-type POZ protein; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 374.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "TMPRSS2",
+   "parameters": {
+    "kcat_per_s": {
+     "citation": "PMID:35676539",
+     "conditions": "substrate: Boc-Leu-GLy-Arg-7-amido-4-methylcoumarin; Homo sapiens, wild-type; the only human wild-type record BRENDA holds",
+     "provenance": "measured",
+     "source": "BRENDA EC 3.4.21.122 (CC BY 4.0), 1 records across 1 papers",
+     "unit": "1/s",
+     "value": 18.0
+    }
+   }
+  },
+  {
+   "entity_type": "gene",
+   "name": "TP53",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P04637",
+     "conditions": "UniProt P04637, Cellular tumor antigen p53; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.65317778
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P04637",
+     "conditions": "UniProt P04637, Cellular tumor antigen p53; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 393.0
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Macrophage M1",
+   "parameters": {
+    "radius_um": {
+     "citation": "PMID:9400735",
+     "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of alveolar macrophage cell; range \u00b10.3 Table - link \u00b5m; method: Abstract: \"Resident AM [Alveolar Macrophage] from CD rats, Syrian golden hamsters, cynomolgus monkeys, and nonsmoking, healthy human volunteers were harvested b; diameter 21.2 um x0.5; healthy human alveolar macrophages, the large end of human macrophage sizes, not tumour-associated",
+     "provenance": "measured",
+     "rationale": "Abstract: \"Comparatively, the AM [Alveolar Macrophage] from monkeys (15.3 \u00b1 0.5 \u00b5m, n = 7) and human volunteers (21.2 \u00b1 0.3 \u00b5m, n = 10) were larger than those from rats and hamsters.\" P.1262 middle column bottom paragraph: \"Table 2 summarizes the morphometric data obtained by selective Coulter-type flow cytometric analysis of unfixed cells in suspension. The cell sizes of hamster and rat AM were n",
+     "source": "BioNumbers BNID:103565 (Krombach F, M\u00fcnzing S, Allmeling AM, Gerlach JT, Behr J, D\u00f6rger M. Cell size of alveolar macrophages: an interspecies co)",
+     "unit": "um",
+     "value": 10.6
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Neutrophil",
+   "parameters": {
+    "lifespan_hours": {
+     "conditions": "circulating lifespan; the description states a 5-90 h range",
+     "provenance": "estimated",
+     "rationale": "its own description: 'Neutrophils are short-lived (~5-90 hours in circulation) and undergo constitutive apoptosis'. 21.2 h is the geometric centre of that stated 5-90 h range, which is the defensible single value for a span covering eighteenfold; the range travels with it in the conditions",
+     "source": "the entity's own curated description in this library",
+     "unit": "h",
+     "value": 21.2
+    },
+    "migration_speed_um_per_min": {
+     "citation": "PMID:20689600",
+     "conditions": "Human Homo sapiens; BioNumbers quantity: Neutrophil speed; range \u00b16 \u00b5m/min; method: Abstract:\"...[investigators] developed a microfluidic device that is simple to operate and allows for precise and robust measurements of chemotaxis speed and pe",
+     "provenance": "measured",
+     "rationale": "P.5 left column:\"In additional control experiments, in the absence of fMLP [N-Formylmethionyl-leucyl-phenylalanine] chemokine, neutrophils did not migrate through the side channels of the device. Furthermore, when a sample of neutrophils was diluted ten-fold, the measured average migration speed was unchanged (17\u00b16 \u00b5m/min and 18\u00b14 \u00b5m/min, p = 0.3), suggesting that migration speed was independent o",
+     "source": "BioNumbers BNID:112247 (Butler KL et al., Burn injury reduces neutrophil directional migration speed in microfluidic devices. PLoS One. 2010 Jul)",
+     "unit": "um/min",
+     "value": 17.0
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of neutrophil; range 7.3-9.7 Table - link \u00b5m; method: P.768 right column bottom paragraph: \"The measurement of the size of isolated and purified leukocytes was done by two independent methods. The first method of l; diameter 8.4 um x0.5; cells in suspension (Coulter, cross-checked by flow at 8.3 um). The seeded scale_um=13 is a blood-smear diameter of a flattened cell and stays as the rendering size; this is the volume-exclusion radius, giving 310 fL against measured 300-320 fL",
+     "provenance": "measured",
+     "rationale": "Value represents mean of coulter counter measurements of 11,000-70,000 cells from three donors. Mean neutrophil diameter measured from same samples by flow cytometer is 8.3\u00b5m, range 7.14-10.25\u00b5m. See table link for diameter of monocytes and lymphocytes. See BNID 100508, 104669",
+     "source": "BioNumbers BNID:100510 (Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. Retention of leukocytes in capillaries: role of ce)",
+     "unit": "um",
+     "value": 4.2
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "AURKA",
+    "uniprot_id": "O14965",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Aurora A (AURKA)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O14965",
+     "conditions": "UniProt O14965, Aurora kinase A; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 45.82338668
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O14965",
+     "conditions": "UniProt O14965, Aurora kinase A; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 403.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "BAX",
+    "uniprot_id": "Q07812",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "BAX",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q07812",
+     "conditions": "UniProt Q07812, Apoptosis regulator BAX; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 21.18440798
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q07812",
+     "conditions": "UniProt Q07812, Apoptosis regulator BAX; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 192.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "BCL2",
+    "uniprot_id": "P10415",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "BCL-2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P10415",
+     "conditions": "UniProt P10415, Apoptosis regulator Bcl-2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 26.265891579999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P10415",
+     "conditions": "UniProt P10415, Apoptosis regulator Bcl-2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 239.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "BTK",
+    "uniprot_id": "Q06187",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "BTK",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q06187",
+     "conditions": "UniProt Q06187, Tyrosine-protein kinase BTK, residues 2-659 of 659; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 76.15005198
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q06187",
+     "conditions": "UniProt Q06187, Tyrosine-protein kinase BTK, residues 2-659 of 659; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 658.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CDK4",
+    "uniprot_id": "P11802",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CDK4",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P11802",
+     "conditions": "UniProt P11802, Cyclin-dependent kinase 4, residues 2-303 of 303; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 33.598648479999994
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P11802",
+     "conditions": "UniProt P11802, Cyclin-dependent kinase 4, residues 2-303 of 303; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 302.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CASP3",
+    "uniprot_id": "P42574",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "Caspase-3",
+   "parameters": {
+    "kcat_per_s": {
+     "citation": "PMID:10381624",
+     "conditions": "substrate: acetyl-DEVD-7-amido-4-methylcoumarin; Homo sapiens, wild-type; Ac-DEVD-AMC, the standard fluorogenic reporter",
+     "provenance": "derived",
+     "rationale": "median of 2 BRENDA measurements across 1 papers, spanning 9.1 to 14 1/s. The citation names the paper contributing most records (2 of 2); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 3.4.22.56 (CC BY 4.0), 2 records across 1 papers",
+     "unit": "1/s",
+     "value": 11.55
+    },
+    "km_um": {
+     "citation": "PMID:16490769",
+     "conditions": "substrate: acetyl-DEVD-7-amido-4-methylcoumarin; Homo sapiens, wild-type; Ac-DEVD-AMC, the standard fluorogenic reporter",
+     "provenance": "derived",
+     "rationale": "median of 10 BRENDA measurements across 5 papers, spanning 5 to 1.07e+04 uM. The citation names the paper contributing most records (3 of 10); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 3.4.22.56 (CC BY 4.0), 10 records across 5 papers",
+     "unit": "uM",
+     "value": 14.7
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CASP8",
+    "uniprot_id": "Q14790",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "Caspase-8",
+   "parameters": {
+    "kcat_per_s": {
+     "citation": "PMID:15209560",
+     "conditions": "substrate: acetyl-IETD-7-amido-4-fluoromethylcoumarin; Homo sapiens, wild-type; IETD is caspase-8's preferred motif, not DEVD",
+     "provenance": "derived",
+     "rationale": "median of 4 BRENDA measurements across 1 papers, spanning 0.65 to 1.25 1/s. The citation names the paper contributing most records (4 of 4); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 3.4.22.61 (CC BY 4.0), 4 records across 1 papers",
+     "unit": "1/s",
+     "value": 0.88
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CASP9",
+    "uniprot_id": "P55211",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "Caspase-9",
+   "parameters": {
+    "kcat_per_s": {
+     "citation": "PMID:10381624",
+     "conditions": "substrate: acetyl-VEHD-7-amido-4-methylcoumarin; Homo sapiens, wild-type; VEHD is caspase-9's preferred motif",
+     "provenance": "derived",
+     "rationale": "median of 2 BRENDA measurements across 1 papers, spanning 0.1 to 0.2 1/s. The citation names the paper contributing most records (2 of 2); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 3.4.22.62 (CC BY 4.0), 2 records across 1 papers",
+     "unit": "1/s",
+     "value": 0.15000000000000002
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P55211",
+     "conditions": "UniProt P55211, Caspase-9 subunit p10, residues 331-416 of 416; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 9.828237979999999
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P55211",
+     "conditions": "UniProt P55211, Caspase-9 subunit p10, residues 331-416 of 416; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 86.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CYCS",
+    "uniprot_id": "P99999",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "Cytochrome c",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P99999",
+     "conditions": "UniProt P99999, Cytochrome c, residues 2-105 of 105; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 11.61753178
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P99999",
+     "conditions": "UniProt P99999, Cytochrome c, residues 2-105 of 105; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 104.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MAPK3",
+    "uniprot_id": "P27361",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "ERK1/2 (MAPK3/1)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P27361",
+     "conditions": "UniProt P27361, Mitogen-activated protein kinase 3, residues 2-379 of 379; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.00438078
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P27361",
+     "conditions": "UniProt P27361, Mitogen-activated protein kinase 3, residues 2-379 of 379; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 378.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "FN1",
+    "uniprot_id": "P02751",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "Fibronectin",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P02751",
+     "conditions": "UniProt P02751, Fibronectin, residues 32-2477 of 2477; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 269.25865778
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P02751",
+     "conditions": "UniProt P02751, Fibronectin, residues 32-2477 of 2477; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 2446.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "HIF1A",
+    "uniprot_id": "Q16665",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "HIF-1alpha",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q16665",
+     "conditions": "UniProt Q16665, Hypoxia-inducible factor 1-alpha; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 92.67041318
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q16665",
+     "conditions": "UniProt Q16665, Hypoxia-inducible factor 1-alpha; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 826.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "IRF3",
+    "uniprot_id": "Q14653",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IRF3",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q14653",
+     "conditions": "UniProt Q14653, Interferon regulatory factor 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 47.21927848
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q14653",
+     "conditions": "UniProt Q14653, Interferon regulatory factor 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 427.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "JAK1",
+    "uniprot_id": "P23458",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "JAK1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P23458",
+     "conditions": "UniProt P23458, Tyrosine-protein kinase JAK1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 133.27704228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P23458",
+     "conditions": "UniProt P23458, Tyrosine-protein kinase JAK1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1154.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "JAK2",
+    "uniprot_id": "O60674",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "JAK2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O60674",
+     "conditions": "UniProt O60674, Tyrosine-protein kinase JAK2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 130.67354928
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O60674",
+     "conditions": "UniProt O60674, Tyrosine-protein kinase JAK2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1132.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MCL1",
+    "uniprot_id": "Q07820",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "MCL-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q07820",
+     "conditions": "UniProt Q07820, Induced myeloid leukemia cell differentiation protein Mcl-1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 37.337355880000004
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q07820",
+     "conditions": "UniProt Q07820, Induced myeloid leukemia cell differentiation protein Mcl-1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 350.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MEK1",
+    "uniprot_id": "Q02750",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "MEK1 (MAP2K1)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q02750",
+     "conditions": "UniProt Q02750, Dual specificity mitogen-activated protein kinase kinase 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 43.43901148
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q02750",
+     "conditions": "UniProt Q02750, Dual specificity mitogen-activated protein kinase kinase 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 393.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MMP9",
+    "uniprot_id": "P14780",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "MMP-9 (Gelatinase B)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P14780",
+     "conditions": "UniProt P14780, 82 kDa matrix metalloproteinase-9, residues 107-707 of 707; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 66.60934618
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P14780",
+     "conditions": "UniProt P14780, 82 kDa matrix metalloproteinase-9, residues 107-707 of 707; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 601.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "RELA",
+    "uniprot_id": "Q04206",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NF-kappaB (p65/RELA)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q04206",
+     "conditions": "UniProt Q04206, Transcription factor p65; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 60.21917768
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q04206",
+     "conditions": "UniProt Q04206, Transcription factor p65; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 551.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "NFATC1",
+    "uniprot_id": "O95644",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NFAT (NFATC1)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O95644",
+     "conditions": "UniProt O95644, Nuclear factor of activated T-cells, cytoplasmic 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 101.24276398
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O95644",
+     "conditions": "UniProt O95644, Nuclear factor of activated T-cells, cytoplasmic 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 943.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "PUMA",
+    "uniprot_id": "Q96PG8",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "PUMA (BBC3)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q96PG8",
+     "conditions": "UniProt Q96PG8, Bcl-2-binding component 3, isoforms 3/4; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 26.49820018
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q96PG8",
+     "conditions": "UniProt Q96PG8, Bcl-2-binding component 3, isoforms 3/4; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 261.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "SRC",
+    "uniprot_id": "P12931",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "SRC",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P12931",
+     "conditions": "UniProt P12931, Proto-oncogene tyrosine-protein kinase Src, residues 2-536 of 536; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 59.70356828
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P12931",
+     "conditions": "UniProt P12931, Proto-oncogene tyrosine-protein kinase Src, residues 2-536 of 536; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 535.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "STAT1",
+    "uniprot_id": "P42224",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "STAT1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P42224",
+     "conditions": "UniProt P42224, Signal transducer and activator of transcription 1-alpha/beta, residues 2-750 of 750; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 87.20356948
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P42224",
+     "conditions": "UniProt P42224, Signal transducer and activator of transcription 1-alpha/beta, residues 2-750 of 750; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 749.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "STAT3",
+    "uniprot_id": "P40763",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "STAT3",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P40763",
+     "conditions": "UniProt P40763, Signal transducer and activator of transcription 3, residues 2-770 of 770; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 87.93660348
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P40763",
+     "conditions": "UniProt P40763, Signal transducer and activator of transcription 3, residues 2-770 of 770; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 769.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "TIMP1",
+    "uniprot_id": "P01033",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "TIMP-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P01033",
+     "conditions": "UniProt P01033, Metalloproteinase inhibitor 1, residues 24-207 of 207; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 20.708833979999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P01033",
+     "conditions": "UniProt P01033, Metalloproteinase inhibitor 1, residues 24-207 of 207; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 184.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "WEE1",
+    "uniprot_id": "P30291",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "WEE1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P30291",
+     "conditions": "UniProt P30291, Wee1-like protein kinase; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 71.59740298000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P30291",
+     "conditions": "UniProt P30291, Wee1-like protein kinase; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 646.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "XIAP",
+    "uniprot_id": "P98170",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "XIAP (BIRC4)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P98170",
+     "conditions": "UniProt P98170, E3 ubiquitin-protein ligase XIAP; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 56.68486558
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P98170",
+     "conditions": "UniProt P98170, E3 ubiquitin-protein ligase XIAP; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 497.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CTNNB1",
+    "uniprot_id": "P35222",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "beta-catenin (CTNNB1)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P35222",
+     "conditions": "UniProt P35222, Catenin beta-1, residues 2-781 of 781; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 85.36539328
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P35222",
+     "conditions": "UniProt P35222, Catenin beta-1, residues 2-781 of 781; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 780.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MTOR",
+    "uniprot_id": "P42345",
+    "uniprot_resolved_by": "curated_alias"
+   },
+   "name": "mTOR",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P42345",
+     "conditions": "UniProt P42345, Serine/threonine-protein kinase mTOR; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 288.89161228
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P42345",
+     "conditions": "UniProt P42345, Serine/threonine-protein kinase mTOR; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 2549.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "CLEC7A"
+   },
+   "name": "Dectin-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9BXN2",
+     "conditions": "UniProt Q9BXN2, C-type lectin domain family 7 member A; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 27.62723488
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9BXN2",
+     "conditions": "UniProt Q9BXN2, C-type lectin domain family 7 member A; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 247.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "IFIH1"
+   },
+   "name": "MDA5",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9BYX4",
+     "conditions": "UniProt Q9BYX4, Interferon-induced helicase C domain-containing protein 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 116.68904018
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9BYX4",
+     "conditions": "UniProt Q9BYX4, Interferon-induced helicase C domain-containing protein 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1025.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "NLRP3"
+   },
+   "name": "NLRP3 inflammasome",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q96P20",
+     "conditions": "UniProt Q96P20, NACHT, LRR and PYD domains-containing protein 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 118.17257638000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q96P20",
+     "conditions": "UniProt Q96P20, NACHT, LRR and PYD domains-containing protein 3; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1036.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "NOD2"
+   },
+   "name": "NOD2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9HC29",
+     "conditions": "UniProt Q9HC29, Nucleotide-binding oligomerization domain-containing protein 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 115.28292158000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9HC29",
+     "conditions": "UniProt Q9HC29, Nucleotide-binding oligomerization domain-containing protein 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1040.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "RIGI"
+   },
+   "name": "RIG-I",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O95786",
+     "conditions": "UniProt O95786, Antiviral innate immune response receptor RIG-I; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 106.59966118000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O95786",
+     "conditions": "UniProt O95786, Antiviral innate immune response receptor RIG-I; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 925.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR2"
+   },
+   "name": "TLR2/1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O60603",
+     "conditions": "UniProt O60603, Toll-like receptor 2, residues 21-784 of 784; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 87.51572478
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O60603",
+     "conditions": "UniProt O60603, Toll-like receptor 2, residues 21-784 of 784; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 764.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR3"
+   },
+   "name": "TLR3",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O15455",
+     "conditions": "UniProt O15455, Toll-like receptor 3, residues 24-904 of 904; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 101.24144668000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O15455",
+     "conditions": "UniProt O15455, Toll-like receptor 3, residues 24-904 of 904; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 881.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR4"
+   },
+   "name": "TLR4",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O00206",
+     "conditions": "UniProt O00206, Toll-like receptor 4, residues 24-839 of 839; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 93.27415238000002
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O00206",
+     "conditions": "UniProt O00206, Toll-like receptor 4, residues 24-839 of 839; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 816.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR5"
+   },
+   "name": "TLR5",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:O60602",
+     "conditions": "UniProt O60602, Toll-like receptor 5, residues 21-858 of 858; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 95.76307368
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:O60602",
+     "conditions": "UniProt O60602, Toll-like receptor 5, residues 21-858 of 858; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 838.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR7"
+   },
+   "name": "TLR7",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9NYK1",
+     "conditions": "UniProt Q9NYK1, Toll-like receptor 7, residues 27-1049 of 1049; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 117.83811388000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9NYK1",
+     "conditions": "UniProt Q9NYK1, Toll-like receptor 7, residues 27-1049 of 1049; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1023.0
+    }
+   }
+  },
+  {
+   "entity_type": "prr",
+   "identity": {
+    "gene_symbol": "TLR9"
+   },
+   "name": "TLR9",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9NR96",
+     "conditions": "UniProt Q9NR96, Toll-like receptor 9, residues 26-1032 of 1032; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 113.18963388
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9NR96",
+     "conditions": "UniProt Q9NR96, Toll-like receptor 9, residues 26-1032 of 1032; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1007.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "4-1BB (CD137)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q07011",
+     "conditions": "UniProt Q07011, Tumor necrosis factor receptor superfamily member 9, residues 24-255 of 255; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 25.30184578
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q07011",
+     "conditions": "UniProt Q07011, Tumor necrosis factor receptor superfamily member 9, residues 24-255 of 255; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 232.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "Androgen Receptor",
+   "parameters": {
+    "kd_nm": {
+     "citation": "PMID:15771445",
+     "conditions": "ligand: METRIBOLONE; equilibrium dissociation constant measured in nM; Homo sapiens; assay: Dissociation constant for [3H]R-1881 binding to human androgen receptor at 273 K; R1881 is the standard high-affinity androgen tracer; DHT is comparable at sub-nanomolar",
+     "provenance": "measured",
+     "source": "ChEMBL CHEMBL1871 / CHEMBL166444; Binding thermodynamics as a tool to investigate the mechanisms of drug-receptor interactio",
+     "unit": "nM",
+     "value": 0.61
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P10275",
+     "conditions": "UniProt P10275, Androgen receptor; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 99.18783918000001
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P10275",
+     "conditions": "UniProt P10275, Androgen receptor; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 920.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "CD47",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q08722",
+     "conditions": "UniProt Q08722, Leukocyte surface antigen CD47, residues 19-323 of 323; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 33.468497479999996
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q08722",
+     "conditions": "UniProt Q08722, Leukocyte surface antigen CD47, residues 19-323 of 323; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 305.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "CD73 (NT5E)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P21589",
+     "conditions": "UniProt P21589, 5'-nucleotidase, residues 27-549 of 574; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 58.01533728
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P21589",
+     "conditions": "UniProt P21589, 5'-nucleotidase, residues 27-549 of 574; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 523.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "CTLA-4 (CD152)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P16410",
+     "conditions": "UniProt P16410, Cytotoxic T-lymphocyte protein 4, residues 36-223 of 223; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 20.57286698
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P16410",
+     "conditions": "UniProt P16410, Cytotoxic T-lymphocyte protein 4, residues 36-223 of 223; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 188.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "EGFR",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P00533",
+     "conditions": "UniProt P00533, Epidermal growth factor receptor, residues 25-1210 of 1210; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 132.01266568
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P00533",
+     "conditions": "UniProt P00533, Epidermal growth factor receptor, residues 25-1210 of 1210; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1186.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "IDO1",
+   "parameters": {
+    "kcat_per_s": {
+     "citation": "PMID:20178337",
+     "conditions": "substrate: L-tryptophan; Homo sapiens, wild-type; the physiological substrate",
+     "provenance": "derived",
+     "rationale": "median of 25 BRENDA measurements across 10 papers, spanning 0.103 to 12 1/s. The citation names the paper contributing most records (12 of 25); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 1.13.11.52 (CC BY 4.0), 25 records across 10 papers",
+     "unit": "1/s",
+     "value": 2.97
+    },
+    "km_um": {
+     "citation": "PMID:20178337",
+     "conditions": "substrate: L-tryptophan; Homo sapiens, wild-type; the physiological substrate",
+     "provenance": "derived",
+     "rationale": "median of 41 BRENDA measurements across 22 papers, spanning 0.72 to 6809 uM. The citation names the paper contributing most records (12 of 41); a single record would have been an arbitrary pick from that spread",
+     "source": "BRENDA EC 1.13.11.52 (CC BY 4.0), 41 records across 22 papers",
+     "unit": "uM",
+     "value": 20.0
+    },
+    "molecular_weight_kda": {
+     "citation": "UniProt:P14902",
+     "conditions": "UniProt P14902, Indoleamine 2,3-dioxygenase 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 45.32627788
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P14902",
+     "conditions": "UniProt P14902, Indoleamine 2,3-dioxygenase 1; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 403.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "LAG-3 (CD223)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P18627",
+     "conditions": "UniProt P18627, Lymphocyte activation gene 3 protein, residues 23-525 of 525; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 54.88241848
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P18627",
+     "conditions": "UniProt P18627, Lymphocyte activation gene 3 protein, residues 23-525 of 525; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 503.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "OX40 (CD134)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P43489",
+     "conditions": "UniProt P43489, Tumor necrosis factor receptor superfamily member 4, residues 29-277 of 277; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 26.60214358
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P43489",
+     "conditions": "UniProt P43489, Tumor necrosis factor receptor superfamily member 4, residues 29-277 of 277; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 249.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "PD-1",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q15116",
+     "conditions": "UniProt Q15116, Programmed cell death protein 1, residues 25-288 of 288; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 28.80150638
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q15116",
+     "conditions": "UniProt Q15116, Programmed cell death protein 1, residues 25-288 of 288; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 264.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "PSMA",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q04609",
+     "conditions": "UniProt Q04609, Glutamate carboxypeptidase 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 84.33069318
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q04609",
+     "conditions": "UniProt Q04609, Glutamate carboxypeptidase 2; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 750.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "TIGIT",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q495A1",
+     "conditions": "UniProt Q495A1, T-cell immunoreceptor with Ig and ITIM domains, residues 22-244 of 244; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 23.953097279999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q495A1",
+     "conditions": "UniProt Q495A1, T-cell immunoreceptor with Ig and ITIM domains, residues 22-244 of 244; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 223.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "TIM-3 (HAVCR2)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q8TDQ0",
+     "conditions": "UniProt Q8TDQ0, Hepatitis A virus cellular receptor 2, residues 22-301 of 301; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 30.967265779999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q8TDQ0",
+     "conditions": "UniProt Q8TDQ0, Hepatitis A virus cellular receptor 2, residues 22-301 of 301; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 280.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "VEGFR2",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P35968",
+     "conditions": "UniProt P35968, Vascular endothelial growth factor receptor 2, residues 20-1356 of 1356; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 149.41320258
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P35968",
+     "conditions": "UniProt P35968, Vascular endothelial growth factor receptor 2, residues 20-1356 of 1356; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 1337.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "name": "VISTA (B7-H5)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:Q9H7M9",
+     "conditions": "UniProt Q9H7M9, V-type immunoglobulin domain-containing suppressor of T-cell activation, residues 33-311 of 311; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 30.66554908
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:Q9H7M9",
+     "conditions": "UniProt Q9H7M9, V-type immunoglobulin domain-containing suppressor of T-cell activation, residues 33-311 of 311; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 279.0
+    }
+   }
+  },
+  {
+   "entity_type": "virus",
+   "name": "Influenza A",
+   "parameters": {
+    "replication_cycle_hours": {
+     "citation": "PMID:16840338",
+     "conditions": "Influenza; BioNumbers quantity: Latent phase of influenza A; latent phase, infection to virion release, from a model fitted to human infection data, x1",
+     "provenance": "measured",
+     "rationale": "The delay model suggests that influenza virus is produced by an infected cell for a period of about 5 h, that it takes about 6 h between infection of target cells and virion release, and that infected cells have an average life span of about 12 h (Table 3).",
+     "source": "BioNumbers BNID:101619 (Baccam P, Beauchemin C, Macken CA, Hayden FG, Perelson AS. Kinetics of influenza A virus infection in humans. J Virol. 2)",
+     "unit": "h",
+     "value": 6.0
+    }
+   }
+  }
+ ],
+ "format": 1
+}

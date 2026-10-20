@@ -20,6 +20,7 @@ Tables:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -36,6 +37,9 @@ from .models import (
 )
 
 log = logging.getLogger(__name__)
+
+#: Advisory-lock key for library initialisation on PostgreSQL.
+_INIT_LOCK_KEY = 0x636F676E  # 'cogn'
 
 
 # Entity types for which `(name, entity_type)` is NOT an identity.
@@ -130,8 +134,16 @@ class EntityStore:
             self._db_path = db_path
             log.info("Using SQLite database at %s", db_path)
 
-        self._init_db()
-        self._auto_seed_if_empty()
+        # Seeding and the curated pass run under a lock shared by every
+        # process opening this library. Two processes opening a fresh
+        # library at once could otherwise both seed it, or one could apply
+        # the curated values while the other was still enriching entities it
+        # had loaded earlier -- whose later saves then overwrote the
+        # evidence after it had been recorded as applied.
+        with self._init_lock():
+            self._init_db()
+            self._auto_seed_if_empty()
+            self._apply_curated_parameters()
 
     def _auto_seed_if_empty(self):
         """Auto-seed the library with base catalogs if the DB is empty."""
@@ -184,6 +196,67 @@ class EntityStore:
                 )
         except Exception as e:
             log.warning("Auto-seed failed (non-fatal): %s", e)
+
+    @contextlib.contextmanager
+    def _init_lock(self):
+        """Serialise library initialisation across processes.
+
+        SQLite: an exclusive lock on a file beside the database. PostgreSQL:
+        a session advisory lock. Where neither is available the
+        initialisation runs unlocked, as it always had.
+        """
+        if self._use_postgres:
+            try:
+                self._execute("SELECT pg_advisory_lock(?)", (_INIT_LOCK_KEY,))
+            except Exception as e:                           # pragma: no cover
+                log.warning("library init lock unavailable: %s", e)
+                yield
+                return
+            try:
+                yield
+            finally:
+                self._execute("SELECT pg_advisory_unlock(?)", (_INIT_LOCK_KEY,))
+            return
+        try:
+            import fcntl
+        except ImportError:                                  # pragma: no cover
+            yield
+            return
+        with open(f"{self._db_path}.init.lock", "a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def _apply_curated_parameters(self):
+        """Bring the library up to date with the repository's curated values.
+
+        The sourced evidence lives in cognisom/library/curated_parameters.json
+        because this database is local state; see library/curated.py. Cheap
+        when nothing changed: one hash compared against library_meta.
+        """
+        try:
+            from .curated import apply_curated
+            apply_curated(self)
+        except Exception as e:
+            log.warning("Applying curated parameters failed (non-fatal): %s", e)
+
+    def get_meta(self, key: str) -> Optional[str]:
+        """A value from library_meta, or None."""
+        row = self._execute(
+            "SELECT value FROM library_meta WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return None
+        return row["value"] if isinstance(row, dict) else row[0]
+
+    def set_meta(self, key: str, value: str) -> None:
+        """Insert or replace a library_meta value."""
+        self._execute(
+            "INSERT INTO library_meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            (key, value))
+        self.conn.commit()
 
     @property
     def conn(self) -> Any:
@@ -296,6 +369,11 @@ class EntityStore:
             CREATE TRIGGER entities_search_update
                 BEFORE INSERT OR UPDATE ON entities
                 FOR EACH ROW EXECUTE FUNCTION entities_search_trigger();
+
+            CREATE TABLE IF NOT EXISTS library_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         """)
         self.conn.commit()
         log.info("PostgreSQL entity store initialized")
@@ -360,6 +438,11 @@ class EntityStore:
             );
 
             CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_id);
+
+            CREATE TABLE IF NOT EXISTS library_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         """)
         c.commit()
         log.info("SQLite entity store initialized at %s", self._db_path)

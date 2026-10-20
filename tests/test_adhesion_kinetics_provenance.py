@@ -444,10 +444,15 @@ def test_a_freshly_seeded_library_carries_the_citations(seeded_store):
         pv.citation
         for e in entities for _, pv in iter_parameters(e) if pv.citation
     }
-    assert cited == {
+    adhesion_kinetics = {
         "PMID:11404363", "PMID:12451422", "PMID:25793408",
         "PMID:9422729", "PMID:9780171", "PMID:9829984",
     }
+    assert adhesion_kinetics <= cited
+    # Every library also takes the repository's curated values on open
+    # (library/curated.py), which include these molecules' UniProt masses.
+    assert all(c.startswith("UniProt:") for c in cited - adhesion_kinetics), (
+        cited - adhesion_kinetics)
 
 
 def test_the_curated_molecules_are_simulation_ready_and_the_gaps_are_not(
