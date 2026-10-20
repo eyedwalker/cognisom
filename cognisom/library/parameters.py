@@ -807,6 +807,87 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         minimum=0.0, maximum=1e3,
         required_for_simulation=True,
     ),
+
+    # ── Subcellular structure ──
+    # Organelles are not entities in this library, so their dimensions are
+    # held as properties of the cell type that has them -- which is also
+    # the more honest shape, since a nuclear volume is a fact about a cell
+    # type and not about a free-floating nucleus. These specs exist mainly
+    # so that a wrong-unit write is refused: a lipid-bilayer thickness and
+    # an organelle diameter are both "a length" to a schema that declares
+    # no unit, and they differ by four orders of magnitude.
+    _spec(
+        "nucleus_volume_um3", "um^3",
+        "Interphase nuclear volume. BioNumbers holds no citable NORMAL "
+        "human somatic value: every human record that resolves is HeLa, "
+        "which is hypertriploid and was measured trypsinized and rounded "
+        "up in suspension (BNID 106665, 220; BNID 101402, 374). So this "
+        "can carry a cancer nucleus with provenance but cannot support a "
+        "normal-versus-malignant comparison on its own, and nuclear "
+        "enlargement must not be asserted from it.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=5.0, maximum=4000.0,
+    ),
+    _spec(
+        "mitochondrion_volume_um3", "um^3",
+        "Volume of ONE mitochondrion, not the per-cell mitochondrial "
+        "volume -- the two differ by a factor of hundreds and BioNumbers "
+        "records do not always say which they mean (BNID 109399, 0.29, "
+        "has an empty comments field). In many cell types mitochondria "
+        "form a connected reticulum rather than discrete bodies, in which "
+        "case a per-organelle volume is not well defined at all.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=0.001, maximum=50.0,
+    ),
+    _spec(
+        "lysosome_diameter_um", "um",
+        "Median lysosomal diameter. A median, not a size: the population "
+        "spans 0.1-1.2 um (BNID 106072), a factor of 12 in diameter and "
+        "~1700 in volume, so instancing one value uniformly asserts a "
+        "monodispersity the measurement contradicts. Note also that the "
+        "pH in BNID 106078's title is the culture medium's, not the "
+        "lumen's, which is nearer 4.5-5.5.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=0.02, maximum=3.0,
+    ),
+    _spec(
+        "ribosome_diameter_um", "um",
+        "Diameter of a cytoplasmic ribosome, 0.025-0.030 um in human "
+        "cells. A 70S record is BACTERIAL and does not apply: human "
+        "cytoplasmic ribosomes are 80S and larger, and a search for "
+        "'ribosome diameter' returns E. coli 70S first. Beware also of "
+        "volume records computed from partial specific volumes (BNID "
+        "102474, 4000 nm^3): those are anhydrous compact volumes that "
+        "exclude the solvent-filled channels, so converting one to an "
+        "equivalent sphere understates the envelope by around a quarter.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=0.015, maximum=0.05,
+    ),
+    _spec(
+        "er_surface_area_um2", "um^2",
+        "Endoplasmic-reticulum membrane area per cell. The ER is a "
+        "continuous network, so an area and a tubule diameter are what "
+        "get measured and a 'length' is not meaningful. The only citable "
+        "human record (BNID 105910) is an aged Leydig cell, a "
+        "steroidogenic cell whose smooth ER is hypertrophied to make "
+        "testosterone and is its dominant organelle -- near the ceiling "
+        "of the human range and not a lymphocyte or a carcinoma cell.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=50.0, maximum=2e5,
+    ),
+    _spec(
+        "golgi_extent_um", "um",
+        "Longest extent of the Golgi apparatus, a stack of 4-8 cisternae. "
+        "Do not fill this from a membrane-thickness record: a search for "
+        "Golgi dimensions returns BNID 105820, 39.5 angstroms, which is "
+        "the phosphate-to-phosphate distance across ONE bilayer and is "
+        "correct for what it measures and 760x too small for the "
+        "organelle. It is the highest-risk record in this area precisely "
+        "because it is citable, human-adjacent and sitting in the field a "
+        "consumer would read.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=0.3, maximum=15.0,
+    ),
     _spec(
         "migration_speed_um_per_min", "um/min",
         "Mean migration speed.",

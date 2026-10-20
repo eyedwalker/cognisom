@@ -341,14 +341,52 @@ def candidates(term: str, limit: int = 8, human_only: bool = True,
     return out
 
 
+#: The same unit is written several ways across BioNumbers -- the micro
+#: SIGN and Greek small mu both appear for micrometres, sometimes in
+#: neighbouring records ("\u00b5m^3" for a nuclear volume, "\u03bcm^3" for a
+#: mitochondrial one), and exponents come as carets or superscripts.
+_UNIT_CHARS = {
+    "\u00b5": "u", "\u03bc": "u",        # micro sign, Greek small mu
+    "\u00b2": "2", "\u00b3": "3",        # superscript two, three
+    "\u00c5": "angstrom", "\u00e5": "angstrom",
+}
+
+
+def _normalise_unit(unit: str) -> str:
+    """A unit string reduced to what it means, for comparison only."""
+    out = (unit or "").strip()
+    for find, repl in _UNIT_CHARS.items():
+        out = out.replace(find, repl)
+    out = out.lower()
+    for junk in ("^", " ", "*", "_"):
+        out = out.replace(junk, "")
+    return out.replace("angstroms", "angstrom")
+
+
+def same_unit(a: str, b: str) -> bool:
+    """Whether two unit strings denote the same unit."""
+    return _normalise_unit(a) == _normalise_unit(b)
+
+
 def accept(entity: BioEntity, parameter: str, record: BioNumberRecord,
            value: Optional[float] = None, note: str = "") -> List[str]:
     """Write a chosen record onto an entity, citing the paper behind it.
 
     ``value`` overrides the record's own number, for the case where a unit
     conversion is needed; state it in ``note`` when you do. The write goes
-    through :func:`set_parameter`, so the spec's unit and range still apply
-    and a value that fails them is rejected rather than stored.
+    through :func:`set_parameter`, so the spec's range still applies and a
+    value that fails it is rejected rather than stored.
+
+    A record whose unit is not the parameter's is refused. This used to
+    pass the spec's unit straight through -- ``unit=spec.unit if spec else
+    record.unit`` -- which *relabelled* the record rather than checking it:
+    a Golgi membrane thickness of 39.5 angstroms, accepted into a
+    parameter declared in micrometres, became "39.5 um", wrong by a factor
+    of ten thousand with nothing in the stored value to show it. The
+    docstring claimed "the spec's unit still applies", but a unit that is
+    overwritten to match can never disagree. Supplying ``value`` is how a
+    caller says it has done the conversion deliberately, and that is the
+    only way past this.
     """
     if not record.citable:
         return [
@@ -357,6 +395,15 @@ def accept(entity: BioEntity, parameter: str, record: BioNumberRecord,
                else "its reference did not resolve to a PubMed record")
         ]
     spec = PARAMETER_SPECS.get(parameter)
+    if spec is not None and value is None and record.unit \
+            and not same_unit(record.unit, spec.unit):
+        return [
+            f"BNID {record.bnid} is in {record.unit!r} but {parameter} is "
+            f"declared in {spec.unit!r}. Convert it and pass the converted "
+            f"number as `value`, saying so in `note`; this is refused "
+            f"rather than relabelled because the two differ by more than a "
+            f"name ({record.quantity!r})."
+        ]
     conditions = "; ".join(p for p in (
         record.organism,
         f"BioNumbers quantity: {record.quantity}" if record.quantity else "",
