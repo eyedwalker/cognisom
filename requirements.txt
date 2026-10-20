@@ -174,6 +174,23 @@ mhcflurry==2.0.6; python_version < "3.13"
 # says 24,893 nM, and it presents 2 peptides for TP53 R175H where MHCflurry
 # presents none. Production and CI are x86_64 Linux on 3.11 and are
 # unaffected by this marker.
+#
+# To run the WHOLE SUITE against the real predictor on this machine --
+# which is otherwise something only CI can do, so a test that silently
+# depends on the approximation stays green here and red there -- add the
+# rest of the suite's imports to that venv and point pytest at the repo:
+#
+#     ~/.venvs/mhcflurry/bin/pip install pytest pytest-xdist matplotlib \
+#         scipy scikit-image rdkit boto3 plotly
+#     SSL_CERT_FILE=$(...certifi...) ~/.venvs/mhcflurry/bin/python -m pytest \
+#         tests/ -q -p no:randomly -n 4 --dist loadfile -m "not network"
+#
+# 2,306 passed in 83 s, verified 2026-10-20 -- faster than CI's 3m37s.
+# conftest.py sets COGNISOM_ALLOW_PWM_FALLBACK, but that only decides
+# whether an ABSENT MHCflurry raises or warns; with it importable the real
+# predictor runs and the variable is inert. A test that needs the
+# approximate path must therefore patch is_mhcflurry_available rather than
+# rely on the machine (see tests/test_neoantigen_ranking.py).
 tensorflow-cpu>=2.13,<2.16; python_version < "3.13" and (sys_platform != "darwin" or platform_machine != "arm64")
 #
 # Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
