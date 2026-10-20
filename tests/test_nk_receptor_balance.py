@@ -924,7 +924,10 @@ def test_the_tcell_closed_loop_is_unchanged_by_the_innate_rewrite():
     counts = engine.event_bus.get_statistics()["event_counts"]
     assert counts.get(EventTypes.MUTATION_OCCURRED, 0) == 1
     assert counts.get(EventTypes.PEPTIDE_GENERATED, 0) == 1
-    assert counts.get(EventTypes.PEPTIDE_PRESENTED, 0) == 2
+    assert counts.get(EventTypes.PEPTIDE_PRESENTED, 0) == 2, (
+        f"presented {counts.get(EventTypes.PEPTIDE_PRESENTED, 0)} peptides, "
+        f"expected 2. Mutations that bound nothing: "
+        f"{engine.modules['cellular'].unpresented_mutations}")
     assert counts.get(EventTypes.IMMUNE_ACTIVATED, 0) == 1
     assert counts.get(EventTypes.CANCER_KILLED, 0) == 1
     assert counts.get(EventTypes.CELL_KILLED_BY_TCELL, 0) == 1

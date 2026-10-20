@@ -152,13 +152,11 @@ def test_a_mutation_that_presents_nothing_says_so_once(caplog, monkeypatch):
 
     import numpy as np
 
-    from cognisom.modules import cellular_module as cm
     from cognisom.modules.cellular_module import CellularModule
     from cognisom.modules.molecular_module import MolecularModule
     from cognisom.core import SimulationConfig, SimulationEngine
 
     monkeypatch.setenv("COGNISOM_ALLOW_PWM_FALLBACK", "1")
-    cm._NO_BINDER_REPORTED.clear()
     np.random.seed(0)
     with contextlib.redirect_stdout(io.StringIO()):
         engine = SimulationEngine(SimulationConfig(dt=0.01, duration=0.03, use_gpu=False))
@@ -181,4 +179,44 @@ def test_a_mutation_that_presents_nothing_says_so_once(caplog, monkeypatch):
     assert len(lines) == 1, lines          # once per (gene, mutation), not per step
     assert "KRAS G12D" in lines[0] and "HLA-B*58:01" in lines[0]
     assert "500 nM" in lines[0] and "Scorer:" in lines[0]
-    cm._NO_BINDER_REPORTED.clear()
+
+
+def test_the_unpresented_mutation_is_readable_state(monkeypatch):
+    """Not only a log line: a caller that wants to know which of a
+    patient's mutations produced nothing presentable should not scrape
+    logs for it. This is what the closed-loop assertions report in CI,
+    where the real predictor runs and this machine cannot."""
+    import contextlib
+    import io
+
+    import numpy as np
+
+    from cognisom.modules.cellular_module import CellularModule
+    from cognisom.modules.molecular_module import MolecularModule
+    from cognisom.core import SimulationConfig, SimulationEngine
+
+    monkeypatch.setenv("COGNISOM_ALLOW_PWM_FALLBACK", "1")
+    np.random.seed(0)
+    with contextlib.redirect_stdout(io.StringIO()):
+        engine = SimulationEngine(SimulationConfig(dt=0.01, duration=0.03, use_gpu=False))
+        engine.register_module("molecular", MolecularModule, {
+            "transcription_rate": 0.0, "exosome_release_rate": 0.0, "mutation_rate": 0.0})
+        engine.register_module("cellular", CellularModule, {
+            "n_normal_cells": 0, "n_cancer_cells": 0, "hla_alleles": ["HLA-B*58:01"]})
+        engine.initialize()
+        mol, cel = engine.modules["molecular"], engine.modules["cellular"]
+        cel.set_molecular_module(mol)
+        cell_id = cel.add_cell(position=[100, 100, 50], cell_type="cancer")
+        mol.add_cell(cell_id)
+        assert cel.unpresented_mutations == []
+        mol.introduce_mutation(cell_id, "KRAS", "G12D")
+        engine.run(duration=0.03)
+
+    assert len(cel.unpresented_mutations) == 1      # once, not once per step
+    record = cel.unpresented_mutations[0]
+    assert record["gene"] == "KRAS" and record["mutation"] == "G12D"
+    assert record["n_peptides"] > 0
+    assert record["best_ic50_nm"] >= record["weak_threshold_nm"]
+    assert record["best_allele"] == "HLA-B*58:01"
+    assert record["scorer"]
+    assert cel.get_state()["unpresented_mutations"] == cel.unpresented_mutations

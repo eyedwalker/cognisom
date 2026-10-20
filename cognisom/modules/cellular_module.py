@@ -37,8 +37,6 @@ DEFAULT_HLA_ALLELES = ("HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02")
 
 logger = logging.getLogger(__name__)
 
-#: (gene, mutation) pairs already reported as presenting nothing.
-_NO_BINDER_REPORTED: set = set()
 
 
 # Oncogenes known to drive intrinsic PD-L1 expression (Type III TME
@@ -223,6 +221,11 @@ class CellularModule(SimulationModule):
         self.hla_alleles: List[str] = list(
             self.config.get('hla_alleles', DEFAULT_HLA_ALLELES)
         )
+        #: One record per (gene, mutation) whose peptides bound nothing on
+        #: this patient's HLA panel: the best IC50 reached, on which
+        #: allele, and which scorer said so. See on_mutation_occurred.
+        self.unpresented_mutations: List[Dict[str, Any]] = []
+        self._unpresented_seen: set = set()
         self.max_displayed_per_mutation = int(
             self.config.get('max_displayed_per_mutation', 5)
         )
@@ -627,7 +630,11 @@ class CellularModule(SimulationModule):
             'total_deaths': self.total_deaths,
             'total_transformations': self.total_transformations,
             'avg_oxygen': np.mean([c.oxygen for c in alive_cells]) if alive_cells else 0,
-            'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0
+            'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0,
+            # Mutations whose peptides bound nothing on this patient's HLA
+            # panel, with the best IC50 each reached and the scorer that
+            # said so. Empty when every mutation presented something.
+            'unpresented_mutations': list(self.unpresented_mutations),
         }
     
     def set_molecular_module(self, molecular_module):
@@ -761,11 +768,28 @@ class CellularModule(SimulationModule):
             # re-scored on every cell on every step, and the second pass is
             # free because score_all has already cached every pair.
             key = (gene, mutation_label)
-            if key not in _NO_BINDER_REPORTED:
-                _NO_BINDER_REPORTED.add(key)
+            if key not in self._unpresented_seen:
+                self._unpresented_seen.add(key)
                 scored = self._mhc_loader.score_all(
                     peptides, self.hla_alleles, include_non_binders=True)
                 best = min(scored, key=lambda p: p.ic50_nm, default=None)
+                # Kept on the module, not only logged: which of a patient's
+                # mutations produced nothing presentable, and how close the
+                # best peptide came, is a result worth reading -- it is how
+                # an HLA-mismatched mutation stays invisible to T cells --
+                # and a caller that wants it should not have to scrape logs.
+                self.unpresented_mutations.append({
+                    "gene": gene,
+                    "mutation": mutation_label,
+                    "n_peptides": len(peptides),
+                    "hla_alleles": list(self.hla_alleles),
+                    "weak_threshold_nm": self._mhc_loader.weak_threshold_nm,
+                    "best_peptide": best.peptide.sequence if best else None,
+                    "best_allele": best.hla_allele if best else None,
+                    "best_ic50_nm": best.ic50_nm if best else None,
+                    "scorer": getattr(
+                        self._mhc_loader._scorer, "_binding_method", "unknown"),
+                })
                 logger.info(
                     "%s %s: %d peptides, none binding %s (weak-binder "
                     "threshold %.0f nM). Best was %s on %s at %.0f nM. "

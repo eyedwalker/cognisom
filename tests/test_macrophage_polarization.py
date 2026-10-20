@@ -521,7 +521,10 @@ def test_the_flagship_closed_loop_trace_is_unchanged(seed):
 
     assert seen.get(EventTypes.MUTATION_OCCURRED) == 1
     assert seen.get(EventTypes.PEPTIDE_GENERATED) == 1
-    assert seen.get(EventTypes.PEPTIDE_PRESENTED) == 2
+    assert seen.get(EventTypes.PEPTIDE_PRESENTED) == 2, (
+        f"presented {seen.get(EventTypes.PEPTIDE_PRESENTED)} peptides, "
+        f"expected 2. Mutations that bound nothing: "
+        f"{engine.modules['cellular'].unpresented_mutations}")
     assert seen.get(EventTypes.IMMUNE_ACTIVATED) == 1
     assert seen.get(EventTypes.CANCER_KILLED) == 1
     assert seen.get(EventTypes.CELL_KILLED_BY_TCELL) == 1
