@@ -110,6 +110,30 @@ LINEAGE_ENTITY = {
     'macrophage': ('Macrophage', 'cell_type'),
 }
 
+
+def chase_displacement(direction: np.ndarray, distance: float,
+                       speed_um_per_min: float,
+                       dt_hours: float) -> np.ndarray:
+    """One chase step toward a target ``distance`` um away along ``direction``.
+
+    ``direction`` is a unit vector. Speed is um/min and the engine steps in
+    hours, so the step is speed x 60 x dt -- the conversion _patrol uses.
+    Both chase sites (here and the GPU-patched update in gpu/orchestrator)
+    multiplied by 0.01 instead, which is 6,000x too slow: at the default
+    10 um/min and dt = 0.01 h a chasing cell moved 0.001 um per step instead
+    of 6 um. A cell that recognised a target from outside the 5 um kill
+    radius therefore sat frozen short of it for the rest of the run, and
+    only targets first seen from inside the kill radius could ever die.
+
+    The step is capped at the remaining distance. Once it is real a cell
+    must close on its target, not fly past it -- at dt = 0.05 h the uncapped
+    step is 30 um, and the cell would oscillate across its target, inside
+    the kill radius only by chance.
+    """
+    step = speed_um_per_min * MINUTES_PER_HOUR * dt_hours
+    return direction * min(step, distance)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -938,7 +962,9 @@ class ImmuneModule(SimulationModule):
                         )
                         direction = direction / distance
                         immune_cell.velocity = direction * effective_speed
-                        immune_cell.position += immune_cell.velocity * dt * 0.01  # Convert min to hours
+                        immune_cell.position += chase_displacement(
+                            direction, distance, effective_speed, dt,
+                        )
                     
                     # Kill if close enough. T cells with a TCR match use
                     # the closed-loop kill_probability(affinity, mhc,

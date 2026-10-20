@@ -45,9 +45,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from cognisom.core.event_bus import EventTypes
 from cognisom.modules.spatial_module import SpatialField, SpatialModule
 
 SECONDS_PER_HOUR = 3600.0
+
+
+def _deaths(runner, cause: str, cell_type: str) -> int:
+    """Deaths of one cause in one lineage, from the runner's event log."""
+    return sum(1 for e in runner.event_log
+               if e["event"] == EventTypes.CELL_DIED
+               and e["data"].get("cause") == cause
+               and e["data"].get("cell_type") == cell_type)
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -332,27 +341,30 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     normal = [c for c in alive if c.cell_type != "cancer"]
 
     assert len(normal) == 160
-    # Cancer survivors moved when the immune patrol unit bug was fixed:
-    # patrol_speed is um/MIN and was converted to hours with x0.01 instead
-    # of x60, so the immune compartment was frozen at a median 0.022 um of
-    # travel per 6 h and never reached a tumour. With immune cells able to
-    # migrate, Baseline now loses 8 cancer cells to real kills.
+    assert _deaths(runner, "hypoxia", "normal") == 0
+    # Every cancer cell is killed. 22 survived while the chase step converted
+    # um/min to hours with x0.01 instead of x60: a cell that recognised a
+    # cancer cell from outside the 5 um kill radius sat frozen short of it,
+    # so only targets first seen from inside the radius could die. (8 more
+    # had survived before that, while the patrol step had the same bug.)
     #
-    # What this test exists for is unchanged and still asserted above:
-    # normal-cell survival at 160.
-    assert len([c for c in alive if c.cell_type == "cancer"]) == 22
-    # 4 before the immune-patrol fix. Immune kills are deaths, so a working
-    # immune compartment raises this; none of the extra deaths are normal
-    # cells, which is what the assertion above pins.
-    assert cells.total_deaths == 6
-    # 102 before the immune-patrol fix: cancer cells killed early never go
-    # on to divide.
-    assert cells.total_divisions == 98
+    # What this test exists for is unchanged and asserted above: normal-cell
+    # survival at 160, and no normal cell dying of anything.
+    assert len([c for c in alive if c.cell_type == "cancer"]) == 0
+    assert cells.total_deaths == 10
+    assert _deaths(runner, "immune_killed", "cancer") == 10
+    # 98 with the chase frozen, 18 of them cancer divisions: cancer cells
+    # killed in the first hours never divide. The 80 left are the normal
+    # population dividing together on the final step -- every normal cell
+    # starts at age 0 with a 24 h division time -- which is why this count
+    # (and the 160 above) is sensitive to dt: at dt = 0.02 the float sum of
+    # steps falls just short of 24 h and none of them divide.
+    assert cells.total_divisions == 80
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(304.4490, abs=0.01)
-    # 309.0560 before the immune-patrol fix: 8 fewer cancer cells survive,
-    # and they are not there to be delivered oxygen. The Krogh law itself is
-    # unchanged -- normal-cell survival and mean oxygen are asserted above.
+        pytest.approx(281.9123, abs=0.01)
+    # 304.4490 with the chase frozen: 22 fewer cancer cells survive to be
+    # delivered oxygen. The Krogh law itself is unchanged -- normal-cell
+    # survival and the oxygen floor below are as before.
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
     assert min(c.oxygen for c in alive) == pytest.approx(0.0739, abs=1e-3)
 
@@ -360,26 +372,34 @@ def test_baseline_normal_cells_still_survive_24h(runs):
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     """Three capillaries and exchange_rate 0.4. If cell O2 were sourced
     from the diffusive field this would be zero hypoxic cells, because a
-    correct solve on this tissue extent returns a uniform field."""
+    correct solve on this tissue extent returns a uniform field.
+
+    The evidence is the cells that die of hypoxia, not the cells still
+    hypoxic at 24 h. Once a chasing immune cell could reach what it had
+    recognised, the cancer cells that used to starve in the capillary-poor
+    corner were killed first, and the end-of-run snapshot lost its hypoxic
+    cells while the mechanism was untouched: 53 normal cells starve either
+    way.
+    """
     runner = runs["Hypoxia"]
     cells = runner.engine.modules["cellular"]
     vascular = runner.engine.modules["vascular"]
     alive = [c for c in cells.cells.values() if c.alive]
 
-    # 3 before the closed loop reached the dashboard. Realising the driver
-    # mutation each cancer cell is labelled with lets T cells recognise and
-    # kill, so fewer cancer cells survive to crowd the capillary-poor corner.
-    # Still produces hypoxia, which is what this test is named for.
-    assert vascular.hypoxic_regions == 2
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 2
-    # Was 0.0143 before the immune-patrol fix; the surviving cells sit in
-    # different positions relative to the capillaries now. The hypoxia
-    # invariants themselves -- 3 hypoxic regions, 3 cells below 0.05 -- are
-    # unchanged and asserted above.
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0186, abs=1e-3)
-    # 74 before the immune-patrol fix. Slightly fewer here: cancer cells
-    # killed early by immune cells never go on to starve.
+    # The mechanism: normal cells starve in this preset and in no other.
+    assert _deaths(runner, "hypoxia", "normal") == 53
+    assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
+    # 16 cancer cells starved too while the chase step was frozen; now all
+    # 20 are killed by immune cells before they can.
+    assert _deaths(runner, "hypoxia", "cancer") == 0
+    assert _deaths(runner, "immune_killed", "cancer") == 20
     assert cells.total_deaths == 73
+    # The 24 h snapshot: 2 hypoxic regions and 2 cells below 0.05 with the
+    # chase frozen, and those were the starving cancer cells. The survivors
+    # now are the 14 best-perfused normal cells.
+    assert vascular.hypoxic_regions == 0
+    assert sum(1 for c in alive if c.oxygen < 0.05) == 0
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0747, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

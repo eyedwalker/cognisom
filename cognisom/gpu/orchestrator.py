@@ -229,6 +229,10 @@ class GPUOrchestrator:
 
     def _patch_immune(self, module, engine):
         """Replace nested detection loop with batch distance computation."""
+        # The chase step is shared with the module so the two cannot drift
+        # apart again; they did, and both carried the same unit bug.
+        from cognisom.modules.immune_module import chase_displacement
+
         module._original_update = module.update
 
         #: Lineages already reported as having no recognition rule. Warning
@@ -331,7 +335,9 @@ class GPUOrchestrator:
                     if distance > 0:
                         direction = direction / distance
                         ic.velocity = direction * ic.speed
-                        ic.position += ic.velocity * dt * 0.01
+                        ic.position += chase_displacement(
+                            direction, distance, ic.speed, dt,
+                        )
                     if distance < ic.kill_radius:
                         if np.random.random() < module.kill_probability:
                             # Out of the snapshot before the queued event
