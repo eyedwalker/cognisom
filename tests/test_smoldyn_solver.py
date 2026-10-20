@@ -805,6 +805,13 @@ def _snapshot(solver):
     return (p.positions[:n].copy(), p.species[:n].copy(), p.alive[:n].copy())
 
 
+#: How far apart the vectorised step and the reference may round, in units
+#: of float32 epsilon. Measured worst case on numpy 1.26 over four steps:
+#: 1 ULP. Eight leaves room for longer runs and still sits far below any
+#: real divergence.
+ULP_TOLERANCE = 8
+
+
 def _assert_same_state(a, b, label):
     pos_a, sp_a, al_a = a
     pos_b, sp_b, al_b = b
@@ -812,24 +819,41 @@ def _assert_same_state(a, b, label):
     assert np.array_equal(sp_a, sp_b), f"{label}: species differs"
     live = al_a == 1
     want, got = pos_b[live], pos_a[live]
-    if np.array_equal(got, want):
-        return
-    # Say what differs. Printing the two arrays is useless here: they agree
-    # to repr precision, so a failure reads as two identical arrays, which
-    # is how this went undiagnosed in CI. A difference of a few ULPs is a
-    # rounding difference between the two code paths on that machine; a
-    # large one is a real divergence, and the size tells them apart.
+    # Positions must agree to float32 round-off, not bit for bit. Bit
+    # identity is not a property either path guarantees: on numpy 1.26 --
+    # which is what CI runs, because TensorFlow pins numpy below 2 -- the
+    # vectorised (n, 3) loop and the reference's per-row (3,) loop round
+    # the same expression differently, measured at up to 1 ULP, while
+    # numpy 2.x happens to agree. The assertion was exact, so CI failed on
+    # five of these and printed two arrays identical to repr precision,
+    # which said nothing.
+    #
+    # The tolerance does not weaken what the test is for. Everything that
+    # carries the semantics -- which particles are alive, what species they
+    # are -- is still compared exactly above, and any real divergence (a
+    # different random draw, a missed reaction, a wrong pairing) moves a
+    # particle by about one displacement, sigma ~ 0.1 um, four orders of
+    # magnitude more than this bound.
+    rtol = ULP_TOLERANCE * np.finfo(np.float32).eps
+    atol = np.finfo(np.float32).eps
+    allowed = rtol * np.abs(want.astype(np.float64)) + atol
     diff = np.abs(got.astype(np.float64) - want.astype(np.float64))
-    worst = int(np.argmax(diff))
+    if (diff <= allowed).all():
+        return
+    # Say what differs, and by how much against what was allowed. Printing
+    # the two arrays is useless here: they agree to repr precision, so a
+    # failure reads as two identical arrays, which is how this went
+    # undiagnosed in CI.
+    worst = int(np.argmax(diff / allowed))
     row, col = divmod(worst, got.shape[1])
-    scale = float(np.abs(want).max())
-    ulp = float(np.spacing(np.float32(scale))) or float(np.spacing(np.float32(1.0)))
     raise AssertionError(
-        f"{label}: positions differ in {int((diff > 0).sum())} of "
-        f"{diff.size} components; max |diff| {diff.max():.3e} "
-        f"({diff.max() / ulp:.1f} ULP at |pos| <= {scale:g}) at live row "
-        f"{row} axis {col}: vectorised {got[row, col]!r} vs reference "
-        f"{want[row, col]!r}"
+        f"{label}: positions differ beyond float32 round-off in "
+        f"{int((diff > allowed).sum())} of {diff.size} components "
+        f"(tolerance {ULP_TOLERANCE} ULP). Worst at live row {row} axis "
+        f"{col}: vectorised {got[row, col]!r} vs reference "
+        f"{want[row, col]!r}, |diff| {diff[row, col]:.3e} against an "
+        f"allowance of {allowed[row, col]:.3e} "
+        f"({diff[row, col] / allowed[row, col]:.1f}x)"
     )
 
 
