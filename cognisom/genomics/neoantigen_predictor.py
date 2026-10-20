@@ -412,7 +412,12 @@ class NeoantigenPredictor:
             max_neoantigens: Maximum neoantigens to return.
 
         Returns:
-            List of Neoantigen objects, sorted by binding affinity.
+            Neoantigen objects, best first. Ranked on the trained scorer's
+            presentation score where it supplied one for every candidate,
+            and on binding affinity where it did not --
+            ``diagnostics.ranking_basis`` says which, and the two are not
+            interchangeable. The order decides which survive
+            ``max_neoantigens``, so it is not only a presentation detail.
         """
         if peptide_lengths is None:
             peptide_lengths = [8, 9, 10, 11]
