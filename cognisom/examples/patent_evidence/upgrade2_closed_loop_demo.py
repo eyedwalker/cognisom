@@ -90,6 +90,11 @@ def banner(title: str) -> None:
     print("=" * 78)
 
 
+#: Simulated hours. Fifteen minutes is ~15 mean lethal contacts at this
+#: demo's shortened contact time, so every presented mutation resolves.
+RUN_H = 0.25
+
+
 def _build_engine() -> SimulationEngine:
     """Three-module engine tuned for trace visibility.
 
@@ -101,11 +106,12 @@ def _build_engine() -> SimulationEngine:
       stays well above the EC50 once affinity x mhc clears it.
     """
     engine = SimulationEngine(SimulationConfig(
-        # 5 steps is enough -- the T cell detects + kills on step 1 or 2
-        # at this configuration; keeping the run short caps the
-        # mhcflurry overhead at the one-time per-mutation peptide
-        # scoring.
-        dt=0.01, duration=0.05, use_gpu=False,
+        # Fifteen minutes. The run stays short because the mhcflurry
+        # overhead is paid once per mutation at peptide scoring, and
+        # because this harness has no vasculature: a cancer cell burns
+        # through its oxygen in about two hours and then dies of hypoxia,
+        # which would muddle a demo about T-cell killing.
+        dt=0.01, duration=RUN_H, use_gpu=False,
     ))
     engine.register_module("molecular", MolecularModule, {
         "transcription_rate": 0.0,
@@ -125,6 +131,14 @@ def _build_engine() -> SimulationEngine:
         "tcr_seed": 0,
         "costimulation": 1.0,
         "checkpoint_block": 0.0,
+        # The subject here is the causal chain, not how long a kill takes.
+        # A contact's outcome is decided when it begins and then takes a
+        # measured time to play out -- a lethal CD8+ contact averages
+        # ~75 min (human T cells on melanoma, PMID:23935904), far longer
+        # than a demo should run -- so the lethal contact is shortened to
+        # one minute here. The kill PROBABILITY is untouched: it is the
+        # same Hill rule at threshold 0.0 and costim 1.0 as before.
+        "lethal_contact_minutes": {"T_cell": 1.0},
     })
     engine.initialize()
     return engine
@@ -290,7 +304,7 @@ def main() -> int:
     print("Trace:    MUTATION_OCCURRED -> PEPTIDE_GENERATED -> "
           "PEPTIDE_PRESENTED -> IMMUNE_ACTIVATED -> CELL_KILLED_BY_TCELL")
 
-    # Reproducible per-step kill rolls inside immune.update.
+    # Reproducible contact outcomes and durations inside immune.update.
     np.random.seed(0)
 
     engine = _build_engine()
@@ -330,8 +344,8 @@ def main() -> int:
               f"WT residue: {mut.effect.wild_type_aa} "
               f"mutant: {mut.effect.mutant_aa}")
 
-    banner("Run engine: 5 steps, T cells colocated with targets")
-    engine.run(duration=0.05)
+    banner(f"Run engine: {RUN_H * 60:.0f} min, T cells colocated with targets")
+    engine.run(duration=RUN_H)
 
     # ---- Per-mutation trace + provenance --------------------------------
     log = list(engine.event_bus.event_log)
