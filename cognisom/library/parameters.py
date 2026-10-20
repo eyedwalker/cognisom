@@ -808,6 +808,70 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         required_for_simulation=True,
     ),
 
+    # ── Cell ultrastructure, measured ──
+    # These carry the morphometry the visualisation needs. They live on
+    # the cell type rather than on an organelle, because that is what is
+    # measured: a nuclear volume fraction is a fact about a lymphocyte,
+    # not about a free-floating nucleus.
+    _spec(
+        "nuclear_volume_fraction", "dimensionless",
+        "Nucleus as a fraction of cell volume. A FRACTION, never a radius "
+        "ratio: the radius is its cube root, and setting a nuclear radius "
+        "to the fraction gives a nucleus at the cube of it -- 0.444 "
+        "becomes 8.8% of the cell, which is how this was wrong before.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL, EntityType.PHYSICAL_CELL),
+        minimum=0.01, maximum=0.90,
+    ),
+    _spec(
+        "granule_volume_fraction", "dimensionless",
+        "Cytoplasmic granules as a fraction of cell volume. The strongest "
+        "single discriminator between these cells -- a 77-fold measured "
+        "spread from eosinophil to lymphocyte in one table "
+        "(PMID 6775712) -- so a value here that is uniform across cell "
+        "types is a placeholder however plausible each one looks.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.0, maximum=0.5,
+    ),
+    _spec(
+        "microvillus_density_per_um2", "1/um^2",
+        "Microvilli per unit surface area. A DENSITY and not a count, so "
+        "it stays right when the cell's diameter does not: the count is "
+        "this times the cell's own area, which is 462 on a 7 um "
+        "lymphocyte and 603 on an 8 um one.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.0, maximum=60.0,
+    ),
+    _spec(
+        "microvillus_length_um", "um",
+        "MEDIAN microvillar length. The distribution is strongly right-"
+        "skewed -- lengths run from 0.1 um to several micrometres -- so "
+        "this is a median and a renderer that treats it as a constant has "
+        "the wrong shape, not merely the wrong number.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.02, maximum=10.0,
+    ),
+    _spec(
+        "microvillus_diameter_um", "um",
+        "Microvillar shaft diameter. Set by the actin bundle inside, "
+        "which does not taper, so the shaft is a cylinder and not a cone.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.02, maximum=0.5,
+    ),
+    _spec(
+        "lytic_granule_count", "count",
+        "Lytic granules per cytotoxic cell. Primary-cell counts only: "
+        "the immortalised NK lines carry around three times as many, and "
+        "that larger figure is what reviews quote.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.0, maximum=1000.0,
+    ),
+    _spec(
+        "lytic_granule_diameter_um", "um",
+        "Lytic granule diameter.",
+        (EntityType.CELL_TYPE, EntityType.IMMUNE_CELL),
+        minimum=0.05, maximum=2.0,
+    ),
+
     # ── Subcellular structure ──
     # Organelles are not entities in this library, so their dimensions are
     # held as properties of the cell type that has them -- which is also

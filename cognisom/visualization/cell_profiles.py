@@ -186,6 +186,12 @@ class Profile:
     #: Short account of why this cell got this detail.
     rationale: str = ""
 
+    #: Where each field's value came from: "library" when it was read off
+    #: a provenanced entity parameter, "default" when it fell back to the
+    #: constant in this module. Without this the two cannot be told apart
+    #: in a report, and a default would pass for evidence.
+    sources: Dict[str, str] = field(default_factory=dict)
+
     def to_dict(self) -> Dict[str, object]:
         out = {k: v for k, v in self.__dict__.items()}
         out["unsourced_fields"] = [f for f in UNSOURCED
@@ -262,8 +268,47 @@ def partition_markers(markers: Sequence[str]) -> Dict[str, List[str]]:
     return out
 
 
+#: Library parameter -> the Profile field it fills. These are the values
+#: that have been sourced and written onto the entities themselves (see
+#: ``library/seed_ultrastructure.py``); everything else here is still a
+#: declared estimate.
+FROM_LIBRARY: Dict[str, str] = {
+    "microvillus_length_um": "microvillus_length_um",
+    "lytic_granule_count": "lytic_granule_count",
+}
+
+
+def library_detail(entity) -> Dict[str, float]:
+    """The provenanced ultrastructure an entity carries, by parameter.
+
+    Reads only MEASURED and CALIBRATED values: a placeholder sitting in
+    the right field is not evidence, and silently preferring one over
+    this module's declared estimate would hide that.
+    """
+    from cognisom.library.parameters import Provenance, get_parameter
+
+    out: Dict[str, float] = {}
+    if entity is None:
+        return out
+    for parameter in ("nuclear_volume_fraction", "granule_volume_fraction",
+                      "microvillus_density_per_um2", "microvillus_length_um",
+                      "microvillus_diameter_um", "lytic_granule_count",
+                      "lytic_granule_diameter_um"):
+        pv = get_parameter(entity, parameter)
+        if pv is None or pv.provenance not in (Provenance.MEASURED,
+                                               Provenance.CALIBRATED):
+            continue
+        try:
+            out[parameter] = float(pv.value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
-                scale_um: float = 8.0, **overrides) -> Profile:
+                scale_um: float = 8.0,
+                library: Optional[Dict[str, float]] = None,
+                **overrides) -> Profile:
     """The detail profile for one library entity.
 
     ``scale_um`` is the cell's diameter, and it is not cosmetic: the
@@ -271,10 +316,17 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     area, so a profile built without it coats every cell as though it
     were 8 um across.
 
-    ``overrides`` replaces any declared estimate, which is how a sourced
-    number arrives without this mapping having to change.
+    ``library`` is what the entity itself carries, from
+    :func:`library_detail`. Where a parameter is there it WINS over the
+    constants in this module, because those are declared estimates and
+    these are measured values with citations attached. The profile
+    records which of the two each field came from.
+
+    ``overrides`` replaces either, which is how a caller states something
+    this mapping cannot know.
     """
     kind = classify(mesh_type)
+    library = library or {}
     base: Dict[str, object] = {}
     why: List[str] = []
 
@@ -320,8 +372,35 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
         log.debug("%s: markers with no recorded compartment: %s",
                   name, placed["unknown"])
 
+    # The library's measured values displace this module's estimates.
+    sources = {k: "default" for k in base}
+    if "microvillus_density_per_um2" in library and kind in ("lymphocyte",
+                                                             "plasma"):
+        base["microvilli_count"] = cd.microvillus_count(
+            scale_um, library["microvillus_density_per_um2"])
+        sources["microvilli_count"] = "library"
+        why.append(f"microvillus density {library['microvillus_density_per_um2']:g}"
+                   "/um^2 read from the entity, not from this module")
+    if "microvillus_length_um" in library and base.get("microvilli_count"):
+        base["microvillus_length_um"] = library["microvillus_length_um"]
+        sources["microvillus_length_um"] = "library"
+    if "microvillus_diameter_um" in library and base.get("microvilli_count"):
+        base["microvillus_radius_um"] = library["microvillus_diameter_um"] / 2.0
+        sources["microvillus_radius_um"] = "library"
+    if "lytic_granule_count" in library:
+        base["lytic_granule_count"] = int(round(library["lytic_granule_count"]))
+        sources["lytic_granule_count"] = "library"
+    if "lytic_granule_diameter_um" in library:
+        base["lytic_granule_radius_um"] = \
+            library["lytic_granule_diameter_um"] / 2.0
+        sources["lytic_granule_radius_um"] = "library"
+
     base.update({k: v for k, v in overrides.items() if v is not None})
+    for k in overrides:
+        if overrides[k] is not None:
+            sources[k] = "override"
     profile = Profile(**base)
+    profile.sources = sources
     # Spread the stud budget across the receptors the cell carries, so the
     # complement is visible rather than a single anonymous density.
     receptors = placed["membrane"] + placed["unknown"]

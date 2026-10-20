@@ -743,8 +743,119 @@
   },
   {
    "entity_type": "cell_type",
+   "name": "CD4+ T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "CD8+ T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
    "name": "Macrophage",
    "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
+     "unit": "dimensionless",
+     "value": 0.026
+    },
     "radius_um": {
      "citation": "PMID:9400735",
      "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of alveolar macrophage cell; range \u00b10.3 Table - link \u00b5m; method: Abstract: \"Resident AM [Alveolar Macrophage] from CD rats, Syrian golden hamsters, cynomolgus monkeys, and nonsmoking, healthy human volunteers were harvested b; diameter 21.2 um x0.5; healthy human alveolar macrophages, not tumour-associated",
@@ -753,6 +864,126 @@
      "source": "BioNumbers BNID:103565 (Krombach F, M\u00fcnzing S, Allmeling AM, Gerlach JT, Behr J, D\u00f6rger M. Cell size of alveolar macrophages: an interspecies co)",
      "unit": "um",
      "value": 10.6
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "NK cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "lytic_granule_count": {
+     "citation": "PMID:29592963",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "63 +/- 23. Explicitly NOT the 194-206 the same paper reports for the NK-92 and YTS lines, which is what reviews quote as 'almost 200 granules': immortalised lines carry about three times the load.",
+     "source": "Gwalani LA, Orange JS, J Immunol 2018",
+     "unit": "count",
+     "value": 63.0
+    },
+    "lytic_granule_diameter_um": {
+     "citation": "PMID:21931537",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "251 +/- 2 nm, where the +/- is a standard error and carries no spread information. Bracketed by two other methods: 333 +/- 103 nm by STED on NK-92 (PMID 21931536), and a 3.3 fF capacitance step on primary human CD8 T cells (PMID 26296096) which at 10 fF/um^2 works out at 324 nm.",
+     "source": "Brown ACN et al., 3D-SIM",
+     "unit": "um",
+     "value": 0.251
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "Regulatory T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
     }
    }
   },
@@ -2458,8 +2689,170 @@
   },
   {
    "entity_type": "immune_cell",
+   "name": "CD4+ Th1 cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "CD4+ Th17 cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "CD4+ Th2 cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
    "name": "CD8+ Effector T cell",
    "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
     "lethal_contact_minutes": {
      "citation": "PMID:23935904",
      "conditions": "Human: healthy-donor HLA-A2.1+ CD8+ T cells transduced with the F5 anti-MART1 TCR, killing HLA-matched MART1+ M202 melanoma cells; live-cell interferometry. \"Individual cytotoxic events due to recognition of CTLs are confirmed by a characteristic decrease in target cell mass following prolonged contact (30 min to 2 h) with a corresponding CTL.\"",
@@ -2469,6 +2862,51 @@
      "unit": "min",
      "value": 75.0
     },
+    "lytic_granule_count": {
+     "citation": "PMID:29592963",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "63 +/- 23. Explicitly NOT the 194-206 the same paper reports for the NK-92 and YTS lines, which is what reviews quote as 'almost 200 granules': immortalised lines carry about three times the load.",
+     "source": "Gwalani LA, Orange JS, J Immunol 2018",
+     "unit": "count",
+     "value": 63.0
+    },
+    "lytic_granule_diameter_um": {
+     "citation": "PMID:21931537",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "251 +/- 2 nm, where the +/- is a standard error and carries no spread information. Bracketed by two other methods: 333 +/- 103 nm by STED on NK-92 (PMID 21931536), and a 3.3 fF capacitance step on primary human CD8 T cells (PMID 26296096) which at 10 fF/um^2 works out at 324 nm.",
+     "source": "Brown ACN et al., 3D-SIM",
+     "unit": "um",
+     "value": 0.251
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
     "nonlethal_contact_minutes": {
      "citation": "PMID:26872694",
      "conditions": "Mus musculus: virus-specific CTLs in lymph node, two-photon intravital imaging. \"Individual contacts between CTLs and surviving targets lasted 8.5 min (Figure 4F), and individual contacts between CTLs and killed targets lasted for approximately 9.0 min (median; Figure 4F).\"",
@@ -2477,6 +2915,336 @@
      "source": "Halle S et al., Immunity 2016 (PMC4846978)",
      "unit": "min",
      "value": 8.5
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "CD8+ Memory T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "CD8+ Naive T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Eosinophil",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood eosinophil; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115197)",
+     "unit": "dimensionless",
+     "value": 0.23
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Gamma-delta T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "ILC1",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "ILC2",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "ILC3",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
     }
    }
   },
@@ -2484,6 +3252,15 @@
    "entity_type": "immune_cell",
    "name": "Macrophage M1",
    "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
+     "unit": "dimensionless",
+     "value": 0.026
+    },
     "radius_um": {
      "citation": "PMID:9400735",
      "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of alveolar macrophage cell; range \u00b10.3 Table - link \u00b5m; method: Abstract: \"Resident AM [Alveolar Macrophage] from CD rats, Syrian golden hamsters, cynomolgus monkeys, and nonsmoking, healthy human volunteers were harvested b; diameter 21.2 um x0.5; healthy human alveolar macrophages, the large end of human macrophage sizes, not tumour-associated",
@@ -2492,6 +3269,72 @@
      "source": "BioNumbers BNID:103565 (Krombach F, M\u00fcnzing S, Allmeling AM, Gerlach JT, Behr J, D\u00f6rger M. Cell size of alveolar macrophages: an interspecies co)",
      "unit": "um",
      "value": 10.6
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Macrophage M2",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
+     "unit": "dimensionless",
+     "value": 0.026
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Memory B cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
     }
    }
   },
@@ -2520,8 +3363,137 @@
   },
   {
    "entity_type": "immune_cell",
+   "name": "NKT cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "lytic_granule_count": {
+     "citation": "PMID:29592963",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "63 +/- 23. Explicitly NOT the 194-206 the same paper reports for the NK-92 and YTS lines, which is what reviews quote as 'almost 200 granules': immortalised lines carry about three times the load.",
+     "source": "Gwalani LA, Orange JS, J Immunol 2018",
+     "unit": "count",
+     "value": 63.0
+    },
+    "lytic_granule_diameter_um": {
+     "citation": "PMID:21931537",
+     "conditions": "Primary human NK cells",
+     "provenance": "measured",
+     "rationale": "251 +/- 2 nm, where the +/- is a standard error and carries no spread information. Bracketed by two other methods: 333 +/- 103 nm by STED on NK-92 (PMID 21931536), and a 3.3 fF capacitance step on primary human CD8 T cells (PMID 26296096) which at 10 fF/um^2 works out at 324 nm.",
+     "source": "Brown ACN et al., 3D-SIM",
+     "unit": "um",
+     "value": 0.251
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Naive B cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
    "name": "Neutrophil",
    "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood neutrophil; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115195)",
+     "unit": "dimensionless",
+     "value": 0.154
+    },
     "lifespan_hours": {
      "conditions": "circulating lifespan; the description states a 5-90 h range",
      "provenance": "estimated",
@@ -2547,6 +3519,108 @@
      "source": "BioNumbers BNID:100510 (Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. Retention of leukocytes in capillaries: role of ce)",
      "unit": "um",
      "value": 4.2
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Regulatory T cell (Treg)",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "T follicular helper (Tfh)",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte",
+     "provenance": "measured",
+     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
     }
    }
   },
