@@ -187,6 +187,8 @@ class TissueSimulationEngine:
         self._cell_arrays = self._distributor.initialize_cells(
             cell_positions, cell_types, cell_radii,
         )
+        if cfg.asynchronous_cell_cycle:
+            self._stagger_division_timers()
 
         # 7. Initialize diffusion fields
         if cfg.enable_diffusion:
@@ -671,6 +673,32 @@ class TissueSimulationEngine:
                 full_alive = self._backend.to_numpy(ca.alive)
                 full_alive[:n_real] = alive
                 ca.alive = self._backend.to_device(full_alive, gpu_id)
+
+    def _stagger_division_timers(self) -> None:
+        """Start each cell at a random point in its cycle.
+
+        Every division timer (and age) used to start at 0, so all cancer
+        cells divided together at 12 h and every other cell at 48 h. Drawn
+        from the steady-state age distribution (core.cell_cycle), from the
+        layout stream after the layout, so the positions and types of a
+        given seed are unchanged.
+        """
+        from cognisom.core.cell_cycle import steady_state_ages
+
+        cfg = self._config
+        for gpu_id, ca in enumerate(self._cell_arrays):
+            n_real = ca.n_real
+            if n_real == 0:
+                continue
+            state = self._backend.to_numpy(ca.state)
+            types = self._backend.to_numpy(ca.cell_types)[:n_real]
+            periods = np.where(types == self._CANCER_TYPE_INDEX,
+                               cfg.division_time_cancer_hr,
+                               cfg.division_time_normal_hr)
+            ages = steady_state_ages(periods, self._rng.random(n_real))
+            state[:n_real, 7] = ages          # division timer
+            state[:n_real, 4] = ages          # age since birth
+            ca.state = self._backend.to_device(state, gpu_id)
 
     def _radius_by_type(self, n_types: int) -> np.ndarray:
         """Radius per archetype index, in composition order, in um.

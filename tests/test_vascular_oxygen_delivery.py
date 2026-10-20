@@ -32,7 +32,10 @@ ARTERIAL_O2 = 0.21
 ARTERIAL_GLUCOSE = 5.0
 
 
-def _baseline(duration=24.0, dt=0.05, seed=12345, vascular=None, cellular=None):
+BASELINE_DT = 0.05
+
+
+def _baseline(duration=24.0, dt=BASELINE_DT, seed=12345, vascular=None, cellular=None):
     """Run the dashboard Baseline preset and hand back both modules."""
     np.random.seed(seed)
     with redirect_stdout(io.StringIO()):
@@ -76,7 +79,23 @@ def test_normal_tissue_survives_a_day_of_the_baseline_scenario():
     o2 = np.array([c.oxygen for c in normal])
     assert o2.min() > O2_DEATH, "a normal cell is at the death threshold"
     assert not (o2 < O2_HYPOXIC).any(), "a Baseline normal cell is hypoxic"
-    assert 0.15 < o2.mean() < 0.19, f"mean normal O2 {o2.mean():.4f} off target"
+    # Each settled cell sits at its own Krogh steady state. This replaced a
+    # band on the mean, 0.15-0.19, read off a run in which every normal cell
+    # divided on the final step and each daughter started at arterial O2:
+    # half the tissue was one step old and sitting at 0.21, and the cells
+    # that had actually lived there averaged 0.126. Read after the exchange
+    # -- metabolism and exchange are applied in turn -- a settled cell sits
+    # above the continuous steady state by at most one step's consumption.
+    # "Settled" is 8 h since the cell's last division: a daughter starts at
+    # its parent's O2, a few um away, and near the Krogh radius, where the
+    # conductance is 0.79 /h, it takes that long to forget the difference.
+    settled = [c for c in normal if c.age > 8.0]
+    assert len(settled) > len(normal) // 3
+    gap = np.array([c.oxygen - vas.get_O2_at_position(c.position)
+                    for c in settled])
+    one_step = O2_DEMAND_NORMAL * BASELINE_DT
+    assert gap.min() >= -1e-6, gap.min()
+    assert gap.max() <= one_step + 1e-5, gap.max()   # residual relaxation
 
     gluc = np.array([c.glucose for c in normal])
     assert gluc.min() > GLUCOSE_DEATH

@@ -33,7 +33,12 @@ CANCER = TissueSimulationEngine._CANCER_TYPE_INDEX
 
 
 def engine(n_cells: int = 200, dt: float = 1.0) -> TissueSimulationEngine:
-    """Cell cycle only: the other subsystems are exercised elsewhere."""
+    """Cell cycle only: the other subsystems are exercised elsewhere.
+
+    Every timer starts at 0, explicitly: these tests time the division
+    clock from a known start ("nothing is due before 12 h"). Runs default
+    to staggered starts; see test_asynchronous_cell_cycle.py.
+    """
     config = TissueScaleConfig(
         n_cells=n_cells,
         dt=dt,
@@ -41,6 +46,7 @@ def engine(n_cells: int = 200, dt: float = 1.0) -> TissueSimulationEngine:
         enable_mechanics=False,
         enable_ode=False,
         enable_cell_cycle=True,
+        asynchronous_cell_cycle=False,
     )
     eng = TissueSimulationEngine(config)
     eng.initialize()

@@ -53,6 +53,9 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
         # reads its geometry from tissue_slab.SLAB_SPEC, overridable
         # per-parameter through 'slab'.
         "seeding": str, "slab": dict,
+        # 'asynchronous' (default) or 'synchronous' initial cycle phase,
+        # and the seed of the generator that staggers it.
+        "initial_cell_cycle": str, "cell_cycle_seed": int,
     },
     "immune": {
         "n_t_cells": int, "n_nk_cells": int, "n_macrophages": int,

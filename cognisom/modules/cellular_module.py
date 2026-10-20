@@ -143,6 +143,17 @@ class CellularModule(SimulationModule):
         # Parameters
         self.division_time_normal = self.config.get('division_time_normal', 24.0)  # hours
         self.division_time_cancer = self.config.get('division_time_cancer', 12.0)  # hours
+        # Where the initial cells start in their cycle: 'asynchronous' (the
+        # default) staggers them over the steady-state age distribution;
+        # 'synchronous' starts every cell at age 0, as before -- for tests
+        # whose subject is the division clock itself. See
+        # _stagger_initial_ages.
+        self.initial_cell_cycle = self.config.get('initial_cell_cycle', 'asynchronous')
+        if self.initial_cell_cycle not in ('asynchronous', 'synchronous'):
+            raise ValueError(
+                "initial_cell_cycle must be 'asynchronous' or 'synchronous', "
+                f"got {self.initial_cell_cycle!r}")
+        self.cell_cycle_seed = int(self.config.get('cell_cycle_seed', 0))
         self.glucose_consumption_normal = self.config.get('glucose_consumption', 0.2)
         self.glucose_consumption_cancer = self.config.get('glucose_consumption_cancer', 0.5)
 
@@ -233,6 +244,9 @@ class CellularModule(SimulationModule):
         # network. Doing it here keeps the per-cell update path cheap.
         self._mhc_loader = MHCLoader()
 
+        if self.initial_cell_cycle == 'asynchronous':
+            self._stagger_initial_ages()
+
         # Subscribe to events
         self.subscribe(EventTypes.EXOSOME_UPTAKEN, self.on_exosome_uptaken)
         self.subscribe(EventTypes.CANCER_KILLED, self.on_cancer_killed)
@@ -243,6 +257,35 @@ class CellularModule(SimulationModule):
         print(f"    ✓ MHC-I display: {len(self.hla_alleles)} HLA alleles "
               f"({', '.join(self.hla_alleles)})")
     
+    def _stagger_initial_ages(self) -> None:
+        """Start each initial cell at a random point in its cycle.
+
+        Every cell used to start at age 0 with its lineage's division
+        time, so a whole lineage divided on one step -- all 80 normal cells
+        at exactly 24 h -- and whether that step fell inside a 24 h run
+        depended on whether the float sum of the steps reached 24.0: at
+        dt = 0.05 it did and the population doubled, at dt = 0.02 it fell
+        short and nothing divided.
+
+        Ages are drawn from the steady-state age distribution of a cycling
+        population (core.cell_cycle.steady_state_ages), so the run starts
+        from that steady state rather than from a synchronised step.
+
+        The draws come from a generator of their own (cell_cycle_seed), so
+        the global stream -- and with it the ring layout the Krogh
+        calibration was measured on, and every other module's draws -- is
+        unchanged.
+        """
+        from cognisom.core.cell_cycle import steady_state_ages
+
+        cells = list(self.cells.values())
+        periods = [self.division_time_cancer if c.cell_type == 'cancer'
+                   else self.division_time_normal for c in cells]
+        rng = np.random.default_rng(self.cell_cycle_seed)
+        ages = steady_state_ages(periods, rng.random(len(cells)))
+        for cell, age in zip(cells, ages):
+            cell.age = float(age)
+
     def _seed_ring(self, n_normal: int, n_cancer: int):
         """The historical layout: normal cells on a circle, cancer in a blob.
 
@@ -463,6 +506,14 @@ class CellularModule(SimulationModule):
         daughter = self.cells[daughter_id]
         daughter.mutations = parent.mutations.copy()
         daughter.mhc1_expression = parent.mhc1_expression
+        # Oxygen and glucose are concentrations, so both cells carry the
+        # parent's. A daughter used to start at the CellState defaults --
+        # arterial O2 and plasma glucose -- so one born in a hypoxic corner
+        # was briefly rescued from it, and when a whole lineage divided on
+        # one step the tissue's mean O2 read as if half of it sat in an
+        # artery. The tissue engine's daughters already inherit their state.
+        daughter.oxygen = parent.oxygen
+        daughter.glucose = parent.glucose
         
         # Reset parent age
         parent.age = 0.0

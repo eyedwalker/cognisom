@@ -354,19 +354,27 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     assert cells.total_deaths == 10
     assert _deaths(runner, "immune_killed", "cancer") == 10
     # 98 with the chase frozen, 18 of them cancer divisions: cancer cells
-    # killed in the first hours never divide. The 80 left are the normal
-    # population dividing together on the final step -- every normal cell
-    # starts at age 0 with a 24 h division time -- which is why this count
-    # (and the 160 above) is sensitive to dt: at dt = 0.02 the float sum of
-    # steps falls just short of 24 h and none of them divide.
+    # killed in the first hours never divide. The 80 are each normal cell
+    # dividing once. They used to all happen on the final step -- every
+    # cell started at age 0 with a 24 h division time -- so the count, and
+    # the 160 above, hung on whether the float sum of the steps reached
+    # 24.0 (at dt = 0.02 it did not, and none divided). Cells now start
+    # staggered over the steady-state age distribution and divide through
+    # the day.
     assert cells.total_divisions == 80
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(281.9123, abs=0.01)
-    # 304.4490 with the chase frozen: 22 fewer cancer cells survive to be
-    # delivered oxygen. The Krogh law itself is unchanged -- normal-cell
-    # survival and the oxygen floor below are as before.
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0739, abs=1e-3)
+        pytest.approx(412.9624, abs=0.01)
+    # 281.9123 while the population doubled on the last step: it now grows
+    # through the day, so more cells draw oxygen for longer.
+    #
+    # The oxygen floor. One normal cell is hypoxic, none is near death:
+    # a daughter is placed a few um from its parent and this one sits near
+    # the edge of its capillary's reach. With every division on the final
+    # step and each daughter starting at arterial O2, no daughter had ever
+    # shown where it actually sat, and the floor read 0.0739.
+    assert min(c.oxygen for c in alive) > 0.02          # the death threshold
+    assert sum(1 for c in alive if c.oxygen < 0.05) == 1
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0448, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -387,19 +395,22 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     alive = [c for c in cells.cells.values() if c.alive]
 
     # The mechanism: normal cells starve in this preset and in no other.
-    assert _deaths(runner, "hypoxia", "normal") == 53
+    # 53 while every cell divided on one step; with divisions spread over
+    # the day, daughters appear in the capillary-poor corner earlier.
+    assert _deaths(runner, "hypoxia", "normal") == 58
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
-    # 16 cancer cells starved too while the chase step was frozen; now all
-    # 20 are killed by immune cells before they can.
+    # 16 cancer cells starved too while the chase step was frozen; now
+    # every one is killed by immune cells before it can (23, counting the
+    # daughters of those that divided first).
     assert _deaths(runner, "hypoxia", "cancer") == 0
-    assert _deaths(runner, "immune_killed", "cancer") == 20
-    assert cells.total_deaths == 73
+    assert _deaths(runner, "immune_killed", "cancer") == 23
+    assert cells.total_deaths == 81
     # The 24 h snapshot: 2 hypoxic regions and 2 cells below 0.05 with the
     # chase frozen, and those were the starving cancer cells. The survivors
-    # now are the 14 best-perfused normal cells.
+    # now are the 12 best-perfused normal cells.
     assert vascular.hypoxic_regions == 0
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0747, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0651, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

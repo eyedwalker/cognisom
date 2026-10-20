@@ -157,6 +157,10 @@ class TissueScaleConfig:
     archetype_radius_source: Dict[str, str] = field(default_factory=dict)
     division_time_normal_hr: float = 48.0
     division_time_cancer_hr: float = 12.0
+    #: Start cells staggered over the steady-state age distribution
+    #: (core.cell_cycle) rather than all at age 0, which made each lineage
+    #: divide on one step.
+    asynchronous_cell_cycle: bool = True
 
     # ── Module toggles ─────────────────────────────────────────
     enable_ode: bool = True            # Intracellular ODE (AR signaling)
@@ -261,6 +265,7 @@ class TissueScaleConfig:
             "cell_radius_um": self.cell_radius_um,
             "archetype_radius_um": dict(self.archetype_radius_um),
             "archetype_radius_source": dict(self.archetype_radius_source),
+            "asynchronous_cell_cycle": self.asynchronous_cell_cycle,
             "enable_ode": self.enable_ode,
             "enable_ssa": self.enable_ssa,
             "enable_mechanics": self.enable_mechanics,
@@ -298,6 +303,7 @@ class TissueScaleConfig:
             cell_radius_um=d.get("cell_radius_um", 5.0),
             archetype_radius_um=dict(d.get("archetype_radius_um") or {}),
             archetype_radius_source=dict(d.get("archetype_radius_source") or {}),
+            asynchronous_cell_cycle=d.get("asynchronous_cell_cycle", True),
             enable_ode=d.get("enable_ode", True),
             enable_ssa=d.get("enable_ssa", False),
             enable_mechanics=d.get("enable_mechanics", True),
