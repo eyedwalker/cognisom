@@ -108,8 +108,27 @@ def _b_sphere(g, seed):
     return {1: _sphere(g, r=0.92)}
 
 
+#: Nuclear radius as a fraction of the cell's, for a lymphocyte.
+#:
+#: A resting lymphocyte is described in every histology text as a nucleus
+#: with a rim of cytoplasm: the nucleus takes most of the cell. This was
+#: 0.42 against a body of 0.92, a volume ratio of (0.42/0.92)^3 = 0.095 --
+#: a dot in an empty ball, and the main reason the library's eighteen
+#: smooth_sphere entities read as featureless spheres rather than as
+#: lymphocytes. 0.80/0.92 cubed is 0.66, which is the N:C a lymphocyte is
+#: actually reported at.
+#:
+#: The ratio is a shape fact, not a measurement this module owns; it is
+#: the one number here that decides whether the silhouette reads as the
+#: right class of cell at all.
+LYMPHOCYTE_NUCLEAR_RADIUS = 0.80
+
+
 def _b_smooth_sphere(g, seed):
-    return {1: _sphere(g, r=0.92), 2: _sphere(g, (0.12, -0.08, 0), 0.42)}
+    # Offset slightly, because a perfectly concentric nucleus reads as a
+    # diagram; a real one sits a little to one side.
+    return {1: _sphere(g, r=0.92),
+            2: _sphere(g, (0.06, -0.04, 0), LYMPHOCYTE_NUCLEAR_RADIUS)}
 
 
 def _b_granular_sphere(g, seed):
@@ -366,6 +385,26 @@ BUILDERS: Dict[str, Callable] = {
 #: granule without knowing which builder ran.
 PART_NAMES = {1: "body", 2: "nucleus", 3: "granules", 4: "er",
               5: "capsid", 6: "flagella", 7: "spore"}
+
+
+def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID
+                ) -> Tuple[Dict[str, np.ndarray], bool]:
+    """The builder's own occupancy masks, before any surface is extracted.
+
+    ``(part name -> boolean grid, fell_back)``. The masks are what define
+    the shape; the meshes are derived from them. A caller placing
+    organelles inside a cell wants the mask, because a point-in-mask test
+    is exact where a point-in-mesh test against a marching-cubes surface
+    is not, and because the volume of a mask is the volume the shape
+    actually has.
+    """
+    builder = BUILDERS.get(mesh_type)
+    fell_back = builder is None
+    if fell_back:
+        builder = _b_sphere
+    g = _grid(grid)
+    return ({PART_NAMES.get(label, str(label)): mask
+             for label, mask in builder(g, seed).items()}, fell_back)
 
 
 def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,

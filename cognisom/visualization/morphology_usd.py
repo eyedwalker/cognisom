@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +63,16 @@ PART_COLORS: Dict[str, Tuple[float, float, float]] = {
 
 #: The body is a shell you look through; the contents are not.
 PART_OPACITY: Dict[str, float] = {"body": 0.35}
+
+#: Colours for instanced detail. Microvilli take the membrane's colour
+#: because they ARE membrane; organelles take their own.
+DETAIL_COLORS: Dict[str, Tuple[float, float, float]] = {
+    "microvilli": (0.80, 0.86, 0.94),
+    "mitochondria": (0.86, 0.46, 0.24),
+    "lysosomes": (0.62, 0.40, 0.72),
+    "lytic_granules": (0.96, 0.78, 0.30),
+    "ribosomes": (0.55, 0.60, 0.70),
+}
 
 #: ``scale_um`` values the library repeats across every entity of a type.
 #: A single number shared by every member of a class is a placeholder that
@@ -209,6 +219,107 @@ def author_entity(
         name=name, entity_type=entity_type, mesh_type=mesh_type,
         builder=builder, fell_back=fell_back, scale_um=float(scale_um),
         parts=counts, prim_path=prim_path)
+
+
+def author_detail(
+    stage,
+    prim_path: str,
+    feature: str,
+    instances,
+    *,
+    prototype: str = "cone",
+    material_scope: str = "/Materials",
+    material_cache: Optional[Dict[str, object]] = None,
+) -> int:
+    """Write one instanced feature under an entity, as a PointInstancer.
+
+    Microvilli are the reason this exists. A resting lymphocyte carries
+    hundreds of them and each is a few hundred nanometres long on a 7 um
+    cell, so they cannot come off the occupancy grid the body is built
+    from -- one voxel at grid 64 is 0.11 um, which is the whole width of a
+    microvillus. They are instead instanced over the body's mesh surface
+    (see ``cell_detail``), which decouples the feature's size from the
+    grid's resolution entirely.
+
+    A PointInstancer and not a prim each: at a few hundred features per
+    cell over fifty-six cells, individual prims would be a hundred
+    thousand of them saying the same thing. Instancing is also what the
+    renderer wants, and what the repo's own ``NestedInstancingManager``
+    assumes for anything at this count.
+    """
+    from pxr import Gf, Sdf, UsdGeom, Vt
+
+    if len(instances) == 0:
+        return 0
+
+    cache = material_cache if material_cache is not None else {}
+    path = f"{prim_path}/{_safe_name(feature)}"
+    instancer = UsdGeom.PointInstancer.Define(stage, path)
+
+    proto_path = f"{path}/prototypes/shape"
+    if prototype == "cone":
+        # A cone, because a microvillus tapers and a cylinder of the same
+        # radius reads as a bristle. Unit height and unit diameter, so the
+        # instance scale is the real size.
+        shape = UsdGeom.Cone.Define(stage, proto_path)
+        shape.CreateHeightAttr(1.0)
+        shape.CreateRadiusAttr(0.5)
+        shape.CreateAxisAttr(UsdGeom.Tokens.z)
+    elif prototype == "capsule":
+        shape = UsdGeom.Capsule.Define(stage, proto_path)
+        shape.CreateHeightAttr(1.0)
+        shape.CreateRadiusAttr(0.5)
+        shape.CreateAxisAttr(UsdGeom.Tokens.z)
+    else:
+        shape = UsdGeom.Sphere.Define(stage, proto_path)
+        shape.CreateRadiusAttr(1.0)
+
+    from pxr import UsdShade
+    colour = DETAIL_COLORS.get(feature, (0.7, 0.7, 0.7))
+    UsdShade.MaterialBindingAPI(shape.GetPrim()).Bind(
+        _material_for_colour(stage, material_scope, feature, colour, cache))
+
+    instancer.CreatePrototypesRel().SetTargets([shape.GetPath()])
+    instancer.CreateProtoIndicesAttr(
+        Vt.IntArray([0] * len(instances)))
+    instancer.CreatePositionsAttr(Vt.Vec3fArray(
+        [Gf.Vec3f(*p) for p in instances.positions.tolist()]))
+    instancer.CreateOrientationsAttr(Vt.QuathArray(
+        [Gf.Quath(float(q[0]), Gf.Vec3h(float(q[1]), float(q[2]), float(q[3])))
+         for q in instances.orientations.tolist()]))
+    instancer.CreateScalesAttr(Vt.Vec3fArray(
+        [Gf.Vec3f(*sc) for sc in instances.scales.tolist()]))
+
+    prim = instancer.GetPrim()
+    prim.SetCustomDataByKey("feature", feature)
+    prim.SetCustomDataByKey("count", len(instances))
+    prim.SetCustomDataByKey(
+        "note",
+        "Instanced over the body's mesh surface, not built from the "
+        "occupancy grid: at grid 64 one voxel spans 0.11 um on a 7 um "
+        "cell, which is the entire width of a microvillus.")
+    return len(instances)
+
+
+def _material_for_colour(stage, scope_path: str, name: str,
+                         colour: Tuple[float, float, float],
+                         cache: Dict[str, object]):
+    from pxr import Sdf, UsdShade
+
+    key = f"detail:{name}"
+    if key in cache:
+        return cache[key]
+    path = f"{scope_path}/{_safe_name(name)}"
+    material = UsdShade.Material.Define(stage, path)
+    shader = UsdShade.Shader.Define(stage, f"{path}/Surface")
+    shader.CreateIdAttr("UsdPreviewSurface")
+    shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(colour)
+    shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.5)
+    shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.0)
+    material.CreateSurfaceOutput().ConnectToSource(
+        shader.ConnectableAPI(), "surface")
+    cache[key] = material
+    return material
 
 
 def library_entities(store=None, types: Optional[Iterable[str]] = None
