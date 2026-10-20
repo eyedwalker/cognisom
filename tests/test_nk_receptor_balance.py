@@ -918,15 +918,21 @@ def test_the_tcell_closed_loop_is_unchanged_by_the_innate_rewrite():
     cellular.cells[cancer_id].position = pos.copy()
     immune.immune_cells[tid].position = pos.copy()
 
-    molecular.introduce_mutation(cancer_id, "TP53", "R175H")
+    molecular.introduce_mutation(cancer_id, "KRAS", "G12D")
     engine.run()
 
     counts = engine.event_bus.get_statistics()["event_counts"]
     assert counts.get(EventTypes.MUTATION_OCCURRED, 0) == 1
     assert counts.get(EventTypes.PEPTIDE_GENERATED, 0) == 1
-    assert counts.get(EventTypes.PEPTIDE_PRESENTED, 0) == 2, (
+    # KRAS G12D, and a floor rather than a pin, for the reason set out
+    # at length on the flagship trace in test_macrophage_polarization:
+    # TP53 R175H presents nothing under the real predictor (best of 38
+    # at 1,386 nM against a 500 nM threshold), so the old exact count
+    # pinned the approximation and was red in CI. The two scorers
+    # present 1 and 5 peptides here and share none of them.
+    assert counts.get(EventTypes.PEPTIDE_PRESENTED, 0) >= 1, (
         f"presented {counts.get(EventTypes.PEPTIDE_PRESENTED, 0)} peptides, "
-        f"expected 2. Mutations that bound nothing: "
+        f"expected at least 1. Mutations that bound nothing: "
         f"{engine.modules['cellular'].unpresented_mutations}")
     assert counts.get(EventTypes.IMMUNE_ACTIVATED, 0) == 1
     assert counts.get(EventTypes.CANCER_KILLED, 0) == 1
@@ -935,7 +941,7 @@ def test_the_tcell_closed_loop_is_unchanged_by_the_innate_rewrite():
     assert immune.total_tcell_kills == 1
     assert immune.total_tcr_recognitions == 1
     assert immune.total_exhaustion_transitions == 0
-    assert cellular.total_peptides_presented == 2
+    assert cellular.total_peptides_presented >= 1
 
 
 def test_the_tcell_hill_branch_is_not_gated_by_the_innate_changes():

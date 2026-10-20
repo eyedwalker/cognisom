@@ -79,6 +79,17 @@ def _install(monkeypatch, score):
                         lambda peps, als: [score(p) for p in peps])
 
 
+def _approximate(monkeypatch):
+    """Pin the approximate path, whatever is installed.
+
+    Which scorer answers is otherwise a property of the machine: these
+    assertions held here, where MHCflurry cannot be imported, and failed
+    under the real predictor -- which is the mistake this whole file is
+    about, one level up.
+    """
+    monkeypatch.setattr(mb, "is_mhcflurry_available", lambda: False)
+
+
 def _disagreeing(peptides):
     """Affinity and presentation that rank the same peptides oppositely.
 
@@ -104,14 +115,19 @@ def _run(predictor, variant, gene="KRAS"):
     )
 
 
-def _peptides(variant, gene="KRAS"):
-    """The peptides this variant yields, under whatever scorer is in place."""
-    return sorted({n.peptide for n in _run(NeoantigenPredictor(), variant, gene)})
+def _peptides(monkeypatch, variant, gene="KRAS"):
+    """Which peptides this variant yields -- the same set either way, since
+    generation happens before any scoring, but pinned so that discovering
+    the set cannot itself depend on the machine."""
+    with monkeypatch.context() as m:
+        m.setattr(mb, "is_mhcflurry_available", lambda: False)
+        return sorted({n.peptide for n in
+                       _run(NeoantigenPredictor(), variant, gene)})
 
 
 def test_the_list_is_ranked_on_presentation_not_affinity(monkeypatch):
     variant = _variant()
-    peptides = _peptides(variant)
+    peptides = _peptides(monkeypatch, variant)
     assert len(peptides) > 1, "need several peptides to have an ordering"
 
     _install(monkeypatch, _disagreeing(peptides))
@@ -130,9 +146,10 @@ def test_the_list_is_ranked_on_presentation_not_affinity(monkeypatch):
     assert result[0].presentation_score == max(scores)
 
 
-def test_the_approximate_path_still_ranks_on_affinity():
+def test_the_approximate_path_still_ranks_on_affinity(monkeypatch):
     """Unchanged behaviour where there is no presentation score: the
     fallback has to be exactly what it was, not a new ordering."""
+    _approximate(monkeypatch)
     predictor = NeoantigenPredictor()
     result = _run(predictor, _variant())
 
@@ -148,7 +165,7 @@ def test_the_two_orderings_are_never_mixed(monkeypatch):
     the affinity ordering, because a list sorted on two different scales
     is not sorted at all."""
     variant = _variant()
-    peptides = _peptides(variant)
+    peptides = _peptides(monkeypatch, variant)
     full = _disagreeing(peptides)
     odd_one = peptides[0]
 
@@ -171,7 +188,7 @@ def test_the_two_orderings_are_never_mixed(monkeypatch):
 def test_the_processing_score_reaches_the_candidate(monkeypatch):
     """Returned on every call and previously discarded."""
     variant = _variant()
-    peptides = _peptides(variant)
+    peptides = _peptides(monkeypatch, variant)
     order = {p: i for i, p in enumerate(peptides)}
     _install(monkeypatch, lambda p: _Scored(
         affinity=200.0, presentation=0.5, processing=0.1 * (order[p] + 1)))
@@ -184,9 +201,10 @@ def test_the_processing_score_reaches_the_candidate(monkeypatch):
         assert score == pytest.approx(0.1 * (order[peptide] + 1))
 
 
-def test_a_processing_score_is_not_invented_on_the_approximate_path():
+def test_a_processing_score_is_not_invented_on_the_approximate_path(monkeypatch):
     """A motif score says nothing about proteasomal cleavage, so there is
     nothing honest to put here. A number would read as a measurement."""
+    _approximate(monkeypatch)
     result = _run(NeoantigenPredictor(), _variant())
     assert result
     assert all(n.processing_score is None for n in result)
@@ -198,6 +216,7 @@ def test_the_ranking_basis_is_recorded_either_way(monkeypatch):
     variant = _variant()
     assert NeoantigenPredictor().diagnostics.ranking_basis == ""
 
+    _approximate(monkeypatch)
     plain = NeoantigenPredictor()
     _run(plain, variant)
     assert plain.diagnostics.ranking_basis == "affinity_nm"
