@@ -193,9 +193,15 @@ def test_an_unknown_lineage_patrols_at_the_default_and_says_why():
 # ── what the module reads, and what it must not ─────────────────────────
 
 def test_only_measured_quantities_are_read(monkeypatch):
-    """An allowlist: the migration speed and the two contact durations.
-    The same rows carry model constructs, and the next widening must not
-    silently replace a calibrated knob."""
+    """An allowlist: the migration speed, the two contact durations and
+    the lytic granule count. The same rows carry model constructs, and
+    the next widening must not silently replace a calibrated knob.
+
+    The granule count joined the list when the kill path started saying
+    HOW it killed rather than only that it had. It is measured --
+    63 +/- 23 on primary human NK cells, PMID 29592963 -- and the
+    assertion below that nothing read is a model construct is what makes
+    widening this list safe."""
     asked = []
     real = SimulationParameterResolver.sourced_value
 
@@ -206,7 +212,8 @@ def test_only_measured_quantities_are_read(monkeypatch):
     monkeypatch.setattr(SimulationParameterResolver, "sourced_value", spy)
     m = _module()
     neutrophil = m.immune_cells[m.add_immune_cell([100, 100, 50], "Neutrophil")]
-    assert set(asked) == {SPEED, "lethal_contact_minutes", "nonlethal_contact_minutes"}
+    assert set(asked) == {SPEED, "lethal_contact_minutes",
+                          "nonlethal_contact_minutes", "lytic_granule_count"}
     assert not any(PARAMETER_SPECS[f].model_construct for f in set(asked))
     assert (neutrophil.detection_radius, neutrophil.kill_radius) == (10.0, 5.0)
     assert m.kill_probability == 0.8

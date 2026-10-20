@@ -235,8 +235,17 @@ def seed(store, *, dry_run: bool = False) -> Tuple[int, int, List[str]]:
 
 
 def _entities(store) -> Iterable[BioEntity]:
-    rows = [r[0] for r in store._conn.execute("SELECT name FROM entities")]
-    for name in rows:
-        entity = store.find_entity_by_name(name)
+    """Every entity, by id.
+
+    By NAME would skip duplicates, and the library has one: "NK cell"
+    exists as both a cell_type and an immune_cell. Looking up by name
+    returned the same record twice, so the immune_cell copy never got
+    its granule count -- and that is the copy the immune module asks
+    for, by LINEAGE_ENTITY['NK_cell'] = ('NK cell', 'immune_cell'). The
+    NK cell, of all cells, ended up with no lytic granules.
+    """
+    rows = [r[0] for r in store._conn.execute("SELECT entity_id FROM entities")]
+    for entity_id in rows:
+        entity = store.get_entity(entity_id)
         if entity is not None:
             yield entity

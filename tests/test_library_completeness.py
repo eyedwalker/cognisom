@@ -213,3 +213,82 @@ def test_the_biggest_absent_classes_are_the_expected_ones(store, rows):
     # These are the lineage definers the renderer uses to tell a Treg
     # from a Th1. None of them is an entity.
     assert len(factors) >= 4, factors
+
+
+# ── the effectors reach the simulation ───────────────────────────────
+
+def test_a_cytotoxic_cell_is_loaded_from_the_library():
+    """Entities in a library nothing reads are vocabulary nobody speaks.
+    An immune cell takes its granule reserve from the entity at
+    creation, so the sourced count is load-bearing rather than stored."""
+    import numpy as np
+    from cognisom.modules.immune_module import ImmuneModule
+
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()):
+        module = ImmuneModule({"n_t_cells": 1, "n_nk_cells": 1,
+                               "n_macrophages": 1})
+        module.initialize()
+    loaded = {c.cell_type: getattr(c, "lytic_granules", None)
+              for c in module.immune_cells.values()}
+    assert loaded.get("T_cell") == pytest.approx(63)
+    assert loaded.get("NK_cell") == pytest.approx(63)
+    # None, not zero: the library has no granule count for a macrophage,
+    # and zero would say it had already degranulated.
+    assert loaded.get("macrophage") is None
+
+
+def test_the_nk_cell_duplicate_does_not_lose_its_granules():
+    """"NK cell" exists as both a cell_type and an immune_cell. Seeding
+    by NAME visited one record twice, so the immune_cell copy -- the one
+    LINEAGE_ENTITY points the simulation at -- got nothing, and the NK
+    cell of all cells ended up unarmed."""
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        from cognisom.library.store import EntityStore
+        store = EntityStore()
+    from cognisom.library.parameters import get_parameter
+
+    rows = [tuple(r) for r in store._conn.execute(
+        "SELECT entity_id, entity_type FROM entities WHERE name = 'NK cell'")]
+    assert len(rows) == 2, f"the duplicate is gone; this test is stale ({rows})"
+    for entity_id, _etype in rows:
+        entity = store.get_entity(entity_id)
+        pv = get_parameter(entity, "lytic_granule_count")
+        assert pv is not None, f"{entity_id} has no granule count"
+        assert pv.value == pytest.approx(63)
+
+
+def test_recording_the_kill_does_not_change_the_kill():
+    """The granule draw has its own RNG stream. Drawing from the global
+    one consumed numbers the rest of the simulation was going to use, so
+    every draw after the first kill shifted: a pinned engagement count
+    went 6 -> 2 and a hypoxic death count 60 -> 58, with nothing about
+    hypoxia touched."""
+    import numpy as np
+    from cognisom.modules.immune_module import ImmuneModule
+
+    import contextlib, io
+    with contextlib.redirect_stdout(io.StringIO()):
+        module = ImmuneModule({"n_t_cells": 1, "n_nk_cells": 0,
+                               "n_macrophages": 0})
+        module.initialize()
+    assert hasattr(module, "_granule_rng")
+
+    np.random.seed(1234)
+    before = np.random.random(5)
+    cell = next(iter(module.immune_cells.values()))
+    cell.lytic_granules = 63.0
+
+    class _Target:
+        cell_id = 99
+        position = np.zeros(3, dtype=np.float32)
+
+    np.random.seed(1234)
+    module._kill_target(cell, _Target())
+    after = np.random.random(5)
+    assert np.allclose(before, after), (
+        "the kill consumed from the global stream")
+    assert cell.lytic_granules < 63.0, "nothing was released"
+    assert cell.lytic_granules >= 59.0, "the cell emptied itself"

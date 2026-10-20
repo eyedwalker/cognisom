@@ -161,6 +161,13 @@ class ImmuneCell:
     cell_id: int
     position: np.ndarray
     cell_type: str  # 'T_cell', 'NK_cell', 'macrophage'
+    #: Lytic granules this cell is loaded with, read from the library at
+    #: creation. None means the library has no sourced count for the
+    #: lineage, which is the answer for a macrophage and a helper T cell
+    #: and is NOT the same as zero -- zero would say the cell has
+    #: degranulated, and a reserve that reaches zero would contradict the
+    #: measurement that a killing cell sheds a few and stays loaded.
+    lytic_granules: Optional[float] = None
     velocity: np.ndarray = None
     
     # State
@@ -440,6 +447,16 @@ class ImmuneModule(SimulationModule):
 
         # Statistics
         self.total_kills = 0
+        #: A separate stream for the granule draw, so recording the cost
+        #: of a kill cannot move the simulation that produced it.
+        self._granule_rng = np.random.default_rng(
+            self.config.get('granule_seed', 0x6D616E))
+        #: Granules shed across every kill this run. The sourced rule is
+        #: that a killing cell sheds a few and stays loaded, so this
+        #: growing while the reserves stay non-zero is the expected
+        #: shape; reserves hitting zero would mean cells are emptying
+        #: themselves, which the measurement says they do not.
+        self.total_granules_released = 0
         self.total_tcell_kills = 0
         self.total_activations = 0
         self.total_recruited = 0
@@ -590,6 +607,12 @@ class ImmuneModule(SimulationModule):
             ).receptor.value
 
         self._patrol_speed_for(cell_type)
+        # The granules it is loaded with, from the library. None where
+        # the library has no sourced count, which is the honest answer
+        # for a macrophage and a helper T cell and is not zero.
+        reserve = self._lytic_reserve(cell_type)
+        if reserve is not None:
+            cell.lytic_granules = float(reserve)
         self.immune_cells[cell_id] = cell
         return cell_id
     
@@ -1091,6 +1114,57 @@ class ImmuneModule(SimulationModule):
         self.contact_time_source.setdefault(lineage, {})[field_name] = note
         return minutes
 
+    #: Granules a cytotoxic cell sheds per target killed, and the floor
+    #: it keeps. Measured on primary human NK cells: 2-4 degranulation
+    #: events per target, about 10% of the reserve released per target
+    #: and about 1% required (PMID 29592963). A killing cell sheds ~6 of
+    #: 63 and stays loaded -- it does not empty itself, which is why one
+    #: NK cell kills serially.
+    GRANULES_PER_KILL = (2, 4)
+
+    def _lytic_reserve(self, lineage: str) -> Optional[float]:
+        """Granules this lineage carries, from the library, or None.
+
+        None means the lineage has no sourced granule count -- which is
+        the answer for a macrophage and for a helper T cell, and is not
+        the same as zero.
+        """
+        if not self.library_params:
+            return None
+        try:
+            from cognisom.genomics import parameter_resolver
+            resolver = parameter_resolver.shared_resolver()
+        except Exception as exc:                        # pragma: no cover
+            logger.debug("entity library unavailable (%s)", exc)
+            return None
+        if resolver is None:
+            return None
+        name, entity_type = LINEAGE_ENTITY.get(lineage, (lineage, 'immune_cell'))
+        pv, _note = resolver.sourced_value(name, entity_type,
+                                           'lytic_granule_count')
+        return float(pv.value) if pv is not None else None
+
+    def _kill_route(self, immune_cell: "ImmuneCell") -> str:
+        """Which of the two killing routes this cell used.
+
+        A cytotoxic lymphocyte kills by granule exocytosis -- perforin
+        opens the target membrane and granzyme B goes through it -- or
+        through a death receptor, FasL on the killer engaging Fas on the
+        target. They converge on caspase-3.
+
+        The library holds both sets of molecules now. What it cannot
+        decide is which route a given contact used, and nothing in this
+        model distinguishes them: the kill is one Bernoulli draw. So this
+        reports the route a cell is EQUIPPED for, from whether it carries
+        a granule reserve, and says so rather than implying the model
+        chose.
+        """
+        if getattr(immune_cell, 'lytic_granules', None):
+            return 'granule_exocytosis'
+        if immune_cell.cell_type in ('T_cell', 'NK_cell'):
+            return 'death_receptor'
+        return 'unresolved'
+
     def _read_library_contact_minutes(self, lineage: str, field_name: str):
         """(minutes, note): the library's value if it is evidence, else the default."""
         default = (DEFAULT_LETHAL_CONTACT_MIN if field_name == CONTACT_FIELDS[0]
@@ -1401,13 +1475,38 @@ class ImmuneModule(SimulationModule):
         MUTATION_OCCURRED -> PEPTIDE_GENERATED -> PEPTIDE_PRESENTED ->
         CELL_KILLED_BY_TCELL is recoverable from the event log.
         """
+        # What the kill was done WITH. The library holds the effectors
+        # now -- perforin, the granzymes, FasL, Fas, TRAIL, wired to the
+        # caspases that were already there -- and until this, nothing in
+        # the simulation referred to any of them: a kill was a counter.
+        route = self._kill_route(immune_cell)
+        released = 0
+        reserve = getattr(immune_cell, 'lytic_granules', None)
+        if route == 'granule_exocytosis' and reserve:
+            low, high = self.GRANULES_PER_KILL
+            # Its OWN stream. Drawing from the global numpy RNG would
+            # consume numbers the rest of the simulation was going to
+            # use, so every draw after the first kill shifts and the
+            # whole trajectory moves -- measured here as a pinned
+            # engagement count going from 6 to 2 and a hypoxic death
+            # count from 60 to 58, with nothing about hypoxia changed.
+            # An addition that is meant to record what happened must not
+            # alter what happens.
+            released = int(self._granule_rng.integers(low, high + 1))
+            released = min(released, int(reserve))
+            immune_cell.lytic_granules = max(0.0, reserve - released)
+
         self.emit_event(EventTypes.CANCER_KILLED, {
             'cell_id': target_cell.cell_id,
             'killer_id': immune_cell.cell_id,
             'killer_type': immune_cell.cell_type,
-            'position': target_cell.position.tolist()
+            'position': target_cell.position.tolist(),
+            'route': route,
+            'granules_released': released,
+            'granules_remaining': getattr(immune_cell, 'lytic_granules', None),
         })
         self.total_kills += 1
+        self.total_granules_released += released
 
         if (immune_cell.cell_type == 'T_cell'
                 and immune_cell.active_tcr_match is not None):
@@ -1642,6 +1741,12 @@ class ImmuneModule(SimulationModule):
             'n_nk_cells': len(nk_cells),
             'n_macrophages': len(macrophages),
             'total_kills': self.total_kills,
+            'total_granules_released': self.total_granules_released,
+            'lytic_reserves': {
+                c.cell_id: getattr(c, 'lytic_granules', None)
+                for c in self.immune_cells.values()
+                if getattr(c, 'lytic_granules', None) is not None
+            },
             'total_activations': self.total_activations,
             'total_recruited': self.total_recruited,
             # Innate arm. nk_model names the rule that actually ran.
