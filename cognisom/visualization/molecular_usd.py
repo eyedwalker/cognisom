@@ -102,6 +102,10 @@ class MoleculeGeometry:
     radius_a: float
     """Half the longest extent, in angstroms -- what it needs for layout."""
     elements: Dict[str, int]
+    prim_path: str
+    """Where it landed. Carried rather than recomputed from the name: two
+    entities can share a prim name, and recomputing sends the second
+    one's transform to the first one's prim."""
     embedded: bool
     """False when distance geometry could not place the atoms. The prim is
     still written, with its topology, and every atom sits at the origin;
@@ -297,7 +301,8 @@ def author_molecule(
     geom = MoleculeGeometry(
         name=name, smiles=smiles, formula=formula,
         atoms=n_atoms, bonds=n_bonds, prims=n_atoms + 2 * n_bonds,
-        radius_a=extent_max, elements=elements, embedded=embedded,
+        radius_a=extent_max, elements=elements, prim_path=prim_path,
+        embedded=embedded,
     )
 
     prim = root.GetPrim()
@@ -426,7 +431,7 @@ def _lay_out(stage, geoms: Sequence[MoleculeGeometry], gap_a: float) -> None:
     columns = max(1, int(math.ceil(math.sqrt(len(geoms)))))
     for index, geom in enumerate(geoms):
         row, col = divmod(index, columns)
-        prim = stage.GetPrimAtPath(f"/Molecules/{_safe_name(geom.name)}")
+        prim = stage.GetPrimAtPath(geom.prim_path)
         if not prim:
             continue
         # Rows run -Y so the grid reads top-left to bottom-right in a
