@@ -189,6 +189,70 @@ def _title_matches(reference: str, title: str) -> bool:
     return len(ref_words & title_words) / len(title_words) >= 0.6
 
 
+#: One surname in a reference: optionally a particle (van, de, la), a
+#: capitalised name, optionally a second one for a double-barrelled or
+#: compound surname.
+_NAME = r"[A-Z][\w'\u2019\-]*"
+_SURNAME = rf"(?:(?:van|von|de|der|den|du|di|da|la|le|el)\s+)?{_NAME}(?:[ -]{_NAME})?"
+#: A whole author list: surnames with initials, comma-separated, closed by
+#: the period that ends the list and begins the title.
+_AUTHOR_RUN = re.compile(
+    rf"^(?:{_SURNAME}\s+[A-Z]{{1,4}}\s*,\s*)*{_SURNAME}\s+[A-Z]{{1,4}}"
+    rf"(?:\s+et\s+al\.?)?\s*[,.]\s+")
+
+#: Most BioNumbers references end with the identifier of the paper they
+#: name. Eight of twelve records this repo cites carry one, and the four
+#: that do not are a PhD thesis, a lab handbook, a textbook rule of thumb
+#: and an unreferenced record -- exactly the four that should not be
+#: citable. Using it is both exact and stable, where a free-text search
+#: depends on PubMed's relevance ranking on the day.
+_EMBEDDED_PMID = re.compile(r"PubMed\s*ID\s*:?\s*(\d{4,9})", re.I)
+#: Trailing journal, year, volume and page junk, which makes an esearch
+#: match nothing if it is left on.
+_TAIL = re.compile(r"\.\s*(?:[A-Z][\w.\s&-]{1,40}\.\s*)?\d{4}.*$")
+
+
+def _title_of(reference: str) -> str:
+    r"""The title out of a BioNumbers reference string.
+
+    This used to be ``re.sub(r"^[^,]*,\s*", "", reference).split(".")[0]``,
+    which strips to the FIRST COMMA -- that is one author, not the author
+    list, so the query it built was never the title the docstring below
+    claims to use. Measured on records this repo actually cites:
+
+        Maul GG, Deaven L. ...        -> "Deaven L" (8 chars, so the whole
+                                         reference with page numbers went
+                                         to esearch and matched nothing;
+                                         BNID 101402 was reported
+                                         uncitable although its paper
+                                         resolves instantly as PMID 406262)
+        Fujioka A, Terai K, ... M.    -> "Terai K, Itoh RE, Aoki K, ..."
+                                         a bare author list
+        Luby-Phelps K. Cytoarchi...   -> "viscosity, diffusion, intra-
+                                         cellular surface area", a fragment
+                                         from the MIDDLE of the title,
+                                         because the title has commas in it
+
+    Three of those happened to resolve anyway, because PubMed will find a
+    paper from its author list and the title read-back then confirms it.
+    So the function worked by luck and failed silently when the leftover
+    was short, discarding good records.
+    """
+    title = _AUTHOR_RUN.sub("", reference, count=1)
+    title = title.split(". ")[0].strip().rstrip(".")
+    if len(title) >= 20:
+        return title
+    # No author list in a form we recognise. Try the reference with the
+    # trailing journal and pagination removed, which is still far better
+    # than the raw string -- "J Cell Biol. 1977 Jun73(3):748-60" matches
+    # nothing. If that leaves too little to search for either, send the
+    # reference as it stands rather than a mangled fragment: a book or a
+    # thesis has no PubMed record to find anyway, and it is better for it
+    # to fail as uncitable than to match some unrelated paper.
+    trimmed = _TAIL.sub("", reference).strip()
+    return trimmed if len(trimmed) >= 20 else reference
+
+
 def resolve_pmid(reference: str,
                  session: Optional[requests.Session] = None) -> tuple:
     """``(pmid, title)`` for a reference string, or ``("", "")``.
@@ -198,33 +262,52 @@ def resolve_pmid(reference: str,
     returned the right thing -- and a citation naming the wrong paper is
     worse than no citation.
     """
-    # The title is the part most likely to be unique; drop the author list.
-    query = re.sub(r"^[^,]*,\s*", "", reference).split(".")[0]
-    if len(query) < 20:
-        query = reference
     s = session or _session()
+
+    # The identifier is usually already in the string. Read its title back
+    # and match it anyway: an identifier scraped from a page is still only
+    # a claim about which paper this is.
+    embedded = _EMBEDDED_PMID.search(reference)
+    if embedded:
+        pmid = embedded.group(1)
+        title = _pubmed_title(pmid, s)
+        if title and _title_matches(reference, title):
+            return pmid, title
+        if title:
+            log.warning(
+                "BioNumbers reference names PubMed ID %s, whose title %r does "
+                "not match the reference; searching instead", pmid, title[:60])
+
+    query = _title_of(reference)
     try:
         found = s.get(PUBMED_SEARCH, params={
-            "db": "pubmed", "retmode": "json", "term": query, "retmax": "3",
+            "db": "pubmed", "retmode": "json", "term": query, "retmax": "10",
         }, timeout=30).json()["esearchresult"]
     except Exception as exc:                            # pragma: no cover
         log.warning("PubMed search failed for %r: %s", query[:60], exc)
         return "", ""
     time.sleep(POLITE_PAUSE_S)
 
+    # retmax is 10 rather than 3 because esearch sorts by its own relevance
+    # and an old paper sinks: the 1977 reference behind the mitochondrial
+    # volume record is 79 hits deep in a free-text search for its own title.
     for pmid in found.get("idlist", []):
-        try:
-            summary = s.get(PUBMED_SUMMARY, params={
-                "db": "pubmed", "retmode": "json", "id": pmid,
-            }, timeout=30).json()["result"]
-        except Exception:                               # pragma: no cover
-            continue
-        time.sleep(POLITE_PAUSE_S)
-        entry = summary.get(pmid, {})
-        title = entry.get("title", "")
-        if _title_matches(reference, title):
+        title = _pubmed_title(pmid, s)
+        if title and _title_matches(reference, title):
             return pmid, title
     return "", ""
+
+
+def _pubmed_title(pmid: str, session) -> str:
+    """The title PubMed holds for ``pmid``, or "" if it cannot be read."""
+    try:
+        summary = session.get(PUBMED_SUMMARY, params={
+            "db": "pubmed", "retmode": "json", "id": pmid,
+        }, timeout=30).json()["result"]
+    except Exception:                                   # pragma: no cover
+        return ""
+    time.sleep(POLITE_PAUSE_S)
+    return summary.get(pmid, {}).get("title", "")
 
 
 def candidates(term: str, limit: int = 8, human_only: bool = True,
