@@ -145,8 +145,16 @@ mhcflurry==2.0.6; python_version < "3.13"
 # The marker is the arch constraint, not a preference: no tensorflow-cpu in the
 # 2.13-2.15 range publishes an arm64 macOS wheel (that line was tensorflow-macos,
 # and mainline TF only returns at 2.16+, which breaks the Keras 2 shim above).
-# So on Apple Silicon the real MHCflurry predictor can only run under Rosetta.
-# Production and CI are x86_64 Linux on 3.11 and are unaffected by this marker.
+# So on Apple Silicon the real MHCflurry predictor cannot run AT ALL, and the
+# Rosetta route this comment used to recommend is a dead end: the x86_64 wheels
+# are compiled for AVX, Rosetta 2 does not emulate AVX, and TensorFlow aborts
+# on import with "The TensorFlow library was compiled to use AVX instructions,
+# but these aren't available on your machine" (verified 2026-10-20 on
+# tensorflow-cpu 2.15.1 under `arch -x86_64` with python3.11). Apple Silicon
+# developers therefore run the PWM fallback, and anything that depends on the
+# real predictor -- the closed-loop presentation tests among them -- can only
+# be checked in CI. Production and CI are x86_64 Linux on 3.11 and are
+# unaffected by this marker.
 tensorflow-cpu>=2.13,<2.16; python_version < "3.13" and (sys_platform != "darwin" or platform_machine != "arm64")
 #
 # Optional: ESM-2 zero-shot stability (Stage C). Stub scorer is the
