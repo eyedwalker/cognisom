@@ -145,15 +145,34 @@ mhcflurry==2.0.6; python_version < "3.13"
 # The marker is the arch constraint, not a preference: no tensorflow-cpu in the
 # 2.13-2.15 range publishes an arm64 macOS wheel (that line was tensorflow-macos,
 # and mainline TF only returns at 2.16+, which breaks the Keras 2 shim above).
-# So on Apple Silicon the real MHCflurry predictor cannot run AT ALL, and the
-# Rosetta route this comment used to recommend is a dead end: the x86_64 wheels
-# are compiled for AVX, Rosetta 2 does not emulate AVX, and TensorFlow aborts
-# on import with "The TensorFlow library was compiled to use AVX instructions,
-# but these aren't available on your machine" (verified 2026-10-20 on
-# tensorflow-cpu 2.15.1 under `arch -x86_64` with python3.11). Apple Silicon
-# developers therefore run the PWM fallback, and anything that depends on the
-# real predictor -- the closed-loop presentation tests among them -- can only
-# be checked in CI. Production and CI are x86_64 Linux on 3.11 and are
+# Do NOT try to satisfy this on Apple Silicon by running x86_64 under Rosetta:
+# the x86_64 wheels are compiled for AVX, Rosetta 2 does not emulate AVX, and
+# TensorFlow aborts on import with "The TensorFlow library was compiled to use
+# AVX instructions, but these aren't available on your machine" (verified
+# 2026-10-20, tensorflow-cpu 2.15.1 under `arch -x86_64`).
+#
+# It DOES run natively on Apple Silicon, with tensorflow-macos, which is not
+# installable from this file because pip has no marker for "this exact
+# version only on this platform". Recipe, verified 2026-10-20 on arm64
+# (14,848 alleles, 22 s to load, ~0.6 s/peptide cold then cached):
+#
+#     /usr/local/bin/python3.11 -m venv ~/.venvs/mhcflurry   # 3.11, not 3.13
+#     ~/.venvs/mhcflurry/bin/pip install mhcflurry==2.0.6 tensorflow-macos==2.15.0
+#     SSL_CERT_FILE=$(~/.venvs/mhcflurry/bin/python -c "import certifi;print(certifi.where())") #         ~/.venvs/mhcflurry/bin/mhcflurry-downloads fetch models_class1_presentation
+#
+# Three traps in that recipe, each of which fails silently or confusingly:
+#   * tensorflow-macos 2.15.1 and 2.16.x are 2 kB metadata-only shims. 2.15.0
+#     is the last real arm64 wheel (209 MB), and it ships the Keras 2 that
+#     mhcflurry 2.0.6 needs; 2.16+ ships Keras 3 and breaks its compat shim.
+#   * the framework python3.11 has no CA bundle, so the weights download dies
+#     with CERTIFICATE_VERIFY_FAILED unless SSL_CERT_FILE points at certifi.
+#   * the weights land in ~/Library/Application Support/mhcflurry on macOS,
+#     not the ~/.local/share/mhcflurry that the CI cache key names.
+#
+# Worth doing: the PWM fallback is not a near-miss. Measured on this repo's
+# own peptides, it calls LVVVGADGVG a 53 nM strong binder where MHCflurry
+# says 24,893 nM, and it presents 2 peptides for TP53 R175H where MHCflurry
+# presents none. Production and CI are x86_64 Linux on 3.11 and are
 # unaffected by this marker.
 tensorflow-cpu>=2.13,<2.16; python_version < "3.13" and (sys_platform != "darwin" or platform_machine != "arm64")
 #
