@@ -57,6 +57,9 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
     "immune": {
         "n_t_cells": int, "n_nk_cells": int, "n_macrophages": int,
         "patrol_speed": float, "kill_probability": float,
+        # Per-lineage patrol speed in um/min, outranking the library;
+        # library_params=False stops the module reading the library.
+        "lineage_patrol_speed": dict, "library_params": bool,
         # The knobs that actually reach each arm. checkpoint_block and
         # costimulation drive the T-cell Hill rule (and, for
         # checkpoint_block, the macrophage PD-1 gate); the two

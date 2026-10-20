@@ -29,10 +29,12 @@ Usage:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from cognisom.library.store import EntityStore
-from cognisom.library.parameters import Provenance, get_parameter
+from cognisom.library.parameters import (
+    PARAMETER_SPECS, SIMULATION_GRADE, ParameterValue, Provenance, get_parameter,
+)
 
 log = logging.getLogger(__name__)
 
@@ -41,9 +43,36 @@ log = logging.getLogger(__name__)
 _MISSING_REPORTED: set = set()
 
 
+# (entity, entity type, field) refusals already reported by sourced_value.
+_REFUSED_REPORTED: set = set()
+
+
 def reset_missing_log() -> None:
     """Forget which absences have been reported. For tests."""
     _MISSING_REPORTED.clear()
+    _REFUSED_REPORTED.clear()
+
+
+_SHARED: Optional["SimulationParameterResolver"] = None
+
+
+def shared_resolver() -> Optional["SimulationParameterResolver"]:
+    """One resolver per process, or None if the library cannot be opened.
+
+    Simulation modules are constructed many times over a run and a test
+    suite; opening the store is cheap after the first time but not free, and
+    a module must never fail to construct because the library is missing --
+    it falls back to its defaults and says so.
+    """
+    global _SHARED
+    if _SHARED is None:
+        try:
+            _SHARED = SimulationParameterResolver(EntityStore())
+        except Exception as exc:                        # pragma: no cover
+            log.warning("entity library unavailable (%s); simulation "
+                        "modules will use their built-in defaults", exc)
+            return None
+    return _SHARED
 
 
 GENE_EFFECT_FIELDS = (
@@ -406,6 +435,61 @@ class SimulationParameterResolver:
         }
         params["_source"] = _provenance_of(met, METABOLITE_PARAM_FIELDS)
         return params
+
+    # ── Single values for running code ─────────────────────────────
+
+    def sourced_value(self, entity_name: str, entity_type: str,
+                      field: str) -> Tuple[Optional[ParameterValue], str]:
+        """One parameter, only if it is evidence a simulation may consume.
+
+        This is the accessor for wiring a library value into running code,
+        and it is deliberately stricter than :func:`_resolve`, which returns
+        any stored number. Returns ``(value, note)``: the full
+        ParameterValue -- unit, grade and citation intact, so the caller
+        can report where its number came from -- with a note of the form
+        ``"measured:PMID:20689600"``; or ``None`` with the reason it was
+        refused. A value is refused when:
+
+        - the parameter is a model construct. A construct is calibrated
+          against an observable, never sourced, and must not reach running
+          code through this path however it is graded;
+        - the entity is not in the library under that exact name and type;
+        - the parameter is absent;
+        - the value is a PLACEHOLDER: a type-level stamp from enrichment is
+          not a measurement of this cell, and reading it would let, say,
+          the cell_type ``Macrophage`` row's 0.5 um/min slow every simulated
+          macrophage tenfold on a number of unknown origin;
+        - its unit differs from the spec's. A unit is converted where it is
+          stored, never assumed where it is read, so a mismatch is a defect
+          in the library row and is logged as one -- but it does not stop a
+          simulation that has a default to fall back on.
+
+        Each refusal is logged once per process.
+        """
+        spec = PARAMETER_SPECS.get(field)
+
+        def refuse(reason: str, level: int = logging.INFO):
+            key = (entity_name, entity_type, field)
+            if key not in _REFUSED_REPORTED:
+                _REFUSED_REPORTED.add(key)
+                log.log(level, "%s %s not used from the library: %s",
+                        entity_name, field, reason)
+            return None, reason
+
+        if spec is not None and spec.model_construct:
+            return refuse("model construct: calibrated, not sourced")
+        entity = self.store.find_entity_by_name(entity_name, entity_type)
+        if entity is None:
+            return refuse(f"no {entity_type} named {entity_name!r}")
+        pv = get_parameter(entity, field)
+        if pv is None:
+            return refuse("absent")
+        if pv.provenance not in SIMULATION_GRADE:
+            return refuse(f"{pv.provenance.value}: not evidence")
+        if spec is not None and pv.unit != spec.unit:
+            return refuse(f"stored in {pv.unit!r}, the spec is {spec.unit!r}",
+                          logging.WARNING)
+        return pv, f"{pv.provenance.value}:{pv.citation or pv.source}"
 
     # ── Cache Management ────────────────────────────────────────────
 

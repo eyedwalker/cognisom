@@ -97,6 +97,19 @@ from cognisom.engine.py.immune.macrophage_polarization import (
 #: patrol_speed is quoted in um/min; the engine steps in hours.
 MINUTES_PER_HOUR = 60.0
 
+#: Module lineage -> the entity-library row its parameters are read from.
+#: The store matches names exactly and case-sensitively, so 'NK_cell'
+#: finds nothing without this table. The macrophage maps to the
+#: unpolarized cell_type row because a simulated macrophage is seeded at
+#: polarization 0.0 (M0); 'Macrophage M1' and 'Macrophage M2' are
+#: polarized states. A lineage not listed here -- a 'Neutrophil' added by
+#: hand -- is looked up under its own name as an immune_cell.
+LINEAGE_ENTITY = {
+    'T_cell': ('CD8+ Effector T cell', 'immune_cell'),
+    'NK_cell': ('NK cell', 'immune_cell'),
+    'macrophage': ('Macrophage', 'cell_type'),
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -199,6 +212,31 @@ class ImmuneModule(SimulationModule):
         self.n_nk_cells = _or_default(self.config.get('n_nk_cells'), 10)
         self.n_macrophages = _or_default(self.config.get('n_macrophages'), 8)
         self.patrol_speed = self.config.get('patrol_speed', 5.0)  # μm/min
+
+        # Per-lineage patrol speed, um/min. patrol_speed above is the
+        # speed of any lineage with nothing more specific. Precedence: an
+        # explicit 'lineage_patrol_speed' entry (a calibration sweep must
+        # be able to pin a speed), then a simulation-grade value from the
+        # entity library, then patrol_speed. The library is read for this
+        # one field only. The same rows carry detection radius, kill
+        # probability and exhaustion rate, but those are model constructs
+        # this module calibrates, and they stay on config. Two other
+        # speeds remain hardcoded and are NOT governed by this: the chase
+        # speed (ImmuneCell.speed) and the ingestion archetypes'.
+        self.lineage_patrol_speed: Dict[str, float] = {
+            lineage: float(speed) for lineage, speed in
+            (self.config.get('lineage_patrol_speed') or {}).items()
+        }
+        #: lineage -> where its patrol speed came from: 'config', the
+        #: library row with the value's grade and citation, or why the
+        #: library had nothing usable (and patrol_speed applies).
+        self.patrol_speed_source: Dict[str, str] = {
+            lineage: 'config' for lineage in self.lineage_patrol_speed
+        }
+        self.library_params = bool(self.config.get('library_params', True))
+        # Read here rather than in initialize(), which reset() re-runs.
+        for lineage in LINEAGE_ENTITY:
+            self._patrol_speed_for(lineage)
         # Baseline per-encounter kill probability for the innate
         # lineages, and the fallback for an immune cell of an
         # unrecognized type. It is NOT a T-cell fallback: the comment
@@ -489,6 +527,7 @@ class ImmuneModule(SimulationModule):
                 self._nk_licensing, self._nk_rng,
             ).receptor.value
 
+        self._patrol_speed_for(cell_type)
         self.immune_cells[cell_id] = cell
         return cell_id
     
@@ -982,6 +1021,55 @@ class ImmuneModule(SimulationModule):
                 return True
         return False
 
+    def _patrol_speed_for(self, lineage: str) -> float:
+        """Patrol speed of ``lineage`` in um/min, reading the library once.
+
+        Called for every patrol step, so after the first call for a
+        lineage it is dictionary lookups only. Cells built outside
+        add_immune_cell (the ingestion bridge constructs ImmuneCell
+        directly) are resolved here on their first step.
+        """
+        speed = self.lineage_patrol_speed.get(lineage)
+        if speed is not None:
+            return speed
+        if lineage not in self.patrol_speed_source:
+            self.patrol_speed_source[lineage] = (
+                self._read_library_patrol_speed(lineage)
+            )
+            return self.lineage_patrol_speed.get(lineage, self.patrol_speed)
+        return self.patrol_speed
+
+    def _read_library_patrol_speed(self, lineage: str) -> str:
+        """Take ``lineage``'s migration speed from the library if it is evidence.
+
+        Returns the note recorded in patrol_speed_source. The resolver
+        passes a value only at simulation grade (never a PLACEHOLDER --
+        the cell_type Macrophage row's stamped 0.5 um/min would otherwise
+        slow every macrophage tenfold) and only in the spec's unit, um/min,
+        which is the unit patrol_speed is quoted in; the hour-step
+        conversion happens once, in _patrol. Fails soft: a deploy without
+        the library still constructs an engine.
+        """
+        if not self.library_params:
+            return 'library not consulted (library_params=False)'
+        try:
+            from cognisom.genomics import parameter_resolver
+            resolver = parameter_resolver.shared_resolver()
+        except Exception as exc:                        # pragma: no cover
+            logger.warning("entity library unavailable (%s)", exc)
+            resolver = None
+        if resolver is None:
+            return 'library unavailable'
+        name, entity_type = LINEAGE_ENTITY.get(lineage, (lineage, 'immune_cell'))
+        pv, note = resolver.sourced_value(
+            name, entity_type, 'migration_speed_um_per_min',
+        )
+        if pv is not None:
+            self.lineage_patrol_speed[lineage] = float(pv.value)
+            logger.info("%s patrols at %.3g um/min from the library (%s, %s)",
+                        lineage, pv.value, name, note)
+        return f"{name}: {note}"
+
     def _patrol(self, immune_cell: ImmuneCell, dt: float):
         """Random patrol movement, ECM-attenuated."""
         # Random walk
@@ -991,14 +1079,13 @@ class ImmuneModule(SimulationModule):
         # ECM barrier (Upgrade 6): patrol speed scales down with the
         # local stromal density. A T cell wandering into a fibrotic
         # region effectively stalls.
-        effective_speed = self.patrol_speed
+        base_speed = self._patrol_speed_for(immune_cell.cell_type)
+        effective_speed = base_speed
         if self.cellular_module is not None:
             local_ecm = self.cellular_module.ecm_density_at(
                 immune_cell.position
             )
-            effective_speed = motility_attenuation(
-                self.patrol_speed, local_ecm,
-            )
+            effective_speed = motility_attenuation(base_speed, local_ecm)
         immune_cell.velocity = direction * effective_speed
 
         # patrol_speed is um/MIN and dt is HOURS, so the conversion is x60.
@@ -1495,6 +1582,9 @@ class ImmuneModule(SimulationModule):
             # The legacy step rule's threshold, which used to be a bare
             # 0.4 literal inside _recognize and is now visible.
             'nk_missing_self_threshold': self.nk_missing_self_threshold,
+            # Where each lineage's patrol speed came from: config, a cited
+            # library value, or the reason the library had none to give.
+            'patrol_speed_source': dict(self.patrol_speed_source),
         }
     
     # Event handlers
