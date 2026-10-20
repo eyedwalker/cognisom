@@ -235,7 +235,10 @@ CALIBRATION_STATEMENT = (
     "amplitude, the resistance ramp and the confidence weights -- are "
     "ILLUSTRATIVE: plausible values that were chosen, fitted to nothing. Read "
     "the response curves as an illustration of the model's structure, not as a "
-    "prediction of what a patient will do.\n"
+    "prediction of what a patient will do. One per-drug input is evidence "
+    "rather than a choice: when a course stops before the end of the window, "
+    "a regimen the entity library covers washes out at its FDA-label "
+    "elimination half-life.\n"
     "Calibration against the six reference trials is DEFERRED, and three "
     "things block it. (1) Median rPFS lies outside the model's output range: "
     "the dynamics carry no acquired-resistance mechanism able to reverse net "
@@ -410,6 +413,46 @@ def _inn_of(profile: Dict) -> str:
 
 
 _UNMAPPED_CLASSES_REPORTED: set = set()
+
+#: Profiles already reported as stopping with no library half-life.
+_NO_HALF_LIFE_REPORTED: set = set()
+
+
+def elimination_half_life_days(profile: Dict) -> Optional[float]:
+    """The profile's library half-life in days, or None.
+
+    The resolver puts a half-life on a profile only when it is evidence --
+    in practice the FDA label's, cited by SPL set id -- and in the spec's
+    unit, hours; this is the one conversion, hours to the loop's days.
+    Hardcoded profiles carry no ``pk`` block and return None.
+    """
+    hours = (profile.get("pk") or {}).get("half_life_hours")
+    return None if hours is None else float(hours) / 24.0
+
+
+def drug_exposure(day: int, last_dose_day: int,
+                  half_life_days: Optional[float]) -> float:
+    """Relative drug exposure on ``day``: 1 while dosed, washing out after.
+
+    Washout is first-order at the label's terminal half-life, which governs
+    the fall after a last dose whatever the dosing pattern was. Exposure
+    while dosed is held at 1, steady state, deliberately: the climb to
+    steady state depends on dose, interval and route, none of which the
+    library holds. Modelling it as a continuous infusion would put
+    pembrolizumab's first-week exposure at a few percent, when a 200 mg
+    bolus is at about two thirds of the steady-state average from the first
+    day, and it would stack a PK delay on the illustrative effect onset that
+    already stands in for one. With no half-life the effect stops at the
+    last dose, which is what this model did before it had one.
+
+    Consumes no random draws, so the noise sequence -- and every curve
+    with no course end -- is unchanged.
+    """
+    if day <= last_dose_day:
+        return 1.0
+    if half_life_days is None:
+        return 0.0
+    return math.exp(-math.log(2.0) * (day - last_dose_day) / half_life_days)
 
 
 def treatment_mechanisms(profile: Dict) -> frozenset:
@@ -589,6 +632,16 @@ class TreatmentResult:
     #: MODEL_CAVEATS.
     caveats: List[str] = field(default_factory=list)
 
+    #: Day of the last dose, or None when the drug was given throughout.
+    last_dose_day: Optional[int] = None
+    #: The label half-life the washout used, in days, or None.
+    elimination_half_life_days: Optional[float] = None
+    #: How exposure was modelled, in words, for display next to the curve.
+    exposure_model: str = ""
+    #: Where each pharmacokinetic parameter came from: a grade and citation
+    #: ("measured:FDA-SPL:<set id>") or why the library gave none.
+    pk_sources: Dict[str, str] = field(default_factory=dict)
+
     @property
     def inputs_fully_measured(self) -> bool:
         """False when any immune input was absent rather than measured."""
@@ -635,6 +688,9 @@ class TreatmentResult:
             "irae_risk": round(self.immune_related_adverse_events, 2),
             "unmeasured_inputs": list(self.unmeasured_inputs),
             "caveats": list(self.caveats),
+            "last_dose_day": self.last_dose_day,
+            "exposure_model": self.exposure_model,
+            "pk_sources": dict(self.pk_sources),
         }
 
 
@@ -833,13 +889,17 @@ class TreatmentSimulator:
 
     def simulate(self, treatment_key: str,
                  twin: DigitalTwinConfig,
-                 duration_days: int = 180) -> TreatmentResult:
+                 duration_days: int = 180,
+                 last_dose_day: Optional[int] = None) -> TreatmentResult:
         """Simulate a treatment and predict response.
 
         Args:
             treatment_key: Key into treatment profiles (entity or hardcoded).
             twin: Personalized DigitalTwinConfig.
             duration_days: Simulation duration in days.
+            last_dose_day: Day of the last dose. None (the default) doses
+                throughout the window. After it the effect washes out at the
+                drug's label half-life when the library has one.
 
         Returns:
             TreatmentResult with tumor response curve and predictions.
@@ -852,10 +912,32 @@ class TreatmentSimulator:
         # Calculate base effectiveness
         effectiveness = self._calculate_effectiveness(profile, twin)
 
+        if last_dose_day is not None:
+            if last_dose_day < 0:
+                raise ValueError(f"last_dose_day must be >= 0, got {last_dose_day}")
+            if last_dose_day >= duration_days:
+                last_dose_day = None      # dosed through the window
+
         # Simulate tumor dynamics
         response_curve = self._simulate_tumor_dynamics(
-            effectiveness, profile, twin, duration_days
+            effectiveness, profile, twin, duration_days,
+            last_dose_day=last_dose_day,
         )
+        half_life = elimination_half_life_days(profile)
+        if last_dose_day is None:
+            exposure_model = (
+                f"Dosed throughout the {duration_days}-day window; exposure "
+                "held at steady state.")
+        elif half_life is None:
+            exposure_model = (
+                f"Last dose on day {last_dose_day}. No library half-life for "
+                "this regimen, so its effect stops at the last dose.")
+        else:
+            exposure_model = (
+                f"Last dose on day {last_dose_day}, then first-order washout "
+                f"at the label half-life of {half_life:.3g} days; exposure "
+                "held at steady state while dosed. Active metabolites are "
+                "not modelled.")
 
         # Find best response and PFS
         best_response = min(response_curve)
@@ -938,6 +1020,10 @@ class TreatmentSimulator:
             rationale=self._generate_rationale(profile, twin, effectiveness),
             unmeasured_inputs=sorted(set(unmeasured)),
             caveats=caveats,
+            last_dose_day=last_dose_day,
+            elimination_half_life_days=half_life,
+            exposure_model=exposure_model,
+            pk_sources=dict((profile.get("pk") or {}).get("_sources") or {}),
         )
 
     @staticmethod
@@ -966,14 +1052,16 @@ class TreatmentSimulator:
 
     def compare_treatments(self, treatment_keys: List[str],
                            twin: DigitalTwinConfig,
-                           duration_days: int = 180) -> List[TreatmentResult]:
+                           duration_days: int = 180,
+                           last_dose_day: Optional[int] = None,
+                           ) -> List[TreatmentResult]:
         """Compare multiple treatments.
 
         Returns list of TreatmentResult sorted by best response.
         """
         results = []
         for key in treatment_keys:
-            result = self.simulate(key, twin, duration_days)
+            result = self.simulate(key, twin, duration_days, last_dose_day)
             results.append(result)
 
         results.sort(key=lambda r: r.best_response)
@@ -1100,10 +1188,17 @@ class TreatmentSimulator:
     def _simulate_tumor_dynamics(self, effectiveness: float,
                                  profile: Dict,
                                  twin: DigitalTwinConfig,
-                                 duration_days: int) -> List[float]:
+                                 duration_days: int,
+                                 last_dose_day: Optional[int] = None,
+                                 ) -> List[float]:
         """Simulate tumor volume changes over time.
 
         Returns list of relative tumor volumes (1.0 = baseline).
+
+        The kill rate is scaled by drug_exposure, which is exactly 1.0 on
+        every day when the drug is given throughout (``last_dose_day`` None),
+        so those curves are the same floats they were before exposure was
+        modelled.
 
         The trajectory is deterministic given the patient AND the regimen:
         the same pair must produce the same curve on every run, or two
@@ -1135,6 +1230,16 @@ class TreatmentSimulator:
         volumes = [1.0]
         volume = 1.0
 
+        dosed_until = duration_days if last_dose_day is None else last_dose_day
+        half_life = elimination_half_life_days(profile)
+        if dosed_until < duration_days and half_life is None:
+            name = str(profile.get("name", ""))
+            if name not in _NO_HALF_LIFE_REPORTED:
+                _NO_HALF_LIFE_REPORTED.add(name)
+                logger.warning(
+                    "%s: no half-life in the library, so after the last dose "
+                    "its effect stops at once rather than washing out", name)
+
         # Base tumor growth rate (per day). The one calibrated parameter in
         # this file: derived from the PROfound cohort A control-arm median
         # rPFS, see CALIBRATED_GROWTH_RATE_PER_DAY. 0.004992/day, where the
@@ -1157,7 +1262,8 @@ class TreatmentSimulator:
                 treatment_factor = 0
             else:
                 ramp = min(1.0, (day - onset) / 21.0)  # 3-week ramp
-                treatment_factor = max_kill_rate * ramp
+                treatment_factor = (max_kill_rate * ramp
+                                    * drug_exposure(day, dosed_until, half_life))
 
             # Net growth = growth - treatment kill
             net_rate = growth_rate - treatment_factor

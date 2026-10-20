@@ -92,6 +92,21 @@ with st.sidebar:
 
     duration = st.slider("Simulation duration (days)", 30, 365, 180, step=30)
 
+    # A course that stops before the window ends. After the last dose a
+    # regimen the entity library covers washes out at its FDA-label
+    # half-life; one without a library half-life stops acting at once.
+    stop_early = st.checkbox(
+        "Stop treatment before the end", value=False,
+        help="After the last dose each drug's effect fades at its label "
+             "elimination half-life: weeks for an antibody, hours for most "
+             "small molecules.",
+    )
+    last_dose_day = (
+        st.slider("Last dose (day)", 7, duration - 1,
+                  min(90, duration - 1), step=1)
+        if stop_early else None
+    )
+
 # ─────────────────────────────────────────────────────────────────────────
 # BUILD TWIN CONFIG
 # ─────────────────────────────────────────────────────────────────────────
@@ -188,7 +203,8 @@ if not selected_treatments:
 results = []
 with st.spinner("Running treatment simulations..."):
     for treatment_key in selected_treatments:
-        result = simulator.simulate(treatment_key, twin, duration_days=duration)
+        result = simulator.simulate(treatment_key, twin, duration_days=duration,
+                                    last_dose_day=last_dose_day)
         results.append(result)
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -212,17 +228,28 @@ if results:
 
     for result in results:
         color = response_colors.get(result.response_category, "#888888")
+        # A stopped regimen with no library half-life drops to zero effect
+        # at the last dose. That is missing data, not pharmacology -- a
+        # combination of two long-lived antibodies would otherwise look
+        # worse after stopping than either antibody alone -- so the curve
+        # is dashed and labelled rather than drawn like the others.
+        no_washout = (result.last_dose_day is not None
+                      and result.elimination_half_life_days is None)
         fig.add_trace(go.Scatter(
             x=list(range(len(result.tumor_response_curve))),
             y=result.tumor_response_curve,
             mode="lines",
-            name=f"{result.treatment_name} ({result.response_category})",
-            line=dict(width=2.5),
+            name=(f"{result.treatment_name} ({result.response_category})"
+                  + (" · no half-life: stops at last dose" if no_washout else "")),
+            line=dict(width=2.5, dash="dash" if no_washout else "solid"),
         ))
 
     # Baseline
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray",
                   annotation_text="Baseline")
+    if last_dose_day is not None:
+        fig.add_vline(x=last_dose_day, line_dash="dash", line_color="gray",
+                      annotation_text="Last dose")
 
     # RECIST thresholds, converted to the volume axis this figure plots:
     # a -30% diameter change is a volume ratio of 0.70**3, and a +20%
@@ -263,6 +290,11 @@ if results:
             "T-cell Reactivation": f"{r.t_cell_reactivation_fraction:.0%}",
             "irAE Risk": f"{r.immune_related_adverse_events:.0%}",
             "Confidence": f"{r.confidence:.0%}",
+            # The one per-drug input that is evidence: the label half-life,
+            # which governs washout after a last dose.
+            "Elimination t½":
+                f"{r.elimination_half_life_days:.3g} d (FDA label)"
+                if r.elimination_half_life_days is not None else "not in library",
         })
 
     comp_df = pd.DataFrame(comparison_data)
@@ -295,6 +327,10 @@ if results:
                          "volume reduction; RECIST is defined on diameters.",
                 )
                 st.metric("PFS", result.format_progression_free_survival())
+                st.caption(result.exposure_model)
+                half_life_source = result.pk_sources.get("half_life_hours", "")
+                if half_life_source.startswith(("measured:", "derived:")):
+                    st.caption(f"Half-life source: {half_life_source}")
                 for caveat in result.caveats:
                     st.caption(caveat)
                 st.metric("Post-treatment Exhaustion",

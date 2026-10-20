@@ -75,6 +75,15 @@ def shared_resolver() -> Optional["SimulationParameterResolver"]:
     return _SHARED
 
 
+#: Pharmacokinetic parameters carried on a drug's treatment profile, each
+#: only if it is evidence. Only the half-life changes a curve (see
+#: treatment_simulator.drug_exposure); volume of distribution and
+#: bioavailability travel with their provenance but are inert until dose
+#: and dosing interval are in the library, because in a normalised
+#: exposure model they cancel.
+PK_FIELDS = ("half_life_hours", "volume_of_distribution_L", "bioavailability")
+
+
 GENE_EFFECT_FIELDS = (
     "mhc1_downregulation_effect", "tumor_growth_multiplier",
     "pd_l1_effect", "pi3k_pathway_activation",
@@ -217,6 +226,19 @@ class SimulationParameterResolver:
             "_source": "entity_library",
             "_entity_id": drug.entity_id if hasattr(drug, "entity_id") else "",
         }
+
+        # Pharmacokinetics, through the evidence gate field by field. Never
+        # through pp.get, which would hand the simulator the enrichment
+        # stamps (Imiquimod's 12 h half-life, five 50 L volumes, five 0.8
+        # bioavailabilities) as if they were label values; and never
+        # through the worst-of _provenance_of, which would refuse
+        # adalimumab's measured half-life because its volume is a stamp.
+        pk: Dict[str, Any] = {"_sources": {}}
+        for field in PK_FIELDS:
+            pv, note = self._sourced(drug, drug.name, "drug", field)
+            pk[field] = None if pv is None else float(pv.value)
+            pk["_sources"][field] = note
+        profile["pk"] = pk
 
         return profile
 
@@ -466,6 +488,12 @@ class SimulationParameterResolver:
 
         Each refusal is logged once per process.
         """
+        entity = self.store.find_entity_by_name(entity_name, entity_type)
+        return self._sourced(entity, entity_name, entity_type, field)
+
+    def _sourced(self, entity, entity_name: str, entity_type: str,
+                 field: str) -> Tuple[Optional[ParameterValue], str]:
+        """The gate behind sourced_value, for a caller that holds the entity."""
         spec = PARAMETER_SPECS.get(field)
 
         def refuse(reason: str, level: int = logging.INFO):
@@ -478,7 +506,6 @@ class SimulationParameterResolver:
 
         if spec is not None and spec.model_construct:
             return refuse("model construct: calibrated, not sourced")
-        entity = self.store.find_entity_by_name(entity_name, entity_type)
         if entity is None:
             return refuse(f"no {entity_type} named {entity_name!r}")
         pv = get_parameter(entity, field)

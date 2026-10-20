@@ -117,7 +117,12 @@ TREATMENT_SIMULATOR_CARD = ModelCard(
         "every run. The stochastic term is one fixed pseudo-random "
         "realisation seeded from the patient and the drug, not a sampling "
         "distribution, so this model yields no interval and no response rate.",
-        "Does not model drug-drug interactions or pharmacokinetics",
+        "Does not model drug-drug interactions. Pharmacokinetics enter only "
+        "as washout: after a last dose, a regimen the entity library covers "
+        "loses its effect at its FDA-label elimination half-life. Exposure "
+        "while dosed is held at steady state; dose, dosing interval, volume "
+        "of distribution and bioavailability do not enter, and active "
+        "metabolites are not modelled.",
         "Response followed by progression is not representable: no "
         "acquired-resistance mechanism can reverse net growth, so "
         "progression-free survival is either an early progression day or is "
