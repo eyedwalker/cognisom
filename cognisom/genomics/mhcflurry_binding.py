@@ -304,7 +304,7 @@ def _predict_mhcflurry(peptide: str, hla_allele: str) -> BindingResult:
 
         affinity = float(row.get("affinity", 5000))
         presentation = float(row.get("presentation_score", 0))
-        percentile = float(row.get("affinity_percentile", 50))
+        percentile = _presentation_percentile(row)
 
         return BindingResult(
             peptide=peptide,
@@ -319,6 +319,45 @@ def _predict_mhcflurry(peptide: str, hla_allele: str) -> BindingResult:
     except Exception as e:
         logger.warning("MHCflurry prediction failed for %s/%s: %s", peptide, allele, e)
         return _predict_pwm_fallback(peptide, hla_allele)
+
+
+#: Reported once if the predictor stops returning the percentile column.
+_PERCENTILE_COLUMN_WARNED: List[bool] = []
+
+
+def _presentation_percentile(row) -> float:
+    """The calibrated percentile rank from one prediction row.
+
+    ``Class1PresentationPredictor.predict`` returns, for each peptide:
+    peptide, peptide_num, sample_name, affinity, best_allele,
+    processing_score, presentation_score, presentation_percentile. The
+    percentile is ``presentation_percentile`` -- the rank of this
+    peptide's presentation score among random peptides, lower being
+    better -- and there is NO ``affinity_percentile`` column.
+
+    The single-peptide path asked for ``affinity_percentile`` and
+    defaulted a miss to 50, so with the real predictor loaded it reported
+    exactly 50.000 for every peptide, while the batch path beside it read
+    the right column. Downstream prefers this number over its own
+    affinity-derived estimate precisely because it is meant to be the
+    calibrated one, so a constant displaced a value that at least ranked
+    correctly. Measured on HLA-A*02:01: 0.019 for NLVPMVATV (16.6 nM),
+    0.870 for KLVVVGADGV (110.8 nM), 3.946 for HMTEVVRHC (1386 nM).
+
+    A missing column now says so once rather than resolving to a
+    plausible-looking middle value: that is what hid this.
+    """
+    value = row.get("presentation_percentile")
+    if value is None:
+        if not _PERCENTILE_COLUMN_WARNED:
+            _PERCENTILE_COLUMN_WARNED.append(True)
+            logger.warning(
+                "MHCflurry returned no 'presentation_percentile' column "
+                "(columns: %s); percentile ranks fall back to the coarse "
+                "affinity-derived estimate.", list(getattr(row, "index", [])),
+            )
+        return float("nan")
+    return float(value)
 
 
 def _predict_mhcflurry_batch(
@@ -396,7 +435,7 @@ def _predict_mhcflurry_batch(
                 peptide=peptides[i],
                 hla_allele=hla_alleles[i],
                 affinity_nm=affinity,
-                percentile_rank=float(row.get("presentation_percentile", 50)),
+                percentile_rank=_presentation_percentile(row),
                 presentation_score=float(row.get("presentation_score", 0)),
                 is_strong_binder=affinity < 50,
                 is_weak_binder=affinity < 500,

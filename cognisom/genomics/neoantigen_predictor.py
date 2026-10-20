@@ -256,6 +256,23 @@ class NeoantigenPredictor:
         # step function standing in for the percentile.
         self._binding_cache: Dict[Tuple[str, str], "_CachedBinding"] = {}
 
+    @staticmethod
+    def _calibrated(value):
+        """``value`` unless it is absent or NaN, in which case None.
+
+        Downstream prefers a stored percentile over its own
+        affinity-derived estimate, and tests that preference with
+        ``is not None``. A NaN passes that test and then propagates
+        through every comparison as False, so an uncalibrated value would
+        quietly displace the estimate that at least ranks correctly.
+        """
+        if value is None:
+            return None
+        try:
+            return None if math.isnan(float(value)) else float(value)
+        except (TypeError, ValueError):
+            return None
+
     def _warm_binding_cache(self, peptides: Sequence[str],
                             hla_alleles: Sequence[str]) -> None:
         """Score every peptide-allele pair up front, in one call.
@@ -319,10 +336,12 @@ class NeoantigenPredictor:
             self._binding_cache[(peptide, allele)] = _CachedBinding(
                 affinity_nm=result.affinity_nm,
                 percentile_rank=(
-                    getattr(result, "percentile_rank", None) if trained else None
+                    self._calibrated(getattr(result, "percentile_rank", None))
+                    if trained else None
                 ),
                 presentation_score=(
-                    getattr(result, "presentation_score", None) if trained else None
+                    self._calibrated(getattr(result, "presentation_score", None))
+                    if trained else None
                 ),
                 method=method,
             )
@@ -703,10 +722,12 @@ class NeoantigenPredictor:
                 trained = method == "mhcflurry"
                 self._binding_cache[(peptide, hla_allele)] = _CachedBinding(
                     affinity_nm=result.affinity_nm,
-                    percentile_rank=(getattr(result, "percentile_rank", None)
-                                     if trained else None),
-                    presentation_score=(getattr(result, "presentation_score", None)
-                                        if trained else None),
+                    percentile_rank=(
+                        self._calibrated(getattr(result, "percentile_rank", None))
+                        if trained else None),
+                    presentation_score=(
+                        self._calibrated(getattr(result, "presentation_score", None))
+                        if trained else None),
                     method=method,
                 )
                 return result.affinity_nm
