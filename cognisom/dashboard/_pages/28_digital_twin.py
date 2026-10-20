@@ -234,13 +234,17 @@ if results:
         # worse after stopping than either antibody alone -- so the curve
         # is dashed and labelled rather than drawn like the others.
         no_washout = (result.last_dose_day is not None
-                      and result.elimination_half_life_days is None)
+                      and any(c["half_life_days"] is None
+                              for c in result.exposure_components))
         fig.add_trace(go.Scatter(
             x=list(range(len(result.tumor_response_curve))),
             y=result.tumor_response_curve,
             mode="lines",
             name=(f"{result.treatment_name} ({result.response_category})"
-                  + (" · no half-life: stops at last dose" if no_washout else "")),
+                  + (" · part of its effect stops at last dose (no half-life)"
+                     if no_washout and len(result.exposure_components) > 1
+                     else " · no half-life: stops at last dose" if no_washout
+                     else "")),
             line=dict(width=2.5, dash="dash" if no_washout else "solid"),
         ))
 
@@ -292,9 +296,13 @@ if results:
             "Confidence": f"{r.confidence:.0%}",
             # The one per-drug input that is evidence: the label half-life,
             # which governs washout after a last dose.
-            "Elimination t½":
-                f"{r.elimination_half_life_days:.3g} d (FDA label)"
-                if r.elimination_half_life_days is not None else "not in library",
+            "Elimination t½": " + ".join(
+                (f"{c['half_life_days']:.3g} d" if c["half_life_days"] is not None
+                 else "not in library")
+                + (f" {c['name'].split()[0]}" if len(r.exposure_components) > 1 else "")
+                for c in r.exposure_components
+            ) + (" (FDA label)" if any(c["half_life_days"] is not None
+                                       for c in r.exposure_components) else ""),
         })
 
     comp_df = pd.DataFrame(comparison_data)
@@ -328,9 +336,11 @@ if results:
                 )
                 st.metric("PFS", result.format_progression_free_survival())
                 st.caption(result.exposure_model)
-                half_life_source = result.pk_sources.get("half_life_hours", "")
-                if half_life_source.startswith(("measured:", "derived:")):
-                    st.caption(f"Half-life source: {half_life_source}")
+                for key, source in result.pk_sources.items():
+                    if (key.endswith("half_life_hours")
+                            and source.startswith(("measured:", "derived:"))):
+                        who = key.split(": ")[0] + " " if ": " in key else ""
+                        st.caption(f"{who}half-life source: {source}")
                 for caveat in result.caveats:
                     st.caption(caveat)
                 st.metric("Post-treatment Exhaustion",

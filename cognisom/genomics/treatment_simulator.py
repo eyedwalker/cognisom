@@ -238,7 +238,9 @@ CALIBRATION_STATEMENT = (
     "prediction of what a patient will do. One per-drug input is evidence "
     "rather than a choice: when a course stops before the end of the window, "
     "a regimen the entity library covers washes out at its FDA-label "
-    "elimination half-life.\n"
+    "elimination half-life, a combination component by component, each "
+    "share weighted by that drug's single-agent effectiveness for the "
+    "patient (a structural assumption).\n"
     "Calibration against the six reference trials is DEFERRED, and three "
     "things block it. (1) Median rPFS lies outside the model's output range: "
     "the dynamics carry no acquired-resistance mechanism able to reverse net "
@@ -428,6 +430,22 @@ def elimination_half_life_days(profile: Dict) -> Optional[float]:
     """
     hours = (profile.get("pk") or {}).get("half_life_hours")
     return None if hours is None else float(hours) / 24.0
+
+
+def regimen_exposure(day: int, last_dose_day: int,
+                     parts: List[Tuple[float, Optional[float]]]) -> float:
+    """Relative exposure of a regimen of one or more drugs on ``day``.
+
+    ``parts`` is (share, half-life in days) per component, shares summing to
+    1. Exactly 1.0 while dosed, whatever the shares, so a regimen given
+    throughout is unchanged to the bit. After the last dose each share
+    washes out at its own component's half-life (drug_exposure) and the
+    shares add; a single agent is one part of share 1.
+    """
+    if day <= last_dose_day:
+        return 1.0
+    return sum(share * drug_exposure(day, last_dose_day, half_life)
+               for share, half_life in parts)
 
 
 def drug_exposure(day: int, last_dose_day: int,
@@ -639,8 +657,12 @@ class TreatmentResult:
     #: How exposure was modelled, in words, for display next to the curve.
     exposure_model: str = ""
     #: Where each pharmacokinetic parameter came from: a grade and citation
-    #: ("measured:FDA-SPL:<set id>") or why the library gave none.
+    #: ("measured:FDA-SPL:<set id>") or why the library gave none. For a
+    #: combination, keyed "<component>: <parameter>".
     pk_sources: Dict[str, str] = field(default_factory=dict)
+    #: The drugs exposure is made of: [{"name", "share", "half_life_days"}].
+    #: One entry of share 1 for a single agent.
+    exposure_components: List[Dict] = field(default_factory=list)
 
     @property
     def inputs_fully_measured(self) -> bool:
@@ -740,6 +762,9 @@ TREATMENT_PROFILES = {
     },
     "pembro_ipi_combo": {
         "name": "Pembrolizumab + Ipilimumab",
+        # Single-agent regimens this one is made of, as keys into the
+        # active profiles; see TreatmentSimulator._exposure_parts.
+        "components": ("pembrolizumab", "ipilimumab"),
         "class": "combination checkpoint",
         "mechanisms": frozenset({MECH_PD1, MECH_CTLA4}),
         "target": "PD-1 + CTLA-4",
@@ -780,6 +805,9 @@ TREATMENT_PROFILES = {
     },
     "olaparib_pembro_combo": {
         "name": "Olaparib + Pembrolizumab",
+        # Single-agent regimens this one is made of, as keys into the
+        # active profiles; see TreatmentSimulator._exposure_parts.
+        "components": ("olaparib", "pembrolizumab"),
         "class": "PARP + checkpoint",
         "mechanisms": frozenset({MECH_PARP, MECH_PD1}),
         "target": "PARP + PD-1",
@@ -810,6 +838,9 @@ TREATMENT_PROFILES = {
     },
     "neoantigen_vaccine_pembro": {
         "name": "Neoantigen Vaccine + Pembrolizumab",
+        # Single-agent regimens this one is made of, as keys into the
+        # active profiles; see TreatmentSimulator._exposure_parts.
+        "components": ("neoantigen_vaccine", "pembrolizumab"),
         "class": "vaccine + checkpoint",
         "mechanisms": frozenset({MECH_VACCINE, MECH_PD1}),
         "target": "Neoantigens + PD-1",
@@ -923,21 +954,16 @@ class TreatmentSimulator:
             effectiveness, profile, twin, duration_days,
             last_dose_day=last_dose_day,
         )
-        half_life = elimination_half_life_days(profile)
-        if last_dose_day is None:
-            exposure_model = (
-                f"Dosed throughout the {duration_days}-day window; exposure "
-                "held at steady state.")
-        elif half_life is None:
-            exposure_model = (
-                f"Last dose on day {last_dose_day}. No library half-life for "
-                "this regimen, so its effect stops at the last dose.")
+        parts = self._exposure_parts(profile, twin)
+        half_life = (parts[0]["half_life_days"] if len(parts) == 1 else None)
+        exposure_model = self._describe_exposure(parts, duration_days,
+                                                 last_dose_day)
+        if len(parts) == 1:
+            pk_sources = dict(parts[0]["pk_sources"])
         else:
-            exposure_model = (
-                f"Last dose on day {last_dose_day}, then first-order washout "
-                f"at the label half-life of {half_life:.3g} days; exposure "
-                "held at steady state while dosed. Active metabolites are "
-                "not modelled.")
+            pk_sources = {f"{part['name']}: {name}": note
+                          for part in parts
+                          for name, note in part["pk_sources"].items()}
 
         # Find best response and PFS
         best_response = min(response_curve)
@@ -1023,7 +1049,12 @@ class TreatmentSimulator:
             last_dose_day=last_dose_day,
             elimination_half_life_days=half_life,
             exposure_model=exposure_model,
-            pk_sources=dict((profile.get("pk") or {}).get("_sources") or {}),
+            pk_sources=pk_sources,
+            exposure_components=[
+                {"name": part["name"], "share": part["share"],
+                 "half_life_days": part["half_life_days"]}
+                for part in parts
+            ],
         )
 
     @staticmethod
@@ -1049,6 +1080,80 @@ class TreatmentSimulator:
         if MECH_VACCINE in mechanisms and twin.mhc1_downregulation is None:
             missing.append("mhc1_downregulation")
         return missing
+
+    def _exposure_parts(self, profile: Dict, twin) -> List[Dict]:
+        """The drugs a regimen's exposure is made of, each with its share.
+
+        A single agent is one part of share 1. A combination lists its
+        components (keys into the active profiles), and after the last dose
+        each component's share of the effect washes out at that component's
+        own label half-life -- pembrolizumab's for weeks, olaparib's within
+        a day. The shares are the components' single-agent effectiveness for
+        this patient, normalised: the effectiveness model adds a term per
+        mechanism, so this is its own split of the combined effect, and it
+        is patient-specific (olaparib's share is large with a DNA-repair
+        defect and small without one). It is a structural assumption, not
+        a fitted one, and it introduces no constant.
+        """
+        def part(component: Dict, share: float) -> Dict:
+            return {
+                "name": str(component.get("name", "")),
+                "share": share,
+                "half_life_days": elimination_half_life_days(component),
+                "pk_sources": dict(
+                    (component.get("pk") or {}).get("_sources") or {}),
+                "vaccine": MECH_VACCINE in treatment_mechanisms(component),
+            }
+
+        keys = profile.get("components") or ()
+        if not keys:
+            return [part(profile, 1.0)]
+        components = []
+        for key in keys:
+            component = self._profiles.get(key)
+            if component is None:
+                raise ValueError(
+                    f"{profile.get('name')!r} lists component {key!r}, "
+                    "which is not a known regimen")
+            components.append(component)
+        strengths = [self._calculate_effectiveness(c, twin) for c in components]
+        total = sum(strengths)
+        shares = ([x / total for x in strengths] if total > 0
+                  else [1.0 / len(components)] * len(components))
+        return [part(c, share) for c, share in zip(components, shares)]
+
+    @staticmethod
+    def _describe_exposure(parts: List[Dict], duration_days: int,
+                           last_dose_day: Optional[int]) -> str:
+        """How exposure was modelled, in words, for display with the curve."""
+        if last_dose_day is None:
+            return (f"Dosed throughout the {duration_days}-day window; "
+                    "exposure held at steady state.")
+
+        def fate(part: Dict) -> str:
+            if part["vaccine"]:
+                return ("a vaccine's effect is T-cell memory, which outlasts "
+                        "the vaccine and is not modelled, so it stops at the "
+                        "last dose (a lower bound)")
+            if part["half_life_days"] is None:
+                return "no library half-life, so it stops at the last dose"
+            return f"label half-life {part['half_life_days']:.3g} days"
+
+        if len(parts) == 1:
+            if parts[0]["half_life_days"] is None:
+                return (f"Last dose on day {last_dose_day}. "
+                        + fate(parts[0])[0].upper() + fate(parts[0])[1:] + ".")
+            return (f"Last dose on day {last_dose_day}, then first-order "
+                    f"washout at the label half-life of "
+                    f"{parts[0]['half_life_days']:.3g} days; exposure held at "
+                    "steady state while dosed. Active metabolites are not "
+                    "modelled.")
+        each = "; ".join(f"{p['name']} (share {p['share']:.2f}): {fate(p)}"
+                         for p in parts)
+        return (f"Last dose on day {last_dose_day}, then each component's "
+                f"share of the effect washes out on its own -- {each}. Shares "
+                "are each drug's single-agent effectiveness for this patient; "
+                "exposure held at steady state while dosed.")
 
     def compare_treatments(self, treatment_keys: List[str],
                            twin: DigitalTwinConfig,
@@ -1231,14 +1336,16 @@ class TreatmentSimulator:
         volume = 1.0
 
         dosed_until = duration_days if last_dose_day is None else last_dose_day
-        half_life = elimination_half_life_days(profile)
-        if dosed_until < duration_days and half_life is None:
-            name = str(profile.get("name", ""))
-            if name not in _NO_HALF_LIFE_REPORTED:
-                _NO_HALF_LIFE_REPORTED.add(name)
-                logger.warning(
-                    "%s: no half-life in the library, so after the last dose "
-                    "its effect stops at once rather than washing out", name)
+        parts = self._exposure_parts(profile, twin)
+        exposure_parts = [(p["share"], p["half_life_days"]) for p in parts]
+        if dosed_until < duration_days:
+            for p in parts:
+                if p["half_life_days"] is None and p["name"] not in _NO_HALF_LIFE_REPORTED:
+                    _NO_HALF_LIFE_REPORTED.add(p["name"])
+                    logger.warning(
+                        "%s: no half-life in the library, so after the last "
+                        "dose its share of the effect stops at once rather "
+                        "than washing out", p["name"])
 
         # Base tumor growth rate (per day). The one calibrated parameter in
         # this file: derived from the PROfound cohort A control-arm median
@@ -1263,7 +1370,8 @@ class TreatmentSimulator:
             else:
                 ramp = min(1.0, (day - onset) / 21.0)  # 3-week ramp
                 treatment_factor = (max_kill_rate * ramp
-                                    * drug_exposure(day, dosed_until, half_life))
+                                    * regimen_exposure(day, dosed_until,
+                                                       exposure_parts))
 
             # Net growth = growth - treatment kill
             net_rate = growth_rate - treatment_factor

@@ -119,7 +119,10 @@ TREATMENT_SIMULATOR_CARD = ModelCard(
         "distribution, so this model yields no interval and no response rate.",
         "Does not model drug-drug interactions. Pharmacokinetics enter only "
         "as washout: after a last dose, a regimen the entity library covers "
-        "loses its effect at its FDA-label elimination half-life. Exposure "
+        "loses its effect at its FDA-label elimination half-life, and a "
+        "combination loses each component's share at that component's own "
+        "half-life, shares weighted by single-agent effectiveness. A "
+        "vaccine's lasting effect (T-cell memory) is not modelled. Exposure "
         "while dosed is held at steady state; dose, dosing interval, volume "
         "of distribution and bioavailability do not enter, and active "
         "metabolites are not modelled.",
