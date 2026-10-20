@@ -336,12 +336,17 @@ class TissueDistributor:
     def gather_positions(
         self, cell_arrays: List[TissueCellArrays],
         max_cells: int = 0,
+        rng: Optional[np.random.Generator] = None,
     ) -> np.ndarray:
         """Gather all cell positions to CPU (for visualization).
 
         Args:
             cell_arrays: Per-GPU cell data.
             max_cells: If > 0, subsample to this many cells.
+            rng: Generator for the subsample. Never the global stream: the
+                subsample used np.random.choice, which shared a stream with
+                the mechanics noise, so changing how often snapshots were
+                taken changed the trajectory.
 
         Returns:
             (total_real_cells, 3) float64 array.
@@ -354,7 +359,8 @@ class TissueDistributor:
         all_pos = np.concatenate(parts, axis=0) if parts else np.empty((0, 3))
 
         if max_cells > 0 and len(all_pos) > max_cells:
-            indices = np.random.choice(len(all_pos), max_cells, replace=False)
+            chooser = rng if rng is not None else np.random.default_rng(0)
+            indices = chooser.choice(len(all_pos), max_cells, replace=False)
             indices.sort()
             return all_pos[indices]
 

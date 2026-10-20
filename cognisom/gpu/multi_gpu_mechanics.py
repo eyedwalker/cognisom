@@ -370,11 +370,23 @@ class MultiGPUCellMechanics:
         decomposer: "DomainDecomposer",
         ghost_exchanger: "GhostExchanger",
         config: Optional[MechanicsConfig] = None,
+        seed: Optional[Any] = None,
     ):
         self._mgpu = multi_gpu
         self._decomp = decomposer
         self._ghost_ex = ghost_exchanger
         self._config = config or MechanicsConfig.default()
+
+        # Random-force generators, one per partition, or None for the
+        # global stream. The tissue engine passes a seed, so a run's
+        # trajectory is a function of its configuration alone: drawn from
+        # the global stream, it changed with anything else in the process
+        # that drew a number -- including the visualisation subsample.
+        # Standalone use without a seed keeps the global stream.
+        if seed is not None and not isinstance(seed, np.random.SeedSequence):
+            seed = np.random.SeedSequence(int(seed))
+        self._seed: Optional[np.random.SeedSequence] = seed
+        self._noise_rngs: Dict[int, Any] = {}
 
         # Per-GPU neighbour state
         self._hashes: List[Optional[_Partition]] = [
@@ -385,6 +397,32 @@ class MultiGPUCellMechanics:
     @property
     def config(self) -> MechanicsConfig:
         return self._config
+
+    def _partition_noise(self, xp, gpu_id: int, n_real: int):
+        """(n_real, 3) float32 standard normals for partition ``gpu_id``.
+
+        Each partition has its own stream, addressed by its id rather than
+        by the order partitions are visited, so the draw a partition gets
+        does not depend on what the others drew.
+        """
+        if self._seed is None:
+            return _normal_noise(xp, n_real)
+        rng = self._noise_rngs.get(gpu_id)
+        if rng is None:
+            child = np.random.SeedSequence(
+                self._seed.entropy,
+                spawn_key=tuple(self._seed.spawn_key) + (gpu_id,),
+            )
+            if xp is np:
+                rng = np.random.default_rng(child)
+            else:                                           # pragma: no cover
+                seed_int = int(child.generate_state(1, np.uint64)[0])
+                try:
+                    rng = xp.random.default_rng(seed_int)
+                except AttributeError:
+                    rng = xp.random.RandomState(seed_int)
+            self._noise_rngs[gpu_id] = rng
+        return rng.standard_normal((n_real, 3), dtype=xp.float32)
 
     def _device_scope(self, gpu_id: int):
         """Make partition ``gpu_id``'s device current for ``xp`` work.
@@ -537,7 +575,8 @@ class MultiGPUCellMechanics:
                 # Add random fluctuations (Brownian-like)
                 if self._config.random_force > 0:
                     forces += (
-                        _normal_noise(xp, n_real) * self._config.random_force
+                        self._partition_noise(xp, gpu_id, n_real)
+                        * self._config.random_force
                     )
 
             forces_list.append(forces)

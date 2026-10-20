@@ -61,6 +61,9 @@ class TissueSimulationEngine:
 
     #: Index of cancer_epithelial in the archetype table.
     _CANCER_TYPE_INDEX = 5
+    #: Spawn keys of the random streams derived from the run seed.
+    _MECHANICS_STREAM = 1
+    _VIZ_STREAM = 2
     #: A cell must have this much ATP to commit to division.
     _DIVISION_MIN_ATP = 0.3
     #: Damage above this blocks division (checkpoint arrest).
@@ -76,8 +79,15 @@ class TissueSimulationEngine:
         self._wall_start: float = 0.0
         self._initialized: bool = False
         # Seeded explicitly so a run is reproducible, and local so it does
-        # not disturb the global NumPy RNG.
-        self._rng = np.random.default_rng(getattr(config, "seed", 0) or 0)
+        # not disturb the global NumPy RNG. This stream lays out the initial
+        # tissue and places daughters; mechanics noise and the
+        # visualisation subsample draw from their own streams of the same
+        # seed, so taking snapshots more or less often cannot change the
+        # physics.
+        self._seed = int(getattr(config, "seed", 0) or 0)
+        self._rng = np.random.default_rng(self._seed)
+        self._viz_rng = np.random.default_rng(
+            np.random.SeedSequence(self._seed, spawn_key=(self._VIZ_STREAM,)))
         self._division_capacity_warned = False
 
         # Components (initialized in .initialize())
@@ -214,6 +224,8 @@ class TissueSimulationEngine:
             self._mechanics = MultiGPUCellMechanics(
                 self._backend, self._decomposer, self._ghost_exchanger,
                 config=mechanics_config,
+                seed=np.random.SeedSequence(
+                    self._seed, spawn_key=(self._MECHANICS_STREAM,)),
             )
 
         self._initialized = True
@@ -406,7 +418,7 @@ class TissueSimulationEngine:
 
         data = {
             "positions": self._distributor.gather_positions(
-                self._cell_arrays, max_cells=max_c,
+                self._cell_arrays, max_cells=max_c, rng=self._viz_rng,
             ),
             "summary": self._distributor.gather_summary(self._cell_arrays),
             "step": self._step_count,
@@ -747,6 +759,7 @@ class TissueSimulationEngine:
             positions = self._distributor.gather_positions(
                 self._cell_arrays,
                 max_cells=self._config.max_viz_cells,
+                rng=self._viz_rng,
             )
             snapshot["positions"] = positions
 

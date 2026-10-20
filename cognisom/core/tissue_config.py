@@ -174,6 +174,10 @@ class TissueScaleConfig:
 
     # ── Execution ──────────────────────────────────────────────
     execution_mode: str = "local"      # "local" (CPU/single GPU) or "remote" (Lambda)
+    #: Seed for every random draw in a run: the initial tissue, division
+    #: placement, mechanics noise and the visualisation subsample each take
+    #: their own stream from it. Same seed and configuration, same run.
+    seed: int = 0
 
     # ── Safety (Lambda Labs) ───────────────────────────────────
     max_runtime_hours: float = 2.0     # Hard auto-terminate limit
@@ -266,6 +270,7 @@ class TissueScaleConfig:
             "snapshot_interval_steps": self.snapshot_interval_steps,
             "max_viz_cells": self.max_viz_cells,
             "execution_mode": self.execution_mode,
+            "seed": self.seed,
             "max_runtime_hours": self.max_runtime_hours,
             "budget_usd": self.budget_usd,
             "disconnect_timeout_min": self.disconnect_timeout_min,
@@ -302,6 +307,7 @@ class TissueScaleConfig:
             snapshot_interval_steps=d.get("snapshot_interval_steps", 100),
             max_viz_cells=d.get("max_viz_cells", 100_000),
             execution_mode=d.get("execution_mode", "local"),
+            seed=int(d.get("seed", 0)),
             max_runtime_hours=d.get("max_runtime_hours", 2.0),
             budget_usd=d.get("budget_usd", 80.0),
             disconnect_timeout_min=d.get("disconnect_timeout_min", 10),

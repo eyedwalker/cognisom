@@ -124,6 +124,10 @@ with tab_config:
         snapshot_interval = st.number_input(
             "Snapshot interval (steps)", min_value=1, max_value=1000, value=100,
         )
+        seed = st.number_input(
+            "Random seed", min_value=0, max_value=2**31 - 1, value=0, step=1,
+            help="Same seed and settings give the same run, cell for cell.",
+        )
 
     st.markdown("---")
     st.markdown("**Modules**")
@@ -205,6 +209,7 @@ with tab_config:
                 enable_cell_cycle=enable_cell_cycle,
                 enable_immune=enable_immune,
                 snapshot_interval_steps=snapshot_interval,
+                seed=int(seed),
                 execution_mode="local" if exec_mode == "Local CPU (free)" else "remote",
                 max_runtime_hours=max_runtime if exec_mode != "Local CPU (free)" else 24.0,
                 budget_usd=budget if exec_mode != "Local CPU (free)" else 0.0,
