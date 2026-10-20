@@ -993,6 +993,14 @@ class ImmuneModule(SimulationModule):
                             immune_cell, target
                         )
                         if np.random.random() < p_kill:
+                            # CANCER_KILLED is queued, so the cellular
+                            # module removes the target only when the step
+                            # ends. Take it out of this step's snapshot
+                            # now, or a second cell reaching it in the
+                            # same step kills it again -- two kills, two
+                            # events, one death -- and a third detects it
+                            # and activates on a corpse.
+                            cancer_cells.pop(immune_cell.target_cell_id, None)
                             self._kill_target(immune_cell, target)
                 else:
                     # Target lost, deactivate

@@ -334,6 +334,10 @@ class GPUOrchestrator:
                         ic.position += ic.velocity * dt * 0.01
                     if distance < ic.kill_radius:
                         if np.random.random() < module.kill_probability:
+                            # Out of the snapshot before the queued event
+                            # lands, as in ImmuneModule.update: one target
+                            # dies once however many cells reach it.
+                            cancer_cells.pop(ic.target_cell_id, None)
                             module._kill_target(ic, target)
                 else:
                     ic.activated = False
