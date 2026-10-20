@@ -51,6 +51,7 @@ class _CachedBinding:
     affinity_nm: float
     percentile_rank: Optional[float] = None
     presentation_score: Optional[float] = None
+    processing_score: Optional[float] = None
     method: str = "unknown"
 
 # Amino acid hydrophobicity index (Kyte-Doolittle scale)
@@ -97,6 +98,16 @@ class Neoantigen:
     """Scorer's combined binding-and-processing score (0-1, higher = more
     likely presented). None when the scorer does not produce one, which is
     the case on the approximate position-weight-matrix path."""
+    processing_score: Optional[float] = None
+    """How likely this peptide is to be produced and delivered to the MHC
+    at all -- proteasomal cleavage and TAP transport -- separately from how
+    well it then binds.
+
+    A candidate rejected on affinity may still be worth a look on another
+    allele; one that would never be cut out of the protein is not a
+    candidate at any affinity -- the score is a property of the peptide
+    and comes back the same on every allele. None on the approximate
+    path."""
     all_allele_scores: Dict[str, float] = field(default_factory=dict)
 
     # Classification
@@ -196,6 +207,13 @@ class PredictionDiagnostics:
 
     genes_with_partial_reference: List[str] = field(default_factory=list)
     mismatch_details: List[str] = field(default_factory=list)
+
+    ranking_basis: str = ""
+    """Which quantity put the candidate list in the order it is in:
+    ``presentation_score`` when the trained scorer supplied one for every
+    candidate, otherwise ``affinity_nm``. The two are not interchangeable,
+    so a caller comparing two runs' top candidates needs to know which
+    ordering it is looking at."""
 
     @property
     def total_skipped(self) -> int:
@@ -341,6 +359,10 @@ class NeoantigenPredictor:
                 ),
                 presentation_score=(
                     self._calibrated(getattr(result, "presentation_score", None))
+                    if trained else None
+                ),
+                processing_score=(
+                    self._calibrated(getattr(result, "processing_score", None))
                     if trained else None
                 ),
                 method=method,
@@ -543,6 +565,7 @@ class NeoantigenPredictor:
                     # supply one, which is the approximate path.
                     scored = self._binding_cache.get((mut_pep, best_allele))
                     presentation_score = scored.presentation_score if scored else None
+                    processing_score = scored.processing_score if scored else None
                     if scored is not None and scored.percentile_rank is not None:
                         percentile = scored.percentile_rank
                     else:
@@ -560,6 +583,7 @@ class NeoantigenPredictor:
                         binding_affinity_nm=best_affinity,
                         percentile_rank=percentile,
                         presentation_score=presentation_score,
+                        processing_score=processing_score,
                         all_allele_scores=allele_scores,
                         is_strong_binder=is_strong,
                         is_weak_binder=is_weak,
@@ -575,20 +599,45 @@ class NeoantigenPredictor:
             if len(all_neoantigens) > before:
                 diag.variants_yielding_peptides += 1
 
-        # Sort by binding affinity (lower = better)
-        # Primary key is unchanged, so any ordering that was already
-        # determined by affinity stays as it was. The allele frequency
-        # only breaks ties -- and the PWM scorer quantises affinity to a
-        # handful of values, so ties are common there. Among equally
-        # good binders, prefer the variant present in more of the tumour;
-        # records without a frequency sort last rather than first.
-        all_neoantigens.sort(
-            key=lambda n: (
-                n.binding_affinity_nm,
+        # Rank on the presentation score where there is one, and only
+        # fall back to raw affinity where there is not.
+        #
+        # Raw IC50 is not comparable across alleles: the same nanomolar
+        # figure is a good binder for one allele's groove and a poor one
+        # for another's, so ordering a mixed-allele list by it ranks the
+        # alleles as much as the peptides. The trained scorer's
+        # presentation score is on one scale for all of them, and it also
+        # folds in whether the peptide would be produced at all, which
+        # affinity cannot see -- a tight binder nothing ever cuts out of
+        # the protein is not a candidate. MHCflurry's own documentation
+        # recommends it over affinity for exactly this purpose.
+        #
+        # The fallback is the previous behaviour, unchanged, for the
+        # approximate path, which produces no presentation score. Mixing
+        # the two orderings in one list would be meaningless, so this is
+        # all-or-nothing and the basis is recorded either way.
+        by_presentation = bool(all_neoantigens) and all(
+            n.presentation_score is not None for n in all_neoantigens
+        )
+        diag.ranking_basis = (
+            "presentation_score" if by_presentation else "affinity_nm"
+        )
+
+        # The allele frequency only breaks ties -- and the PWM scorer
+        # quantises affinity to a handful of values, so ties are common
+        # there. Among equally good candidates, prefer the variant present
+        # in more of the tumour; records without a frequency sort last
+        # rather than first.
+        def _rank(n):
+            primary = (-n.presentation_score if by_presentation
+                       else n.binding_affinity_nm)
+            return (
+                primary,
                 -(n.variant_allele_frequency
                   if n.variant_allele_frequency is not None else -1.0),
             )
-        )
+
+        all_neoantigens.sort(key=_rank)
 
         # Remove duplicates (same peptide, same allele)
         seen = set()
@@ -727,6 +776,9 @@ class NeoantigenPredictor:
                         if trained else None),
                     presentation_score=(
                         self._calibrated(getattr(result, "presentation_score", None))
+                        if trained else None),
+                    processing_score=(
+                        self._calibrated(getattr(result, "processing_score", None))
                         if trained else None),
                     method=method,
                 )

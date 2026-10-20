@@ -171,6 +171,28 @@ class BindingResult:
     is_weak_binder: bool
     """IC50 < 500 nM."""
 
+    processing_score: Optional[float] = None
+    """How likely the antigen-processing machinery is to deliver this peptide
+    to the MHC at all -- proteasomal cleavage and TAP transport -- learned
+    from mass-spec eluted ligands, independent of how well it then binds.
+
+    It is what distinguishes a peptide that fails because nothing would ever
+    cut it out from one that is produced and simply does not fit the groove,
+    and the two call for different things: the first is not a candidate at
+    any affinity, the second may be one on another allele.
+
+    It is a property of the peptide, not of the pair. Measured across
+    HLA-A*02:01, A*24:02 and B*07:02, the predictor returns the same value
+    for a given peptide on all three (NLVPMVATV: 0.5330 on each), because
+    cleavage and transport happen before the MHC is involved. So a low
+    score rules a peptide out on every allele at once, where a poor
+    affinity only rules out the one.
+
+    ``None`` on the approximate path, which models binding only. A motif
+    score carries no information about processing, so there is nothing
+    honest to put here.
+    """
+
     method: str = "mhcflurry"
     """'mhcflurry' or 'pwm' (fallback)."""
 
@@ -181,6 +203,8 @@ class BindingResult:
             "affinity_nm": round(self.affinity_nm, 2),
             "percentile_rank": round(self.percentile_rank, 4),
             "presentation_score": round(self.presentation_score, 6),
+            "processing_score": (round(self.processing_score, 6)
+                                 if self.processing_score is not None else None),
             "is_strong_binder": self.is_strong_binder,
             "is_weak_binder": self.is_weak_binder,
             "method": self.method,
@@ -312,6 +336,7 @@ def _predict_mhcflurry(peptide: str, hla_allele: str) -> BindingResult:
             affinity_nm=affinity,
             percentile_rank=percentile,
             presentation_score=presentation,
+            processing_score=_optional_float(row, "processing_score"),
             is_strong_binder=affinity < 50,
             is_weak_binder=affinity < 500,
             method="mhcflurry",
@@ -319,6 +344,24 @@ def _predict_mhcflurry(peptide: str, hla_allele: str) -> BindingResult:
     except Exception as e:
         logger.warning("MHCflurry prediction failed for %s/%s: %s", peptide, allele, e)
         return _predict_pwm_fallback(peptide, hla_allele)
+
+
+def _optional_float(row, column: str) -> Optional[float]:
+    """``column`` as a float, or None if the predictor did not return it.
+
+    Unlike the percentile, an absent processing score has an honest
+    representation -- nothing -- so a miss needs no warning. The caller
+    must not substitute a number for it: a presented peptide and one that
+    was never produced are different outcomes.
+    """
+    value = row.get(column)
+    if value is None:
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if value != value else value          # NaN is an absence
 
 
 #: Reported once if the predictor stops returning the percentile column.
@@ -437,6 +480,7 @@ def _predict_mhcflurry_batch(
                 affinity_nm=affinity,
                 percentile_rank=_presentation_percentile(row),
                 presentation_score=float(row.get("presentation_score", 0)),
+                processing_score=_optional_float(row, "processing_score"),
                 is_strong_binder=affinity < 50,
                 is_weak_binder=affinity < 500,
                 method="mhcflurry",
