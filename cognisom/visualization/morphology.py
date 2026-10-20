@@ -549,10 +549,25 @@ def _b_coccus_chain(g, seed):
 
 
 def _b_coccus_cluster(g, seed):
+    """Staphylococcus: cocci dividing in several planes, so they stay in
+    an irregular cluster rather than a chain or a pair.
+
+    The centres were drawn from an unbounded normal, so a tail draw put a
+    coccus past the edge of the grid and it came out sliced flat -- 21
+    voxels of it against the -x face. Clamping the draw keeps the whole
+    cluster inside, and keeping the cocci touching is what makes it a
+    cluster rather than scattered cells.
+    """
     rng = np.random.default_rng(seed)
     out = np.zeros(g.shape[:3], bool)
+    radius = 0.21
+    reach = 0.92 - radius                 # the furthest a centre may sit
     for _ in range(11):
-        out |= _sphere(g, rng.normal(scale=0.36, size=3), 0.21)
+        centre = rng.normal(scale=0.34, size=3)
+        length = float(np.linalg.norm(centre))
+        if length > reach:
+            centre *= reach / length
+        out |= _sphere(g, centre, radius)
     return {1: out}
 
 
