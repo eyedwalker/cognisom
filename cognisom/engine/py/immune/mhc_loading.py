@@ -150,6 +150,19 @@ class MHCLoader:
         This is the entrypoint the cellular module calls once per cell
         per update step to populate ``mhc1_displayed_peptides``.
         """
+        peptides = list(peptides)
+        # One batched call for every pair first. MHCflurry is a neural
+        # network whose per-invocation overhead dwarfs the marginal cost of
+        # another peptide, so scoring pairs one at a time is the difference
+        # between seconds and minutes -- the neoantigen path already learned
+        # this (NeoantigenPredictor._warm_binding_cache), but this loop,
+        # which is the one the cellular module runs on every mutation,
+        # still asked pair by pair. It blew the 120 s timeout on the
+        # nine-module fixture in CI, where the real predictor runs. A miss
+        # just falls through to the per-pair path below.
+        self._scorer._warm_binding_cache(
+            [p.sequence for p in peptides], hla_alleles,
+        )
         out: List[MHCPresentation] = []
         for pep in peptides:
             for pres in self.score_peptide(pep, hla_alleles):

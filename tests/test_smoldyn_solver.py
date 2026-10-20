@@ -811,7 +811,26 @@ def _assert_same_state(a, b, label):
     assert np.array_equal(al_a, al_b), f"{label}: alive differs"
     assert np.array_equal(sp_a, sp_b), f"{label}: species differs"
     live = al_a == 1
-    assert np.array_equal(pos_a[live], pos_b[live]), f"{label}: positions differ"
+    want, got = pos_b[live], pos_a[live]
+    if np.array_equal(got, want):
+        return
+    # Say what differs. Printing the two arrays is useless here: they agree
+    # to repr precision, so a failure reads as two identical arrays, which
+    # is how this went undiagnosed in CI. A difference of a few ULPs is a
+    # rounding difference between the two code paths on that machine; a
+    # large one is a real divergence, and the size tells them apart.
+    diff = np.abs(got.astype(np.float64) - want.astype(np.float64))
+    worst = int(np.argmax(diff))
+    row, col = divmod(worst, got.shape[1])
+    scale = float(np.abs(want).max())
+    ulp = float(np.spacing(np.float32(scale))) or float(np.spacing(np.float32(1.0)))
+    raise AssertionError(
+        f"{label}: positions differ in {int((diff > 0).sum())} of "
+        f"{diff.size} components; max |diff| {diff.max():.3e} "
+        f"({diff.max() / ulp:.1f} ULP at |pos| <= {scale:g}) at live row "
+        f"{row} axis {col}: vectorised {got[row, col]!r} vs reference "
+        f"{want[row, col]!r}"
+    )
 
 
 def _binding_system(radius=0.2, domain=10.0, diffusion=1.0):

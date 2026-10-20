@@ -691,6 +691,24 @@ class NeoantigenPredictor:
             try:
                 result = predict_binding(peptide, hla_allele)
                 self._binding_method = "mhcflurry-2.0.6"
+                # Remember it. This read the cache and never filled it, so
+                # every repeat of a (peptide, allele) pair paid another
+                # network invocation -- and in a simulation the same
+                # mutation's peptides are re-scored on every cell on every
+                # step. Only the trained scorer's percentile and
+                # presentation score are kept; the approximate path reports
+                # placeholders for both, and storing those as if calibrated
+                # is how an approximation comes to be read as a prediction.
+                method = getattr(result, "method", "unknown")
+                trained = method == "mhcflurry"
+                self._binding_cache[(peptide, hla_allele)] = _CachedBinding(
+                    affinity_nm=result.affinity_nm,
+                    percentile_rank=(getattr(result, "percentile_rank", None)
+                                     if trained else None),
+                    presentation_score=(getattr(result, "presentation_score", None)
+                                        if trained else None),
+                    method=method,
+                )
                 return result.affinity_nm
             except MHCflurryUnavailableError:
                 raise

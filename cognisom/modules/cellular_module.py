@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
+import logging
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
@@ -33,6 +34,11 @@ from cognisom.engine.py.molecular.peptidome import (
 # panel used by the neoantigen vaccine pipeline (HLA-A/B/C). Override
 # via module config 'hla_alleles'.
 DEFAULT_HLA_ALLELES = ("HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02")
+
+logger = logging.getLogger(__name__)
+
+#: (gene, mutation) pairs already reported as presenting nothing.
+_NO_BINDER_REPORTED: set = set()
 
 
 # Oncogenes known to drive intrinsic PD-L1 expression (Type III TME
@@ -746,6 +752,32 @@ class CellularModule(SimulationModule):
         # downstream TCR matching.
         presentations = self._mhc_loader.score_all(peptides, self.hla_alleles)
         if not presentations:
+            # Peptides were generated and none of them binds this patient's
+            # panel, which is a real and interesting outcome -- it is how an
+            # HLA-mismatched mutation stays invisible to T cells -- but
+            # silently returning makes it indistinguishable from a broken
+            # scorer. Say which scorer ran and how close the best peptide
+            # came. Once per (gene, mutation): the same mutation is
+            # re-scored on every cell on every step, and the second pass is
+            # free because score_all has already cached every pair.
+            key = (gene, mutation_label)
+            if key not in _NO_BINDER_REPORTED:
+                _NO_BINDER_REPORTED.add(key)
+                scored = self._mhc_loader.score_all(
+                    peptides, self.hla_alleles, include_non_binders=True)
+                best = min(scored, key=lambda p: p.ic50_nm, default=None)
+                logger.info(
+                    "%s %s: %d peptides, none binding %s (weak-binder "
+                    "threshold %.0f nM). Best was %s on %s at %.0f nM. "
+                    "Scorer: %s.",
+                    gene, mutation_label, len(peptides),
+                    "/".join(self.hla_alleles),
+                    self._mhc_loader.weak_threshold_nm,
+                    best.peptide.sequence if best else "-",
+                    best.hla_allele if best else "-",
+                    best.ic50_nm if best else float("nan"),
+                    getattr(self._mhc_loader._scorer, "_binding_method", "unknown"),
+                )
             return
         presentations.sort(key=lambda p: p.ic50_nm)
         kept = presentations[:self.max_displayed_per_mutation]
