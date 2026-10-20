@@ -108,6 +108,24 @@ class EntityGeometry:
         return sum(v for v, _t in self.parts.values())
 
 
+def shape_seed(name: str) -> int:
+    """A stable per-entity seed for the procedural builders.
+
+    Everything was built with seed 0, so two entities sharing a
+    mesh_type and a scale got byte-identical meshes: 26 of the 56
+    rendered entities had a twin, including eight smooth_sphere cells at
+    8 um and eight more at 7 um. That is the renderer destroying a
+    distinction rather than the library failing to make one -- a
+    population of lymphocytes is not one lymphocyte copied.
+
+    It adds no information. The cells still differ only in the ways the
+    library records. It stops them being the SAME OBJECT, which is a
+    different claim and a false one.
+    """
+    import hashlib
+    return int.from_bytes(hashlib.sha256(name.encode()).digest()[:4], "big")
+
+
 def _safe_name(name: str) -> str:
     out = "".join(c if c.isalnum() else "_" for c in name)
     while "__" in out:
