@@ -83,10 +83,16 @@ def test_points_land_on_the_surface(lymphocyte):
     rng = np.random.default_rng(0)
     points, normals = cd.sample_surface(v, f, 400, rng)
     assert len(points) == 400 and len(normals) == 400
-    # every point is within a voxel of some surface vertex
-    d = np.sqrt(((points[:, None, :] - v[None, ::5, :]) ** 2).sum(-1)).min(1)
-    assert d.max() < SCALE / GRID * 2, d.max()
     assert np.allclose(np.linalg.norm(normals, axis=1), 1.0, atol=1e-5)
+
+    # Every point lies on the surface. The yardstick is the mesh's own
+    # triangle size, not a voxel: a point in the middle of a triangle is
+    # legitimately that far from the nearest VERTEX, so a fixed tolerance
+    # measures the triangulation rather than the sampling.
+    from scipy.spatial import cKDTree
+    edge = np.linalg.norm(v[f[:, 0]] - v[f[:, 1]], axis=1).mean()
+    distance, _ = cKDTree(v).query(points)
+    assert distance.max() < edge * 1.5, (distance.max(), edge)
 
 
 def test_sampling_is_by_area_not_by_vertex(lymphocyte):

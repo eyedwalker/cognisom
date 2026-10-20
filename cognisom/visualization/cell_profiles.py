@@ -182,11 +182,11 @@ class Profile:
 #: mitochondria and little else. The resting lymphocyte is the cell this
 #: whole module exists for, because it is the eighteen-way collision.
 _LYMPHOCYTE = dict(
-    microvilli_count=220,
-    microvillus_length_um=0.45,
-    microvillus_radius_um=0.045,
+    microvilli_count=320,
+    microvillus_length_um=0.38,
+    microvillus_radius_um=0.042,
     mitochondrial_volume_fraction=0.03,
-    mitochondrion_radius_um=0.18,
+    mitochondrion_radius_um=0.15,
     receptor_stud_count=90,
 )
 
@@ -279,7 +279,7 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     if placed["granule"] and set(placed["granule"]) & LYTIC_CARGO:
         cargo = sorted(set(placed["granule"]) & LYTIC_CARGO)
         base["lytic_granule_count"] = 24
-        base["lytic_granule_radius_um"] = 0.25
+        base["lytic_granule_radius_um"] = 0.19
         why.append("carries " + ", ".join(cargo) +
                    ", so it holds lytic granules")
     if placed["nucleus"]:

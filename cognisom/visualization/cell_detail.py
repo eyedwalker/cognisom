@@ -290,12 +290,27 @@ def organelles(mask: np.ndarray, *, scale_um: float, count: int,
     picking one that looks right.
     """
     rng = np.random.default_rng(seed)
-    positions = sample_interior(mask, count, rng, scale_um,
-                                margin=radius_um, frame=frame)
+    # Sample over the WHOLE compartment and then fit each organelle to the
+    # room it landed in, rather than excluding everywhere too shallow to
+    # hold a full-sized one.
+    #
+    # Excluding was the obvious thing and it clumps badly: a lymphocyte's
+    # cytoplasm is a thin rim around an off-centre nucleus, so a margin of
+    # one organelle radius disqualified 44% of it -- all on the thin side
+    # -- and drove every mitochondrion into the same crescent. Measured
+    # clumping went from 0.16 to 0.32 on a scale where 0 is even.
+    #
+    # Clamping is also the more honest rule: an organelle occupies the
+    # space available to it, so the size distribution that comes out
+    # reflects the shape of the compartment instead of being imposed.
+    positions = sample_interior(mask, count, rng, scale_um, frame=frame)
     if len(positions) == 0:
         return Instances(positions, np.zeros((0, 4), np.float32), positions)
     radii = radius_um * np.clip(
         1.0 + rng.normal(scale=radius_spread, size=len(positions)), 0.3, 2.2)
+    headroom = _depth_at(mask, positions, scale_um, frame)
+    if headroom is not None:
+        radii = np.minimum(radii, np.maximum(headroom, radius_um * 0.25))
     # Unit sphere prototype, so the scale IS the radius; mitochondria are
     # given a long axis because they are not round.
     scales = np.stack([radii, radii, radii], axis=1)
@@ -305,6 +320,43 @@ def organelles(mask: np.ndarray, *, scale_um: float, count: int,
                      scales.astype(np.float32))
 
 
+def _depth_at(mask: np.ndarray, points: np.ndarray, scale_um: float,
+              frame: Optional[Tuple[float, np.ndarray]]) -> Optional[np.ndarray]:
+    """How far each point is from leaving ``mask``, in micrometres."""
+    try:
+        from scipy.ndimage import distance_transform_edt
+    except ImportError:                             # pragma: no cover
+        return None
+    resolution = (frame[0] if frame is not None
+                  else float(scale_um) / mask.shape[0])
+    offset = frame[1] if frame is not None else None
+    depth = distance_transform_edt(mask) * resolution
+    idx = np.asarray(points, np.float64)
+    idx = (idx - offset) / resolution if offset is not None else \
+        (idx / (scale_um / 2.0) + 1.0) * (mask.shape[0] - 1) / 2.0
+    idx = np.rint(idx).astype(int)
+    inside = ((idx >= 0) & (idx < np.array(mask.shape))).all(axis=1)
+    out = np.zeros(len(idx))
+    good = idx[inside]
+    out[inside] = depth[good[:, 0], good[:, 1], good[:, 2]]
+    return out
+
+
+#: Most instances drawn for one organelle population in one cell.
+#:
+#: The fraction is right and the count that follows from it is unviewable.
+#: A 20 um macrophage holds roughly 2,000 um^3 of cytoplasm, so 6% of it
+#: in 0.26 um mitochondria is about 1,600 of them -- which is the right
+#: order for a real cell, and as 1,600 opaque spheres it fills the cell
+#: solid and hides everything else including the nucleus.
+#:
+#: So the count is capped for drawing. The cap is reported, never
+#: silent: :func:`volume_fraction_count` returns what the fraction asks
+#: for, and a caller that caps is expected to record both numbers. A
+#: truncation nobody mentions reads as "this is the whole population".
+DRAW_CAP = 260
+
+
 def volume_fraction_count(fraction: float, compartment_um3: float,
                           radius_um: float) -> int:
     """How many spheres of ``radius_um`` fill ``fraction`` of a volume.
@@ -312,11 +364,23 @@ def volume_fraction_count(fraction: float, compartment_um3: float,
     The honest direction of the calculation: morphometry reports a volume
     fraction and a size, and the count follows. Choosing a count directly
     is choosing a fraction without saying so.
+
+    This is the TRUE count. See :data:`DRAW_CAP` for why a caller may draw
+    fewer, and :func:`capped` for the pair.
     """
     if radius_um <= 0 or compartment_um3 <= 0 or fraction <= 0:
         return 0
     one = 4.0 / 3.0 * math.pi * radius_um ** 3
     return max(0, int(round(fraction * compartment_um3 / one)))
+
+
+def capped(count: int, cap: int = DRAW_CAP) -> Tuple[int, int]:
+    """``(draw, true)``: how many to draw and how many there are.
+
+    Returning both is the point. A caller that takes only the first has
+    to discard the second deliberately.
+    """
+    return (min(count, cap), count)
 
 
 def mask_volume_um3(mask: np.ndarray, scale_um: float) -> float:

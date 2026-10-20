@@ -70,6 +70,56 @@ def _sphere(g, centre=(0, 0, 0), r=1.0, squash=(1, 1, 1)):
     return np.linalg.norm(d, axis=-1) <= r
 
 
+def _rounded_box(g, half, roundness=5.0, centre=(0, 0, 0)):
+    """A superellipsoid: a box with rounded edges.
+
+    Epithelial cells were built as literal boxes -- ``abs(x) < 0.62`` and
+    the same in y and z -- which renders as a glass cube with sharp 90
+    degree corners. No cell has those. A superellipsoid keeps the flat
+    faces that make cuboidal epithelium cuboidal and rounds the edges,
+    which is both what the tissue looks like and what distinguishes a
+    cuboidal cell from a columnar one in the first place.
+
+    ``roundness`` 2 is an ellipsoid, large is a box; 4-6 reads as a cell.
+    """
+    d = np.abs((g - np.asarray(centre, np.float32))
+               / np.asarray(half, np.float32))
+    return (d ** roundness).sum(axis=-1) <= 1.0
+
+
+def _helix(g, start, axis, length, turns, amplitude, radius):
+    """A helical filament: a bacterial flagellum.
+
+    Flagella were a random walk, which wandered out past the grid edge and
+    came back as a clipped fragment floating beside the cell. A real
+    flagellum is a helix of fairly regular pitch, which is also what makes
+    it legible as a flagellum rather than as debris.
+    """
+    axis = np.asarray(axis, np.float64)
+    axis = axis / np.linalg.norm(axis)
+    tmp = np.array([0.0, 0.0, 1.0])
+    if abs(axis @ tmp) > 0.9:
+        tmp = np.array([0.0, 1.0, 0.0])
+    u = np.cross(axis, tmp); u /= np.linalg.norm(u)
+    v = np.cross(axis, u)
+
+    out = np.zeros(g.shape[:3], bool)
+    steps = 26
+    prev = None
+    for i in range(steps + 1):
+        t = i / steps
+        angle = 2.0 * np.pi * turns * t
+        # The amplitude eases in, so the filament leaves the cell along
+        # its axis rather than starting mid-swing.
+        a = amplitude * min(1.0, t * 3.0)
+        point = (np.asarray(start, np.float64) + axis * length * t
+                 + u * np.cos(angle) * a + v * np.sin(angle) * a)
+        if prev is not None:
+            out |= _capsule(g, prev, point, radius)
+        prev = point
+    return out
+
+
 def _capsule(g, a, b, r):
     """Filled capsule between two points: the body of a rod bacterium."""
     a = np.asarray(a, np.float32); b = np.asarray(b, np.float32)
@@ -88,6 +138,31 @@ def _lobes(g, n_lobes, radius, spread, seed):
              float(rng.uniform(-0.12, 0.12)))
         out |= _sphere(g, c, radius)
     return out
+
+
+def _veil(g, centre, direction, reach, width, thickness):
+    """A flat sheet extending along ``direction``: a lamellipodium.
+
+    A macrophage's processes are broad flattened veils, not rods. They
+    were nine radial capsules of radius 0.14-0.24, which renders as a ball
+    with sausages stuck in it -- closer to a jack than to a cell, and it
+    loses the one thing the shape is for, which is the large thin leading
+    edge a phagocyte crawls and engulfs on.
+
+    An axis-aligned squash cannot express this, because each veil points
+    somewhere different, so the ellipsoid is built in its own frame.
+    """
+    u = np.asarray(direction, np.float64)
+    u = u / np.linalg.norm(u)
+    tmp = np.array([0.0, 0.0, 1.0])
+    if abs(u @ tmp) > 0.9:
+        tmp = np.array([0.0, 1.0, 0.0])
+    w = np.cross(u, tmp); w /= np.linalg.norm(w)
+    n = np.cross(u, w)
+    basis = np.stack([u, w, n]).astype(np.float32)        # rows
+    d = (g - np.asarray(centre, np.float32)) @ basis.T
+    radii = np.asarray([reach, width, thickness], np.float32)
+    return ((d / radii) ** 2).sum(axis=-1) <= 1.0
 
 
 def _spikes(g, n, inner, outer, thickness, seed):
@@ -173,13 +248,26 @@ def _b_bilobed_granular(g, seed):
 
 
 def _b_ruffled_pseudopod(g, seed):
-    """Macrophage: a body throwing broad irregular processes."""
+    """Macrophage: a spread body with broad lamellipodia and ruffles."""
     rng = np.random.default_rng(seed)
-    body = _sphere(g, r=0.66)
-    for _ in range(9):
-        d = rng.normal(size=3); d /= np.linalg.norm(d)
-        body |= _capsule(g, d * 0.3, d * rng.uniform(0.85, 1.0), rng.uniform(0.14, 0.24))
-    return {1: body, 2: _sphere(g, (0.1, 0.05, 0), 0.30)}
+    # Adherent macrophages spread, so the body is flattened rather than
+    # round, and the veils come off its edge.
+    body = _sphere(g, r=0.60, squash=(1.0, 1.0, 0.62))
+    for k in range(6):
+        angle = 2.0 * np.pi * k / 6.0 + rng.uniform(-0.3, 0.3)
+        tilt = rng.uniform(-0.28, 0.28)
+        d = np.array([np.cos(angle), np.sin(angle), tilt])
+        d /= np.linalg.norm(d)
+        body |= _veil(g, d * 0.42, d,
+                      reach=rng.uniform(0.46, 0.60),
+                      width=rng.uniform(0.30, 0.44),
+                      thickness=rng.uniform(0.07, 0.11))
+    # Membrane ruffles: folds standing off the dorsal surface, which is
+    # what "ruffled" names and what a phagocyte's surface actually does.
+    x, y, z = g[..., 0], g[..., 1], g[..., 2]
+    folds = np.sin(x * 11.0 + 0.7) * np.sin(y * 9.0) > 0.35
+    body |= folds & _sphere(g, (0, 0, 0.10), 0.80, squash=(1.0, 1.0, 0.72))
+    return {1: body, 2: _sphere(g, (0.10, 0.05, 0), 0.30)}
 
 
 def _b_irregular_ruffled(g, seed):
@@ -201,17 +289,55 @@ def _b_stellate_branching(g, seed):
 def _b_eccentric_nucleus_er(g, seed):
     """Plasma cell: nucleus pushed to one side, ER filling the rest."""
     body = _sphere(g, r=0.92)
-    nuc = _sphere(g, (-0.40, 0.0, 0.0), 0.38)
+    nuc = _sphere(g, (-0.34, 0.0, 0.0), 0.42)
+    # Rough ER is stacked lamellae -- flattened cisternae wrapped round
+    # the nucleus -- not a cloud. It was a spherical shell speckled at 55%
+    # random, which renders as one solid blob filling half the cell and
+    # says nothing about what an ER is. Concentric sheets read as the
+    # stack they are, and are what makes a plasma cell recognisable.
     rng = np.random.default_rng(seed)
-    er = _sphere(g, (0.18, 0, 0), 0.62) & ~_sphere(g, (0.18, 0, 0), 0.30)
-    er &= rng.random(g.shape[:3]) < 0.55
+    # Cisternae wrapped round the nucleus, which is how rough ER is
+    # arranged in a plasma cell. They must be THIN: at grid 64 a voxel is
+    # 0.031 of the grid, so a period of 0.14 with a quarter duty cycle is
+    # a sheet about one voxel thick with three voxels of lumen between.
+    # Concentric shells 8 voxels thick merged into one solid ball that
+    # filled the cell and hid the nucleus.
+    # PARALLEL cisternae, not concentric shells. Concentric shells wrap
+    # the whole cell, so whatever their thickness the outermost one is all
+    # you ever see and the ER reads as a solid ball that hides the
+    # nucleus. Parallel sheets present their EDGES, which is what makes a
+    # stack legible as a stack -- and it is also what rough ER looks like
+    # in a plasma cell: flattened cisternae in register, not onion skin.
+    x, y = g[..., 0], g[..., 1]
+    # tilted slightly off-axis so the stack is never seen exactly
+    # edge-on or exactly face-on from a default view
+    across = 0.94 * y + 0.34 * x
+    period, duty = 0.17, 0.34
+    sheets = np.sin(across * (2.0 * np.pi / period)) > np.cos(np.pi * duty)
+    sheets &= rng.random(g.shape[:3]) < 0.88      # fenestrated
+    # Confined to a stack in the cytoplasm rather than filling the whole
+    # hemisphere. Sheets that reach the membrane on every side still
+    # present a closed outer surface, so the cell reads as a striped ball;
+    # leaving cytoplasm around the stack is what lets the sheets be seen
+    # as sheets, with ends.
+    region = (_sphere(g, (0.30, 0.0, 0.0), 0.60, squash=(1.0, 1.15, 1.15))
+              | _sphere(g, (-0.05, 0.0, 0.0), 0.46))
+    er = sheets & region
     return {1: body, 2: nuc & body, 4: er & body & ~nuc}
 
 
 def _b_elongated_spindle(g, seed):
-    """Fibroblast: a long thin cell with tapered ends."""
+    """Fibroblast: a long thin cell with tapered ends.
+
+    The nucleus has to fit. It was r=0.30 squashed (1.5, 1, 1), giving
+    half-extents (0.45, 0.30, 0.30) inside a body of (0.95, 0.247, 0.19)
+    -- wider than the cell in two axes out of three, so 37% of its voxels
+    lay outside the membrane and it visibly burst through the side. It is
+    also elongated along the cell, as a fibroblast nucleus is.
+    """
     body = _sphere(g, r=0.95, squash=(1.0, 0.26, 0.20))
-    return {1: body, 2: _sphere(g, (0, 0, 0), 0.30, squash=(1.5, 1, 1))}
+    return {1: body,
+            2: _sphere(g, (0, 0, 0), 0.155, squash=(2.4, 1.0, 0.82))}
 
 
 def _b_flat_squamous(g, seed):
@@ -221,21 +347,20 @@ def _b_flat_squamous(g, seed):
 
 def _b_polarized_columnar(g, seed):
     """Columnar epithelium: tall, with the nucleus held basally."""
-    x, y, z = g[..., 0], g[..., 1], g[..., 2]
-    body = (np.abs(x) < 0.40) & (np.abs(y) < 0.40) & (np.abs(z) < 0.95)
-    return {1: body, 2: _sphere(g, (0, 0, -0.52), 0.26)}
+    body = _rounded_box(g, (0.44, 0.44, 0.96), roundness=4.0)
+    return {1: body, 2: _sphere(g, (0, 0, -0.56), 0.28, squash=(1, 1, 1.15))}
 
 
 def _b_cuboidal(g, seed):
-    x, y, z = g[..., 0], g[..., 1], g[..., 2]
-    body = (np.abs(x) < 0.62) & (np.abs(y) < 0.62) & (np.abs(z) < 0.62)
-    return {1: body, 2: _sphere(g, (0, 0, 0), 0.26)}
+    """Basal epithelium: about as tall as it is wide, edges rounded."""
+    body = _rounded_box(g, (0.70, 0.70, 0.70), roundness=4.5)
+    return {1: body, 2: _sphere(g, (0, 0, 0), 0.30)}
 
 
 def _b_cuboidal_tall(g, seed):
-    x, y, z = g[..., 0], g[..., 1], g[..., 2]
-    body = (np.abs(x) < 0.46) & (np.abs(y) < 0.46) & (np.abs(z) < 0.86)
-    return {1: body, 2: _sphere(g, (0, 0, -0.40), 0.24)}
+    """HEV cell: plump for endothelium, which is how it is recognised."""
+    body = _rounded_box(g, (0.52, 0.52, 0.90), roundness=4.0)
+    return {1: body, 2: _sphere(g, (0, 0, -0.38), 0.27)}
 
 
 def _b_flat_activated_adhesion(g, seed):
@@ -283,23 +408,32 @@ def _b_enveloped_pleomorphic(g, seed):
 def _b_bullet_shape(g, seed):
     """Rhabdovirus: one rounded end, one flat."""
     z = g[..., 2]
-    body = _sphere(g, (0, 0, 0.1), 0.80, squash=(0.62, 0.62, 1.0)) & (z > -0.62)
-    return {1: body, 5: _sphere(g, (0, 0, 0.1), 0.34, squash=(0.5, 0.5, 0.9)) & (z > -0.5)}
+    # Rhabdovirus: a cylinder with one hemispherical end and one flat, the
+    # shape the family is named for. Cutting an ellipsoid at z > -0.62
+    # removed almost nothing -- its base was already at -0.70 -- so it
+    # rendered as a rounded capsule with no flat end at all.
+    body = (_capsule(g, (0, 0, -0.30), (0, 0, 0.34), 0.42)
+            & (z > -0.30))
+    core = (_capsule(g, (0, 0, -0.22), (0, 0, 0.26), 0.24) & (z > -0.22))
+    return {1: body, 5: core}
 
 
 # bacteria
 def _b_rod_flagellated(g, seed):
     rng = np.random.default_rng(seed)
-    body = _capsule(g, (-0.50, 0, 0), (0.50, 0, 0), 0.26)
+    body = _capsule(g, (-0.46, 0, 0), (0.46, 0, 0), 0.26)
     fla = np.zeros(g.shape[:3], bool)
-    for k in range(3):
-        prev = np.array([0.52, 0.0, 0.0])
-        d = np.array([1.0, 0.0, 0.0])
-        for i in range(9):
-            d = d + rng.normal(scale=0.42, size=3); d /= np.linalg.norm(d)
-            nxt = prev + d * 0.085
-            fla |= _capsule(g, prev, nxt, 0.028)
-            prev = nxt
+    # Peritrichous: flagella over the whole surface, not one tuft. Each is
+    # a helix, and each stays inside the grid -- the random walk this
+    # replaces reached x = 1.29 on a grid that ends at 1.0, so it was
+    # clipped and rendered as a fragment floating beside the cell.
+    for k in range(5):
+        angle = 2.0 * np.pi * k / 5.0 + 0.3
+        anchor = np.array([0.30 - 0.30 * k / 4.0,
+                           0.22 * np.cos(angle), 0.22 * np.sin(angle)])
+        direction = np.array([0.55, np.cos(angle), np.sin(angle)])
+        fla |= _helix(g, anchor, direction, length=0.62, turns=2.1,
+                      amplitude=0.065, radius=0.022)
     return {1: body, 6: fla}
 
 
@@ -387,6 +521,74 @@ PART_NAMES = {1: "body", 2: "nucleus", 3: "granules", 4: "er",
               5: "capsid", 6: "flagella", 7: "spore"}
 
 
+#: Taubin smoothing passes applied to every extracted surface.
+#:
+#: Marching cubes over an occupancy grid produces terraces: the surface
+#: steps from one voxel layer to the next, and those steps catch the light
+#: as concentric rings. It is the single thing that made these cells read
+#: as contoured blobs rather than cells, and no grid resolution removes it
+#: -- a finer grid makes the steps smaller and more numerous, not absent.
+#:
+#: ``MeshGenerator`` has had a ``smoothing`` parameter since it was
+#: written, documented and defaulting to 0.5. It is assigned to
+#: ``self.smoothing`` and read nowhere, and the ``smooth_mesh`` method
+#: beside it is never called -- and needs trimesh, which is not installed.
+#: So nothing has ever been smoothed.
+#:
+#: 25 is where the benefit stops. Measured on a lymphocyte nucleus at
+#: grid 64, as mean local deviation from the neighbour average:
+#:
+#:      passes    ripple    volume drift
+#:           0    0.0290           --
+#:           8    0.0109        +0.02%
+#:          14    0.0076        +0.04%
+#:          25    0.0045        -0.04%
+#:          40    0.0042        +0.11%
+#:          60    0.0037        +0.17%
+#:
+#: A 6.5-fold reduction by 25 and almost nothing after, while the volume
+#: holds to a fifth of a percent throughout -- which is the property a
+#: plain Laplacian smoother would not have.
+SMOOTH_PASSES = 25
+
+#: Taubin's two step sizes. A plain Laplacian smoother shrinks a closed
+#: surface a little on every pass, so a cell smoothed enough to lose its
+#: terraces would also have lost volume -- and volume here is a quantity
+#: other code reads. Taubin alternates a positive step with a slightly
+#: larger negative one, which cancels the shrinkage while still removing
+#: the high-frequency steps.
+TAUBIN_LAMBDA = 0.5
+TAUBIN_MU = -0.53
+
+
+def smooth_surface(vertices: np.ndarray, triangles: np.ndarray,
+                   passes: int = SMOOTH_PASSES,
+                   lam: float = TAUBIN_LAMBDA,
+                   mu: float = TAUBIN_MU) -> np.ndarray:
+    """Taubin-smoothed vertices. Topology is untouched.
+
+    Each pass moves every vertex a fraction of the way towards the mean of
+    its neighbours, alternating the sign so the volume comes back.
+    """
+    if len(vertices) == 0 or len(triangles) == 0 or passes <= 0:
+        return vertices
+
+    edges = np.vstack([triangles[:, [0, 1]], triangles[:, [1, 2]],
+                       triangles[:, [2, 0]]])
+    edges = np.vstack([edges, edges[:, ::-1]])
+    edges = np.unique(edges, axis=0)            # each neighbour once
+    counts = np.bincount(edges[:, 0], minlength=len(vertices))
+    counts = np.maximum(counts, 1)[:, None]
+
+    out = np.asarray(vertices, np.float64).copy()
+    for step in range(passes):
+        neighbour_sum = np.zeros_like(out)
+        np.add.at(neighbour_sum, edges[:, 0], out[edges[:, 1]])
+        delta = neighbour_sum / counts - out
+        out += (lam if step % 2 == 0 else mu) * delta
+    return out
+
+
 def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID
                 ) -> Tuple[Dict[str, np.ndarray], bool]:
     """The builder's own occupancy masks, before any surface is extracted.
@@ -408,7 +610,8 @@ def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID
 
 
 def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
-                grid: int = GRID, cut: bool = False
+                grid: int = GRID, cut: bool = False,
+                smooth: int = SMOOTH_PASSES
                 ) -> Tuple[Dict[str, Tuple[np.ndarray, np.ndarray]], bool]:
     """Geometry per named part, so a nucleus can be coloured as a nucleus.
 
@@ -458,8 +661,10 @@ def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
             off += len(v)
         if not verts:
             continue
+        V = np.concatenate(verts)
+        T = np.concatenate(tris)
         out[PART_NAMES.get(label, str(label))] = (
-            np.concatenate(verts), np.concatenate(tris))
+            smooth_surface(V, T, passes=smooth), T)
 
     if out:
         centre = np.concatenate([v for v, _ in out.values()]).mean(axis=0)
