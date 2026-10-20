@@ -45,7 +45,9 @@ from cognisom.gpu.multi_gpu_diffusion import MultiGPUDiffusionSolver
 
 #: cfg.dt is hours; diffusion coefficients are um^2/s.
 _SECONDS_PER_HOUR = 3600.0
-from cognisom.gpu.multi_gpu_mechanics import MultiGPUCellMechanics, MechanicsConfig
+from cognisom.gpu.multi_gpu_mechanics import (
+    ADHESION_RANGE_UM, MultiGPUCellMechanics, MechanicsConfig,
+)
 
 log = logging.getLogger(__name__)
 
@@ -126,7 +128,9 @@ class TissueSimulationEngine:
                            generates random positions within tissue volume.
             cell_types: (N,) int32 archetype indices. If None, assigned
                        according to config.initial_composition.
-            cell_radii: (N,) float32 radii. If None, uses config default.
+            cell_radii: (N,) float32 radii. If None, each cell takes its
+                       archetype's radius (config.radius_for), which is
+                       cell_radius_um unless the config carries better.
         """
         cfg = self._config
         log.info(
@@ -164,7 +168,12 @@ class TissueSimulationEngine:
         elif cell_types is None:
             cell_types = np.zeros(len(cell_positions), dtype=np.int32)
 
-        # 6. Distribute cells across GPUs
+        # 6. Distribute cells across GPUs. The distributor's own default was
+        # a literal 5.0, so cfg.cell_radius_um was never read and no
+        # archetype could have its own size.
+        if cell_radii is None:
+            cell_radii = self._radius_by_type(int(np.max(cell_types, initial=0)) + 1)[
+                np.asarray(cell_types, dtype=np.int64)]
         self._cell_arrays = self._distributor.initialize_cells(
             cell_positions, cell_types, cell_radii,
         )
@@ -184,9 +193,27 @@ class TissueSimulationEngine:
 
         # 8. Initialize mechanics
         if cfg.enable_mechanics:
+            mechanics_config = MechanicsConfig.default()
+            # The neighbour search sees every contact only while its bucket
+            # is at least the contact range of the largest cell; below that
+            # it falls back to the original 27-bucket stencil, misses
+            # included. 15 um covers 5 um cells and nothing above 6.5 um, so
+            # size it to the largest radius present. Radii only shrink after
+            # this (a daughter is smaller than its parent).
+            r_max = float(np.max(cell_radii, initial=cfg.cell_radius_um))
+            contact_range = 2.0 * r_max + ADHESION_RANGE_UM
+            mechanics_config.bucket_size_um = max(
+                mechanics_config.bucket_size_um, contact_range)
+            if contact_range > cfg.ghost_width_cells_um:
+                log.warning(
+                    "cells of radius %.1f um have a %.1f um contact range, "
+                    "beyond the %.1f um ghost region: contacts across "
+                    "partition boundaries will be missed. Raise "
+                    "ghost_width_cells_um.", r_max, contact_range,
+                    cfg.ghost_width_cells_um)
             self._mechanics = MultiGPUCellMechanics(
                 self._backend, self._decomposer, self._ghost_exchanger,
-                config=MechanicsConfig.default(),
+                config=mechanics_config,
             )
 
         self._initialized = True
@@ -632,6 +659,21 @@ class TissueSimulationEngine:
                 full_alive = self._backend.to_numpy(ca.alive)
                 full_alive[:n_real] = alive
                 ca.alive = self._backend.to_device(full_alive, gpu_id)
+
+    def _radius_by_type(self, n_types: int) -> np.ndarray:
+        """Radius per archetype index, in composition order, in um.
+
+        Type indices follow list(initial_composition) -- the order
+        _generate_initial_cells assigns them in. An index past the end of
+        the composition (caller-supplied types) takes cell_radius_um.
+        """
+        cfg = self._config
+        names = list(cfg.initial_composition)
+        return np.array(
+            [cfg.radius_for(names[i]) if i < len(names) else cfg.cell_radius_um
+             for i in range(max(n_types, len(names)))],
+            dtype=np.float32,
+        )
 
     def _generate_initial_cells(self) -> Tuple[np.ndarray, np.ndarray]:
         """Generate random initial cell positions and types.

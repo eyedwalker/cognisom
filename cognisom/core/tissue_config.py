@@ -79,6 +79,25 @@ DEFAULT_COMPOSITION: Dict[str, float] = {
 }
 
 
+#: Archetype -> the entity-library row its parameters are read from. The
+#: store matches names exactly and case-sensitively, so without this table no
+#: archetype key finds a row. The immune archetypes read the rows the immune
+#: module reads (modules/immune_module.LINEAGE_ENTITY), the macrophage the
+#: unpolarized cell_type row. smooth_muscle and cancer_epithelial have no row
+#: -- "Prostate cancer stem cell" is a stem cell, not bulk tumour epithelium
+#: -- so they always take the config default.
+ARCHETYPE_ENTITY: Dict[str, Tuple[str, str]] = {
+    "luminal_secretory": ("Luminal epithelial cell", "cell_type"),
+    "basal": ("Basal epithelial cell", "cell_type"),
+    "fibroblast": ("Stromal fibroblast", "cell_type"),
+    "endothelial": ("Endothelial cell", "cell_type"),
+    "neuroendocrine": ("Neuroendocrine cell", "cell_type"),
+    "macrophage": ("Macrophage", "cell_type"),
+    "t_cell": ("CD8+ Effector T cell", "immune_cell"),
+    "nk_cell": ("NK cell", "immune_cell"),
+}
+
+
 @dataclass
 class TissueScaleConfig:
     """Master configuration for tissue-scale simulation."""
@@ -126,7 +145,16 @@ class TissueScaleConfig:
     initial_composition: Dict[str, float] = field(
         default_factory=lambda: dict(DEFAULT_COMPOSITION)
     )
-    cell_radius_um: float = 5.0       # Default cell radius
+    cell_radius_um: float = 5.0       # Radius of any archetype without its own
+    #: Per-archetype radius in um, for archetypes with something better than
+    #: the default. Filled by resolve_radii_from_library when the config is
+    #: built, or set directly, and serialised with the config so a remote run
+    #: uses the same radii without the library.
+    archetype_radius_um: Dict[str, float] = field(default_factory=dict)
+    #: archetype -> where its radius came from: "config", the library row
+    #: with the value's grade and citation, or why the library gave none
+    #: (and cell_radius_um applies).
+    archetype_radius_source: Dict[str, str] = field(default_factory=dict)
     division_time_normal_hr: float = 48.0
     division_time_cancer_hr: float = 12.0
 
@@ -155,6 +183,45 @@ class TissueScaleConfig:
     @property
     def total_steps(self) -> int:
         return int(self.duration / self.dt)
+
+    def radius_for(self, archetype: str) -> float:
+        """Radius of ``archetype`` in um."""
+        return float(self.archetype_radius_um.get(archetype, self.cell_radius_um))
+
+    def resolve_radii_from_library(self, resolver=None) -> "TissueScaleConfig":
+        """Take each archetype's radius from the entity library where it is evidence.
+
+        A value is used only if the resolver passes it -- simulation grade,
+        in um, not a placeholder. Every cell row's radius except a few
+        curated ones is a placeholder halved from a scale_um nobody
+        measured, and reading those would resize most of the tissue on no
+        evidence. An archetype already in archetype_radius_um keeps its
+        value: explicit config outranks the library. Fails soft -- with no
+        library the config is unchanged and says so. Returns self.
+        """
+        if resolver is None:
+            try:
+                from cognisom.genomics import parameter_resolver
+                resolver = parameter_resolver.shared_resolver()
+            except Exception:                              # pragma: no cover
+                resolver = None
+        for archetype in self.initial_composition:
+            if archetype in self.archetype_radius_um:
+                self.archetype_radius_source.setdefault(archetype, "config")
+                continue
+            row = ARCHETYPE_ENTITY.get(archetype)
+            if row is None:
+                self.archetype_radius_source[archetype] = "no library row"
+                continue
+            if resolver is None:
+                self.archetype_radius_source[archetype] = "library unavailable"
+                continue
+            name, entity_type = row
+            pv, note = resolver.sourced_value(name, entity_type, "radius_um")
+            if pv is not None:
+                self.archetype_radius_um[archetype] = float(pv.value)
+            self.archetype_radius_source[archetype] = f"{name}: {note}"
+        return self
 
     @property
     def n_fields(self) -> int:
@@ -188,6 +255,8 @@ class TissueScaleConfig:
             },
             "initial_composition": self.initial_composition,
             "cell_radius_um": self.cell_radius_um,
+            "archetype_radius_um": dict(self.archetype_radius_um),
+            "archetype_radius_source": dict(self.archetype_radius_source),
             "enable_ode": self.enable_ode,
             "enable_ssa": self.enable_ssa,
             "enable_mechanics": self.enable_mechanics,
@@ -222,6 +291,8 @@ class TissueScaleConfig:
             mechanics_substeps=d.get("mechanics_substeps", 10),
             initial_composition=d.get("initial_composition", dict(DEFAULT_COMPOSITION)),
             cell_radius_um=d.get("cell_radius_um", 5.0),
+            archetype_radius_um=dict(d.get("archetype_radius_um") or {}),
+            archetype_radius_source=dict(d.get("archetype_radius_source") or {}),
             enable_ode=d.get("enable_ode", True),
             enable_ssa=d.get("enable_ssa", False),
             enable_mechanics=d.get("enable_mechanics", True),

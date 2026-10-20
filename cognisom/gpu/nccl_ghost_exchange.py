@@ -156,10 +156,13 @@ class GhostExchanger:
         states_per_gpu: List[Any],
         partition_bounds: List[Tuple[float, float]],
         ghost_width_um: float = 30.0,
-    ) -> Tuple[List[Any], List[Any]]:
+        radii_per_gpu: Optional[List[Any]] = None,
+    ) -> Tuple[List[Any], ...]:
         """Exchange ghost cells between neighboring partitions.
 
-        Returns additional ghost positions and states to append to each GPU.
+        Returns additional ghost positions and states to append to each GPU,
+        and, when ``radii_per_gpu`` is given, the ghosts' radii as a third
+        list -- (positions, states, radii) -- selected by the same masks.
 
         Args:
             positions_per_gpu: Per-GPU (N, 3) float64 arrays.
@@ -181,6 +184,8 @@ class GhostExchanger:
         send_left_state = [None] * n
         send_right_pos = [None] * n
         send_right_state = [None] * n
+        send_left_radii = [None] * n
+        send_right_radii = [None] * n
 
         for i in range(n):
             m = masks[i]
@@ -190,11 +195,15 @@ class GhostExchanger:
                 idx = xp.where(m["send_left_mask"])[0]
                 send_left_pos[i] = positions_per_gpu[i][idx]
                 send_left_state[i] = states_per_gpu[i][idx]
+                if radii_per_gpu is not None:
+                    send_left_radii[i] = radii_per_gpu[i][idx]
 
             if m["send_right_mask"].any():
                 idx = xp.where(m["send_right_mask"])[0]
                 send_right_pos[i] = positions_per_gpu[i][idx]
                 send_right_state[i] = states_per_gpu[i][idx]
+                if radii_per_gpu is not None:
+                    send_right_radii[i] = radii_per_gpu[i][idx]
 
         # Exchange positions
         recv_left_pos, recv_right_pos = self._mgpu.neighbor_exchange(
@@ -203,21 +212,31 @@ class GhostExchanger:
         recv_left_state, recv_right_state = self._mgpu.neighbor_exchange(
             send_left_state, send_right_state,
         )
+        if radii_per_gpu is not None:
+            recv_left_radii, recv_right_radii = self._mgpu.neighbor_exchange(
+                send_left_radii, send_right_radii,
+            )
 
         # Combine received ghosts per GPU
         ghost_positions = []
         ghost_states = []
+        ghost_radii = []
 
         for i in range(n):
             parts_pos = []
             parts_state = []
+            parts_radii = []
 
             if recv_left_pos[i] is not None:
                 parts_pos.append(recv_left_pos[i])
                 parts_state.append(recv_left_state[i])
+                if radii_per_gpu is not None:
+                    parts_radii.append(recv_left_radii[i])
             if recv_right_pos[i] is not None:
                 parts_pos.append(recv_right_pos[i])
                 parts_state.append(recv_right_state[i])
+                if radii_per_gpu is not None:
+                    parts_radii.append(recv_right_radii[i])
 
             xp = np if not parts_pos else (
                 np if isinstance(parts_pos[0], np.ndarray) else self._get_xp()
@@ -226,11 +245,17 @@ class GhostExchanger:
             if parts_pos:
                 ghost_positions.append(xp.concatenate(parts_pos, axis=0))
                 ghost_states.append(xp.concatenate(parts_state, axis=0))
+                if radii_per_gpu is not None:
+                    ghost_radii.append(xp.concatenate(parts_radii, axis=0))
             else:
                 ghost_positions.append(xp.empty((0, 3), dtype=np.float64))
                 ghost_states.append(xp.empty((0, states_per_gpu[0].shape[1]),
                                               dtype=np.float32))
+                if radii_per_gpu is not None:
+                    ghost_radii.append(xp.empty((0,), dtype=np.float32))
 
+        if radii_per_gpu is not None:
+            return ghost_positions, ghost_states, ghost_radii
         return ghost_positions, ghost_states
 
     # ── Internal helpers ───────────────────────────────────────

@@ -209,11 +209,25 @@ with tab_config:
                 max_runtime_hours=max_runtime if exec_mode != "Local CPU (free)" else 24.0,
                 budget_usd=budget if exec_mode != "Local CPU (free)" else 0.0,
             )
+            # Archetype sizes from the entity library, where they are
+            # evidence; resolved here so the remote runner gets them in the
+            # config JSON. Every other archetype keeps the default radius.
+            config.resolve_radii_from_library()
             st.session_state.tissue_config = config
             st.success(
                 f"Configuration built: {n_cells:,} cells, "
                 f"{grid_size}^3 grid, {n_gpus} GPUs, "
                 f"{duration}h duration ({config.total_steps} steps)"
+            )
+            sized = [
+                f"{name.replace('_', ' ')} {radius:.3g} µm "
+                f"({config.archetype_radius_source.get(name, '').split(': ', 1)[-1]})"
+                for name, radius in config.archetype_radius_um.items()
+            ]
+            st.caption(
+                "Cell radii: " + ("; ".join(sized) + "; " if sized else "")
+                + f"every other archetype {config.cell_radius_um:.3g} µm "
+                "(no measured value in the library)."
             )
         except Exception as e:
             st.error(f"Configuration error: {e}")

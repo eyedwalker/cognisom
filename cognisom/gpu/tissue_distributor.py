@@ -108,7 +108,8 @@ class TissueDistributor:
         Args:
             positions: (N, 3) float64 — cell positions in physical coords (um).
             cell_types: (N,) int32 — archetype index per cell.
-            radii: (N,) float32 — cell radii. Default 5.0 um.
+            radii: (N,) float32 — cell radii. Default 5.0 um; the tissue
+                engine always passes its per-archetype radii.
             n_ode_species: Number of ODE state variables per cell.
 
         Returns:
@@ -201,11 +202,16 @@ class TissueDistributor:
         # Get real positions and state for ghost exchange
         real_positions = [ca.positions for ca in cell_arrays]
         real_states = [ca.state for ca in cell_arrays]
+        real_radii = [ca.radii for ca in cell_arrays]
 
-        # Exchange ghost cells
-        ghost_pos, ghost_states = self._ghost_ex.exchange_cell_ghosts(
+        # Exchange ghost cells. Radii travel with them: a ghost is a
+        # neighbour's boundary cell as the force law sees it, and it was
+        # given a literal 5.0 um, so a large cell near a partition boundary
+        # pushed on its neighbours as if it were a small one.
+        ghost_pos, ghost_states, ghost_radii_in = self._ghost_ex.exchange_cell_ghosts(
             real_positions, real_states,
             self._partition_bounds, self._ghost_width_um,
+            radii_per_gpu=real_radii,
         )
 
         # Append ghost cells to each partition
@@ -227,7 +233,7 @@ class TissueDistributor:
 
             # Pad other arrays for ghost cells
             ghost_vel = xp.zeros((n_ghost, 3), dtype=np.float32)
-            ghost_radii = xp.full(n_ghost, 5.0, dtype=np.float32)
+            ghost_radii = ghost_radii_in[i].astype(np.float32)
             ghost_types = xp.zeros(n_ghost, dtype=np.int32)
             ghost_alive = xp.ones(n_ghost, dtype=bool)
 
