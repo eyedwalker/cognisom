@@ -22,11 +22,22 @@ wrong, and the ones that failed are not here:
   * no proteasome size -- the record is a yeast 20S shell volume from a
     PhD thesis with no PubMed entry;
   * no excess membrane area, though PMID 6775712 measures it for all
-    four cell types (cell and nucleus: 84%/98% neutrophil, 130%/32%
-    lymphocyte, 137%/73% monocyte, 92%/84% eosinophil). It belongs to
-    the renderer's surface budget rather than to any parameter the
-    simulation currently reads, and a measurement with nowhere to go is
-    not evidence yet;
+    four cell types -- cell and nucleus: 84%/98% neutrophil, 130%/32%
+    lymphocyte, 137%/73% monocyte, 92%/84% eosinophil. It is not a
+    parameter the simulation reads; it is a CHECK on the renderer, and
+    the renderer currently fails it. The microvillus coat built from the
+    two sourced constants above (3 per um^2, 0.35 um) adds 30% to a
+    smooth sphere, for every cell type, because count scales with area
+    and the fraction is therefore scale-free. Measured is 84-137%, so
+    the coat accounts for 22-35% of it, and the shortfall cannot be
+    tuned away inside the measurements: closing it would need 1.60 um
+    villi against a measured 0.35 um median, or 13.1 per um^2 against a
+    measured 3 +/- 0.5. The reading is that most of the excess is not in
+    villi at all -- the paper calls it 'membrane foldings' throughout
+    and watches it unfold as the cell swells -- so the renderer needs a
+    fold layer rather than different villi, and these four numbers are
+    the per-type target it should hit. They also say the cell types
+    DIFFER, 1.6-fold, where the renderer is flat;
   * no normal human nuclear VOLUME -- every citable human record is HeLa,
     hypertriploid and measured trypsinized in suspension, so the
     normal-versus-malignant contrast cannot be sourced here at all. The
@@ -119,7 +130,14 @@ LYMPHOCYTE: Tuple[Measurement, ...] = (
         "A MEDIAN of a strongly right-skewed distribution, not a mean. "
         "Lengths run 'from 0.1 um to several micrometers' (PMID "
         "27647916, verbatim), so a constant-length coat has the wrong "
-        "shape and not merely the wrong number.",
+        "shape and not merely the wrong number. Confirmed from an "
+        "unrelated direction by PMID 6775712, read 2026-10-20: TEM "
+        "morphometry puts 'the height of the membrane foldings at 305 "
+        "mosmole' at 'about 0.35 um', and checks it by arithmetic -- a "
+        "6.72 um smooth-sphere diameter plus twice the folding height "
+        "gives 7.42 um, which is what light microscopy measures at the "
+        "outer edge. Two methods 24 years apart, one measuring villus "
+        "length and the other folding height, agree to two figures.",
     ),
     Measurement(
         "microvillus_diameter_um", 0.085, "um",
