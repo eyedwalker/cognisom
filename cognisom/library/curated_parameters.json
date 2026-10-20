@@ -3901,6 +3901,33 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "FAS",
+    "uniprot_id": "P25445",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Fas (FAS/CD95)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P25445",
+     "conditions": "UniProt P25445, Tumor necrosis factor receptor superfamily member 6, residues 26-335 of 335; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 35.07997047999999
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P25445",
+     "conditions": "UniProt P25445, Tumor necrosis factor receptor superfamily member 6, residues 26-335 of 335; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 310.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "FN1",
     "uniprot_id": "P02751",
     "uniprot_resolved_by": "curated_alias"
@@ -3922,6 +3949,87 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 2446.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "GNLY",
+    "uniprot_id": "P22749",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Granulysin (GNLY)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P22749",
+     "conditions": "UniProt P22749, Granulysin, residues 23-145 of 145; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 14.08915628
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P22749",
+     "conditions": "UniProt P22749, Granulysin, residues 23-145 of 145; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 123.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "GZMA",
+    "uniprot_id": "P12544",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Granzyme A (GZMA)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P12544",
+     "conditions": "UniProt P12544, Granzyme A, residues 29-262 of 262; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 25.84707448
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P12544",
+     "conditions": "UniProt P12544, Granzyme A, residues 29-262 of 262; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 234.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "GZMB",
+    "uniprot_id": "P10144",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Granzyme B (GZMB)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P10144",
+     "conditions": "UniProt P10144, Granzyme B, residues 21-247 of 247; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 25.53951758
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P10144",
+     "conditions": "UniProt P10144, Granzyme B, residues 21-247 of 247; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 227.0
     }
    }
   },
@@ -4198,6 +4306,33 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "PRF1",
+    "uniprot_id": "P14222",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Perforin (PRF1)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P14222",
+     "conditions": "UniProt P14222, Perforin-1, residues 22-555 of 555; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 59.184484579999996
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P14222",
+     "conditions": "UniProt P14222, Perforin-1, residues 22-555 of 555; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 534.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "SRC",
     "uniprot_id": "P12931",
     "uniprot_resolved_by": "gene_exact_name"
@@ -4279,6 +4414,33 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "SRGN",
+    "uniprot_id": "P10124",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Serglycin (SRGN)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P10124",
+     "conditions": "UniProt P10124, Serglycin, residues 28-158 of 158; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 14.712083279999998
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P10124",
+     "conditions": "UniProt P10124, Serglycin, residues 28-158 of 158; mature chain, not the translated precursor",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 131.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "TIMP1",
     "uniprot_id": "P01033",
     "uniprot_resolved_by": "curated_alias"
@@ -4300,6 +4462,33 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 184.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "TNFSF10",
+    "uniprot_id": "P50591",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "TRAIL (TNFSF10/CD253)",
+   "parameters": {
+    "molecular_weight_kda": {
+     "citation": "UniProt:P50591",
+     "conditions": "UniProt P50591, Tumor necrosis factor ligand superfamily member 10; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "kDa",
+     "value": 32.50889548
+    },
+    "sequence_length_aa": {
+     "citation": "UniProt:P50591",
+     "conditions": "UniProt P50591, Tumor necrosis factor ligand superfamily member 10; whole translated sequence",
+     "provenance": "measured",
+     "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
+     "unit": "aa",
+     "value": 281.0
     }
    }
   },

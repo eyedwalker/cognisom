@@ -482,6 +482,17 @@ class Protein(BioEntity):
     #: refuses to carry an accession without both.
     gene_symbol: str = ""
     uniprot_resolved_by: str = ""
+    #: UniProt's own recommended protein name for the accession above,
+    #: read back at the time it was resolved.
+    #:
+    #: ``uniprot_resolved_by`` says HOW an accession was chosen and this
+    #: says WHAT it turned out to be, which is the half that lets the
+    #: choice be re-checked. Without it a wrong accession is
+    #: indistinguishable from a right one: resolving "Fas ligand" once
+    #: returned P49327, fatty acid synthase, and nothing stored on the
+    #: entity would have shown that the mass belonged to a 2,511-residue
+    #: metabolic enzyme.
+    uniprot_recommended_name: str = ""
     pdb_ids: List[str] = field(default_factory=list)
     amino_acid_length: int = 0
     sequence_preview: str = ""  # first 100 residues
@@ -508,6 +519,7 @@ class Protein(BioEntity):
             "uniprot_id": self.uniprot_id,
             "gene_symbol": self.gene_symbol,
             "uniprot_resolved_by": self.uniprot_resolved_by,
+            "uniprot_recommended_name": self.uniprot_recommended_name,
             "pdb_ids": self.pdb_ids,
             "amino_acid_length": self.amino_acid_length,
             "sequence_preview": self.sequence_preview,
@@ -532,6 +544,8 @@ class Protein(BioEntity):
         self.uniprot_id = props.get("uniprot_id", "")
         self.gene_symbol = props.get("gene_symbol", "")
         self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
+        self.uniprot_recommended_name = props.get(
+            "uniprot_recommended_name", "")
         self.pdb_ids = props.get("pdb_ids", [])
         self.amino_acid_length = props.get("amino_acid_length", 0)
         self.sequence_preview = props.get("sequence_preview", "")

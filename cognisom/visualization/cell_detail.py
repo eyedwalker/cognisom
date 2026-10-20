@@ -305,13 +305,41 @@ def projections(vertices: np.ndarray, triangles: np.ndarray, *,
         # length_um exactly, and sigma sets how long the tail runs.
         lengths = length_um * np.exp(rng.normal(scale=0.62, size=len(points)))
         lengths = np.clip(lengths, length_um * 0.28, length_um * 6.0)
+        # And then clamped to the CELL. The measured tail is real --
+        # lengths run "from 0.1 um to several micrometres" -- but a few
+        # draws beyond the 99th percentile, rendered as rigid radial
+        # rods, turn a lymphocyte into a sea urchin: measured on a 7 um
+        # cell, p99 was 1.72 um against a body radius of 3.19, and the
+        # spine halo reached 1.48x the body radius, so most of the
+        # silhouette was spines rather than cell.
+        #
+        # A real long microvillus is flexible and lies along the
+        # membrane; this renderer only has straight rods, so the honest
+        # move is to cap what it draws and say how many were capped,
+        # rather than to draw a shape the measurement does not imply.
+        radius = float(np.linalg.norm(
+            vertices - vertices.mean(axis=0), axis=1).max())
+        ceiling = max(length_um, radius * MAX_PROJECTION_OF_RADIUS)
+        clamped = int((lengths > ceiling).sum())
+        if clamped:
+            log.debug("%d of %d projections longer than %.2f um were capped "
+                      "to it (the renderer draws rigid rods)",
+                      clamped, len(lengths), ceiling)
+        lengths = np.minimum(lengths, ceiling)
     else:
         lengths = length_um * np.clip(
             1.0 + rng.normal(scale=length_spread, size=len(points)), 0.25, 2.5)
     # A prototype of unit height centred on its own origin: its base sits
     # at the membrane once it is pushed out by half its height, less the
-    # embedded part.
-    offset = lengths * (0.5 - embed)
+    # part sunk into it.
+    #
+    # The sinking is an absolute depth, not a fraction of length. As a
+    # fraction the longest projections embedded deepest -- a 2.1 um
+    # villus sank 0.52 um, which is the entire thickness of a
+    # lymphocyte's cytoplasmic rim, so the worst offenders were also the
+    # ones whose inner ends ended up inside the nucleus.
+    sink = min(embed * length_um, radius_um * 1.5)
+    offset = lengths * 0.5 - sink
     positions = points + normals * offset[:, None]
     scales = np.stack([np.full(len(points), radius_um * 2.0),
                        np.full(len(points), radius_um * 2.0),
@@ -321,9 +349,14 @@ def projections(vertices: np.ndarray, triangles: np.ndarray, *,
                      scales.astype(np.float32))
 
 
+#: How long a projection may be as a fraction of the cell's own radius.
+#: A cap on what the renderer DRAWS, not a claim about the measurement.
+MAX_PROJECTION_OF_RADIUS = 0.30
+
+
 def organelles(mask: np.ndarray, *, scale_um: float, count: int,
                radius_um: float, seed: int = 0,
-               radius_spread: float = 0.3,
+               radius_spread: float = 0.3, elongation: float = 1.0,
                frame: Optional[Tuple[float, np.ndarray]] = None) -> Instances:
     """A population of rounded organelles inside a compartment.
 
@@ -354,9 +387,17 @@ def organelles(mask: np.ndarray, *, scale_um: float, count: int,
     headroom = _depth_at(mask, positions, scale_um, frame)
     if headroom is not None:
         radii = np.minimum(radii, np.maximum(headroom, radius_um * 0.25))
-    # Unit sphere prototype, so the scale IS the radius; mitochondria are
-    # given a long axis because they are not round.
-    scales = np.stack([radii, radii, radii], axis=1)
+    # Unit sphere prototype, so the scale IS the radius -- and the long
+    # axis is real: a mitochondrion is not round, and drawn as a sphere
+    # it is indistinguishable from a granule or a vesicle. The comment
+    # here used to claim the elongation while the line below it set three
+    # equal axes, which also made the random orientation on the next line
+    # meaningless.
+    #
+    # The random orientation is what makes a population of them read as
+    # scattered organelles rather than as a pattern.
+    stretch = elongation if elongation and elongation > 1.0 else 1.0
+    scales = np.stack([radii, radii, radii * stretch], axis=1)
     orient = quat_z_to(rng.normal(size=(len(positions), 3)))
     return Instances(positions.astype(np.float32),
                      orient.astype(np.float32),

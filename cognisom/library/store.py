@@ -158,6 +158,24 @@ class EntityStore:
                 seed_immunology_catalog(self)
                 seed_expanded_catalog(self)
 
+                # The molecules a cytotoxic cell kills with. The base
+                # catalogues carry the apoptotic cascade -- caspase-8,
+                # caspase-3, BAX, cytochrome c -- and nothing that sets
+                # it off, so the chain ran from a killer cell to a
+                # caspase with a hole in the middle. These must be
+                # seeded and not only added to a running database, or a
+                # freshly built library gets curated records with no
+                # entity to put them on.
+                try:
+                    from .seed_cytotoxic_effectors import seed as seed_effectors
+                    added, notes = seed_effectors(self, source=False)
+                    log.info("Cytotoxic effectors: %d added", added)
+                    for note in notes:
+                        log.debug("  %s", note)
+                except Exception as e:
+                    log.warning("Cytotoxic effector seed failed "
+                                "(non-fatal): %s", e)
+
                 # Enrich with visualization/physics defaults
                 try:
                     from .enrichment import EntityEnricher
@@ -187,6 +205,31 @@ class EntityStore:
                 except Exception as e:
                     log.warning(
                         "Adhesion kinetics curation failed (non-fatal): %s", e)
+
+                # Synonyms last, so every entity seeded above gets them.
+                # The field had been in the schema since the library was
+                # written and was empty on all 294 entities, so a
+                # reference resolved only when the name used happened to
+                # be the name stored.
+                try:
+                    from .seed_synonyms import seed as seed_synonyms
+                    touched, added, dropped = seed_synonyms(self)
+                    log.info("Synonyms: %d entities, %d synonyms, %d "
+                             "ambiguous forms dropped", touched, added, dropped)
+                except Exception as e:
+                    log.warning("Synonym seed failed (non-fatal): %s", e)
+
+                # And the measured ultrastructure, which the rendered
+                # cells read back.
+                try:
+                    from .seed_ultrastructure import seed as seed_ultra
+                    ents, values, problems = seed_ultra(self)
+                    log.info("Ultrastructure: %d entities, %d measured values",
+                             ents, values)
+                    for problem in problems:
+                        log.warning("Ultrastructure refused: %s", problem)
+                except Exception as e:
+                    log.warning("Ultrastructure seed failed (non-fatal): %s", e)
 
                 final = self.stats()
                 log.info(

@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -98,13 +99,30 @@ MARKER_COLORS: Dict[str, Tuple[float, float, float]] = {
 }
 
 
+#: MARKER_COLORS keyed for lookup, built once.
+_COLOR_BY_KEY = None
+
+
 def marker_color(marker: str) -> Tuple[float, float, float]:
-    """A stable colour for a marker, curated where it matters."""
-    if marker in MARKER_COLORS:
-        return MARKER_COLORS[marker]
-    # A hash the Python hash randomisation cannot move between runs.
+    """A stable colour for a marker, curated where it matters.
+
+    Keyed through the same normalisation as the compartment table, so
+    ``CD8`` and ``CD8+`` are one molecule and get one colour. They did
+    not: ``CD8`` took the curated red and ``CD8+`` fell through to a
+    hashed green, so the same receptor was two colours on two cells and
+    the convention broke on the cell named for it.
+    """
+    global _COLOR_BY_KEY
+    if _COLOR_BY_KEY is None:
+        _COLOR_BY_KEY = {_canonical(k): v for k, v in MARKER_COLORS.items()}
+    key = _canonical(marker)
+    if key in _COLOR_BY_KEY:
+        return _COLOR_BY_KEY[key]
+    # Hash the CANONICAL key, not the name as written: hashing the name
+    # gave granzyme_B and "granzyme B+" two different colours for one
+    # molecule, which is the bug the curated table had one level up.
     import hashlib
-    digest = hashlib.sha256(marker.encode()).digest()
+    digest = hashlib.sha256(key.encode()).digest()
     hue = digest[0] / 255.0
     import colorsys
     return tuple(round(c, 4) for c in colorsys.hsv_to_rgb(hue, 0.52, 0.88))
@@ -160,6 +178,11 @@ class Profile:
     #: morphometry reports one, and a count where it reports a count.
     mitochondrial_volume_fraction: float = 0.0
     mitochondrion_radius_um: float = 0.22
+    #: Long axis as a multiple of the short. A mitochondrion is not
+    #: round, and drawn as a sphere it cannot be told from a granule or a
+    #: vesicle -- which is part of why a cytotoxic T cell missing all its
+    #: lytic granules did not look obviously wrong.
+    mitochondrion_elongation: float = 2.2
     lysosome_count: int = 0
     lysosome_radius_um: float = 0.25
     lytic_granule_count: int = 0
@@ -255,16 +278,64 @@ def classify(mesh_type: str) -> str:
     return _CLASS_BY_MESH.get(mesh_type, "other")
 
 
+#: Trailing flow-cytometry notation: a level, not part of the name.
+_LEVEL = re.compile(r"(hi|lo|low|high|int|dim|bright|\+|-)$", re.I)
+
+
+def normalise_marker(marker: str) -> str:
+    """The molecule underneath a marker string as the library writes it.
+
+    The library writes the same molecule several ways. ``CD8+ T cell``
+    carries ``perforin+`` and ``granzyme B+``; ``CD8+ Effector T cell``
+    carries ``perforin`` and ``granzyme_B``. Looking these up literally
+    made the compartment table miss on the first and hit on the second,
+    so a cytotoxic T cell got no lytic granules and had its perforin and
+    granzyme B -- soluble cargo stored inside granules -- drawn as studs
+    on the OUTSIDE of its plasma membrane. On the one cell whose whole
+    identity is that it kills by degranulating.
+
+    The suffix is an expression LEVEL (``CD25hi``, ``CD127lo``, ``AR-``),
+    not part of the molecule's name, and the separator between words is
+    arbitrary. Both are stripped before any lookup.
+    """
+    out = str(marker).strip()
+    # Strip repeatedly: "CD127lo+" occurs.
+    for _ in range(3):
+        stripped = _LEVEL.sub("", out).strip()
+        if stripped == out:
+            break
+        out = stripped
+    return out
+
+
+def _canonical(marker: str) -> str:
+    """A lookup key: normalised, separator- and case-insensitive."""
+    return re.sub(r"[\s_\-]+", "", normalise_marker(marker)).lower()
+
+
+#: The compartment table, keyed for lookup rather than for reading.
+_COMPARTMENT_BY_KEY = None
+
+
+def compartment_of(marker: str) -> Optional[str]:
+    """Where this molecule resides, however the marker is written."""
+    global _COMPARTMENT_BY_KEY
+    if _COMPARTMENT_BY_KEY is None:
+        _COMPARTMENT_BY_KEY = {_canonical(k): v
+                               for k, v in COMPARTMENT.items()}
+    return _COMPARTMENT_BY_KEY.get(_canonical(marker))
+
+
 def partition_markers(markers: Sequence[str]) -> Dict[str, List[str]]:
     """Split a marker list by where each molecule actually resides."""
     out: Dict[str, List[str]] = {"membrane": [], "nucleus": [],
                                  "granule": [], "unknown": []}
     for marker in markers or ():
-        where = COMPARTMENT.get(marker)
+        where = compartment_of(marker)
         if where is None:
-            out["unknown"].append(marker)
+            out["unknown"].append(str(marker))
         else:
-            out[where].append(marker)
+            out[where].append(str(marker))
     return out
 
 
@@ -358,8 +429,11 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
                    "lysosomes")
 
     placed = partition_markers(markers)
-    if placed["granule"] and set(placed["granule"]) & LYTIC_CARGO:
-        cargo = sorted(set(placed["granule"]) & LYTIC_CARGO)
+    lytic_keys = {_canonical(c) for c in LYTIC_CARGO}
+    carried = sorted(m for m in placed["granule"]
+                     if _canonical(m) in lytic_keys)
+    if carried:
+        cargo = carried
         base["lytic_granule_count"] = LYTIC_GRANULES_PER_CELL
         base["lytic_granule_radius_um"] = LYTIC_GRANULE_RADIUS_UM
         why.append("carries " + ", ".join(cargo) +

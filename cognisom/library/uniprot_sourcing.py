@@ -200,8 +200,16 @@ def resolve_accession(
             continue
         url = f"{BASE_URL}/search"
         params = {
-            "query": f"gene_exact:{candidate} AND organism_id:9606 AND reviewed:true",
-            "fields": "accession", "size": "1", "format": "json",
+            # Quoted. An unquoted multi-word candidate is not an exact
+            # gene match at all: Lucene splits "Fas ligand" into
+            # gene_exact:Fas plus the free-text term "ligand", and the
+            # first hit that comes back is whatever that matched. It
+            # matched FASN -- fatty acid synthase, 2,511 residues -- and
+            # that mass would have been written onto Fas ligand with a
+            # UniProt accession making it look sourced.
+            "query": (f'gene_exact:"{candidate}" AND organism_id:9606 '
+                      f'AND reviewed:true'),
+            "fields": "accession,gene_primary", "size": "5", "format": "json",
         }
         try:
             response = s.get(url, params=params, timeout=30)
@@ -210,10 +218,29 @@ def resolve_accession(
         except Exception as exc:                       # pragma: no cover
             log.warning("UniProt search failed for %s: %s", candidate, exc)
             continue
+        for hit in results:
+            # Read the gene symbol back and require it to BE the
+            # candidate. A search that returns something is not the same
+            # as a search that returned the right thing, and an accession
+            # nobody checked is indistinguishable from one that was.
+            primary = [g.get("geneName", {}).get("value", "")
+                       for g in (hit.get("genes") or [])]
+            match = next((sym for sym in primary
+                          if sym.upper() == candidate.upper()), None)
+            if match:
+                # Return UniProt's symbol, not the candidate's casing.
+                # Human gene symbols are uppercase by convention, and an
+                # entity named "Fas (FAS/CD95)" yields the candidate
+                # "Fas" -- storing that as the gene symbol records how
+                # the entity happens to be written rather than what the
+                # gene is called.
+                return (hit.get("primaryAccession"), match,
+                        curated or "gene_exact_name")
         if results:
-            return (results[0].get("primaryAccession"), candidate,
-                    curated or "gene_exact_name")
-    return None, "", f"no reviewed human entry for {symbols[:3]}"
+            log.info("UniProt returned %d entries for %r but none has that "
+                     "gene symbol; not accepting them",
+                     len(results), candidate)
+    return None, "", f"no reviewed human entry whose gene symbol is {symbols[:3]}"
 
 
 def _model_residues(accession: str) -> Optional[int]:
