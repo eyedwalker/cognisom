@@ -163,11 +163,24 @@ def resolve_small_molecule(name: str, client: Any = None) -> Optional[Dict]:
     }
 
 
-def conformer_prim_count(smiles: str, with_hydrogens: bool = True) -> Tuple[int, int]:
-    """Atoms and bonds in an embedded 3-D conformer: the prim budget.
+#: Fixed seed for conformer embedding. The same SMILES must give the same
+#: coordinates on every machine, or a geometry test pins nothing and two
+#: exports of one library differ for no reason.
+CONFORMER_SEED = 0xC0FFEE
 
-    A ball-and-stick rendering is one prim per atom plus one per bond, so this
-    is what a single entity costs when it stops being a sphere.
+
+def embed_conformer(smiles: str, with_hydrogens: bool = True):
+    """A molecule with 3-D coordinates, or as far as we got.
+
+    Returns ``(mol, embedded)``. ``mol`` is None only if the SMILES does not
+    parse. ``embedded`` is False when the distance-geometry step could not
+    place the atoms, in which case the topology is still there and the
+    coordinates are not -- callers that need geometry must check it, because
+    an unembedded molecule reports every atom at the origin rather than
+    raising.
+
+    ETKDG for the initial placement, then MMFF94 minimisation. Both are
+    rdkit defaults; the seed is ours.
     """
     from rdkit import Chem, RDLogger
     from rdkit.Chem import AllChem
@@ -175,10 +188,33 @@ def conformer_prim_count(smiles: str, with_hydrogens: bool = True) -> Tuple[int,
 
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return (0, 0)
+        return None, False
     if with_hydrogens:
         mol = Chem.AddHs(mol)
-    if AllChem.EmbedMolecule(mol, randomSeed=0xC0FFEE) != 0:
-        return (mol.GetNumAtoms(), mol.GetNumBonds())
-    AllChem.MMFFOptimizeMolecule(mol)
+    if AllChem.EmbedMolecule(mol, randomSeed=CONFORMER_SEED) != 0:
+        # Random starting coordinates rescue the few cages and macrocycles
+        # that the default series of starts cannot place.
+        if AllChem.EmbedMolecule(mol, randomSeed=CONFORMER_SEED,
+                                 useRandomCoords=True) != 0:
+            return mol, False
+    try:
+        AllChem.MMFFOptimizeMolecule(mol, maxIters=2000)
+    except Exception as exc:                        # no MMFF params for it
+        log.debug("MMFF minimisation skipped for %s: %s", smiles, exc)
+    return mol, True
+
+
+def conformer_prim_count(smiles: str, with_hydrogens: bool = True) -> Tuple[int, int]:
+    """Atoms and bonds in an embedded 3-D conformer: the prim budget.
+
+    One prim per atom plus one per bond is the floor. The exporter in
+    ``cognisom.visualization.molecular_usd`` draws each bond as two
+    half-length cylinders so that each half carries its own atom's colour,
+    which is what makes the elements readable, so what it actually emits is
+    ``atoms + 2 * bonds``. This stays the floor because it is the figure to
+    compare against the one sphere a molecule used to get.
+    """
+    mol, _ = embed_conformer(smiles, with_hydrogens)
+    if mol is None:
+        return (0, 0)
     return (mol.GetNumAtoms(), mol.GetNumBonds())
