@@ -767,9 +767,17 @@ def _colocated_nk_run(mhc, *, immune_cfg, subset=None, n=6,
     killers = []
     engine.event_bus.subscribe(
         EventTypes.CANCER_KILLED, lambda d: killers.append(d["killer_type"]))
+    # Which NK cells engaged at least once. total_activations counts
+    # engagements, and a contact that does not kill now ends in release and
+    # re-engagement, so it counts attempts; "this clone engages this
+    # target" is the set of cells that ever did.
+    engaged = set()
+    engine.event_bus.subscribe(
+        EventTypes.IMMUNE_ACTIVATED, lambda d: engaged.add(d["immune_id"]))
     engine.initialize()
     cellular = engine.modules["cellular"]
     immune = engine.modules["immune"]
+    immune.engaged_cells = engaged
     immune.set_cellular_module(cellular)
     for i, ic in enumerate(immune.immune_cells.values()):
         pos = [100.0 + 20.0 * i, 100.0, 50.0]
@@ -802,7 +810,7 @@ def test_a_licensed_clone_spares_an_intact_mhc_target_through_the_engine():
     # kills: missing self.
     lost, lost_killers = _colocated_nk_run(
         0.0, immune_cfg=cfg, subset=KIR.KIR2DL1)
-    assert lost.total_activations == 6
+    assert len(lost.engaged_cells) == 6
     assert lost.total_kills > 0
     assert set(lost_killers) == {"NK_cell"}
 
@@ -817,10 +825,11 @@ def test_an_unlicensed_clone_is_mhc_independent_through_the_engine():
     counts = []
     for mhc in (0.0, 0.5, 1.0):
         mod, _ = _colocated_nk_run(mhc, immune_cfg=cfg, subset=KIR.KIR3DL1)
-        counts.append((mod.total_activations, mod.total_kills))
+        counts.append((mod.total_activations, mod.total_kills,
+                       len(mod.engaged_cells)))
     assert len({c[0] for c in counts}) == 1, counts
-    assert counts[0][0] == 6
-    assert all(k > 0 for _, k in counts)
+    assert all(c[2] == 6 for c in counts), counts
+    assert all(c[1] > 0 for c in counts), counts
 
 
 def test_the_legacy_step_rule_still_behaves_exactly_as_measured():
@@ -831,7 +840,7 @@ def test_the_legacy_step_rule_still_behaves_exactly_as_measured():
         mod, killers = _colocated_nk_run(mhc, immune_cfg={})
         assert mod.get_state()["nk_model"] == "missing_self_threshold"
         if expect_engagement:
-            assert mod.total_activations == 6, mhc
+            assert len(mod.engaged_cells) == 6, mhc
             assert mod.total_kills > 0, mhc
         else:
             assert mod.total_activations == 0, mhc
@@ -889,6 +898,10 @@ def test_the_tcell_closed_loop_is_unchanged_by_the_innate_rewrite():
         "tcr_recognition_threshold": 0.0, "tcr_repertoire_size": 200,
         "tcr_seed": 0, "costimulation": 1.0, "checkpoint_block": 0.0,
         "patient_id": "SEQC2",
+        # The subject is the causal chain, not kill timing. A lethal T-cell
+        # contact lasts ~75 min by the library's measured value, longer than
+        # this run, so it is made one minute long here.
+        "lethal_contact_minutes": {"T_cell": 1.0},
     })
     engine.initialize()
     molecular = engine.modules["molecular"]

@@ -43,7 +43,8 @@ import pytest
 from cognisom.genomics import parameter_resolver
 from cognisom.genomics.parameter_resolver import SimulationParameterResolver
 from cognisom.library.parameters import (
-    SIMULATION_GRADE, ParameterValue, Provenance, _sidecar, set_parameter,
+    PARAMETER_SPECS, SIMULATION_GRADE, ParameterValue, Provenance, _sidecar,
+    set_parameter,
 )
 from cognisom.modules.immune_module import (
     LINEAGE_ENTITY, MINUTES_PER_HOUR, ImmuneCell, ImmuneModule,
@@ -191,9 +192,10 @@ def test_an_unknown_lineage_patrols_at_the_default_and_says_why():
 
 # ── what the module reads, and what it must not ─────────────────────────
 
-def test_only_the_migration_speed_is_read(monkeypatch):
-    """An allowlist: the same rows carry model constructs, and the next
-    widening must not silently replace a calibrated knob."""
+def test_only_measured_quantities_are_read(monkeypatch):
+    """An allowlist: the migration speed and the two contact durations.
+    The same rows carry model constructs, and the next widening must not
+    silently replace a calibrated knob."""
     asked = []
     real = SimulationParameterResolver.sourced_value
 
@@ -204,7 +206,8 @@ def test_only_the_migration_speed_is_read(monkeypatch):
     monkeypatch.setattr(SimulationParameterResolver, "sourced_value", spy)
     m = _module()
     neutrophil = m.immune_cells[m.add_immune_cell([100, 100, 50], "Neutrophil")]
-    assert set(asked) == {SPEED}
+    assert set(asked) == {SPEED, "lethal_contact_minutes", "nonlethal_contact_minutes"}
+    assert not any(PARAMETER_SPECS[f].model_construct for f in set(asked))
     assert (neutrophil.detection_radius, neutrophil.kill_radius) == (10.0, 5.0)
     assert m.kill_probability == 0.8
 

@@ -12,8 +12,9 @@ The test deliberately tunes the simulation for determinism: TCR
 recognition threshold is 0.0 (every match recognized), the T cell is
 colocated with the cancer cell so detection / kill ranges are
 immediately satisfied, mhc1 expression and costimulation are high so
-the Hill kill probability is essentially 1.0, and numpy.random is
-seeded so the per-step kill roll is reproducible.
+the Hill kill probability is essentially 1.0, the lethal contact is made
+one minute long, and numpy.random is seeded so the contact's outcome roll
+and duration draw are reproducible.
 
 The test is NOT a sensitivity study of any individual stage -- those
 are covered by the per-module unit tests
@@ -68,6 +69,10 @@ def _build_engine() -> SimulationEngine:
         # and mhc clear the EC50.
         'costimulation': 1.0,
         'checkpoint_block': 0.0,
+        # The subject is the causal chain, not kill timing. A lethal T-cell
+        # contact lasts ~75 min by the library's measured value, longer than
+        # this run, so it is made one minute long here.
+        'lethal_contact_minutes': {'T_cell': 1.0},
     })
     engine.initialize()
     return engine
@@ -81,7 +86,7 @@ def _colocate(cancer_cell, immune_cell, position=(100.0, 100.0, 50.0)) -> None:
 
 
 def test_closed_loop_event_trace_in_causal_order():
-    # Reproducible numpy randomness for the per-step kill roll inside
+    # Reproducible numpy randomness for the contact outcome and duration inside
     # immune.update.
     np.random.seed(0)
 

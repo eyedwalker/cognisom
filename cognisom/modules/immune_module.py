@@ -32,7 +32,7 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 
 from cognisom.core.module_base import SimulationModule
@@ -111,6 +111,17 @@ LINEAGE_ENTITY = {
 }
 
 
+#: Contact durations in minutes, for a lineage the library has no
+#: simulation-grade value for. ILLUSTRATIVE: chosen, not measured. Today the
+#: library supplies the T cell's lethal (75 min) and non-lethal (8.5 min)
+#: contacts and the NK cell's lethal contact (19 min); the macrophage's
+#: and the NK cell's non-lethal contact fall back to these. See
+#: ImmuneModule._engage.
+DEFAULT_LETHAL_CONTACT_MIN = 60.0
+DEFAULT_NONLETHAL_CONTACT_MIN = 15.0
+CONTACT_FIELDS = ('lethal_contact_minutes', 'nonlethal_contact_minutes')
+
+
 def chase_displacement(direction: np.ndarray, distance: float,
                        speed_um_per_min: float,
                        dt_hours: float) -> np.ndarray:
@@ -179,6 +190,12 @@ class ImmuneCell:
     speed: float = 10.0  # μm/min
     detection_radius: float = 10.0  # μm
     kill_radius: float = 5.0  # μm
+
+    # The contact in progress, if any: when it resolves (module clock,
+    # hours) and whether it ends in the target's death. Both are decided
+    # once, when the contact begins; see ImmuneModule._engage.
+    contact_ends_at: Optional[float] = None
+    contact_lethal: bool = False
 
     def __post_init__(self):
         if self.velocity is None:
@@ -261,6 +278,20 @@ class ImmuneModule(SimulationModule):
         # Read here rather than in initialize(), which reset() re-runs.
         for lineage in LINEAGE_ENTITY:
             self._patrol_speed_for(lineage)
+
+        # How long a contact lasts, per lineage, in minutes: lethal (contact
+        # to the target's death) and non-lethal (contact to detachment).
+        # Same precedence as the patrol speed: an explicit
+        # 'lethal_contact_minutes' / 'nonlethal_contact_minutes' entry, then
+        # a simulation-grade library value, then the illustrative default.
+        self._contact_minutes: Dict[Tuple[str, str], float] = {}
+        self.contact_time_source: Dict[str, Dict[str, str]] = {}
+        for lineage in LINEAGE_ENTITY:
+            for lethal in (True, False):
+                self._contact_minutes_for(lineage, lethal)
+        #: Hours of simulated time this module has stepped through. Contacts
+        #: resolve against it.
+        self.clock_h = 0.0
         # Baseline per-encounter kill probability for the innate
         # lineages, and the fallback for an immune cell of an
         # unrecognized type. It is NOT a T-cell fallback: the comment
@@ -816,6 +847,7 @@ class ImmuneModule(SimulationModule):
 
     def update(self, dt: float):
         """Update immune system"""
+        self._advance_clock(dt)
         if not self.cellular_module:
             return
         
@@ -888,40 +920,10 @@ class ImmuneModule(SimulationModule):
                                     1.0,
                                     cancer_cell.pdl1_expression + 0.5,
                                 ))
-                                # Chronic-antigen exhaustion bookkeeping
-                                # (Dolina 2021, lecture slide 52): every
-                                # recognized engagement increments the
-                                # clone's encounter counter. When the
-                                # exhaustion threshold is crossed, the
-                                # clone transitions from PD-1-lo
-                                # precursor to PD-1-hi exhausted and we
-                                # fire a TCELL_EXHAUSTED event so
-                                # downstream consumers (analytics, ICB
-                                # response models) can see it.
-                                new_count, did_exhaust = (
-                                    self._tcr_repertoire.register_engagement(
-                                        tcr_match.tcr.tcr_id
-                                    )
-                                )
-                                if did_exhaust:
-                                    self.total_exhaustion_transitions += 1
-                                    self.emit_event(
-                                        EventTypes.TCELL_EXHAUSTED,
-                                        {
-                                            'tcr_id': tcr_match.tcr.tcr_id,
-                                            'cdr3': tcr_match.tcr.cdr3,
-                                            'encounter_count': new_count,
-                                            'target_id': cancer_id,
-                                            'peptide': (
-                                                tcr_match.presentation
-                                                .peptide.sequence
-                                            ),
-                                            'mutation': (
-                                                tcr_match.presentation
-                                                .peptide.mutation_label
-                                            ),
-                                        },
-                                    )
+                                # Exhaustion is counted per contact, in
+                                # _engage: recognition happens at sensing
+                                # range, and the TCR engages its pMHC only
+                                # once the cells touch.
 
                             self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
                                 'immune_id': immune_id,
@@ -973,70 +975,135 @@ class ImmuneModule(SimulationModule):
                     # and macrophages the PD-1-gated phagocytic
                     # probability.
                     if distance < immune_cell.kill_radius:
-                        # Continuous-contact engagement: every step a
-                        # T cell sits on its target, the clone
-                        # accumulates engagement signal (real-biology
-                        # chronic-antigen exposure). This is what
-                        # drives precursor -> exhausted transition
-                        # over time even when the tumor doesn't die.
-                        if (
-                            immune_cell.cell_type == 'T_cell'
-                            and immune_cell.active_tcr_match is not None
-                        ):
-                            tcr_id = (
-                                immune_cell.active_tcr_match.tcr.tcr_id
-                            )
-                            new_count, did_exhaust = (
-                                self._tcr_repertoire.register_engagement(
-                                    tcr_id
-                                )
-                            )
-                            if did_exhaust:
-                                self.total_exhaustion_transitions += 1
-                                pres = (
-                                    immune_cell.active_tcr_match.presentation
-                                )
-                                self.emit_event(
-                                    EventTypes.TCELL_EXHAUSTED,
-                                    {
-                                        'tcr_id': tcr_id,
-                                        'cdr3': (
-                                            immune_cell.active_tcr_match
-                                            .tcr.cdr3
-                                        ),
-                                        'encounter_count': new_count,
-                                        'target_id': (
-                                            immune_cell.target_cell_id
-                                        ),
-                                        'peptide': pres.peptide.sequence,
-                                        'mutation': (
-                                            pres.peptide.mutation_label
-                                        ),
-                                    },
-                                )
-
-                        p_kill = self._target_kill_probability(
-                            immune_cell, target
-                        )
-                        if np.random.random() < p_kill:
-                            # CANCER_KILLED is queued, so the cellular
-                            # module removes the target only when the step
-                            # ends. Take it out of this step's snapshot
-                            # now, or a second cell reaching it in the
-                            # same step kills it again -- two kills, two
-                            # events, one death -- and a third detects it
-                            # and activates on a corpse.
-                            cancer_cells.pop(immune_cell.target_cell_id, None)
-                            self._kill_target(immune_cell, target)
+                        self._engage(immune_cell, target, cancer_cells)
                 else:
                     # Target lost, deactivate
-                    immune_cell.activated = False
-                    immune_cell.target_cell_id = None
-                    immune_cell.active_tcr_match = None
+                    self._release(immune_cell)
             
             # Keep in bounds
             immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
     
+    def _advance_clock(self, dt: float) -> None:
+        """Advance the module clock contacts resolve against (hours)."""
+        self.clock_h += dt
+
+    def _engage(self, immune_cell: ImmuneCell, target, cancer_cells) -> None:
+        """One step of an effector in contact with its target.
+
+        A contact is an encounter with one outcome, decided when it begins.
+        It kills with the per-contact probability _target_kill_probability
+        gives -- the T-cell Hill rule, the NK receptor balance, the
+        macrophage PD-1 gate -- and it lasts a time drawn from the lineage's
+        measured contact duration: an exponential with the mean of its
+        lethal contact (contact to the target's death) or its non-lethal one
+        (contact to detachment). When the time is up, a lethal contact kills
+        the target and a non-lethal one ends with the effector letting go,
+        free to sense and engage again -- so killing that needs repeated
+        contacts emerges from repeated tries, as imaging of CTLs in tumours
+        shows it does (PMID:34471116).
+
+        This replaced a roll of the same probability on every step of
+        contact. That made the kill rate per hour a function of dt -- at up
+        to 0.8 per roll a cell killed within a step or two of touching,
+        whatever the step was -- and the T-cell exhaustion counter, which
+        counted steps of contact against a threshold of five encounters,
+        exhausted a clone after three minutes on one target at dt = 0.01 h.
+        """
+        now = self.clock_h
+        if immune_cell.contact_ends_at is None:
+            self._register_tcr_engagement(immune_cell)
+            p_kill = self._target_kill_probability(immune_cell, target)
+            immune_cell.contact_lethal = bool(np.random.random() < p_kill)
+            minutes = self._contact_minutes_for(
+                immune_cell.cell_type, immune_cell.contact_lethal)
+            immune_cell.contact_ends_at = (
+                now + np.random.exponential(minutes) / MINUTES_PER_HOUR)
+            return
+        if now < immune_cell.contact_ends_at:
+            return
+        if immune_cell.contact_lethal:
+            # CANCER_KILLED is queued, so the cellular module removes the
+            # target only when the step ends. Take it out of this step's
+            # snapshot now, or a second cell reaching it in the same step
+            # kills it again -- two kills, two events, one death -- and a
+            # third detects it and activates on a corpse.
+            cancer_cells.pop(immune_cell.target_cell_id, None)
+            self._kill_target(immune_cell, target)
+        else:
+            self._release(immune_cell)
+
+    def _release(self, immune_cell: ImmuneCell) -> None:
+        """End an engagement: the effector disengages and patrols again."""
+        immune_cell.activated = False
+        immune_cell.target_cell_id = None
+        immune_cell.active_tcr_match = None
+        immune_cell.contact_ends_at = None
+        immune_cell.contact_lethal = False
+
+    def _register_tcr_engagement(self, immune_cell: ImmuneCell) -> None:
+        """Count one TCR-pMHC engagement for a T cell's clone.
+
+        Once per contact. Chronic antigen exposure is repeated contact
+        with a target that does not die, which is what drives a clone from
+        PD-1-lo precursor to PD-1-hi exhausted (Dolina et al. 2021).
+        """
+        if (immune_cell.cell_type != 'T_cell'
+                or immune_cell.active_tcr_match is None):
+            return
+        match = immune_cell.active_tcr_match
+        tcr_id = match.tcr.tcr_id
+        new_count, did_exhaust = self._tcr_repertoire.register_engagement(tcr_id)
+        if did_exhaust:
+            self.total_exhaustion_transitions += 1
+            pres = match.presentation
+            self.emit_event(
+                EventTypes.TCELL_EXHAUSTED,
+                {
+                    'tcr_id': tcr_id,
+                    'cdr3': match.tcr.cdr3,
+                    'encounter_count': new_count,
+                    'target_id': immune_cell.target_cell_id,
+                    'peptide': pres.peptide.sequence,
+                    'mutation': pres.peptide.mutation_label,
+                },
+            )
+
+    def _contact_minutes_for(self, lineage: str, lethal: bool) -> float:
+        """Mean contact duration for ``lineage``, in minutes, read once."""
+        field_name = CONTACT_FIELDS[0] if lethal else CONTACT_FIELDS[1]
+        key = (lineage, field_name)
+        minutes = self._contact_minutes.get(key)
+        if minutes is not None:
+            return minutes
+        configured = (self.config.get(field_name) or {}).get(lineage)
+        if configured is not None:
+            minutes, note = float(configured), 'config'
+        else:
+            minutes, note = self._read_library_contact_minutes(lineage, field_name)
+        self._contact_minutes[key] = minutes
+        self.contact_time_source.setdefault(lineage, {})[field_name] = note
+        return minutes
+
+    def _read_library_contact_minutes(self, lineage: str, field_name: str):
+        """(minutes, note): the library's value if it is evidence, else the default."""
+        default = (DEFAULT_LETHAL_CONTACT_MIN if field_name == CONTACT_FIELDS[0]
+                   else DEFAULT_NONLETHAL_CONTACT_MIN)
+        if not self.library_params:
+            return default, 'default (library_params=False)'
+        try:
+            from cognisom.genomics import parameter_resolver
+            resolver = parameter_resolver.shared_resolver()
+        except Exception as exc:                        # pragma: no cover
+            logger.warning("entity library unavailable (%s)", exc)
+            resolver = None
+        if resolver is None:
+            return default, 'default (library unavailable)'
+        name, entity_type = LINEAGE_ENTITY.get(lineage, (lineage, 'immune_cell'))
+        pv, note = resolver.sourced_value(name, entity_type, field_name)
+        if pv is None:
+            return default, f"default (illustrative); {name}: {note}"
+        return float(pv.value), f"{name}: {note}"
+
     def _target_within_reach(self, immune_cell: ImmuneCell, cancer_cells) -> bool:
         """Is a cancer cell already inside this cell's sensing radius?
 
@@ -1225,18 +1292,15 @@ class ImmuneModule(SimulationModule):
         ``TCRMatch`` is a *snapshot* taken at recognition time and cached
         on the immune cell as ``active_tcr_match``. It is rewritten only
         when the T cell re-recognizes a target, and cleared on target
-        loss or kill. But exhaustion accrues on every step of a
-        sustained engagement (``register_engagement`` in the contact
-        branch of ``_update_immune_cells``), so a clone can cross the
-        exhaustion threshold while the cached snapshot still reports
-        PRECURSOR.
+        loss or kill. But exhaustion accrues on the clone, once per
+        contact by any of its cells (``_register_tcr_engagement``), so the
+        clone can cross the threshold while this cell's snapshot still
+        reports PRECURSOR.
 
-        Reading ``match.is_exhausted`` therefore misses the transition
-        for the whole duration of the engagement that caused it, which
+        Reading ``match.is_exhausted`` would miss that transition, which
         is precisely the chronic-antigen-exposure regime the two-state
         model exists to represent. Resolving against the repertoire by
-        clone id keeps the ICB-rescue gate honest within a single
-        engagement.
+        clone id keeps the ICB-rescue gate honest.
 
         Falls back to the snapshot when the clone is unknown to the
         repertoire (repertoire replaced mid-run, or a match constructed
@@ -1355,9 +1419,7 @@ class ImmuneModule(SimulationModule):
             })
 
         # Deactivate immune cell
-        immune_cell.activated = False
-        immune_cell.target_cell_id = None
-        immune_cell.active_tcr_match = None
+        self._release(immune_cell)
 
     # ---- Macrophage M1/M2 polarization -------------------------
 
@@ -1619,6 +1681,8 @@ class ImmuneModule(SimulationModule):
             # Where each lineage's patrol speed came from: config, a cited
             # library value, or the reason the library had none to give.
             'patrol_speed_source': dict(self.patrol_speed_source),
+            'contact_time_source': {k: dict(v) for k, v in
+                                    self.contact_time_source.items()},
         }
     
     # Event handlers

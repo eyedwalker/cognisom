@@ -342,39 +342,28 @@ def test_baseline_normal_cells_still_survive_24h(runs):
 
     assert len(normal) == 160
     assert _deaths(runner, "hypoxia", "normal") == 0
-    # Every cancer cell is killed. 22 survived while the chase step converted
-    # um/min to hours with x0.01 instead of x60: a cell that recognised a
-    # cancer cell from outside the 5 um kill radius sat frozen short of it,
-    # so only targets first seen from inside the radius could die. (8 more
-    # had survived before that, while the patrol step had the same bug.)
+    # What this test exists for is above: normal-cell survival at 160, and
+    # no normal cell dying of anything. The rest pins the run.
     #
-    # What this test exists for is unchanged and asserted above: normal-cell
-    # survival at 160, and no normal cell dying of anything.
-    assert len([c for c in alive if c.cell_type == "cancer"]) == 0
+    # Cancer: 22 survived while the chase step was frozen (x0.01 for x60);
+    # 0 once chasing cells moved but every contact rolled its kill
+    # probability each step and killed within a step or two; 7 now that a
+    # contact has one outcome and lasts a measured time (a lethal NK
+    # contact averages 19 min, a T cell's 75), so some tumour cells divide
+    # before they are killed. Every death is still an immune kill.
+    assert len([c for c in alive if c.cell_type == "cancer"]) == 7
     assert cells.total_deaths == 10
     assert _deaths(runner, "immune_killed", "cancer") == 10
-    # 98 with the chase frozen, 18 of them cancer divisions: cancer cells
-    # killed in the first hours never divide. The 80 are each normal cell
-    # dividing once. They used to all happen on the final step -- every
-    # cell started at age 0 with a 24 h division time -- so the count, and
-    # the 160 above, hung on whether the float sum of the steps reached
-    # 24.0 (at dt = 0.02 it did not, and none divided). Cells now start
-    # staggered over the steady-state age distribution and divide through
-    # the day.
-    assert cells.total_divisions == 80
+    # 80 normal divisions -- each normal cell divides once, now at a time
+    # staggered over the day rather than all on the final step -- plus 7
+    # cancer divisions that come before the kill.
+    assert cells.total_divisions == 87
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(412.9624, abs=0.01)
-    # 281.9123 while the population doubled on the last step: it now grows
-    # through the day, so more cells draw oxygen for longer.
-    #
-    # The oxygen floor. One normal cell is hypoxic, none is near death:
-    # a daughter is placed a few um from its parent and this one sits near
-    # the edge of its capillary's reach. With every division on the final
-    # step and each daughter starting at arterial O2, no daughter had ever
-    # shown where it actually sat, and the floor read 0.0739.
+        pytest.approx(425.7635, abs=0.01)
+    # The oxygen floor: no normal cell hypoxic, none near death.
     assert min(c.oxygen for c in alive) > 0.02          # the death threshold
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 1
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0448, abs=1e-3)
+    assert sum(1 for c in alive if c.oxygen < 0.05) == 0
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0585, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -385,9 +374,9 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     The evidence is the cells that die of hypoxia, not the cells still
     hypoxic at 24 h. Once a chasing immune cell could reach what it had
     recognised, the cancer cells that used to starve in the capillary-poor
-    corner were killed first, and the end-of-run snapshot lost its hypoxic
-    cells while the mechanism was untouched: 53 normal cells starve either
-    way.
+    corner were mostly killed first, and the end-of-run snapshot lost its
+    hypoxic cells while the mechanism was untouched: normal cells starve
+    in this preset whatever the immune compartment does.
     """
     runner = runs["Hypoxia"]
     cells = runner.engine.modules["cellular"]
@@ -395,22 +384,19 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     alive = [c for c in cells.cells.values() if c.alive]
 
     # The mechanism: normal cells starve in this preset and in no other.
-    # 53 while every cell divided on one step; with divisions spread over
-    # the day, daughters appear in the capillary-poor corner earlier.
-    assert _deaths(runner, "hypoxia", "normal") == 58
+    assert _deaths(runner, "hypoxia", "normal") == 59
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
-    # 16 cancer cells starved too while the chase step was frozen; now
-    # every one is killed by immune cells before it can (23, counting the
-    # daughters of those that divided first).
-    assert _deaths(runner, "hypoxia", "cancer") == 0
-    assert _deaths(runner, "immune_killed", "cancer") == 23
-    assert cells.total_deaths == 81
-    # The 24 h snapshot: 2 hypoxic regions and 2 cells below 0.05 with the
-    # chase frozen, and those were the starving cancer cells. The survivors
-    # now are the 12 best-perfused normal cells.
+    # Cancer cells starve here too when the immune compartment does not
+    # reach them first: 16 while the chase step was frozen, 0 while every
+    # contact killed within a step or two, 3 now that a kill takes a
+    # measured contact time.
+    assert _deaths(runner, "hypoxia", "cancer") == 3
+    assert _deaths(runner, "immune_killed", "cancer") == 24
+    assert cells.total_deaths == 86
+    # The 24 h snapshot: the survivors are the 11 best-perfused normal cells.
     assert vascular.hypoxic_regions == 0
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0651, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0611, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

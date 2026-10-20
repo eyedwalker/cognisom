@@ -63,6 +63,9 @@ MODULE_PARAM_SCHEMA: Dict[str, Dict[str, type]] = {
         # Per-lineage patrol speed in um/min, outranking the library;
         # library_params=False stops the module reading the library.
         "lineage_patrol_speed": dict, "library_params": bool,
+        # Per-lineage mean contact durations in minutes, outranking the
+        # library: contact to the target's death, and contact to release.
+        "lethal_contact_minutes": dict, "nonlethal_contact_minutes": dict,
         # The knobs that actually reach each arm. checkpoint_block and
         # costimulation drive the T-cell Hill rule (and, for
         # checkpoint_block, the macrophage PD-1 gate); the two

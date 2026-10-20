@@ -58,6 +58,14 @@ def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
     return float(max(0.0, min(1.0, total)))
 
 
+#: Death rate of a cancer cell below the hypoxia or starvation threshold,
+#: per hour. ILLUSTRATIVE: it is the 0.01-per-step roll this replaced, read
+#: at the module's design step of 0.01 h, so behaviour at that step is
+#: unchanged and every other step now agrees with it. No measured
+#: survival time under these thresholds was found to source it from.
+HYPOXIC_CANCER_DEATH_PER_HOUR = 1.0
+
+
 @dataclass
 class CellState:
     """State of a single cell"""
@@ -451,11 +459,16 @@ class CellularModule(SimulationModule):
             if cell.age >= division_time:
                 cells_to_divide.append(cell_id)
             
-            # Check for death (hypoxia, starvation)
+            # Check for death (hypoxia, starvation). A normal cell dies at
+            # once; a cancer cell is more resistant and dies at a rate per
+            # hour. That rate used to be a bare 0.01 per step, so a
+            # starving cancer cell lived ~1 h at dt = 0.01 and ~5 h at
+            # dt = 0.05.
             if cell.oxygen < 0.02 or cell.glucose < 0.5:
                 if cell.cell_type == 'normal':
                     cells_to_die.append(cell_id)
-                elif np.random.random() < 0.01:  # Cancer more resistant
+                elif np.random.random() < -np.expm1(
+                        -HYPOXIC_CANCER_DEATH_PER_HOUR * dt):
                     cells_to_die.append(cell_id)
         
         # Process divisions

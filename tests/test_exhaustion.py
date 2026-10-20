@@ -245,10 +245,16 @@ def test_kill_outcome_exhausted_signal_skips_rescue_term():
 
 def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
     """End-to-end: a colocated T cell engages a tumor target across
-    enough engine steps to cross the exhaustion threshold. At that
-    point a TCELL_EXHAUSTED event must appear on the bus AND the
-    per-encounter kill probability computed for that clone must drop
-    by approximately the EXHAUSTED_KILL_MULTIPLIER ratio."""
+    enough contacts to cross the exhaustion threshold. At that point a
+    TCELL_EXHAUSTED event must appear on the bus AND the per-encounter
+    kill probability computed for that clone must drop by approximately
+    the EXHAUSTED_KILL_MULTIPLIER ratio.
+
+    Engagements are counted once per contact. They used to be counted
+    on every step of contact, which crossed a threshold meant for
+    encounters within minutes; a contact that does not kill now ends in
+    release and re-engagement, so the run has to be long enough for a
+    second contact (a non-lethal T-cell contact averages 8.5 min)."""
     from cognisom.core import SimulationConfig, SimulationEngine
     from cognisom.core.event_bus import EventTypes
     from cognisom.modules.cellular_module import CellularModule
@@ -257,7 +263,7 @@ def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
 
     np.random.seed(0)
     engine = SimulationEngine(SimulationConfig(
-        dt=0.01, duration=0.10, use_gpu=False,
+        dt=0.01, duration=1.0, use_gpu=False,
     ))
     engine.register_module("molecular", MolecularModule, {
         "transcription_rate": 0.0,
@@ -295,11 +301,11 @@ def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
     imm.immune_cells[t_id].position = np.array(pos, dtype=np.float32)
 
     # Force the engaging clone to exhaust after just two engagements
-    # so the test runs in a few engine steps.
+    # so the test needs only two contacts.
     imm._tcr_repertoire.exhaustion_threshold = 2
 
     mol.introduce_mutation(cancer_id, "KRAS", "G12D")
-    engine.run(duration=0.10)
+    engine.run(duration=1.0)
     engine.event_bus.process_events()
 
     log = engine.event_bus.event_log

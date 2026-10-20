@@ -146,6 +146,10 @@ def _build_engine(n_drivers: int) -> SimulationEngine:
         "tcr_seed": 0,
         "costimulation": 1.0,
         "checkpoint_block": 0.0,
+        # The subject is the causal chain, not kill timing. A lethal T-cell
+        # contact lasts ~75 min by the library's measured value, longer than
+        # this run, so it is made one minute long here.
+        "lethal_contact_minutes": {"T_cell": 1.0},
     })
     engine.initialize()
     return engine

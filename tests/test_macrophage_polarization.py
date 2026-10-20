@@ -472,6 +472,10 @@ def _flagship_engine():
         'n_t_cells': 1, 'n_nk_cells': 0, 'n_macrophages': 0,
         'tcr_recognition_threshold': 0.0, 'tcr_repertoire_size': 200,
         'tcr_seed': 0, 'costimulation': 1.0, 'checkpoint_block': 0.0,
+        # The subject is the causal chain, not kill timing. A lethal T-cell
+        # contact lasts ~75 min by the library's measured value, longer than
+        # this run, so it is made one minute long here.
+        'lethal_contact_minutes': {'T_cell': 1.0},
     })
     engine.initialize()
     return engine

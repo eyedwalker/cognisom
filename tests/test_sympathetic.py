@@ -120,6 +120,14 @@ def test_state_fields_match_attenuation():
 # Immune module integration
 # ---------------------------------------------------------------------------
 
+#: Long enough for recognition, contact and a resolved contact. A contact
+#: now has one outcome, decided when it begins, and the T cell stays on its
+#: target until the contact resolves; three minutes (the old window) ended
+#: before the first contact did, so every arm recorded no kill and the
+#: comparisons below held vacuously.
+RUN_H = 0.5
+
+
 def _build_engine(**immune_overrides):
     from cognisom.core import SimulationConfig, SimulationEngine
     from cognisom.modules.cellular_module import CellularModule
@@ -144,6 +152,10 @@ def _build_engine(**immune_overrides):
         "tcr_seed": 0,
         "costimulation": 1.0,
         "checkpoint_block": 0.0,
+        # The subject is the causal chain, not kill timing. A lethal T-cell
+        # contact lasts ~75 min by the library's measured value, longer than
+        # this run, so it is made one minute long here.
+        "lethal_contact_minutes": {"T_cell": 1.0},
     }
     immune_cfg.update(immune_overrides)
     engine.register_module("immune", ImmuneModule, immune_cfg)
@@ -194,14 +206,14 @@ def test_stress_reduces_total_tcell_kills_end_to_end():
     (Armaiz-Pena 2015 corollary).
 
     Uses sympathetic_max_suppression=0.99 so the stressed arm's
-    per-step kill probability drops to ~1% of baseline, making the
+    per-contact kill probability drops to ~1% of baseline, making the
     stochastic difference robust to seed."""
     # Run 1: no stress
     np.random.seed(0)
     eng_low = _build_engine(stress_level=0.0)
     _spawn_test_cell(eng_low)
     eng_low.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_low.run(duration=0.05)
+    eng_low.run(duration=RUN_H)
     kills_low = eng_low.modules["immune"].total_tcell_kills
 
     # Run 2: high stress + near-complete suppression
@@ -213,7 +225,7 @@ def test_stress_reduces_total_tcell_kills_end_to_end():
     )
     _spawn_test_cell(eng_high)
     eng_high.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_high.run(duration=0.05)
+    eng_high.run(duration=RUN_H)
     kills_high = eng_high.modules["immune"].total_tcell_kills
 
     assert kills_high <= kills_low, (
@@ -234,7 +246,7 @@ def test_beta_blocker_rescues_stressed_kill_count():
     eng_stress = _build_engine(stress_level=1.0, beta_blocker=0.0)
     _spawn_test_cell(eng_stress)
     eng_stress.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_stress.run(duration=0.05)
+    eng_stress.run(duration=RUN_H)
     kills_stress = eng_stress.modules["immune"].total_tcell_kills
 
     # Stress + full blocker
@@ -242,13 +254,14 @@ def test_beta_blocker_rescues_stressed_kill_count():
     eng_rescued = _build_engine(stress_level=1.0, beta_blocker=1.0)
     _spawn_test_cell(eng_rescued)
     eng_rescued.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_rescued.run(duration=0.05)
+    eng_rescued.run(duration=RUN_H)
     kills_rescued = eng_rescued.modules["immune"].total_tcell_kills
 
     assert kills_rescued >= kills_stress, (
         f"β-blocker should rescue function; got rescued={kills_rescued} vs "
         f"stress={kills_stress}"
     )
+    assert kills_rescued > 0, "the rescued arm must kill, or this is vacuous"
 
 
 def test_max_suppression_zero_means_stress_is_inert():
@@ -262,14 +275,15 @@ def test_max_suppression_zero_means_stress_is_inert():
     )
     _spawn_test_cell(eng_no_axis)
     eng_no_axis.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_no_axis.run(duration=0.05)
+    eng_no_axis.run(duration=RUN_H)
     kills_no_axis = eng_no_axis.modules["immune"].total_tcell_kills
 
     np.random.seed(0)
     eng_baseline = _build_engine(stress_level=0.0)
     _spawn_test_cell(eng_baseline)
     eng_baseline.modules["molecular"].introduce_mutation(0, "KRAS", "G12D")
-    eng_baseline.run(duration=0.05)
+    eng_baseline.run(duration=RUN_H)
     kills_baseline = eng_baseline.modules["immune"].total_tcell_kills
 
     assert kills_no_axis == kills_baseline
+    assert kills_baseline > 0, "the baseline must kill, or this is vacuous"

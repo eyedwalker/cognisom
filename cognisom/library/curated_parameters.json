@@ -2458,6 +2458,30 @@
   },
   {
    "entity_type": "immune_cell",
+   "name": "CD8+ Effector T cell",
+   "parameters": {
+    "lethal_contact_minutes": {
+     "citation": "PMID:23935904",
+     "conditions": "Human: healthy-donor HLA-A2.1+ CD8+ T cells transduced with the F5 anti-MART1 TCR, killing HLA-matched MART1+ M202 melanoma cells; live-cell interferometry. \"Individual cytotoxic events due to recognition of CTLs are confirmed by a characteristic decrease in target cell mass following prolonged contact (30 min to 2 h) with a corresponding CTL.\"",
+     "provenance": "derived",
+     "rationale": "Midpoint of the reported 30 min to 2 h range of contact preceding target death. Consistent with mouse measurements: a 75.7 +/- 8.3 min mean lethal-synapse duration for OT-I CTLs on B16F10 cells (PMID:37500886) and 1.8 +/- 1.5 h from binding to death on MEC-1/OVA cells (PMID:34471116).",
+     "source": "Zangle TA et al., PLoS One 2013 (PMC3720853)",
+     "unit": "min",
+     "value": 75.0
+    },
+    "nonlethal_contact_minutes": {
+     "citation": "PMID:26872694",
+     "conditions": "Mus musculus: virus-specific CTLs in lymph node, two-photon intravital imaging. \"Individual contacts between CTLs and surviving targets lasted 8.5 min (Figure 4F), and individual contacts between CTLs and killed targets lasted for approximately 9.0 min (median; Figure 4F).\"",
+     "provenance": "estimated",
+     "rationale": "Median non-lethal contact of mouse CTLs in vivo, used for the human row because no human measurement was found. In vivo imaging of mouse melanoma gives a median of 15 min for the transient, non-lethal contacts that make up >95% of CTL contacts there (PMID:34471116).",
+     "source": "Halle S et al., Immunity 2016 (PMC4846978)",
+     "unit": "min",
+     "value": 8.5
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
    "name": "Macrophage M1",
    "parameters": {
     "radius_um": {
@@ -2468,6 +2492,20 @@
      "source": "BioNumbers BNID:103565 (Krombach F, M\u00fcnzing S, Allmeling AM, Gerlach JT, Behr J, D\u00f6rger M. Cell size of alveolar macrophages: an interspecies co)",
      "unit": "um",
      "value": 10.6
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "NK cell",
+   "parameters": {
+    "lethal_contact_minutes": {
+     "citation": "PMID:31270246",
+     "conditions": "Human primary NK cells killing HeLa-CD48 targets, single-cell time-lapse with granzyme B and caspase-8 reporters. \"This time span was shorter for target cells showing strong GrzB activity (19 \u00b1 9 min) compared with the ones with strong Casp8 activity (65 \u00b1 31 min; time span, Fig. 1 B), confirming that GrzB kills target cells faster than death receptors.\" The value is the granzyme route, mean of contact-to-death; NK cells shift to the slower death-receptor route over successive kills.",
+     "provenance": "measured",
+     "source": "Prager I et al., J Exp Med 2019 (PMC6719417)",
+     "unit": "min",
+     "value": 19.0
     }
    }
   },

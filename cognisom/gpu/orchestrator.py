@@ -241,6 +241,7 @@ class GPUOrchestrator:
         warned: set = set()
 
         def gpu_update(dt):
+            module._advance_clock(dt)
             if not module.cellular_module:
                 return
 
@@ -339,15 +340,11 @@ class GPUOrchestrator:
                             direction, distance, ic.speed, dt,
                         )
                     if distance < ic.kill_radius:
-                        if np.random.random() < module.kill_probability:
-                            # Out of the snapshot before the queued event
-                            # lands, as in ImmuneModule.update: one target
-                            # dies once however many cells reach it.
-                            cancer_cells.pop(ic.target_cell_id, None)
-                            module._kill_target(ic, target)
+                        # The module's own contact model: one outcome per
+                        # contact, resolved after a measured duration.
+                        module._engage(ic, target, cancer_cells)
                 else:
-                    ic.activated = False
-                    ic.target_cell_id = None
+                    module._release(ic)
 
             # Bounds
             for ic in module.immune_cells.values():

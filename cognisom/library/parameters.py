@@ -857,6 +857,28 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         inapplicable_when=_not_contact_cytotoxic,
         model_construct=True,
     ),
+    # The time a contact takes, which kill_probability does not say: the
+    # probability is per contact, and these say how long a contact lasts.
+    # Unlike the probability they are measured directly, by time-lapse
+    # imaging of effector-target pairs, so they are sourced, not
+    # calibrated. The immune module draws each contact's duration from an
+    # exponential with this mean.
+    _spec(
+        "lethal_contact_minutes", "min",
+        "Time from an effector's contact with a target to the target's "
+        "death, for a contact that kills.",
+        (EntityType.IMMUNE_CELL, EntityType.CELL_TYPE),
+        minimum=0.0, maximum=24.0 * 60.0,
+        inapplicable_when=_not_contact_cytotoxic,
+    ),
+    _spec(
+        "nonlethal_contact_minutes", "min",
+        "Duration of an effector-target contact that does not kill, before "
+        "the effector detaches and is free to engage again.",
+        (EntityType.IMMUNE_CELL, EntityType.CELL_TYPE),
+        minimum=0.0, maximum=24.0 * 60.0,
+        inapplicable_when=_not_contact_cytotoxic,
+    ),
     # ── Binding constants beyond the receptor path ──
     # Eighteen key spellings carry a dissociation constant, most of them
     # naming their partner (vegfr2_kd_pm, sirpa_kd_nm, dna_binding_kd_nm).
