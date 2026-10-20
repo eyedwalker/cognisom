@@ -236,3 +236,84 @@ def test_the_pdf_directory_is_not_committed():
     """These are licensed copies. They are not ours to redistribute."""
     ignore = (REPO_ROOT / ".gitignore").read_text()
     assert "docs/papers" in ignore
+
+
+# ── the PDF a publisher actually produces ────────────────────────────
+
+def _descriptor_with(*keys):
+    """A font descriptor declaring each of ``keys`` as a font program."""
+    from pypdf.generic import DictionaryObject, NameObject, NumberObject
+    d = DictionaryObject()
+    d[NameObject("/FontName")] = NameObject("/ZUPGTX+Times-Bold")
+    for key in keys:
+        d[NameObject(key)] = NumberObject(1)
+    return d
+
+
+class _FakeReader:
+    def __init__(self, pages):
+        self.pages = pages
+
+
+def test_a_font_declared_twice_does_not_cost_the_paper():
+    """pypdf refuses a page outright when one font descriptor carries two
+    embedded programs -- PdfReadError: More than one /FontFile found. The
+    spec does say at most one; publisher exports emit two anyway. Every
+    page of the ScienceDirect copy of PMID 6775712 carries /FontFile and
+    /FontFile3 for the same Times face, so ten pages of the paper that
+    four stored granule fractions come from extracted to nothing."""
+    from pypdf.generic import DictionaryObject, NameObject
+
+    good = _descriptor_with("/FontFile2")
+    bad = _descriptor_with("/FontFile", "/FontFile3")
+    fonts = DictionaryObject()
+    fonts[NameObject("/F1")] = DictionaryObject()
+    fonts[NameObject("/F1")][NameObject("/FontDescriptor")] = bad
+    fonts[NameObject("/F2")] = DictionaryObject()
+    fonts[NameObject("/F2")][NameObject("/FontDescriptor")] = good
+    resources = DictionaryObject()
+    resources[NameObject("/Font")] = fonts
+
+    repaired = lit._drop_duplicate_font_files(
+        _FakeReader([{"/Resources": resources}]))
+    assert repaired == 1
+    # one program left, and it is the FIRST declared -- not whichever
+    # the dict happened to yield last
+    assert [k for k in lit._FONT_FILE_KEYS if k in bad] == ["/FontFile"]
+    # a descriptor that was already legal is untouched
+    assert "/FontFile2" in good
+
+
+def test_the_repair_leaves_a_well_formed_pdf_alone():
+    from pypdf.generic import DictionaryObject, NameObject
+    fonts = DictionaryObject()
+    fonts[NameObject("/F1")] = DictionaryObject()
+    fonts[NameObject("/F1")][NameObject("/FontDescriptor")] = _descriptor_with("/FontFile")
+    resources = DictionaryObject()
+    resources[NameObject("/Font")] = fonts
+    assert lit._drop_duplicate_font_files(_FakeReader([{"/Resources": resources}])) == 0
+
+
+def test_one_unreadable_page_does_not_discard_the_others(tmp_path, monkeypatch):
+    """A paper is worth nine tenths of itself. The old reader joined a
+    generator inside one try, so any page that raised took the whole
+    document with it and returned None."""
+    class _Page:
+        def __init__(self, text, boom=False):
+            self.text, self.boom = text, boom
+        def get(self, _key):
+            return None
+        def extract_text(self):
+            if self.boom:
+                raise ValueError("unparseable content stream")
+            return self.text
+
+    pages = [_Page("x" * 400), _Page("", boom=True), _Page("Table 2. 23.0%" + "y" * 400)]
+    import pypdf
+    monkeypatch.setattr(pypdf, "PdfReader", lambda _p: _FakeReader(pages))
+    papers = tmp_path / "papers"
+    papers.mkdir()
+    (papers / "6775712.pdf").write_bytes(b"%PDF-1.4\n")
+
+    text = lit.local_pdf("6775712", root=str(papers))
+    assert text and "23.0%" in text

@@ -16,7 +16,6 @@ pypdf. No credentials, no proxy, nothing shared.
 | 9829984 | 10.1074/jbc.273.49.32506 | Values behind: bond_lifetime_seconds, kd_nm, koff_per_s, kon_per_nm_per_s |
 | 20178337 | 10.1021/bi100022c | Values behind: kcat_per_s, km_um |
 | 27647916 | 10.1073/pnas.1605399113 | Fig. S2 legend (density 3 +/- 0.5 um^-2 by TIRF vs 4.5 by SEM) and the microvillar diameter measurements. We have these from the abstract only. |
-| 6775712 | 10.1182/blood.v56.5.866.866 | Table 2 in full: granule, mitochondrial, nuclear and cytosolic volume fractions for eosinophil, neutrophil, monocyte and lymphocyte. FOUR of our stored values come from this one table and none of us has seen it. |
 | 10381624 | 10.1038/sj.cdd.4400497 | Values behind: kcat_per_s |
 | 12451422 | 10.1007/s00249-002-0248-9 | Values behind: kd_nm |
 | 15130947 | 10.1182/blood-2004-02-0437 | Table/figure giving microvillar LENGTH per lymphocyte source, and the 2-4 per um^2 DENSITY range. We store the median 0.35 um from the abstract; the per-source table is what separates T from B and resting from activated. |
@@ -28,8 +27,22 @@ pypdf. No credentials, no proxy, nothing shared.
 | 25679760 | 10.1016/j.cell.2015.01.007 | Amoeboid migration speeds under confinement. Holds up migration_speed_um_per_min. |
 | 35676539 | 10.1038/s41589-022-01059-7 | Values behind: kcat_per_s |
 
-**17 papers.** Priority order: 6775712 first (four stored
-values from one table), then 15130947 and 27647916 (every microvillus
-number), then 308396 (the nuclear fraction).
+**16 papers.** Priority order: 15130947 and 27647916 next (every
+microvillus number), then 308396 (the nuclear fraction).
+
+## Done
+
+**6775712** arrived 2026-10-20 and Table 2 is read. All four stored
+granule fractions match it exactly -- 23.0 / 15.4 / 2.6 / 0.2 -- so the
+BioNumbers transcription was faithful. What the BNIDs did not carry is
+the paper's Appendix: the four are overestimates, by up to 19% / 28% /
+29% / 44%, because a granule's diameter is comparable to the 0.08 um
+section and it gets counted too often. That bias is now recorded beside
+each value. The same Appendix clears the nuclear fraction explicitly.
+
+Reading it also found a reader bug: pypdf refuses any page whose font
+descriptor declares two embedded programs, and every page of a
+ScienceDirect PDF does. All ten pages extracted to nothing until that
+was fixed, so the next publisher PDF would have failed the same way.
 
 Everything else the library cites is already readable in full.

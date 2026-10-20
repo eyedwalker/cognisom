@@ -283,16 +283,24 @@ def reachability(pmids: List[str], session=None) -> Dict[str, str]:
 LOCAL_PDFS = "docs/papers"
 
 
-def local_pdf(pmid: str, root: str = LOCAL_PDFS) -> Optional[str]:
+def local_pdf(pmid: str, root: Optional[str] = None) -> Optional[str]:
     """Text of a PDF placed here by hand, or None.
 
     Checked BEFORE the network, so a paper somebody has already fetched
     is never requested again, and so the full text wins over the
     abstract that the online routes would otherwise settle for.
+
+    ``root`` defaults to :data:`LOCAL_PDFS` read at CALL time, not at
+    import. Binding it as a default argument captured the value when
+    this module was first imported, so redirecting the directory had no
+    effect -- which let a test that meant to point at an empty temporary
+    directory read the real one instead, and pass for the wrong reason
+    right up until a real PDF landed there.
     """
     import pathlib
 
-    path = pathlib.Path(root) / f"{str(pmid).strip()}.pdf"
+    path = pathlib.Path(root if root is not None else LOCAL_PDFS)
+    path = path / f"{str(pmid).strip()}.pdf"
     if not path.exists():
         return None
     try:
@@ -302,9 +310,87 @@ def local_pdf(pmid: str, root: str = LOCAL_PDFS) -> Optional[str]:
         return None
     try:
         reader = pypdf.PdfReader(str(path))
-        text = " ".join((page.extract_text() or "") for page in reader.pages)
+        _drop_duplicate_font_files(reader)
     except Exception as exc:
-        log.warning("could not read %s: %s", path, exc)
+        log.warning("could not open %s: %s", path, exc)
         return None
+
+    # Per page, so one unreadable page costs that page and not the paper.
+    pages, failed = [], 0
+    for number, page in enumerate(reader.pages, 1):
+        try:
+            pages.append(page.extract_text() or "")
+        except Exception as exc:
+            failed += 1
+            log.warning("%s page %d: %s", path, number, exc)
+    if failed:
+        log.warning("%s: %d of %d pages unreadable", path, failed, len(reader.pages))
+    text = " ".join(pages)
     text = re.sub(r"\s+", " ", text).strip()
     return text if len(text) > 500 else None
+
+
+#: Font-descriptor keys for an embedded font program. A descriptor is
+#: supposed to carry at most one.
+_FONT_FILE_KEYS = ("/FontFile", "/FontFile2", "/FontFile3")
+
+
+def _drop_duplicate_font_files(reader) -> int:
+    """Keep one embedded font program per descriptor; drop the rest.
+
+    pypdf refuses a page outright -- ``PdfReadError: More than one
+    /FontFile found`` -- when a font descriptor declares two of them. The
+    PDF spec does say at most one, but publisher export pipelines emit
+    both regularly: every page of the ScienceDirect copy of PMID 6775712
+    carries ``/FontFile`` (Type 1) and ``/FontFile3`` (CFF) for the same
+    Times face. Both describe the same glyphs, the file renders correctly
+    in every viewer, and pypdf alone declines to read it.
+
+    That mattered: 6775712 is the paper four stored granule volume
+    fractions come from, it is the one this module's whole local-PDF
+    route was built for, and ten pages of it extracted to nothing.
+
+    So the duplicate is dropped in memory -- the first key present wins,
+    the file on disk is untouched, and nothing but the font table is
+    altered. Returns how many descriptors were repaired.
+    """
+    def descriptors(obj, seen):
+        if id(obj) in seen:
+            return
+        seen.add(id(obj))
+        try:
+            obj = obj.get_object()
+        except Exception:
+            return
+        if isinstance(obj, dict):
+            for key, value in list(obj.items()):
+                if key == "/FontDescriptor":
+                    try:
+                        yield value.get_object()
+                    except Exception:
+                        pass
+                else:
+                    yield from descriptors(value, seen)
+        elif isinstance(obj, list):
+            for value in obj:
+                yield from descriptors(value, seen)
+
+    repaired, seen = 0, set()
+    for page in reader.pages:
+        try:
+            resources = page.get("/Resources")
+        except Exception:
+            continue
+        for descriptor in descriptors(resources, seen):
+            present = [k for k in _FONT_FILE_KEYS if k in descriptor]
+            if len(present) <= 1:
+                continue
+            for key in present[1:]:
+                try:
+                    del descriptor[key]
+                except Exception:
+                    pass
+            repaired += 1
+    if repaired:
+        log.info("dropped duplicate font programs in %d descriptors", repaired)
+    return repaired

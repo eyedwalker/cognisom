@@ -21,6 +21,12 @@ wrong, and the ones that failed are not here:
     non-citable, and the citable figure is a surface AREA;
   * no proteasome size -- the record is a yeast 20S shell volume from a
     PhD thesis with no PubMed entry;
+  * no excess membrane area, though PMID 6775712 measures it for all
+    four cell types (cell and nucleus: 84%/98% neutrophil, 130%/32%
+    lymphocyte, 137%/73% monocyte, 92%/84% eosinophil). It belongs to
+    the renderer's surface budget rather than to any parameter the
+    simulation currently reads, and a measurement with nowhere to go is
+    not evidence yet;
   * no normal human nuclear VOLUME -- every citable human record is HeLa,
     hypertriploid and measured trypsinized in suspension, so the
     normal-versus-malignant contrast cannot be sourced here at all. The
@@ -32,6 +38,13 @@ The granule fractions all come from Schmid-Schonbein PMID 6775712 Table
 2, which matters more than any individual number in it: a 77-fold spread
 measured the same way on the same day is a comparison you can trust,
 where four numbers from four papers would not be.
+
+That table was read on 2026-10-20, from a copy fetched by hand. Until
+then every number here had reached the library through BioNumbers, and
+the transcription turned out to be faithful -- all four match. What the
+BNIDs did NOT carry is the Appendix, which says the four are
+overestimates and by how much. A record of a measurement is not the
+measurement.
 """
 from __future__ import annotations
 
@@ -78,14 +91,13 @@ LYMPHOCYTE: Tuple[Measurement, ...] = (
         "3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees "
         "independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 "
         "um^3 cell. A RADIUS is the cube root of this; using the "
-        "fraction as a radius gives a nucleus at 8.8% of the cell.",
-    ),
-    Measurement(
-        "granule_volume_fraction", 0.002, "dimensionless",
-        "PMID:6775712", "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
-        "Human peripheral blood lymphocyte",
-        "The floor of the 77-fold spread in this table; an eosinophil "
-        "measured the same way is 23.0%.",
+        "fraction as a radius gives a nucleus at 8.8% of the cell. The "
+        "same Appendix that discounts the granule fractions clears this "
+        "one: the section-thickness error is 'negligible, because the "
+        "section thickness is small in comparison to nuclear "
+        "dimensions'. Checked against the paper's own Table 1, where an "
+        "eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% "
+        "against Table 2's 17.9%.",
     ),
     Measurement(
         "microvillus_density_per_um2", 3.0, "1/um^2",
@@ -146,22 +158,47 @@ CYTOTOXIC: Tuple[Measurement, ...] = (
 
 #: Granulocytes and phagocytes, all from the one table.
 _TABLE = "Schmid-Schonbein GW et al., Table 2"
-GRANULE_FRACTIONS: Dict[str, Tuple[float, str]] = {
-    "eosinophil": (0.230, "BNID 115197"),
-    "neutrophil": (0.154, "BNID 115195"),
-    "monocyte": (0.026, "BNID 115196"),
-    "lymphocyte": (0.002, "BNID 115194"),
+
+#: ``cell -> (fraction, BNID, stated maximum overestimate)``.
+#:
+#: The third number is the reason to read a paper rather than a record
+#: of it. Table 2 gives the fractions bare, and so does every BioNumbers
+#: entry derived from it; the paper's own Appendix then says they are
+#: biased HIGH, and by how much. A granule's diameter is comparable to
+#: the 0.08 um section, so a granule is caught by more sections than its
+#: size warrants and is counted too often. The authors put the maximum
+#: at 44% for lymphocytes, 29% for monocytes, 28% for neutrophils and
+#: 19% for eosinophils -- a bias that runs the WRONG WAY for this
+#: library, because it is largest exactly where the fraction is smallest.
+GRANULE_FRACTIONS: Dict[str, Tuple[float, str, float]] = {
+    "eosinophil": (0.230, "BNID 115197", 0.19),
+    "neutrophil": (0.154, "BNID 115195", 0.28),
+    "monocyte": (0.026, "BNID 115196", 0.29),
+    "lymphocyte": (0.002, "BNID 115194", 0.44),
 }
 
 
-def _granule(fraction: float, bnid: str, cell: str) -> Measurement:
+def _granule(fraction: float, bnid: str, bias: float, cell: str) -> Measurement:
+    """One granule volume fraction, carrying its known bias.
+
+    The value stays as Table 2 prints it. The bias is recorded beside it
+    rather than subtracted out: the Appendix gives a MAXIMUM, not a
+    point estimate, so correcting by it would trade a known overestimate
+    for an unknown underestimate.
+    """
+    floor = fraction / (1.0 + bias)
     return Measurement(
         "granule_volume_fraction", fraction, "dimensionless",
         "PMID:6775712", f"{_TABLE} ({bnid})",
         f"Human peripheral blood {cell}; stereology on electron micrographs",
         "One table, one method, one paper, which is what makes the "
         "77-fold spread across these cells a comparison rather than four "
-        "unrelated numbers.",
+        "unrelated numbers. Table 2 as printed, which is an "
+        f"OVERESTIMATE: the paper's Appendix puts the bias from finite "
+        f"section thickness at up to {bias:.0%} for this cell, so the "
+        f"true fraction is between {floor:.4f} and {fraction:.4f}. Not "
+        "corrected here because the Appendix states a maximum rather "
+        "than a point estimate.",
     )
 
 
@@ -187,6 +224,11 @@ def measurements_for(name: str) -> List[Measurement]:
     out: List[Measurement] = []
     if name in LYMPHOCYTE_NAMES:
         out.extend(LYMPHOCYTE)
+        # Built the same way as the other three rather than written out
+        # again. It had its own copy, which drifted the moment the table
+        # grew a bias column: the lymphocyte carries the LARGEST stated
+        # overestimate of the four, 44%, on the smallest fraction.
+        out.append(_granule(*GRANULE_FRACTIONS["lymphocyte"], "lymphocyte"))
     if name in CYTOTOXIC_NAMES:
         out.extend(CYTOTOXIC)
     if name in EOSINOPHIL_NAMES:
