@@ -219,10 +219,25 @@ def _unpaywall(article: Article, session) -> str:
 def fetch(pmid: str, session=None) -> Article:
     """Everything retrievable for one PMID, with the tier it reached."""
     session = session or _session()
-    article, note = _europepmc(str(pmid).strip(), session)
+    pmid = str(pmid).strip()
+
+    # A PDF somebody already fetched beats anything online, and costs no
+    # request at all.
+    offline = local_pdf(pmid)
+
+    article, note = _europepmc(pmid, session)
     if article is None:
-        return Article(pmid=str(pmid), attempts=[note])
+        stub = Article(pmid=pmid, attempts=[note])
+        if offline:
+            stub.tier, stub.text, stub.route = FULL_TEXT, offline, "local:pdf"
+        return stub
     article.attempts.append(note)
+
+    if offline:
+        article.tier, article.text = FULL_TEXT, offline
+        article.route = "local:pdf"
+        article.attempts.append(f"local pdf: {len(offline)} chars")
+        return article
 
     if not article.full_text:
         article.attempts.append(_ncbi_fulltext(article, session))
@@ -255,3 +270,41 @@ def reachability(pmids: List[str], session=None) -> Dict[str, str]:
         out[str(pmid)] = fetch(pmid, session).tier
         time.sleep(_pause())
     return out
+
+
+#: Where a PDF fetched by hand is looked for, named ``<PMID>.pdf``.
+#:
+#: Most of what this library cites is paywalled to an automated fetch and
+#: readable to a person with institutional access. Rather than hand this
+#: module a credential -- which would be broad, tied to one person, and
+#: the sort of thing that ends up in a log -- a PDF dropped in this
+#: directory is read from disk. The directory is gitignored: these are
+#: licensed copies and they are not ours to redistribute.
+LOCAL_PDFS = "docs/papers"
+
+
+def local_pdf(pmid: str, root: str = LOCAL_PDFS) -> Optional[str]:
+    """Text of a PDF placed here by hand, or None.
+
+    Checked BEFORE the network, so a paper somebody has already fetched
+    is never requested again, and so the full text wins over the
+    abstract that the online routes would otherwise settle for.
+    """
+    import pathlib
+
+    path = pathlib.Path(root) / f"{str(pmid).strip()}.pdf"
+    if not path.exists():
+        return None
+    try:
+        import pypdf
+    except ImportError:                                 # pragma: no cover
+        log.warning("pypdf is not installed; %s cannot be read", path)
+        return None
+    try:
+        reader = pypdf.PdfReader(str(path))
+        text = " ".join((page.extract_text() or "") for page in reader.pages)
+    except Exception as exc:
+        log.warning("could not read %s: %s", path, exc)
+        return None
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) > 500 else None

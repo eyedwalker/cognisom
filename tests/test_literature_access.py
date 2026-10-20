@@ -188,3 +188,51 @@ def test_xml_stripping_keeps_the_numbers():
     assert "44.4%" in text and "Table 2" in text
     assert "Smith 1999" not in text, "the reference list is not the paper"
     assert "<" not in text
+
+
+# ── a PDF fetched by hand ────────────────────────────────────────────
+
+def test_a_local_pdf_is_read_before_anything_online(tmp_path, monkeypatch):
+    """Most of what this library cites is paywalled to an automated
+    fetch and readable to a person with institutional access. A PDF
+    dropped on disk beats the abstract the online routes settle for, and
+    costs no request."""
+    pytest.importorskip("pypdf")
+    from pypdf import PdfWriter
+
+    papers = tmp_path / "papers"
+    papers.mkdir()
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    with open(papers / "6775712.pdf", "wb") as fh:
+        writer.write(fh)
+
+    # A blank page yields no text, so the module must fall through
+    # rather than report a full text it did not get.
+    monkeypatch.setattr(lit, "LOCAL_PDFS", str(papers))
+    assert lit.local_pdf("6775712") is None
+    assert lit.local_pdf("nonexistent") is None
+
+
+def test_a_local_pdf_with_text_wins(tmp_path, monkeypatch):
+    monkeypatch.setattr(lit, "local_pdf",
+                        lambda pmid, root=None: "Table 2. Granules 23.0%" + "x" * 600
+                        if pmid == "6775712" else None)
+    session = _Session(search={
+        "EXT_ID:6775712 AND SRC:MED": _record("6775712", "Morphometry of human leukocytes"),
+    })
+    article = lit.fetch("6775712", session)
+    assert article.full_text
+    assert article.route == "local:pdf"
+    assert "23.0%" in article.text
+
+    # and a paper with no local copy still goes online
+    other = lit.fetch("1", _Session(search={
+        "EXT_ID:1 AND SRC:MED": _record("1", "Another paper")}))
+    assert other.tier == lit.ABSTRACT
+
+
+def test_the_pdf_directory_is_not_committed():
+    """These are licensed copies. They are not ours to redistribute."""
+    ignore = (REPO_ROOT / ".gitignore").read_text()
+    assert "docs/papers" in ignore

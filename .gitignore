@@ -1,110 +1,98 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
 
-# Microsoft Office lock files (~$Document.docx, ~$Spreadsheet.xlsx)
+!.env.example
+!infrastructure/terraform/.terraform.lock.hcl
+# (cognisom/visualization/exporters.py), so running a dashboard page or a
+# ...but the template carries no secrets and is how a fresh clone discovers
 # Auto-created whenever Word / Excel / PowerPoint has a doc open.
-~$*
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
+# Data files
+# IDE
+# Jupyter
+# Microsoft Office lock files (~$Document.docx, ~$Spreadsheet.xlsx)
+# Model files (large)
+# NOTE: .terraform.lock.hcl is deliberately NOT ignored. It pins provider
+# Node
+# OS
+# Output files
+# PhysiCell (cloned for reference)
+# Python
+# SceneExporter defaults its output to a cwd-relative "scene.json"
 # Secrets and API keys
+# Temporary files
+# Terraform
+# Testing
+# Virtual environments
+# changing; until then, do not commit the artifact.
+# demo from the repo root drops one here. The default itself is worth
+# providers against production on each run (switch-compute-mode.yml applies
+# versions and must be committed, or `terraform init` can resolve different
+# which variables are required.
+# with -auto-approve).
+*$py.class
+*.csv
+*.egg
+*.egg-info/
+*.gif
+*.h5
+*.ipynb
+*.jpg
+*.key
+*.log
+*.mp4
+*.pkl
+*.png
+*.pth
+*.py[cod]
+*.so
+*.swo
+*.swp
+*.tmp
+*.tsv
+*~
+.DS_Store
+.Python
+.coverage
+.eggs/
 .env
 .env.*
-# ...but the template carries no secrets and is how a fresh clone discovers
-# which variables are required.
-!.env.example
-*.key
-secrets/
-
-# Terraform
-infrastructure/terraform/.terraform/
-# NOTE: .terraform.lock.hcl is deliberately NOT ignored. It pins provider
-# versions and must be committed, or `terraform init` can resolve different
-# providers against production on each run (switch-compute-mode.yml applies
-# with -auto-approve).
-!infrastructure/terraform/.terraform.lock.hcl
-infrastructure/terraform/terraform.tfvars
+.idea/
+.installed.cfg
+.ipynb_checkpoints/
+.pytest_cache/
+.vscode/
+ENV/
+PhysiCell/
+SESSION_STATE_*.md
+Thumbs.db
+__pycache__/
+build/
+cognisom.pem
+cognisom.txt
+data/
+develop-eggs/
+dist/
+docs/papers/
+downloads/
+eggs/
+env/
+htmlcov/
 infrastructure/terraform/*.tfstate
 infrastructure/terraform/*.tfstate.backup
 infrastructure/terraform/.terraform.tfstate.lock.info
-
-# Virtual environments
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Node
+infrastructure/terraform/.terraform/
+infrastructure/terraform/terraform.tfvars
+lib/
+lib64/
+models/*.xml
 node_modules/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Output files
 output/
-*.png
-*.jpg
-*.gif
-*.mp4
+parts/
 results.json
-# SceneExporter defaults its output to a cwd-relative "scene.json"
-# (cognisom/visualization/exporters.py), so running a dashboard page or a
-# demo from the repo root drops one here. The default itself is worth
-# changing; until then, do not commit the artifact.
 scene.json
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# PhysiCell (cloned for reference)
-PhysiCell/
-
-# Temporary files
-*.log
-*.tmp
+sdist/
+secrets/
 temp/
 tmp/
-
-# Model files (large)
-*.h5
-*.pkl
-*.pth
-models/*.xml
-
-# Data files
-data/
-*.csv
-*.tsv
-cognisom.pem
-cognisom.txt
-SESSION_STATE_*.md
+var/
+venv/
+wheels/
+~$*
