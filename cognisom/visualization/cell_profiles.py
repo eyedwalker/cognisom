@@ -50,6 +50,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from cognisom.visualization import cell_detail as cd
+
 log = logging.getLogger(__name__)
 
 #: Where each molecule in the library's marker lists actually resides.
@@ -113,15 +115,28 @@ def marker_color(marker: str) -> Tuple[float, float, float]:
 #: cytotoxic lymphocyte is told from a naive one without inventing a shape.
 LYTIC_CARGO = frozenset({"granzyme_B", "granzyme_A", "perforin", "granulysin"})
 
-#: Counts and sizes declared here rather than sourced. Named so a report
-#: cannot present them as curated.
+#: Counts and sizes still declared here rather than sourced. Named so a
+#: report cannot present them as curated. The microvillus and lytic
+#: granule fields have left this set -- they are measured now, and the
+#: citations sit on the constants they come from.
 UNSOURCED: Tuple[str, ...] = (
-    "microvilli_count", "microvillus_length_um", "microvillus_radius_um",
     "mitochondrial_volume_fraction", "mitochondrion_radius_um",
     "lysosome_count", "lysosome_radius_um",
-    "lytic_granule_count", "lytic_granule_radius_um",
-    "receptor_stud_count",
+    "receptor_stud_count", "ruffle_amplitude_um",
 )
+
+#: Lytic granules in a primary human NK cell: 63 +/- 23 (PMID 29592963).
+#: Explicitly NOT the 194-206 from the same paper's NK-92 and YTS lines,
+#: which is what reviews quote as "almost 200 granules" -- immortalised
+#: lines carrying three times the load.
+LYTIC_GRANULES_PER_CELL = 63
+
+#: Lytic granule radius, um. Diameter 0.25-0.33 across three methods and
+#: three papers: 251 +/- 2 nm on primary human NK by 3D-SIM (PMID
+#: 21931537), 333 +/- 103 nm on NK-92 by STED (PMID 21931536), and a
+#: 3.3 fF capacitance step on primary human CD8 T cells (PMID 26296096),
+#: which at 10 fF/um^2 works out at 324 nm.
+LYTIC_GRANULE_RADIUS_UM = 0.145
 
 
 @dataclass
@@ -181,11 +196,18 @@ class Profile:
 #: Lymphocyte: microvilli, a nucleus filling most of the cell, few
 #: mitochondria and little else. The resting lymphocyte is the cell this
 #: whole module exists for, because it is the eighteen-way collision.
+#: A lymphocyte's surface grammar is DISCRETE MICROVILLI; a monocyte's
+#: and a neutrophil's is RUFFLES (PMID 15130947). That contrast is the
+#: one thing in this mapping that lets a viewer tell a lymphocyte from a
+#: monocyte at a glance, so the two must not be mixed.
+#:
+#: The count is not stored here. It comes from the measured density and
+#: whatever diameter the entity declares, so it stays right when the cell
+#: changes size -- cell_detail.microvillus_count.
 _LYMPHOCYTE = dict(
-    microvilli_count=320,
-    microvillus_length_um=0.38,
-    microvillus_radius_um=0.042,
-    mitochondrial_volume_fraction=0.03,
+    microvillus_length_um=cd.MICROVILLUS_MEDIAN_LENGTH_UM,
+    microvillus_radius_um=cd.MICROVILLUS_DIAMETER_UM / 2.0,
+    mitochondrial_volume_fraction=0.038,
     mitochondrion_radius_um=0.15,
     receptor_stud_count=90,
 )
@@ -241,8 +263,13 @@ def partition_markers(markers: Sequence[str]) -> Dict[str, List[str]]:
 
 
 def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
-                **overrides) -> Profile:
+                scale_um: float = 8.0, **overrides) -> Profile:
     """The detail profile for one library entity.
+
+    ``scale_um`` is the cell's diameter, and it is not cosmetic: the
+    microvillus count is a measured DENSITY times this cell's own surface
+    area, so a profile built without it coats every cell as though it
+    were 8 um across.
 
     ``overrides`` replaces any declared estimate, which is how a sourced
     number arrives without this mapping having to change.
@@ -253,12 +280,15 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
 
     if kind in ("lymphocyte", "plasma"):
         base.update(_LYMPHOCYTE)
-        why.append("lymphocyte: microvilli and a nucleus filling most of "
-                   "the cell")
+        base["microvilli_count"] = cd.microvillus_count(scale_um)
+        why.append(f"lymphocyte: {base['microvilli_count']} microvilli, from "
+                   f"a measured {cd.MICROVILLUS_DENSITY_PER_UM2:g}/um^2 over "
+                   f"this cell's own {scale_um:g} um")
     elif kind in ("phagocyte", "dendritic"):
         base.update(_PHAGOCYTE)
-        why.append("phagocyte: a ruffled surface and many lysosomes rather "
-                   "than microvilli")
+        why.append("phagocyte: ruffles, not microvilli -- the surface "
+                   "grammar that separates a monocyte from a lymphocyte "
+                   "at a glance")
     elif kind == "granulocyte":
         base.update(mitochondrial_volume_fraction=0.04,
                     mitochondrion_radius_um=0.2,
@@ -278,8 +308,8 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     placed = partition_markers(markers)
     if placed["granule"] and set(placed["granule"]) & LYTIC_CARGO:
         cargo = sorted(set(placed["granule"]) & LYTIC_CARGO)
-        base["lytic_granule_count"] = 24
-        base["lytic_granule_radius_um"] = 0.19
+        base["lytic_granule_count"] = LYTIC_GRANULES_PER_CELL
+        base["lytic_granule_radius_um"] = LYTIC_GRANULE_RADIUS_UM
         why.append("carries " + ", ".join(cargo) +
                    ", so it holds lytic granules")
     if placed["nucleus"]:

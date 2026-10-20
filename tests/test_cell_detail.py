@@ -56,23 +56,37 @@ def lymphocyte():
 
 def test_a_lymphocyte_is_mostly_nucleus(lymphocyte):
     """It was 0.095 -- a dot in an empty ball, and the main reason the
-    eighteen smooth_sphere entities read as featureless spheres. A resting
-    lymphocyte is described everywhere as a nucleus with a rim of
-    cytoplasm."""
+    eighteen smooth_sphere entities read as featureless spheres.
+
+    The replacement is measured, and it is NOT what "a nucleus with a rim
+    of cytoplasm" suggests: 0.444 (Schmid-Schonbein PMID 6775712, via
+    BNID 115194) and 0.458 (Petrzilka PMID 308396, 47.5 of 103.8 um^3).
+    An earlier version of this test asserted 0.55-0.78, which was a guess
+    wearing a test's clothes.
+    """
     _parts, masks = lymphocyte
     body = cd.mask_volume_um3(masks["body"], SCALE)
     nucleus = cd.mask_volume_um3(masks["nucleus"], SCALE)
-    assert 0.55 < nucleus / body < 0.78, nucleus / body
-    assert LYMPHOCYTE_NUCLEAR_RADIUS > 0.7
+    assert 0.41 < nucleus / body < 0.49, nucleus / body
+    # And the radius is the cube root of the fraction, never the fraction
+    # itself -- setting the radius to 0.444 would give a nucleus at 8.8%
+    # of the cell, which is the bug this replaced, reached from the right
+    # number.
+    assert LYMPHOCYTE_NUCLEAR_RADIUS == pytest.approx(
+        0.92 * 0.444 ** (1 / 3), rel=1e-6)
 
 
 def test_the_cytoplasm_is_a_thin_shell(lymphocyte):
-    """Which is why the frame alignment matters: there is very little room
-    between the nucleus and the membrane for anything to sit in."""
+    """Which is why the frame alignment matters: there is little room
+    between the nucleus and the membrane for anything to sit in.
+
+    The same table gives cytoplasm 51.6% against nucleus 44.4% (PMID
+    6775712), so this is the measured complement, not a loose bound.
+    """
     _parts, masks = lymphocyte
     cyto = masks["body"] & ~masks["nucleus"]
     body = cd.mask_volume_um3(masks["body"], SCALE)
-    assert 0.2 < cd.mask_volume_um3(cyto, SCALE) / body < 0.45
+    assert 0.50 < cd.mask_volume_um3(cyto, SCALE) / body < 0.60
 
 
 # ── surface sampling ─────────────────────────────────────────────────
@@ -160,7 +174,13 @@ def test_projections_stand_off_the_surface_not_inside_it(lymphocyte):
     # Centres sit around the membrane, pushed out by half the length less
     # the embedded part -- not buried, not floating.
     assert r_inst.mean() > r_surface.mean()
-    assert r_inst.max() < r_surface.max() + 0.5
+    # The ceiling is set by the longest microvillus, and the distribution
+    # is log-normal with a long tail by measurement -- lengths run "from
+    # 0.1 um to several micrometers" (PMID 27647916). A bound that
+    # assumed a symmetric spread was really asserting the wrong
+    # distribution.
+    longest = float(inst.scales[:, 2].max())
+    assert r_inst.max() < r_surface.max() + longest
 
 
 def test_no_surface_no_crash():

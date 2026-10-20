@@ -165,6 +165,60 @@ def _veil(g, centre, direction, reach, width, thickness):
     return ((d / radii) ** 2).sum(axis=-1) <= 1.0
 
 
+#: Granule volume fraction of the cell, by cell type. One table, one
+#: method, one paper -- Schmid-Schonbein PMID 6775712 Table 2, read back
+#: through BNIDs 115197 / 115195 / 115196 / 115194:
+#:
+#:      eosinophil  23.0%
+#:      neutrophil  15.4%
+#:      monocyte     2.6%
+#:      lymphocyte   0.2%
+#:
+#: A 77-fold measured spread, and the strongest single discriminator
+#: between these cells. The builders gave an eosinophil 2.4% and a
+#: neutrophil 1.5% -- tenfold low, and close enough to each other that
+#: the discriminator was flattened to nothing.
+GRANULE_FRACTION = {
+    "eosinophil": 0.230,
+    "neutrophil": 0.154,
+    "monocyte": 0.026,
+    "lymphocyte": 0.002,
+}
+
+
+def _granules_to_fraction(g, body, fraction, radius, seed, spread=0.35):
+    """Granules filling ``fraction`` of ``body`` by volume.
+
+    Placed until the fraction is reached rather than by a precomputed
+    count, because granules overlap: at an eosinophil's 23% the overlap
+    is substantial and a count derived from the single-granule volume
+    falls short of the target by a third.
+    """
+    rng = np.random.default_rng(seed)
+    target = fraction * float(body.sum())
+    if target <= 0:
+        return np.zeros(g.shape[:3], bool)
+    out = np.zeros(g.shape[:3], bool)
+    # Candidate centres must sit a granule's radius inside the body, or
+    # granules placed against the membrane push through it -- which they
+    # did, on 1.4-3.6% of granule vertices across the three granulocytes.
+    try:
+        from scipy.ndimage import distance_transform_edt
+        voxel = 2.0 / body.shape[0]            # the grid spans [-1, 1]
+        deep = distance_transform_edt(body) * voxel >= radius
+        idx = np.argwhere(deep if deep.any() else body)
+    except ImportError:                                 # pragma: no cover
+        idx = np.argwhere(body)
+    for _ in range(4000):
+        if float((out & body).sum()) >= target:
+            break
+        centre = (g[tuple(idx[rng.integers(len(idx))])]
+                  if len(idx) else np.zeros(3))
+        r = radius * (1.0 + rng.normal(scale=spread))
+        out |= _sphere(g, centre, max(r, radius * 0.4))
+    return out & body
+
+
 def _spikes(g, n, inner, outer, thickness, seed):
     """Radial projections: viral envelope spikes, or cell processes."""
     rng = np.random.default_rng(seed)
@@ -190,13 +244,24 @@ def _b_sphere(g, seed):
 #: 0.42 against a body of 0.92, a volume ratio of (0.42/0.92)^3 = 0.095 --
 #: a dot in an empty ball, and the main reason the library's eighteen
 #: smooth_sphere entities read as featureless spheres rather than as
-#: lymphocytes. 0.80/0.92 cubed is 0.66, which is the N:C a lymphocyte is
-#: actually reported at.
+#: lymphocytes.
 #:
-#: The ratio is a shape fact, not a measurement this module owns; it is
-#: the one number here that decides whether the silhouette reads as the
-#: right class of cell at all.
-LYMPHOCYTE_NUCLEAR_RADIUS = 0.80
+#: The replacement is measured, and it is NOT the 0.66 that "a nucleus
+#: with a rim of cytoplasm" suggests. Two groups, two stereological
+#: models, agree the nuclear VOLUME fraction is about 0.45:
+#:
+#:   0.444  Schmid-Schonbein, PMID 6775712 Table 2 (BNID 115194:
+#:          "nucleus 44.4%: granules 0.2%: mitochondria 3.8%:
+#:          cytoplasm 51.6%")
+#:   0.458  Petrzilka, PMID 308396 -- nucleus 47.5 um^3 in a cell of
+#:          103.8 um^3
+#:
+#: A radius is not a volume fraction. f^(1/3) = 0.767, so against a body
+#: of 0.92 the nuclear radius is 0.705. Setting the radius from f
+#: directly would give a nucleus at f^3 = 9% of the cell -- which is
+#: exactly the bug this replaces, arrived at from the right number.
+LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION = 0.444
+LYMPHOCYTE_NUCLEAR_RADIUS = 0.92 * LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION ** (1 / 3)
 
 
 def _b_smooth_sphere(g, seed):
@@ -207,44 +272,59 @@ def _b_smooth_sphere(g, seed):
 
 
 def _b_granular_sphere(g, seed):
-    rng = np.random.default_rng(seed)
+    """NK / NKT: a lymphocyte carrying lytic granules.
+
+    Still a lymphocyte, so it keeps the lymphocyte nucleus; the granules
+    are what set it apart, and they are few -- a primary human NK cell
+    holds 63 +/- 23 of them (PMID 29592963), not the ~200 that reviews
+    quote from the NK-92 and YTS cell lines.
+    """
     body = _sphere(g, r=0.92)
-    gran = np.zeros(g.shape[:3], bool)
-    for _ in range(26):
-        c = rng.normal(scale=0.42, size=3)
-        gran |= _sphere(g, c, 0.09)
-    return {1: body, 3: gran & body}
+    nuc = _sphere(g, (0.06, -0.04, 0), LYMPHOCYTE_NUCLEAR_RADIUS)
+    gran = _granules_to_fraction(g, body & ~nuc, 0.020, 0.052, seed)
+    return {1: body, 2: nuc, 3: gran}
 
 
 def _b_dense_granular(g, seed):
-    rng = np.random.default_rng(seed)
+    """Mast cell / basophil: so densely granulated that the granules,
+    not the nucleus, are what you see. Taken at the eosinophil's measured
+    fraction, which is the highest in the table and the closest
+    available: Schmid-Schonbein's series does not separate basophils."""
     body = _sphere(g, r=0.92)
-    gran = np.zeros(g.shape[:3], bool)
-    for _ in range(70):
-        gran |= _sphere(g, rng.normal(scale=0.46, size=3), 0.075)
-    return {1: body, 3: gran & body}
+    nuc = _sphere(g, (0.10, 0.06, 0), 0.40)
+    gran = _granules_to_fraction(g, body & ~nuc,
+                                 GRANULE_FRACTION["eosinophil"], 0.062, seed)
+    return {1: body, 2: nuc, 3: gran}
 
 
 def _b_multilobed_granular(g, seed):
-    """Neutrophil: three to five nuclear lobes on a thread, dense granules."""
-    rng = np.random.default_rng(seed)
+    """Neutrophil: three to five nuclear lobes on a thread, dense granules.
+
+    15.4% of the cell by volume (PMID 6775712), against the 1.5% this
+    built before. Finer granules than an eosinophil's, and fewer by
+    volume, which is the pair of facts that separates the two.
+    """
     body = _sphere(g, r=0.92)
     nuc = _lobes(g, 4, 0.30, 0.44, seed)
-    gran = np.zeros(g.shape[:3], bool)
-    for _ in range(60):
-        gran |= _sphere(g, rng.normal(scale=0.5, size=3), 0.07)
-    return {1: body, 2: nuc & body, 3: gran & body & ~nuc}
+    gran = _granules_to_fraction(g, body & ~nuc,
+                                 GRANULE_FRACTION["neutrophil"], 0.058, seed)
+    return {1: body, 2: nuc & body, 3: gran}
 
 
 def _b_bilobed_granular(g, seed):
-    """Eosinophil: two lobes, coarser granules."""
-    rng = np.random.default_rng(seed)
+    """Eosinophil: two nuclear lobes, and packed with coarse granules.
+
+    23.0% of the cell by volume (PMID 6775712), the highest in the
+    series and nearly ten times what this built before. An eosinophil is
+    defined by how full of granules it is -- that is what the stain
+    picks out -- so an eosinophil at 2.4% is not a dimmer eosinophil, it
+    is a different cell.
+    """
     body = _sphere(g, r=0.92)
     nuc = _sphere(g, (-0.34, 0.10, 0), 0.36) | _sphere(g, (0.34, -0.10, 0), 0.36)
-    gran = np.zeros(g.shape[:3], bool)
-    for _ in range(34):
-        gran |= _sphere(g, rng.normal(scale=0.48, size=3), 0.10)
-    return {1: body, 2: nuc & body, 3: gran & body & ~nuc}
+    gran = _granules_to_fraction(g, body & ~nuc,
+                                 GRANULE_FRACTION["eosinophil"], 0.085, seed)
+    return {1: body, 2: nuc & body, 3: gran}
 
 
 def _b_ruffled_pseudopod(g, seed):
@@ -341,8 +421,20 @@ def _b_elongated_spindle(g, seed):
 
 
 def _b_flat_squamous(g, seed):
+    """Endothelium: a thin plate that bulges where the nucleus is.
+
+    The nucleus was half-extent 0.17 in z inside a cell of 0.152 -- the
+    nucleus was thicker than the cell it is in, and 16% of its vertices
+    lay outside the membrane. Thinning the nucleus would fix the
+    containment and lose the fact: a squamous cell really is thinner than
+    its nucleus everywhere except over the nucleus, and the bulge is how
+    you pick endothelial nuclei out of a vessel wall. So the body bulges
+    instead.
+    """
+    nuc = _sphere(g, (0, 0, 0), 0.34, squash=(1, 1, 0.52))
     body = _sphere(g, r=0.95, squash=(1.0, 1.0, 0.16))
-    return {1: body, 2: _sphere(g, (0, 0, 0), 0.34, squash=(1, 1, 0.5))}
+    body |= _sphere(g, (0, 0, 0), 0.40, squash=(1, 1, 0.58))   # the bulge
+    return {1: body, 2: nuc & body}
 
 
 def _b_polarized_columnar(g, seed):
@@ -364,9 +456,12 @@ def _b_cuboidal_tall(g, seed):
 
 
 def _b_flat_activated_adhesion(g, seed):
+    """Inflamed endothelium: flat, thickened, with a nuclear bulge."""
+    nuc = _sphere(g, (0, 0, 0), 0.28, squash=(1, 1, 0.55))
     body = _sphere(g, r=0.95, squash=(1.0, 0.85, 0.18))
+    body |= _sphere(g, (0, 0, 0), 0.34, squash=(1, 1, 0.62))
     body |= _spikes(g, 7, 0.5, 0.98, 0.06, seed) & (np.abs(g[..., 2]) < 0.18)
-    return {1: body, 2: _sphere(g, (0, 0, 0), 0.28, squash=(1, 1, 0.55))}
+    return {1: body, 2: nuc & body}
 
 
 # viruses

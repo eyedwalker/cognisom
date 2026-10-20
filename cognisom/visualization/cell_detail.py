@@ -244,16 +244,53 @@ def quat_z_to(directions: np.ndarray) -> np.ndarray:
 
 # ── the features themselves ─────────────────────────────────────────────
 
+#: Measured microvillar density on resting human T cells, per um^2.
+#:
+#: 3 +/- 0.5 by live-cell variable-angle TIRF with 3D surface
+#: reconstruction (PMID 27647916), and independently the midpoint of the
+#: 2-4 range from SEM morphometry across lymphocyte sources (PMID
+#: 15130947). Two labs, two decades, two unrelated methods, same number.
+#:
+#: A DENSITY is the thing to store, not a count: the count follows from
+#: whatever diameter an entity declares, so it stays right when the cell
+#: changes size. 3/um^2 is 462 microvilli on a 7 um lymphocyte and 603 on
+#: an 8 um one.
+MICROVILLUS_DENSITY_PER_UM2 = 3.0
+
+#: Median microvillar length, um (PMID 15130947). The MEDIAN of a
+#: strongly right-skewed distribution, not a mean -- lengths run "from
+#: 0.1 um to several micrometers" (PMID 27647916, verbatim).
+MICROVILLUS_MEDIAN_LENGTH_UM = 0.35
+
+#: Shaft diameter, um: 0.070-0.100 measured on resting human T cells, and
+#: the same on effector cells (PMID 27647916). Rendered at the midpoint.
+MICROVILLUS_DIAMETER_UM = 0.085
+
+
+def microvillus_count(diameter_um: float,
+                      density_per_um2: float = MICROVILLUS_DENSITY_PER_UM2
+                      ) -> int:
+    """How many microvilli a cell of this diameter carries."""
+    if diameter_um <= 0:
+        return 0
+    return int(round(density_per_um2 * math.pi * diameter_um ** 2))
+
+
 def projections(vertices: np.ndarray, triangles: np.ndarray, *,
                 count: int, length_um: float, radius_um: float,
                 seed: int = 0, length_spread: float = 0.35,
-                embed: float = 0.25) -> Instances:
+                embed: float = 0.25, lognormal: bool = True) -> Instances:
     """Microvilli, filopodia or spikes standing off a surface.
 
-    ``count`` is a number per cell, so a caller can hand over a measured
-    density and have it mean that. ``length_spread`` is the fractional
-    standard deviation of length: a real brush border is not uniform, and
-    an exactly uniform one reads as a machined object rather than a cell.
+    ``count`` is a number per cell, so a caller can hand a measured
+    density through :func:`microvillus_count` and have it mean that.
+
+    ``length_um`` is the MEDIAN, and the distribution is log-normal by
+    default, because that is the shape the measurement has: microvillar
+    lengths run from 0.1 um to several micrometres about a median of
+    0.35. A symmetric spread around a mean cannot produce the long tail,
+    and a constant length reads as machined stubble -- which is most of
+    what makes a coated cell look synthetic rather than alive.
 
     ``embed`` sinks each projection into the surface by that fraction of
     its length, so the base meets the membrane instead of floating on it.
@@ -263,8 +300,14 @@ def projections(vertices: np.ndarray, triangles: np.ndarray, *,
     if len(points) == 0:
         return Instances(points, np.zeros((0, 4), np.float32), points)
 
-    lengths = length_um * np.clip(
-        1.0 + rng.normal(scale=length_spread, size=len(points)), 0.25, 2.5)
+    if lognormal:
+        # exp(normal) has median exp(0) = 1, so the median length is
+        # length_um exactly, and sigma sets how long the tail runs.
+        lengths = length_um * np.exp(rng.normal(scale=0.62, size=len(points)))
+        lengths = np.clip(lengths, length_um * 0.28, length_um * 6.0)
+    else:
+        lengths = length_um * np.clip(
+            1.0 + rng.normal(scale=length_spread, size=len(points)), 0.25, 2.5)
     # A prototype of unit height centred on its own origin: its base sits
     # at the membrane once it is pushed out by half its height, less the
     # embedded part.
