@@ -417,6 +417,48 @@
   ]
  },
  {
+  "referenced_as": "BCL-6",
+  "entity_name": "BCL6",
+  "gene": "BCL6",
+  "accession": "P41182",
+  "uniprot_name": "B-cell lymphoma 6 protein",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 706,
+  "synonyms": [
+   "BCL6",
+   "BCL-6",
+   "LAZ-3",
+   "ZBTB27",
+   "BCL5"
+  ],
+  "description": "The transcriptional repressor that makes a T follicular helper cell and a germinal centre B cell, and the reciprocal antagonist of BLIMP-1: BCL6 holds a B cell in the germinal centre and BLIMP-1 drives it out as a plasma cell. The pair is a switch, and the library held neither half.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
+ },
+ {
+  "referenced_as": "BLIMP-1",
+  "entity_name": "BLIMP-1 (PRDM1)",
+  "gene": "PRDM1",
+  "accession": "O75626",
+  "uniprot_name": "PR domain zinc finger protein 1",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 825,
+  "synonyms": [
+   "PRDM1",
+   "BLIMP-1",
+   "BLIMP1",
+   "PRDI-BF1",
+   "Beta-interferon gene positive regulatory domain I-binding factor"
+  ],
+  "description": "The transcription factor that terminates the germinal centre programme and commits a B cell to become an antibody-secreting plasma cell -- the counterpart to BCL6. It also drives terminal differentiation and exhaustion in CD8 T cells, so it sits on both sides of this platform's biology.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
+ },
+ {
   "referenced_as": "CD40L",
   "entity_name": "CD40 ligand (CD40L/CD154)",
   "gene": "CD40LG",
@@ -747,6 +789,26 @@
   ]
  },
  {
+  "referenced_as": "Scurfin",
+  "entity_name": "FOXP3",
+  "gene": "FOXP3",
+  "accession": "Q9BZS1",
+  "uniprot_name": "Forkhead box protein P3",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 431,
+  "synonyms": [
+   "FOXP3",
+   "Scurfin",
+   "forkhead box P3",
+   "JM2"
+  ],
+  "description": "The lineage-defining transcription factor of the regulatory T cell, and the one that is not merely a marker: FOXP3 is required to MAKE a Treg, and its loss causes IPEX, a fatal autoimmune syndrome in infancy. It is the single molecule that separates a Treg from any other CD4 T cell, and it is NUCLEAR -- which is exactly why its absence from this library mattered: the renderer had it in a list called surface_markers with nothing to tell it otherwise, so the one molecule that defines immunosuppression was drawn as a receptor on the outside of the cell.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
+ },
+ {
   "referenced_as": "FAP+ / FAP-",
   "entity_name": "Fibroblast activation protein alpha (FAP)",
   "gene": "FAP",
@@ -797,6 +859,25 @@
   "compartments": [
    "cytoplasm"
   ]
+ },
+ {
+  "referenced_as": "GATA-3",
+  "entity_name": "GATA3",
+  "gene": "GATA3",
+  "accession": "P23771",
+  "uniprot_name": "Trans-acting T-cell-specific transcription factor GATA-3",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 443,
+  "synonyms": [
+   "GATA3",
+   "GATA-3",
+   "GATA-binding factor 3"
+  ],
+  "description": "The Th2 master regulator, driving IL-4, IL-5 and IL-13 and repressing the Th1 programme. Also required for ILC2 identity, which is why this library lists it on both. The counterpart to T-bet in the type1/type2 switch.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
  },
  {
   "referenced_as": "NANOG+",
@@ -993,6 +1074,28 @@
   ]
  },
  {
+  "referenced_as": "RORgt",
+  "entity_name": "RORgt (RORC)",
+  "gene": "RORC",
+  "accession": "P51449",
+  "uniprot_name": "Nuclear receptor ROR-gamma",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 518,
+  "synonyms": [
+   "RORC",
+   "RORgt",
+   "ROR-gamma-t",
+   "RORgamma",
+   "Nuclear receptor RZR-gamma",
+   "NR1F3"
+  ],
+  "description": "The Th17 and ILC3 master regulator, driving IL-17 and IL-22. The thymus-specific isoform RORgt is the immunological one; the library's marker lists write it 'RORgt'. A nuclear receptor rather than a classical transcription factor, and therefore druggable -- RORgt inverse agonists are in trials, which is why it matters to a treatment simulation.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
+ },
+ {
   "referenced_as": "SYP+",
   "entity_name": "Synaptophysin (SYP)",
   "gene": "SYP",
@@ -1011,6 +1114,27 @@
   "compartments": [
    "granule"
   ]
+ },
+ {
+  "referenced_as": "T-bet",
+  "entity_name": "T-bet (TBX21)",
+  "gene": "TBX21",
+  "accession": "Q9UL17",
+  "uniprot_name": "T-box transcription factor TBX21",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 535,
+  "synonyms": [
+   "TBX21",
+   "T-bet",
+   "Tbet",
+   "T-cell-specific T-box transcription factor T-bet",
+   "TBLYM"
+  ],
+  "description": "The master regulator of the type 1 response. T-bet drives IFN-gamma and represses the Th2 and Th17 programmes, so it is what makes a CD4 cell a Th1 rather than a Th2, and it is also required in CD8 effectors and NK cells. With GATA3 and RORgt it forms the three-way switch the renderer would need to tell the CD4 subsets apart -- all three were absent.",
+  "uniprot_verified": "2026-10-21: gene symbol, recommended name and length read back from UniProt"
  },
  {
   "referenced_as": "TOX",

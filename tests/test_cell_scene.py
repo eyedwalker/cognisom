@@ -58,6 +58,12 @@ class _Stub:
         self.properties = {}
         self.physics_params = {}
 
+    def to_dict(self):
+        # scene_for reads markers through to_dict, because only some
+        # entity classes carry a loose .properties attribute and the
+        # immune cells do not.
+        return {"properties": self.properties}
+
 
 def _scene(store, index, name):
     entity = store.find_entity_by_name(name)

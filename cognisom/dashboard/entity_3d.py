@@ -502,9 +502,12 @@ def _render_cell_from_library(entity, height: int) -> bool:
 
     from cognisom.visualization import cell_scene as cs
 
-    markers = tuple(sorted(
-        (getattr(entity, "properties", None) or {}).get("surface_markers")
-        or (getattr(entity, "properties", None) or {}).get("markers") or []))
+    # markers_of reads the serialised dict, because only some entity
+    # classes have a loose .properties attribute and the immune cells --
+    # the ones with markers worth placing -- do not.
+    from cognisom.visualization.cell_profiles import markers_of
+
+    markers = tuple(sorted(markers_of(entity.to_dict())))
     try:
         scene = _cached_scene(entity.name, entity.mesh_type or "",
                               float(entity.scale_um or 10.0), markers,

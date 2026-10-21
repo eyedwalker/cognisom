@@ -188,7 +188,16 @@ def scene_for(entity, *, grid: int = CARD_GRID,
             opacity=PART_OPACITY.get(part, 1.0)))
 
     # ── the detail the library can pay for ───────────────────────────
-    markers = cp.markers_of(getattr(entity, "properties", None) or {})
+    # Through to_dict(), not getattr(entity, "properties").
+    #
+    # Only some entity classes carry a loose .properties attribute;
+    # ImmuneCellEntity does not, and its markers live in the dict
+    # to_dict() builds. Reading the attribute returned {} for every
+    # immune cell in the library, so NO immune cell's markers reached
+    # the profile -- the compartment placement, the stud groups and the
+    # lytic-cargo detection were all running on an empty list, silently,
+    # for exactly the twenty-five cells the whole mapping exists for.
+    markers = cp.markers_of(entity.to_dict())
     profile = cp.profile_for(name, mesh_type, markers, scale_um=scale_um,
                              library=library, compartments=compartments)
     scene.profile = profile

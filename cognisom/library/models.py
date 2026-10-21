@@ -309,6 +309,23 @@ class BioEntity:
         if not self.display_name:
             self.display_name = self.name
 
+    #: Externally sourced annotations, merged into ``properties`` on
+    #: save and read back on load.
+    #:
+    #: This exists because ``_extra_properties`` is a FIXED key set per
+    #: subclass: anything written as a loose attribute is dropped when
+    #: the entity is stored, with no error and no warning. That trap has
+    #: now cost this repository three separate losses -- the cytotoxic
+    #: effectors' verified UniProt names, 94 curated accessions, and a
+    #: whole Human Protein Atlas pass -- each discovered only by going
+    #: back to look.
+    #:
+    #: A typed field per source does not scale: the next atlas needs
+    #: another one, on five classes. Anything put here survives, whatever
+    #: the subclass, so a sourcing module does not have to edit the model
+    #: to record what it found.
+    sourced: Dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         d = {
             "entity_id": self.entity_id,
@@ -327,7 +344,8 @@ class BioEntity:
             "updated_at": self.updated_at,
             "created_by": self.created_by,
             "tags": self.tags,
-            "properties": self._extra_properties(),
+            "properties": {**(self.sourced or {}),
+                            **self._extra_properties()},
         }
         # Include visualization/physics/interaction fields if set
         if self.usd_prim_type:
@@ -402,6 +420,10 @@ class BioEntity:
 
         # Apply type-specific properties
         entity._apply_properties(props)
+        # Whatever the subclass did not claim is a sourced annotation.
+        claimed = set(entity._extra_properties() or {})
+        entity.sourced = {k: v for k, v in (props or {}).items()
+                          if k not in claimed}
         return entity
 
     def _apply_properties(self, props: dict):

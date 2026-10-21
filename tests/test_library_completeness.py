@@ -235,27 +235,51 @@ def test_the_cd_markers_and_chemokines_are_no_longer_the_gap(store, rows):
     assert not chemokine, sorted(chemokine)
 
 
-def test_the_lineage_transcription_factors_are_the_named_remaining_gap(
-        store, rows):
-    """FOXP3, T-bet, GATA3, RORgt, BCL6 and BLIMP-1 are what the
-    renderer would tell a Treg from a Th1 by, and none is an entity.
+def test_the_lineage_transcription_factors_are_entities_now(store, rows):
+    """They were the named remaining gap and the test that held it said
+    to delete it rather than edit a number when they arrived.
 
-    Their accessions are verified and sitting in the notes -- FOXP3
-    Q9BZS1, TBX21 Q9UL17, GATA3 P23771, RORC P51449, BCL6 P41182, PRDM1
-    O75626 -- so this is writing, not research. The test names them so
-    the gap cannot be reported as closed while they are absent, and so
-    that whoever adds them deletes this test rather than editing a
-    number.
+    FOXP3, T-bet, GATA3, RORgt, BCL6 and BLIMP-1 are what the renderer
+    tells a Treg from a Th1 by. Each is NUCLEAR, and the point is not
+    only that they exist: a marker list called surface_markers with
+    nothing to tell it otherwise drew FOXP3 -- the molecule that defines
+    immunosuppression -- as a receptor on the outside of the cell.
     """
+    from cognisom.visualization import cell_profiles as cp
+
     index = syn.resolve_index(store)
-    missing = {v for v in _referenced(rows) if v.lower() not in index}
-    factors = {"FOXP3", "T-bet", "GATA3", "RORgt", "BCL6", "BLIMP-1"} & missing
-    assert len(factors) >= 4, (
-        f"some arrived: {sorted({'FOXP3','T-bet','GATA3','RORgt','BCL6','BLIMP-1'} - factors)}"
-        " -- finish the set and delete this test")
+    compartments = cp.library_compartment_index(store)
+    for marker in ("FOXP3", "T-bet", "GATA3", "RORgt", "BCL6", "BLIMP-1"):
+        assert marker.lower() in index, f"{marker} is still not an entity"
+        assert cp.compartment_of(marker, compartments) == "nucleus", (
+            f"{marker} does not place in the nucleus")
 
 
-# ── the effectors reach the simulation ───────────────────────────────
+def test_a_cd4_subset_is_told_apart_by_its_factor(store):
+    """The whole reason they were wanted. Each subset now carries its
+    own lineage definer, in the nucleus, and nothing unplaced."""
+    import contextlib
+    import io
+
+    from cognisom.visualization import cell_profiles as cp
+    from cognisom.visualization import cell_scene as cs
+
+    compartments = cp.library_compartment_index(store)
+    expected = {"Regulatory T cell (Treg)": "FOXP3",
+                "CD4+ Th1 cell": "T-bet",
+                "CD4+ Th2 cell": "GATA3",
+                "CD4+ Th17 cell": "RORgt"}
+    for name, factor in expected.items():
+        entity = store.find_entity_by_name(name, "immune_cell")
+        assert entity is not None, name
+        with contextlib.redirect_stdout(io.StringIO()):
+            scene = cs.scene_for(entity, grid=20, compartments=compartments)
+        assert factor in scene.profile.nuclear_markers, (
+            f"{name}: {factor} is not in the nucleus "
+            f"({scene.profile.nuclear_markers})")
+        assert not scene.profile.unknown_markers, (
+            f"{name} has unplaced markers: {scene.profile.unknown_markers}")
+
 
 def test_a_cytotoxic_cell_is_loaded_from_the_library():
     """Entities in a library nothing reads are vocabulary nobody speaks.
