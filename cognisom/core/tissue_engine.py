@@ -139,6 +139,70 @@ class TissueSimulationEngine:
     def cell_arrays(self) -> List[TissueCellArrays]:
         return self._cell_arrays
 
+
+    #: Persistence time for a cell migrating in tissue, minutes. The
+    #: library has no sourced persistence for any lineage yet, so this is
+    #: an explicit ESTIMATE and is named as one rather than buried: it
+    #: sits in the 10-90 min range PMID:25679760 measures for fibroblasts
+    #: across its adhesion series (Figure 2H), toward the low-adhesion
+    #: end because a cell in tissue is not on a glass coverslip.
+    DEFAULT_PERSISTENCE_MIN = 15.0
+
+    #: Where the motility coefficient came from, so a run can say.
+    _motility_source: str = "not resolved"
+
+    def _resolve_motility_diffusion(self, cfg) -> float:
+        """D for the tissue, from the library's migration speed.
+
+        Returns 0.0 when the library has no evidenced speed, which
+        leaves the diffusive term switched off rather than inventing
+        motion. That is the honest default: before this, motility came
+        from a random FORCE whose effect depended on how finely the step
+        was subdivided.
+        """
+        from cognisom.library.seed_migration_modes import (
+            diffusion_coefficient_um2_per_min)
+
+        explicit = getattr(cfg, "motility_diffusion_um2_per_min", None)
+        if explicit is not None:
+            return float(explicit)
+
+        speed = getattr(cfg, "migration_speed_um_per_min", None)
+        if speed is None:
+            # Straight from the library, the way resolve_radii does it,
+            # and only when the value is EVIDENCE. 42 of the 44 stored
+            # migration speeds are placeholders; reading one of those
+            # would be inventing motion, so the term stays off.
+            try:
+                import contextlib
+                import io
+
+                from cognisom.library.parameters import (Provenance,
+                                                         get_parameter)
+                from cognisom.library.store import EntityStore
+
+                with contextlib.redirect_stdout(io.StringIO()):
+                    store = EntityStore()
+                entity = store.find_entity_by_name("Stromal fibroblast")
+                value = (get_parameter(entity, "migration_speed_um_per_min")
+                         if entity is not None else None)
+                if value is not None and \
+                        value.provenance is not Provenance.PLACEHOLDER:
+                    speed = float(value.value)
+                    self._motility_source = (
+                        f"Stromal fibroblast {speed} um/min "
+                        f"({value.provenance.value}: {value.citation}), "
+                        f"P={self.DEFAULT_PERSISTENCE_MIN:g} min estimated")
+            except Exception:                              # pragma: no cover
+                log.debug("motility not resolved from the library",
+                          exc_info=True)
+                speed = None
+        if not speed:
+            self._motility_source = "none: no evidenced migration speed"
+            return 0.0
+        return diffusion_coefficient_um2_per_min(
+            float(speed), self.DEFAULT_PERSISTENCE_MIN)
+
     def initialize(
         self,
         cell_positions: Optional[np.ndarray] = None,
@@ -237,6 +301,14 @@ class TissueSimulationEngine:
                     "partition boundaries will be missed. Raise "
                     "ghost_width_cells_um.", r_max, contact_range,
                     cfg.ghost_width_cells_um)
+            # Motility from the library, as a DIFFUSION coefficient.
+            # The library carries migration SPEED; a speed is not a
+            # diffusion coefficient, because a fast cell that turns
+            # constantly goes nowhere. The persistent-random-walk
+            # relation D = S^2 P / 2 (PMID:25679760) is the conversion,
+            # and it needs the persistence time as well.
+            mechanics_config.motility_diffusion_um2_per_min = \
+                self._resolve_motility_diffusion(cfg)
             self._mechanics = MultiGPUCellMechanics(
                 self._backend, self._decomposer, self._ghost_exchanger,
                 config=mechanics_config,

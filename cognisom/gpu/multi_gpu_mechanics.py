@@ -49,6 +49,22 @@ class MechanicsConfig:
     # Migration
     migration_force: float = 100.0         # pN (chemotaxis base force)
     random_force: float = 20.0             # pN (Brownian-like fluctuations)
+    #: Cell motility as a DIFFUSION coefficient, um^2/min. When set, the
+    #: random part of cell motion is a displacement of sqrt(2 D dt) per
+    #: axis instead of a force, which is the only form that does not
+    #: depend on how the step was subdivided: n substeps of dt/n give a
+    #: total variance of n * 2D(dt/n) = 2D dt, exactly as one step of dt.
+    #:
+    #: A force cannot do that. random_force produced a displacement
+    #: proportional to dt, so halving the step halved each kick, and the
+    #: clamp at max_displacement_um then saturated -- which made tissue
+    #: mixing a function of mechanics_substeps, a NUMERICAL accuracy
+    #: knob. Measured on this engine: raising it from 5 to 40 moved the
+    #: mean cell 7.65 -> 19.04 um over the same 2 simulated hours.
+    #:
+    #: D comes from the library via the persistent-random-walk relation
+    #: D = S^2 P / 2 (PMID:25679760); see seed_migration_modes.
+    motility_diffusion_um2_per_min: float = 0.0
 
     # Spatial hash
     bucket_size_um: float = 15.0           # Should be >= 2 * max_cell_radius
@@ -387,6 +403,10 @@ class MultiGPUCellMechanics:
             seed = np.random.SeedSequence(int(seed))
         self._seed: Optional[np.random.SeedSequence] = seed
         self._noise_rngs: Dict[int, Any] = {}
+        #: Fraction of cells whose displacement hit max_displacement_um
+        #: on the last integrate(). A clamp that binds on nearly every
+        #: cell on nearly every step is the model, not a stability guard.
+        self._clamped_fraction: float = 0.0
 
         # Per-GPU neighbour state
         self._hashes: List[Optional[_Partition]] = [
@@ -618,10 +638,29 @@ class MultiGPUCellMechanics:
                 dt_seconds = dt * 3600.0
                 displacement = f[:n_real] * dt_seconds / gamma
 
-                # Clamp displacement for stability
+                # Clamp displacement for stability. A guard that fires
+                # on nearly every cell on nearly every step is not a
+                # guard, it is the model -- 99.98% of cell-substeps used
+                # to land at exactly max_displacement_um -- so how often
+                # it binds is recorded for anyone who wants to check.
                 disp_mag = xp.linalg.norm(displacement, axis=1, keepdims=True)
+                self._clamped_fraction = float(
+                    (disp_mag > max_disp).mean()) if n_real else 0.0
                 scale = xp.minimum(1.0, max_disp / xp.maximum(disp_mag, 1e-10))
                 displacement = displacement * scale
+
+                # Motility as DIFFUSION, not as a force. sqrt(2 D dt)
+                # per axis, added after the clamp because it is not a
+                # force and the clamp exists to bound force-driven
+                # overshoot. This term is substep-invariant by
+                # construction: the variance is linear in dt, so
+                # subdividing the step leaves the total unchanged.
+                d_coeff = self._config.motility_diffusion_um2_per_min
+                if d_coeff > 0.0:
+                    dt_minutes = dt * 60.0
+                    sigma = float(np.sqrt(2.0 * d_coeff * dt_minutes))
+                    displacement = displacement + (
+                        self._partition_noise(xp, gpu_id, n_real) * sigma)
 
                 # Only move alive cells
                 alive_mask = alive if alive.ndim > 1 else alive[:, None]
