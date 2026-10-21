@@ -76,6 +76,26 @@ ANCHOR_CITATION = "PMID:9829984"
 ANCHOR_PPM = 37.5
 ANCHOR_PPM_FROM = "Monocyte"
 
+#: That substitution has been tested, which is the one thing a
+#: transcript atlas can honestly do for a protein number. CZ CELLxGENE
+#: Census 2025-01-30, blood, primary data: mean SELPLG (the PSGL-1 gene)
+#: counts per cell were 1.001 in 43,430 neutrophils against 0.468 to
+#: 1.177 across three monocyte populations -- a neutrophil/monocyte
+#: ratio of 0.85, with the neutrophil sitting inside the spread of the
+#: monocyte subtypes themselves.
+#:
+#: Supportive, not conclusive. RNA is not protein, and neutrophils are
+#: the worst case for single-cell sequencing: low RNA content and poor
+#: survival through dissociation, visible here as only 46% of them
+#: registering the transcript at all. It tests the assumption rather
+#: than replacing it, and the grade stays CALIBRATED.
+PROXY_CHECK = (
+    "CZ CELLxGENE Census 2025-01-30 (blood, primary): mean SELPLG counts "
+    "1.001/cell in 43,430 neutrophils vs 0.468-1.177 across 1.64M "
+    "monocytes, ratio 0.85. Transcript, not protein, and neutrophil "
+    "scRNA-seq drops out badly (46% positive), so this supports the "
+    "substitution without establishing it.")
+
 #: A HeLa cell is about this big, and holds this many protein molecules.
 #: Used only to check the calibration, never to produce a value.
 HELA_VOLUME_UM3 = 2425.0
@@ -246,7 +266,8 @@ def seed(store, *, dry_run: bool = False) -> Run:
                     f"named: PaxDb has no {ANCHOR_CELL} dataset for "
                     f"{ANCHOR_PROTEIN}, so the anchor's ppm is the "
                     f"{ANCHOR_PPM_FROM} value as the nearest myeloid "
-                    "proxy. Every count here inherits that assumption.\n"
+                    "proxy. Every count here inherits that assumption, "
+                    f"which has been checked: {PROXY_CHECK}\n"
                     f"Stored for {cell}, where this receptor is most "
                     "abundant of the cells whose size is evidence. The "
                     "per-cell-type counts are in sourced['copies_per_cell'] "
