@@ -699,13 +699,74 @@ def _not_cycling(entity) -> Optional[str]:
 
 PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
     # ── Cytokines: what a diffusible-factor field needs ──
+    # ── Half-lives: four quantities, not one ──────────────────────
+    #
+    # ``half_life_hours`` was declared once, for cytokine, ligand,
+    # protein and drug, and described as "Serum or interstitial
+    # half-life" -- which names two different things in six words. The
+    # stored data named four:
+    #
+    #   drug     23 values, 22 of them MEASURED against FDA labels. The
+    #            pharmacokinetic elimination half-life, read by
+    #            treatment_simulator to decay drug exposure.
+    #   gene     18 values, all placeholder, and gene is not even in the
+    #            applies_to above. reaction_builder reads AR's as the
+    #            mRNA degradation rate k_ar_m_deg, so these are mRNA
+    #            half-lives and they are load-bearing.
+    #   cytokine 30 values, all placeholder, every one of them 4.0 --
+    #            one default written thirty times. Circulating serum
+    #            half-life of a secreted signal.
+    #   protein   4 values, all placeholder. Intracellular turnover,
+    #            measured by pulse-chase, nothing to do with serum.
+    #
+    # These differ by orders of magnitude and come from unrelated
+    # experiments. Filling 126 entities under one key would make every
+    # value look alike while meaning different things -- which is
+    # exactly the Km-alias failure this library already paid to find.
     _spec(
-        "half_life_hours", "h",
-        "Serum or interstitial half-life.",
-        (EntityType.CYTOKINE, EntityType.LIGAND, EntityType.PROTEIN,
-         EntityType.DRUG),
+        "elimination_half_life_hours", "h",
+        "Pharmacokinetic elimination half-life: how long the body takes "
+        "to clear half a dose. A whole-organism property measured in "
+        "plasma, and the only one of these four that this library "
+        "currently has evidence for -- 22 drugs carry it with an FDA "
+        "label citation.",
+        (EntityType.DRUG,),
         minimum=0.0, maximum=24.0 * 365,
         required_for_simulation=True,
+    ),
+    _spec(
+        "circulating_half_life_hours", "h",
+        "Serum half-life of a secreted signalling molecule: how long it "
+        "survives in circulation before clearance. Minutes to hours for "
+        "most cytokines, and NOT the same as how long the protein "
+        "survives inside the cell that made it.",
+        (EntityType.CYTOKINE, EntityType.LIGAND),
+        minimum=0.0, maximum=24.0 * 365,
+        required_for_simulation=True,
+    ),
+    _spec(
+        "protein_turnover_half_life_hours", "h",
+        "Intracellular degradation half-life: how long a protein "
+        "survives inside the cell before proteasomal or lysosomal "
+        "turnover. Measured by pulse-chase or SILAC, hours to days, and "
+        "unrelated to anything measured in plasma.",
+        (EntityType.PROTEIN, EntityType.RECEPTOR,
+         EntityType.ADHESION_MOLECULE, EntityType.ANTIBODY,
+         EntityType.COMPLEMENT_COMPONENT,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR,
+         EntityType.MHC_MOLECULE),
+        minimum=0.0, maximum=24.0 * 365,
+    ),
+    _spec(
+        "mrna_half_life_hours", "h",
+        "Half-life of the TRANSCRIPT, not the protein it encodes. This "
+        "is what a gene row's half-life has always meant here: "
+        "reaction_builder reads AR's and uses it as the mRNA "
+        "degradation rate k_ar_m_deg. A transcript and its protein "
+        "routinely differ by a factor of ten, so the two cannot share a "
+        "name.",
+        (EntityType.GENE,),
+        minimum=0.0, maximum=24.0 * 365,
     ),
     _spec(
         "diffusion_coeff_um2_s", "um^2/s",

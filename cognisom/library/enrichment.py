@@ -855,7 +855,7 @@ class EntityEnricher:
     _PHYSICS_DEFAULTS = {
         "cell_type": {"division_time_hours": 24.0, "apoptosis_rate_per_hour": 0.001, "migration_speed_um_per_min": 0.5, "oxygen_consumption_rate": 0.05},
         "immune_cell": {"division_time_hours": 48.0, "migration_speed_um_per_min": 5.0, "detection_radius_um": 30.0, "kill_probability": 0.3, "exhaustion_rate": 0.01},
-        "cytokine": {"diffusion_coefficient_m2_per_s": 1e-10, "half_life_hours": 4.0, "production_rate_pg_per_cell_per_hour": 10.0},
+        "cytokine": {"diffusion_coefficient_m2_per_s": 1e-10, "circulating_half_life_hours": 4.0, "production_rate_pg_per_cell_per_hour": 10.0},
         "drug": {"half_life_hours": 12.0, "bioavailability": 0.8, "volume_of_distribution_L": 50.0},
         "metabolite": {"diffusion_coefficient_m2_per_s": 1e-9, "normal_concentration_mM": 5.0},
         "virus": {"replication_cycle_hours": 8.0, "burst_size": 100},

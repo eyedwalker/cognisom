@@ -193,8 +193,15 @@ def test_without_the_library_the_profile_says_so(store):
 def test_the_microvillus_count_scales_with_the_cell(store):
     """A density times this cell's own area. The count it replaced was one
     fixed number, which was wrong at every diameter but one."""
-    assert cd.microvillus_count(7.0) == pytest.approx(462, abs=2)
-    assert cd.microvillus_count(8.0) == pytest.approx(603, abs=2)
+    # 4.1/um^2, PMID 15130947 Table 2, human lymphocytes over 28 cells.
+    # It was 3.0 -- the midpoint of that paper's ABSTRACT range across
+    # mouse, human and a B-lymphoma line -- cited to a different paper
+    # whose full text contains no density at all.
+    assert cd.microvillus_count(7.0) == pytest.approx(631, abs=2)
+    assert cd.microvillus_count(8.0) == pytest.approx(824, abs=2)
+    # and the paper's own worked example reproduces: a 5.4 um lymphocyte
+    # carries 377 microvilli by its arithmetic, 376 by ours.
+    assert cd.microvillus_count(5.4) == pytest.approx(377, abs=2)
     assert cd.microvillus_count(8.0) > cd.microvillus_count(7.0)
     # doubling the density doubles the count
     assert cd.microvillus_count(7.0, 6.0) == pytest.approx(

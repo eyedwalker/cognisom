@@ -161,6 +161,10 @@ def test_the_result_names_each_component_and_its_source(sim):
     halves = {c["name"].split()[0]: c["half_life_days"] for c in result.exposure_components}
     assert halves == {"Pembrolizumab": pytest.approx(22.0), "Ipilimumab": pytest.approx(15.4)}
     for drug in ("Pembrolizumab", "Ipilimumab"):
-        assert result.pk_sources[f"{drug}: half_life_hours"].startswith("measured:FDA-SPL:")
+        # elimination_ since the half-life split: one name was carrying a
+        # drug's clearance, a transcript's decay, a cytokine's time in
+        # circulation and a protein's turnover.
+        assert result.pk_sources[
+            f"{drug}: elimination_half_life_hours"].startswith("measured:FDA-SPL:")
     assert "share" in result.exposure_model
     assert result.elimination_half_life_days is None      # no single value for a combination

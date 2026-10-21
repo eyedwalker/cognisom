@@ -51,7 +51,7 @@ def test_measured_without_a_citation_is_rejected():
     """This is the core rule. A guess may not be recorded as a
     measurement, because downstream nothing can tell them apart."""
     pv = ParameterValue(value=0.28, unit="h", provenance=Provenance.MEASURED)
-    problems = pv.validate(PARAMETER_SPECS["half_life_hours"])
+    problems = pv.validate(PARAMETER_SPECS["circulating_half_life_hours"])
     assert any("citation" in p for p in problems)
 
 
@@ -148,12 +148,12 @@ def test_parameter_not_declared_for_this_entity_type_is_rejected():
 def test_non_strict_mode_reports_instead_of_raising():
     il2 = Cytokine(name="IL-2")
     problems = set_parameter(
-        il2, "half_life_hours",
+        il2, "circulating_half_life_hours",
         ParameterValue(value=0.28, unit="h", provenance=Provenance.MEASURED),
         strict=False,
     )
     assert problems
-    assert "half_life_hours" not in il2.physics_params, (
+    assert "circulating_half_life_hours" not in il2.physics_params, (
         "an invalid value must not be stored even in non-strict mode"
     )
 
@@ -165,17 +165,17 @@ def test_flat_read_path_is_preserved():
     must keep working, or this system breaks the pipeline it is meant
     to improve."""
     il2 = Cytokine(name="IL-2")
-    set_parameter(il2, "half_life_hours", _measured())
-    assert il2.physics_params["half_life_hours"] == 0.28
-    assert isinstance(il2.physics_params["half_life_hours"], float)
+    set_parameter(il2, "circulating_half_life_hours", _measured())
+    assert il2.physics_params["circulating_half_life_hours"] == 0.28
+    assert isinstance(il2.physics_params["circulating_half_life_hours"], float)
 
 
 def test_provenance_survives_a_store_round_trip():
     il2 = Cytokine(name="IL-2")
-    set_parameter(il2, "half_life_hours", _measured())
+    set_parameter(il2, "circulating_half_life_hours", _measured())
 
     restored = BioEntity.from_dict(il2.to_dict())
-    pv = get_parameter(restored, "half_life_hours")
+    pv = get_parameter(restored, "circulating_half_life_hours")
 
     assert pv.value == 0.28
     assert pv.provenance is Provenance.MEASURED
@@ -187,24 +187,24 @@ def test_a_scalar_with_no_recorded_provenance_reads_as_placeholder():
     """Numbers already in physics_params have unknown origin. Reporting
     them as anything better would invent provenance."""
     cyt = Cytokine(name="IL-6")
-    cyt.physics_params["half_life_hours"] = 1.0
+    cyt.physics_params["circulating_half_life_hours"] = 1.0
 
-    pv = get_parameter(cyt, "half_life_hours")
+    pv = get_parameter(cyt, "circulating_half_life_hours")
     assert pv.provenance is Provenance.PLACEHOLDER
     assert not pv.is_simulation_grade
 
 
 def test_missing_parameter_reads_as_none():
-    assert get_parameter(Cytokine(name="IL-2"), "half_life_hours") is None
+    assert get_parameter(Cytokine(name="IL-2"), "circulating_half_life_hours") is None
 
 
 def test_iter_parameters_skips_bookkeeping_keys():
     il2 = Cytokine(name="IL-2")
-    set_parameter(il2, "half_life_hours", _measured())
+    set_parameter(il2, "circulating_half_life_hours", _measured())
     il2.physics_params["_source"] = "legacy"
 
     names = {name for name, _ in iter_parameters(il2)}
-    assert "half_life_hours" in names
+    assert "circulating_half_life_hours" in names
     assert "_source" not in names
     assert "parameter_provenance" not in names
 
@@ -354,7 +354,7 @@ def test_cell_related_types_declare_required_parameters():
 def test_specs_for_filters_by_entity_type():
     assert "kill_probability" in specs_for(EntityType.IMMUNE_CELL)
     assert "kill_probability" not in specs_for(EntityType.CYTOKINE)
-    assert "half_life_hours" in specs_for(EntityType.CYTOKINE)
+    assert "circulating_half_life_hours" in specs_for(EntityType.CYTOKINE)
 
 
 def test_cell_type_entity_can_carry_division_time():

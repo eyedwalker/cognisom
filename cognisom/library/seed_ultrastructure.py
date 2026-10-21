@@ -25,19 +25,24 @@ wrong, and the ones that failed are not here:
     four cell types -- cell and nucleus: 84%/98% neutrophil, 130%/32%
     lymphocyte, 137%/73% monocyte, 92%/84% eosinophil. It is not a
     parameter the simulation reads; it is a CHECK on the renderer, and
-    the renderer currently fails it. The microvillus coat built from the
-    two sourced constants above (3 per um^2, 0.35 um) adds 30% to a
-    smooth sphere, for every cell type, because count scales with area
-    and the fraction is therefore scale-free. Measured is 84-137%, so
-    the coat accounts for 22-35% of it, and the shortfall cannot be
-    tuned away inside the measurements: closing it would need 1.60 um
-    villi against a measured 0.35 um median, or 13.1 per um^2 against a
-    measured 3 +/- 0.5. The reading is that most of the excess is not in
-    villi at all -- the paper calls it 'membrane foldings' throughout
-    and watches it unfold as the cell swells -- so the renderer needs a
-    fold layer rather than different villi, and these four numbers are
-    the per-type target it should hit. They also say the cell types
-    DIFFER, 1.6-fold, where the renderer is flat;
+    the renderer currently fails it.
+
+    The size of the shortfall is not our arithmetic. PMID 15130947
+    computes it itself, from its own Table 2: a 2.7 um-radius lymphocyte
+    is 92 um^2 of smooth sphere, 4.1 villi/um^2 gives 377 of them, each
+    contributing 0.119 um^2, so 45 um^2 of extra membrane -- "a 49%
+    increase in cell surface area", verbatim. Reproduced here exactly
+    from those inputs. With this library's 0.085 um villus diameter
+    (PMID 27647916's SEM) rather than the 0.100 the paper assumed, it is
+    42%.
+
+    Against a measured 130% for a lymphocyte, microvilli therefore
+    account for about 38% of the excess membrane. The remaining ~60% is
+    what PMID 6775712 calls "membrane foldings" throughout, and watches
+    unfold as the cell swells. So the renderer needs a FOLD LAYER rather
+    than different villi, and these four numbers are the per-type target
+    it should hit. They also say the cell types DIFFER, 1.6-fold, where
+    the renderer is flat;
   * no normal human nuclear VOLUME -- every citable human record is HeLa,
     hypertriploid and measured trypsinized in suspension, so the
     normal-versus-malignant contrast cannot be sourced here at all. The
@@ -111,26 +116,43 @@ LYMPHOCYTE: Tuple[Measurement, ...] = (
         "against Table 2's 17.9%.",
     ),
     Measurement(
-        "microvillus_density_per_um2", 3.0, "1/um^2",
-        "PMID:27647916",
-        "Jung Y et al., PNAS 2016, Fig. S2 legend",
-        "Resting primary human peripheral blood T cells, live and "
-        "unfixed; variable-angle TIRF with 3D surface reconstruction",
-        "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range "
-        "from SEM morphometry across lymphocyte sources two decades "
-        "earlier (PMID 15130947) -- two labs, two unrelated methods, the "
-        "same number. Measured on LIVE cells, so it escapes the "
-        "critical-point-drying artefact; the same paper's own SEM gives "
-        "4.5, which is the size of that artefact.",
+        "microvillus_density_per_um2", 4.1, "1/um^2",
+        "PMID:15130947",
+        "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
+        "Human peripheral blood lymphocytes, 85-90% pure, fixed in "
+        "suspension and imaged by SEM at 10,000-20,000x; density counted "
+        "in a 2x2 um box per cell",
+        "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and "
+        "the table is why this changed. It had been 3.0, cited to PMID "
+        "27647916 and attributed to that paper's Fig. S2 legend -- but "
+        "the full text of PMID 27647916, read on 2026-10-21, contains no "
+        "density at all: no '3 +/- 0.5', no figure per um^2, nothing. "
+        "The number may be in its supplementary material, which nobody "
+        "here has seen. Meanwhile the paper this library already cited "
+        "for microvillus LENGTH states a density for human lymphocytes "
+        "directly, with n. "
+        "The old note also called 3.0 'the midpoint of the 2-4 range' "
+        "from this paper. The 2-4 range is the ABSTRACT's summary across "
+        "mouse, human and a B-lymphoma line; the human row of Table 2 is "
+        "4.1, at the top of it. Taking a midpoint of a cross-species "
+        "range in place of the human measurement is how a number ends up "
+        "a quarter low.",
     ),
     Measurement(
-        "microvillus_length_um", 0.35, "um",
-        "PMID:15130947", "Majstoravich S et al., Blood 2004",
-        "Circulating mammalian lymphocytes; SEM morphometry",
-        "A MEDIAN of a strongly right-skewed distribution, not a mean. "
-        "Lengths run 'from 0.1 um to several micrometers' (PMID "
-        "27647916, verbatim), so a constant-length coat has the wrong "
-        "shape and not merely the wrong number. Confirmed from an "
+        "microvillus_length_um", 0.38, "um",
+        "PMID:15130947",
+        "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
+        "Human peripheral blood lymphocytes; SEM morphometry, individual "
+        "microvilli traced within a 2x2 um box",
+        "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly "
+        "right-skewed distribution, not a mean. Lengths run 'from 0.1 um "
+        "to several micrometers' (PMID 27647916, verbatim), so a "
+        "constant-length coat has the wrong shape and not merely the "
+        "wrong number. "
+        "It had been 0.35, which is the midpoint of the 0.3-0.4 range "
+        "the abstract quotes ACROSS SOURCES -- mouse, human and a "
+        "B-lymphoma line. The human row of Table 2 is 0.38. Confirmed "
+        "from an "
         "unrelated direction by PMID 6775712, read 2026-10-20: TEM "
         "morphometry puts 'the height of the membrane foldings at 305 "
         "mosmole' at 'about 0.35 um', and checks it by arithmetic -- a "

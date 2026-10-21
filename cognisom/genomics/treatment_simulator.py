@@ -428,7 +428,13 @@ def elimination_half_life_days(profile: Dict) -> Optional[float]:
     unit, hours; this is the one conversion, hours to the loop's days.
     Hardcoded profiles carry no ``pk`` block and return None.
     """
-    hours = (profile.get("pk") or {}).get("half_life_hours")
+    pk = profile.get("pk") or {}
+    # The typed name, with the old one still read so a profile built
+    # before the split -- or by a caller that has not been updated --
+    # does not silently lose its half-life and fall back to no decay.
+    hours = pk.get("elimination_half_life_hours")
+    if hours is None:
+        hours = pk.get("half_life_hours")
     return None if hours is None else float(hours) / 24.0
 
 

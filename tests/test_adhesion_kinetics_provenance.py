@@ -796,12 +796,22 @@ def test_unspecced_names_reports_the_uncontracted_remainder():
     from cognisom.library.models import Cytokine
 
     c = Cytokine(name="IL-test3")
-    c.physics_params = {"half_life_hours": 4.0, "not_a_declared_name": 1.0}
+    # circulating_half_life_hours and not the old half_life_hours: that
+    # name was retired when one parameter carrying four quantities was
+    # split into four, so it is now genuinely uncontracted and would
+    # make a poor example of a contracted one.
+    c.physics_params = {"circulating_half_life_hours": 4.0,
+                        "not_a_declared_name": 1.0,
+                        "half_life_hours": 4.0}
 
     counts = unspecced_names([c])
     assert counts.get("not_a_declared_name") == 1
-    assert "half_life_hours" not in counts
-    assert "half_life_hours" in PARAMETER_SPECS
+    assert "circulating_half_life_hours" not in counts
+    assert "circulating_half_life_hours" in PARAMETER_SPECS
+    # and the retired name shows up as the uncontracted name it now is,
+    # which is how anything still writing it becomes visible
+    assert counts.get("half_life_hours") == 1
+    assert "half_life_hours" not in PARAMETER_SPECS
 
 
 # ── The run summary must not launder a level ─────────────────────────

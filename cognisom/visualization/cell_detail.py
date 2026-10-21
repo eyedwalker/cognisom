@@ -244,26 +244,33 @@ def quat_z_to(directions: np.ndarray) -> np.ndarray:
 
 # ── the features themselves ─────────────────────────────────────────────
 
-#: Measured microvillar density on resting human T cells, per um^2.
+#: Microvillar density on a resting human lymphocyte, per um^2.
 #:
-#: 3 +/- 0.5 by live-cell variable-angle TIRF with 3D surface
-#: reconstruction (PMID 27647916), and independently the midpoint of the
-#: 2-4 range from SEM morphometry across lymphocyte sources (PMID
-#: 15130947). Two labs, two decades, two unrelated methods, same number.
+#: 4.1 +/- 1.2 over 28 cells, PMID 15130947 Table 2, read from the table
+#: on 2026-10-21. It had been 3.0, cited to PMID 27647916 and attributed
+#: to that paper's Fig. S2 legend -- and the full text of PMID 27647916
+#: contains no density at all. The old note here also called 3.0 "the
+#: midpoint of the 2-4 range" from PMID 15130947: that range is the
+#: ABSTRACT's summary across mouse, human and a B-lymphoma line, and the
+#: human row of its Table 2 is 4.1.
 #:
 #: A DENSITY is the thing to store, not a count: the count follows from
 #: whatever diameter an entity declares, so it stays right when the cell
-#: changes size. 3/um^2 is 462 microvilli on a 7 um lymphocyte and 603 on
-#: an 8 um one.
-MICROVILLUS_DENSITY_PER_UM2 = 3.0
+#: changes size. 4.1/um^2 is 631 microvilli on a 7 um lymphocyte and 824
+#: on an 8 um one -- and the paper's own worked example, a 5.4 um cell,
+#: gives 377.
+MICROVILLUS_DENSITY_PER_UM2 = 4.1
 
-#: Median microvillar length, um (PMID 15130947). The MEDIAN of a
-#: strongly right-skewed distribution, not a mean -- lengths run "from
-#: 0.1 um to several micrometers" (PMID 27647916, verbatim).
-MICROVILLUS_MEDIAN_LENGTH_UM = 0.35
+#: Median microvillar length, um: 0.38 +/- 0.22 over 1,200 microvilli on
+#: human peripheral blood lymphocytes (PMID 15130947 Table 2). The MEDIAN
+#: of a strongly right-skewed distribution, not a mean -- lengths run
+#: "from 0.1 um to several micrometers" (PMID 27647916, verbatim). It had
+#: been 0.35, the midpoint of a cross-species range.
+MICROVILLUS_MEDIAN_LENGTH_UM = 0.38
 
 #: Shaft diameter, um: 0.070-0.100 measured on resting human T cells, and
 #: the same on effector cells (PMID 27647916). Rendered at the midpoint.
+#: PMID 15130947 assumes 0.100 for its own surface-area calculation.
 MICROVILLUS_DIAMETER_UM = 0.085
 
 

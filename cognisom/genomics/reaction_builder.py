@@ -483,6 +483,13 @@ def resolve_half_life_hours(physics_params: Dict) -> Optional[float]:
     if not physics_params:
         return None
     for key, to_hours in (
+        # The typed names first. A gene row's half-life is its
+        # TRANSCRIPT's -- this function's one production caller turns it
+        # into k_ar_m_deg, an mRNA degradation rate -- so mrna_ leads.
+        ("mrna_half_life_hours", 1.0),
+        ("protein_turnover_half_life_hours", 1.0),
+        ("circulating_half_life_hours", 1.0),
+        ("elimination_half_life_hours", 1.0),
         ("half_life_hours", 1.0),
         ("half_life_h", 1.0),
         ("half_life_min", 1.0 / 60.0),

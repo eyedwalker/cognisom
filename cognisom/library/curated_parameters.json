@@ -842,13 +842,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -861,12 +861,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -893,13 +893,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -912,12 +912,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -944,13 +944,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -963,12 +963,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -1052,13 +1052,13 @@
      "value": 0.251
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -1071,12 +1071,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -1103,13 +1103,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -1122,12 +1122,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -2117,6 +2117,14 @@
    "entity_type": "drug",
    "name": "Abiraterone",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "conditions": "Abiraterone Acetate prescribing information, effective 20250317; label states: \"Elimination In patients with metastatic CRPC, the mean terminal half-life of abiraterone in plasma (mean \u00b1 SD) is 12 \u00b1 5 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
+     "unit": "h",
+     "value": 12.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:0c91aa38-3b0a-232c-8eb1-55f08e8e6644",
      "conditions": "Abiraterone Acetate prescribing information, effective 20250317; label states: \"Elimination In patients with metastatic CRPC, the mean terminal half-life of abiraterone in plasma (mean \u00b1 SD) is 12 \u00b1 5 hours.\"",
@@ -2147,6 +2155,14 @@
      "unit": "dimensionless",
      "value": 0.64
     },
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "conditions": "HYRIMOZ prescribing information, effective 20251017; label states: \"The mean terminal half-life was approximately 2 weeks, ranging from 10 to 20 days across studies.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1ac7d061-3380-468c-b077-c05f8dfbc829",
+     "unit": "h",
+     "value": 336.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:1ac7d061-3380-468c-b077-c05f8dfbc829",
      "conditions": "HYRIMOZ prescribing information, effective 20251017; label states: \"The mean terminal half-life was approximately 2 weeks, ranging from 10 to 20 days across studies.\"",
@@ -2161,6 +2177,14 @@
    "entity_type": "drug",
    "name": "Aldesleukin (IL-2)",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:f3c516ad-d405-4fbe-af6a-962080dbfa7d",
+     "conditions": "PROLEUKIN prescribing information, effective 20241220; label states: \"Elimination The serum elimination half-life aldesleukin is 85 minutes in patients with cancer following a 5-minute intravenous infusion of Proleukin.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f3c516ad-d405-4fbe-af6a-962080dbfa7d",
+     "unit": "h",
+     "value": 1.4166666666666667
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:f3c516ad-d405-4fbe-af6a-962080dbfa7d",
      "conditions": "PROLEUKIN prescribing information, effective 20241220; label states: \"Elimination The serum elimination half-life aldesleukin is 85 minutes in patients with cancer following a 5-minute intravenous infusion of Proleukin.\"",
@@ -2182,6 +2206,14 @@
      "source": "FDA prescribing information via openFDA, SPL set d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
      "unit": "dimensionless",
      "value": 1.0
+    },
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "conditions": "ERLEADA prescribing information, effective 20260702; label states: \"Elimination Apalutamide half-life is approximately 3 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
+     "unit": "h",
+     "value": 72.0
     },
     "half_life_hours": {
      "citation": "FDA-SPL:d1cda4f7-cb33-46ea-b9ac-431f6452b1a5",
@@ -2205,6 +2237,14 @@
    "entity_type": "drug",
    "name": "Atezolizumab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:a617b089-ce66-464b-987b-b45d029b4d6f",
+     "conditions": " prescribing information, effective 20260520; label states: \"Elimination The atezolizumab clearance (CV%) was 0.2 L/day (29%) and the terminal half-life was 27 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set a617b089-ce66-464b-987b-b45d029b4d6f",
+     "unit": "h",
+     "value": 648.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:a617b089-ce66-464b-987b-b45d029b4d6f",
      "conditions": " prescribing information, effective 20260520; label states: \"Elimination The atezolizumab clearance (CV%) was 0.2 L/day (29%) and the terminal half-life was 27 days.\"",
@@ -2249,6 +2289,14 @@
      "unit": "dimensionless",
      "value": 0.3
     },
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "conditions": " prescribing information, effective 20250603; label states: \"Elimination The effective half-life of darolutamide and ketodarolutamide is approximately 20 hours in patients.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
+     "unit": "h",
+     "value": 20.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:1a7cb212-56e4-4b9d-a73d-bfee7fe4735e",
      "conditions": " prescribing information, effective 20250603; label states: \"Elimination The effective half-life of darolutamide and ketodarolutamide is approximately 20 hours in patients.\"",
@@ -2271,6 +2319,14 @@
    "entity_type": "drug",
    "name": "Docetaxel",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:2992d633-08fa-44f3-b14d-41700f24686b",
+     "conditions": "Docetaxel prescribing information, effective 20260415; label states: \"Elimination With extended plasma sampling up to 8 to 22 days post infusion, the estimated mean total body clearance was 18 L/h/m 2 (range of means: 14 to 23) and mean terminal elimination half-life was 116 hours (range o\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 2992d633-08fa-44f3-b14d-41700f24686b",
+     "unit": "h",
+     "value": 116.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:2992d633-08fa-44f3-b14d-41700f24686b",
      "conditions": "Docetaxel prescribing information, effective 20260415; label states: \"Elimination With extended plasma sampling up to 8 to 22 days post infusion, the estimated mean total body clearance was 18 L/h/m 2 (range of means: 14 to 23) and mean terminal elimination half-life was 116 hours (range o\"",
@@ -2293,6 +2349,14 @@
    "entity_type": "drug",
    "name": "Eculizumab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:002f9748-b0e8-4b6e-a38b-56930a839491",
+     "conditions": "BKEMV prescribing information, effective 20260702; label states: \"Elimination The half-life of eculizumab ranged between 141 hours and 882 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 002f9748-b0e8-4b6e-a38b-56930a839491",
+     "unit": "h",
+     "value": 511.5
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:002f9748-b0e8-4b6e-a38b-56930a839491",
      "conditions": "BKEMV prescribing information, effective 20260702; label states: \"Elimination The half-life of eculizumab ranged between 141 hours and 882 hours.\"",
@@ -2315,6 +2379,14 @@
    "entity_type": "drug",
    "name": "Enzalutamide",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "conditions": "Xtandi prescribing information, effective 20260728; label states: \"The mean terminal half-life (t 1/2 ) for enzalutamide after a single oral dose is 5.8 days (2.8 to 10.2 days).\"; 5.8 days is enzalutamide itself; 8.2 days is its active metabolite N-desmethyl enzalutamide",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
+     "unit": "h",
+     "value": 139.2
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:b129fdc9-1d8e-425c-a5a9-8a2ed36dfbdf",
      "conditions": "Xtandi prescribing information, effective 20260728; label states: \"The mean terminal half-life (t 1/2 ) for enzalutamide after a single oral dose is 5.8 days (2.8 to 10.2 days).\"; 5.8 days is enzalutamide itself; 8.2 days is its active metabolite N-desmethyl enzalutamide",
@@ -2337,6 +2409,14 @@
    "entity_type": "drug",
    "name": "Infliximab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:a0a046c1-056d-45a9-bfd9-13b47c24f257",
+     "conditions": "REMICADE prescribing information, effective 20250603; label states: \"Pharmacokinetic results for single doses of 3 mg/kg to 10 mg/kg in RA, 5 mg/kg in CD, and 3 mg/kg to 5 mg/kg in Ps indicate that the median terminal half-life of infliximab is 7.7 to 9.5 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set a0a046c1-056d-45a9-bfd9-13b47c24f257",
+     "unit": "h",
+     "value": 206.39999999999998
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:a0a046c1-056d-45a9-bfd9-13b47c24f257",
      "conditions": "REMICADE prescribing information, effective 20250603; label states: \"Pharmacokinetic results for single doses of 3 mg/kg to 10 mg/kg in RA, 5 mg/kg in CD, and 3 mg/kg to 5 mg/kg in Ps indicate that the median terminal half-life of infliximab is 7.7 to 9.5 days.\"",
@@ -2351,6 +2431,14 @@
    "entity_type": "drug",
    "name": "Interferon alfa-2b",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:30789790-8317-49f9-b97b-8c5ba17b53d2",
+     "conditions": " prescribing information, effective 20240123; label states: \"The elimination half-life was approximately 2 hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 30789790-8317-49f9-b97b-8c5ba17b53d2",
+     "unit": "h",
+     "value": 2.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:30789790-8317-49f9-b97b-8c5ba17b53d2",
      "conditions": " prescribing information, effective 20240123; label states: \"The elimination half-life was approximately 2 hours.\"",
@@ -2365,6 +2453,14 @@
    "entity_type": "drug",
    "name": "Ipilimumab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:2265ef30-253e-11df-8a39-0800200c9a66",
+     "conditions": "YERVOY prescribing information, effective 20260820; label states: \"Elimination The mean (percent coefficient of variation) terminal half-life (t 1/2 ) was 15.4 days (34%) and then mean (percent coefficient of variation) clearance (CL) was 16.8 mL/h (38%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 2265ef30-253e-11df-8a39-0800200c9a66",
+     "unit": "h",
+     "value": 369.6
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:2265ef30-253e-11df-8a39-0800200c9a66",
      "conditions": "YERVOY prescribing information, effective 20260820; label states: \"Elimination The mean (percent coefficient of variation) terminal half-life (t 1/2 ) was 15.4 days (34%) and then mean (percent coefficient of variation) clearance (CL) was 16.8 mL/h (38%).\"",
@@ -2379,6 +2475,14 @@
    "entity_type": "drug",
    "name": "Lutetium-177 PSMA",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:14908037-2892-4d98-a053-253ce35afb1a",
+     "conditions": "PLUVICTO prescribing information, effective 20260812; label states: \"Elimination The lutetium Lu 177 vipivotide tetraxetan terminal elimination half-life is 41.6 hours (68.8%) and the clearance (CL) is 2.04 L/h (31.5%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 14908037-2892-4d98-a053-253ce35afb1a",
+     "unit": "h",
+     "value": 41.6
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:14908037-2892-4d98-a053-253ce35afb1a",
      "conditions": "PLUVICTO prescribing information, effective 20260812; label states: \"Elimination The lutetium Lu 177 vipivotide tetraxetan terminal elimination half-life is 41.6 hours (68.8%) and the clearance (CL) is 2.04 L/h (31.5%).\"",
@@ -2401,6 +2505,14 @@
    "entity_type": "drug",
    "name": "Nivolumab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "conditions": "OPDIVO prescribing information, effective 20260812; label states: \"The geometric mean elimination half-life (t 1/2 ) is 25 days (77.5%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
+     "unit": "h",
+     "value": 600.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:f570b9c4-6846-4de2-abfa-4d0a4ae4e394",
      "conditions": "OPDIVO prescribing information, effective 20260812; label states: \"The geometric mean elimination half-life (t 1/2 ) is 25 days (77.5%).\"",
@@ -2423,6 +2535,14 @@
    "entity_type": "drug",
    "name": "Olaparib",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "conditions": "Lynparza prescribing information, effective 20250710; label states: \"Elimination The mean (\u00b1 standard deviation) terminal plasma half-life of olaparib is 14.9 \u00b1 8.2 hours and the apparent plasma clearance is 7.4 \u00b1 3.9 L/h following a single 300 mg dose of Lynparza.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 741ff3e3-dc1a-45a6-84e5-2481b27131aa",
+     "unit": "h",
+     "value": 14.9
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:741ff3e3-dc1a-45a6-84e5-2481b27131aa",
      "conditions": "Lynparza prescribing information, effective 20250710; label states: \"Elimination The mean (\u00b1 standard deviation) terminal plasma half-life of olaparib is 14.9 \u00b1 8.2 hours and the apparent plasma clearance is 7.4 \u00b1 3.9 L/h following a single 300 mg dose of Lynparza.\"",
@@ -2445,6 +2565,14 @@
    "entity_type": "drug",
    "name": "Pembrolizumab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "conditions": "KEYTRUDA QLEX prescribing information, effective 20260731; label states: \"The terminal half-life is 22 days.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 097d166f-b73b-41d3-9b37-7653cd2a0c41",
+     "unit": "h",
+     "value": 528.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:097d166f-b73b-41d3-9b37-7653cd2a0c41",
      "conditions": "KEYTRUDA QLEX prescribing information, effective 20260731; label states: \"The terminal half-life is 22 days.\"",
@@ -2467,6 +2595,14 @@
    "entity_type": "drug",
    "name": "Relatlimab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "conditions": "OPDUALAG prescribing information, effective 20260608; label states: \"The geometric mean (CV%) clearance of nivolumab is 7.6 mL/h (40%) at steady state, 21% lower than after the first dose [9.6 mL/h (40%)] and the terminal t 1/2 is 26.5 days (36%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b22c9d83-3256-4e17-85f7-f331a504adc6",
+     "unit": "h",
+     "value": 636.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:b22c9d83-3256-4e17-85f7-f331a504adc6",
      "conditions": "OPDUALAG prescribing information, effective 20260608; label states: \"The geometric mean (CV%) clearance of nivolumab is 7.6 mL/h (40%) at steady state, 21% lower than after the first dose [9.6 mL/h (40%)] and the terminal t 1/2 is 26.5 days (36%).\"",
@@ -2489,6 +2625,14 @@
    "entity_type": "drug",
    "name": "Rituximab",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:b172773b-3905-4a1c-ad95-bab4b6126563",
+     "conditions": "Rituxan prescribing information, effective 20250106; label states: \"The estimated median terminal half-life of rituximab was 32 days (range, 14 to 62 days).\"; 32 days is the label's own 'estimated median terminal half-life' across all patients; the 22- and 18-day figures are the NHL and RA population-PK subsets",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b172773b-3905-4a1c-ad95-bab4b6126563",
+     "unit": "h",
+     "value": 768.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:b172773b-3905-4a1c-ad95-bab4b6126563",
      "conditions": "Rituxan prescribing information, effective 20250106; label states: \"The estimated median terminal half-life of rituximab was 32 days (range, 14 to 62 days).\"; 32 days is the label's own 'estimated median terminal half-life' across all patients; the 22- and 18-day figures are the NHL and RA population-PK subsets",
@@ -2519,6 +2663,14 @@
      "unit": "dimensionless",
      "value": 0.36
     },
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:0295d202-1cfe-7659-e063-6294a90a476e",
+     "conditions": "Rubraca prescribing information, effective 20251231; label states: \"Elimination The mean apparent total clearance at steady state is 44.2 L/h (45%) and the mean terminal elimination half-life is 26 (39%) hours.\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 0295d202-1cfe-7659-e063-6294a90a476e",
+     "unit": "h",
+     "value": 26.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:0295d202-1cfe-7659-e063-6294a90a476e",
      "conditions": "Rubraca prescribing information, effective 20251231; label states: \"Elimination The mean apparent total clearance at steady state is 44.2 L/h (45%) and the mean terminal elimination half-life is 26 (39%) hours.\"",
@@ -2541,6 +2693,14 @@
    "entity_type": "drug",
    "name": "Ruxolitinib",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "conditions": "JAKAFI prescribing information, effective 20260720; label states: \"Elimination JAKAFI The mean elimination half-life of ruxolitinib is approximately 3 hours and the mean elimination half-life of ruxolitinib and its metabolites is approximately 5.8 hours in healthy volunteers.\"; 3 hours is the parent drug; 5.8 hours is 'ruxolitinib plus metabolites' in the same sentence, 5 hours is the extended-release product, 3.7 hours is under ketoconazole",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set f1c82580-87ae-11e0-bc84-0002a5d5c51b",
+     "unit": "h",
+     "value": 3.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:f1c82580-87ae-11e0-bc84-0002a5d5c51b",
      "conditions": "JAKAFI prescribing information, effective 20260720; label states: \"Elimination JAKAFI The mean elimination half-life of ruxolitinib is approximately 3 hours and the mean elimination half-life of ruxolitinib and its metabolites is approximately 5.8 hours in healthy volunteers.\"; 3 hours is the parent drug; 5.8 hours is 'ruxolitinib plus metabolites' in the same sentence, 5 hours is the extended-release product, 3.7 hours is under ketoconazole",
@@ -2563,6 +2723,14 @@
    "entity_type": "drug",
    "name": "Talazoparib",
    "parameters": {
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:b653221e-971f-4452-92d4-797924f1ff59",
+     "conditions": "Talzenna prescribing information, effective 20240709; label states: \"Elimination The mean terminal plasma half-life (\u00b1standard deviation) is 90 (\u00b158) hours and the mean apparent oral clearance (inter-subject variability) is 6.5 L/h (31%).\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set b653221e-971f-4452-92d4-797924f1ff59",
+     "unit": "h",
+     "value": 90.0
+    },
     "half_life_hours": {
      "citation": "FDA-SPL:b653221e-971f-4452-92d4-797924f1ff59",
      "conditions": "Talzenna prescribing information, effective 20240709; label states: \"Elimination The mean terminal plasma half-life (\u00b1standard deviation) is 90 (\u00b158) hours and the mean apparent oral clearance (inter-subject variability) is 6.5 L/h (31%).\"",
@@ -2592,6 +2760,14 @@
      "source": "FDA prescribing information via openFDA, SPL set 253635c8-1ea7-41ba-b216-dea5e3305c47",
      "unit": "dimensionless",
      "value": 0.74
+    },
+    "elimination_half_life_hours": {
+     "citation": "FDA-SPL:253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "conditions": "Tofacitinib prescribing information, effective 20260901; label states: \"12.3 Pharmacokinetics Following oral administration of tofacitinib tablets, peak plasma concentrations were reached within 0.5 hour -1 hour, elimination half-life was about 3 hours and a dose-proportional increase in sys\"",
+     "provenance": "measured",
+     "source": "FDA prescribing information via openFDA, SPL set 253635c8-1ea7-41ba-b216-dea5e3305c47",
+     "unit": "h",
+     "value": 3.0
     },
     "half_life_hours": {
      "citation": "FDA-SPL:253635c8-1ea7-41ba-b216-dea5e3305c47",
@@ -3057,13 +3233,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3076,12 +3252,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3108,13 +3284,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3127,12 +3303,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3159,13 +3335,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3178,12 +3354,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3237,13 +3413,13 @@
      "value": 0.251
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3256,12 +3432,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nonlethal_contact_minutes": {
      "citation": "PMID:26872694",
@@ -3297,13 +3473,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3316,12 +3492,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3348,13 +3524,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3367,12 +3543,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3414,13 +3590,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3433,12 +3609,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3465,13 +3641,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3484,12 +3660,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3516,13 +3692,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3535,12 +3711,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3567,13 +3743,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3586,12 +3762,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3657,13 +3833,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3676,12 +3852,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3734,13 +3910,13 @@
      "value": 0.251
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3753,12 +3929,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nonlethal_contact_minutes": {
      "citation": "PMID:24639676",
@@ -3812,13 +3988,13 @@
      "value": 0.251
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3831,12 +4007,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3863,13 +4039,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3882,12 +4058,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -3955,13 +4131,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -3974,12 +4150,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",
@@ -4006,13 +4182,13 @@
      "value": 0.002
     },
     "microvillus_density_per_um2": {
-     "citation": "PMID:27647916",
-     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "citation": "PMID:15130947",
+     "conditions": "Human peripheral blood lymphocytes, 85-90% pure, fixed in suspension and imaged by SEM at 10,000-20,000x; density counted in a 2x2 um box per cell",
      "provenance": "measured",
-     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
-     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "rationale": "4.1 +/- 1.2 villi/um^2 over 28 cells. Read off the table, and the table is why this changed. It had been 3.0, cited to PMID 27647916 and attributed to that paper's Fig. S2 legend -- but the full text of PMID 27647916, read on 2026-10-21, contains no density at all: no '3 +/- 0.5', no figure per um^2, nothing. The number may be in its supplementary material, which nobody here has seen. Meanwhile the paper this library already cited for microvillus LENGTH states a density for human lymphocytes directly, with n. The old note also called 3.0 'the midpoint of the 2-4 range' from this paper. The 2-4 range is the ABSTRACT's summary across mouse, human and a B-lymphoma line; the human row of Table 2 is 4.1, at the top of it. Taking a midpoint of a cross-species range in place of the human measurement is how a number ends up a quarter low.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "1/um^2",
-     "value": 3.0
+     "value": 4.1
     },
     "microvillus_diameter_um": {
      "citation": "PMID:27647916",
@@ -4025,12 +4201,12 @@
     },
     "microvillus_length_um": {
      "citation": "PMID:15130947",
-     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "conditions": "Human peripheral blood lymphocytes; SEM morphometry, individual microvilli traced within a 2x2 um box",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
-     "source": "Majstoravich S et al., Blood 2004",
+     "rationale": "0.38 +/- 0.22 um over 1,200 microvilli. A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. It had been 0.35, which is the midpoint of the 0.3-0.4 range the abstract quotes ACROSS SOURCES -- mouse, human and a B-lymphoma line. The human row of Table 2 is 0.38. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004;104(5):1396-1403, Table 2",
      "unit": "um",
-     "value": 0.35
+     "value": 0.38
     },
     "nuclear_volume_fraction": {
      "citation": "PMID:6775712",

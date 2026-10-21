@@ -108,21 +108,21 @@ class _PlantedStore:
 
 def test_enzalutamide_carries_its_label_half_life(sim):
     pk = sim._profiles["enzalutamide"]["pk"]
-    assert pk["half_life_hours"] == pytest.approx(139.2)
-    assert pk["_sources"]["half_life_hours"].startswith("measured:FDA-SPL:")
+    assert pk["elimination_half_life_hours"] == pytest.approx(139.2)
+    assert pk["_sources"]["elimination_half_life_hours"].startswith("measured:FDA-SPL:")
     assert elimination_half_life_days(sim._profiles["enzalutamide"]) == pytest.approx(5.8)
 
 
 def test_the_seam_converts_hours_to_days_once():
-    assert elimination_half_life_days({"pk": {"half_life_hours": 24.0}}) == 1.0
-    assert elimination_half_life_days({"pk": {"half_life_hours": None}}) is None
+    assert elimination_half_life_days({"pk": {"elimination_half_life_hours": 24.0}}) == 1.0
+    assert elimination_half_life_days({"pk": {"elimination_half_life_hours": None}}) is None
     assert elimination_half_life_days({"pk": None}) is None
     assert elimination_half_life_days(TREATMENT_PROFILES["pembrolizumab"]) is None
 
 
 def test_the_pk_fields_are_sourced_parameters_in_the_units_assumed():
     units = {f: PARAMETER_SPECS[f].unit for f in PK_FIELDS}
-    assert units == {"half_life_hours": "h", "volume_of_distribution_L": "L",
+    assert units == {"elimination_half_life_hours": "h", "volume_of_distribution_L": "L",
                      "bioavailability": "dimensionless"}
     assert not any(PARAMETER_SPECS[f].model_construct for f in PK_FIELDS)
 
@@ -233,11 +233,11 @@ def test_a_stop_without_a_half_life_warns_once(caplog):
 
 def test_a_placeholder_half_life_is_refused(store):
     row = copy.deepcopy(store.find_entity_by_name("Enzalutamide", "drug"))
-    _sidecar(row).pop("half_life_hours")
-    row.physics_params["half_life_hours"] = 12.0              # a bare stamp
+    _sidecar(row).pop("elimination_half_life_hours")
+    row.physics_params["elimination_half_life_hours"] = 12.0              # a bare stamp
     profile = SimulationParameterResolver(_PlantedStore(row)).get_treatment_profile("Enzalutamide")
-    assert profile["pk"]["half_life_hours"] is None
-    assert profile["pk"]["_sources"]["half_life_hours"] == "placeholder: not evidence"
+    assert profile["pk"]["elimination_half_life_hours"] is None
+    assert profile["pk"]["_sources"]["elimination_half_life_hours"] == "placeholder: not evidence"
     assert elimination_half_life_days(profile) is None
 
 
@@ -248,7 +248,7 @@ def test_a_stamped_field_does_not_veto_a_measured_one(store):
     row.physics_params["volume_of_distribution_L"] = 50.0     # the enrichment stamp
     pk = SimulationParameterResolver(_PlantedStore(row)).get_treatment_profile("Enzalutamide")["pk"]
     assert pk["volume_of_distribution_L"] is None
-    assert pk["half_life_hours"] == pytest.approx(139.2)
+    assert pk["elimination_half_life_hours"] == pytest.approx(139.2)
 
 
 # ── the result says where its number came from ──────────────────────────
@@ -257,11 +257,11 @@ def test_the_result_names_its_half_life_and_how_exposure_was_modelled(sim):
     r = sim.simulate("enzalutamide", _twin(), WINDOW, last_dose_day=STOP)
     assert r.last_dose_day == STOP
     assert r.elimination_half_life_days == pytest.approx(5.8)
-    assert r.pk_sources["half_life_hours"].startswith("measured:FDA-SPL:")
+    assert r.pk_sources["elimination_half_life_hours"].startswith("measured:FDA-SPL:")
     assert "5.8 days" in r.exposure_model
     summary = r.summary()
     assert summary["exposure_model"] == r.exposure_model
-    assert summary["pk_sources"]["half_life_hours"] == r.pk_sources["half_life_hours"]
+    assert summary["pk_sources"]["elimination_half_life_hours"] == r.pk_sources["elimination_half_life_hours"]
 
 
 def test_a_regimen_without_library_pk_says_so():

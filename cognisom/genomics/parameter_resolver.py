@@ -81,7 +81,13 @@ def shared_resolver() -> Optional["SimulationParameterResolver"]:
 #: bioavailability travel with their provenance but are inert until dose
 #: and dosing interval are in the library, because in a normalised
 #: exposure model they cancel.
-PK_FIELDS = ("half_life_hours", "volume_of_distribution_L", "bioavailability")
+#: A drug's pharmacokinetics. ``elimination_half_life_hours`` and not
+#: the old ``half_life_hours``: that one name carried four different
+#: quantities -- a drug's clearance from plasma, a transcript's decay, a
+#: cytokine's survival in circulation and a protein's turnover inside
+#: the cell -- and the 22 FDA-cited values here are all the first kind.
+PK_FIELDS = ("elimination_half_life_hours", "volume_of_distribution_L",
+             "bioavailability")
 
 
 GENE_EFFECT_FIELDS = (
