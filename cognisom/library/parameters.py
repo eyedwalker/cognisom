@@ -1245,6 +1245,23 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         minimum=0.0, maximum=1e5,
     ),
     _spec(
+        "copies_per_cell", "molecules/cell",
+        "TOTAL protein molecules of this species in one cell, counting "
+        "every compartment. Not the same quantity as "
+        "surface_density_per_cell, which is the surface pool alone, and "
+        "the difference is not small: a shotgun proteome includes the ER, "
+        "Golgi, endosomal and secretory pools of a receptor along with "
+        "whatever is displayed. Writing one into the other put 24 million "
+        "CD14 on a macrophage surface -- 43% of the entire membrane "
+        "covered by a single protein -- which is how the distinction was "
+        "noticed. A receptor's surface fraction is its own measurement "
+        "and this library does not have it for anything.",
+        (EntityType.RECEPTOR, EntityType.PROTEIN, EntityType.CYTOKINE,
+         EntityType.ADHESION_MOLECULE, EntityType.MHC_MOLECULE,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR),
+        minimum=1.0, maximum=1e9,
+    ),
+    _spec(
         "constant_region_mass_kda", "kDa",
         "Mass of ONE immunoglobulin heavy-chain constant region. It is not "
         "the mass of an antibody and must never be read as one: an IGH* "

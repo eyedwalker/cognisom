@@ -12421,6 +12421,16 @@
    },
    "name": "B7-2 (CD86)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "64.8 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 1.3% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 711100.3
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P42081",
      "conditions": "AlphaFold model, 2640 atoms, 69% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 20.2 nm.",
@@ -12456,6 +12466,11 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P42081-F1",
+    "copies_per_cell": {
+     "Macrophage": 711100.3,
+     "Macrophage M1": 711100.3,
+     "Monocyte": 40045.5
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -12508,6 +12523,16 @@
    },
    "name": "CCR2 (CD192)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "30.6 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.6% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 335797.3
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P41597",
      "conditions": "AlphaFold model, 2954 atoms, 73% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 14.4 nm.",
@@ -12555,6 +12580,11 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P41597-F1",
+    "copies_per_cell": {
+     "Macrophage": 335797.3,
+     "Macrophage M1": 335797.3,
+     "Monocyte": 18910.4
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -12645,6 +12675,16 @@
    },
    "name": "CCR6 (CD196)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "25.5 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.1% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 6503.6
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P51684",
      "conditions": "AlphaFold model, 2983 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
@@ -12693,7 +12733,11 @@
      "T follicular helper (Tfh)": 11.9
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-P51684-F1"
+    "alphafold_model": "AF-P51684-F1",
+    "copies_per_cell": {
+     "Memory B cell": 6503.6,
+     "Naive B cell": 6503.6
+    }
    }
   },
   {
@@ -12708,6 +12752,16 @@
    },
    "name": "CCR7 (CD197)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "12.4 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.1% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 3162.5
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P32248",
      "conditions": "AlphaFold model, 3012 atoms, 75% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 10.0 nm.",
@@ -12763,6 +12817,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P32248-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 1252.3,
+     "CD8+ Naive T cell": 1252.3,
+     "Memory B cell": 3162.5,
+     "Naive B cell": 3162.5
+    },
     "hpa_bucket": "cytoplasm",
     "hpa_location": "Mitochondria",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -12814,7 +12874,18 @@
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "CD19 co-receptor (CD19)",
-   "parameters": {},
+   "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "134 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.7% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 34175.8
+    }
+   },
    "sourced": {
     "abundance_measured_in": {
      "Memory B cell": "peripheral blood B cells",
@@ -12827,7 +12898,11 @@
      "Naive B cell": 134.0,
      "Plasma cell": 134.0
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "copies_per_cell": {
+     "Memory B cell": 34175.8,
+     "Naive B cell": 34175.8
+    }
    }
   },
   {
@@ -12842,6 +12917,16 @@
    },
    "name": "CD27 (TNFRSF7)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "12 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.1% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 3060.5
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P26842",
      "conditions": "AlphaFold model, 2033 atoms, 53% at pLDDT>=70 (mean pLDDT 72); extent computed over the confident atoms. Over all atoms it is 16.6 nm.",
@@ -12897,6 +12982,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P26842-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 3060.5,
+     "CD8+ Naive T cell": 3060.5,
+     "Memory B cell": 1017.6,
+     "Naive B cell": 1017.6
+    },
     "hpa_bucket": "granule",
     "hpa_location": "Vesicles",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -12914,6 +13005,16 @@
    },
    "name": "CD3 epsilon chain (CD3E)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "667 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 3.7% of it, which is impossible, so most of this pool is intracellular. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 170114.1
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P07766",
      "conditions": "AlphaFold model, 1624 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.3 nm.",
@@ -12981,6 +13082,15 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P07766-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 170114.1,
+     "CD8+ Naive T cell": 170114.1,
+     "Macrophage": 27434.4,
+     "Macrophage M1": 27434.4,
+     "Memory B cell": 26779.6,
+     "Monocyte": 1545.0,
+     "Naive B cell": 26779.6
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Endoplasmic reticulum, Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -12998,6 +13108,16 @@
    },
    "name": "CD4 co-receptor (CD4)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "5.66 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 1443.5
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P01730",
      "conditions": "AlphaFold model, 3590 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 19.9 nm.",
@@ -13053,6 +13173,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P01730-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 808.5,
+     "CD8+ Naive T cell": 808.5,
+     "Memory B cell": 1443.5,
+     "Naive B cell": 1443.5
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13114,6 +13240,16 @@
    },
    "name": "CD8 alpha chain (CD8A)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "371 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 2.1% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 94621.2
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P01732",
      "conditions": "AlphaFold model, 1811 atoms, 69% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
@@ -13161,6 +13297,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P01732-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 94621.2,
+     "CD8+ Naive T cell": 94621.2,
+     "Memory B cell": 4029.7,
+     "Naive B cell": 4029.7
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13178,6 +13320,16 @@
    },
    "name": "CRTH2 (PTGDR2/CD294)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "2.62 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 668.2
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:Q9Y5Y4",
      "conditions": "AlphaFold model, 3047 atoms, 77% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 11.6 nm.",
@@ -13214,7 +13366,11 @@
      "Exhausted CD8+ T cell": 2.62
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-Q9Y5Y4-F1"
+    "alphafold_model": "AF-Q9Y5Y4-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 668.2,
+     "CD8+ Naive T cell": 668.2
+    }
    }
   },
   {
@@ -13229,6 +13385,16 @@
    },
    "name": "CSF-1 receptor (CSF1R/CD115)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "13 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.3% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 142659.0
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P07333",
      "conditions": "AlphaFold model, 7607 atoms, 75% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
@@ -13264,6 +13430,11 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P07333-F1",
+    "copies_per_cell": {
+     "Macrophage": 142659.0,
+     "Macrophage M1": 142659.0,
+     "Monocyte": 8033.8
+    },
     "hpa_bucket": "granule",
     "hpa_location": "Vesicles, Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13303,6 +13474,16 @@
    },
    "name": "CXCR3 (CD183)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "1.77 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 451.4
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P49682",
      "conditions": "AlphaFold model, 2859 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 11.4 nm.",
@@ -13339,7 +13520,11 @@
      "Exhausted CD8+ T cell": 1.77
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-P49682-F1"
+    "alphafold_model": "AF-P49682-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 451.4,
+     "CD8+ Naive T cell": 451.4
+    }
    }
   },
   {
@@ -13354,6 +13539,16 @@
    },
    "name": "CXCR5 (CD185)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "0.82 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 209.1
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P32302",
      "conditions": "AlphaFold model, 2955 atoms, 73% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
@@ -13412,7 +13607,13 @@
      "T follicular helper (Tfh)": 1.89
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-P32302-F1"
+    "alphafold_model": "AF-P32302-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 209.1,
+     "CD8+ Naive T cell": 209.1,
+     "Memory B cell": 170.9,
+     "Naive B cell": 170.9
+    }
    }
   },
   {
@@ -13449,6 +13650,16 @@
    },
    "name": "Ectonucleoside triphosphate diphosphohydrolase 1 (CD39/ENTPD1)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "90.3 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.5% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 23030.4
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P49961",
      "conditions": "AlphaFold model, 4088 atoms, 91% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 12.0 nm.",
@@ -13494,6 +13705,13 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P49961-F1",
+    "copies_per_cell": {
+     "Macrophage": 542104.2,
+     "Macrophage M1": 542104.2,
+     "Memory B cell": 23030.4,
+     "Monocyte": 30528.5,
+     "Naive B cell": 23030.4
+    },
     "hpa_bucket": "cytoplasm",
     "hpa_location": "Microtubules",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13549,6 +13767,16 @@
    },
    "name": "Fc-gamma receptor III (CD16/FCGR3A)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "60.8 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 1.2% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 667205.2
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P08637",
      "conditions": "AlphaFold model, 2056 atoms, 77% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
@@ -13609,7 +13837,14 @@
      "T follicular helper (Tfh)": 8.07
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-P08637-F1"
+    "alphafold_model": "AF-P08637-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 12777.7,
+     "CD8+ Naive T cell": 12777.7,
+     "Macrophage": 667205.2,
+     "Macrophage M1": 667205.2,
+     "Monocyte": 37573.6
+    }
    }
   },
   {
@@ -13704,6 +13939,16 @@
    },
    "name": "Hemoglobin scavenger receptor (CD163)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "204 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 4.0% of it, which is impossible, so most of this pool is intracellular. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 2238649.0
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:Q86VB7",
      "conditions": "AlphaFold model, 8762 atoms, 78% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
@@ -13759,6 +14004,15 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-Q86VB7-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 2.6,
+     "CD8+ Naive T cell": 2.6,
+     "Macrophage": 2238649.0,
+     "Macrophage M1": 2238649.0,
+     "Memory B cell": 517.7,
+     "Monocyte": 126069.2,
+     "Naive B cell": 517.7
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13776,6 +14030,16 @@
    },
    "name": "ICOS (CD278)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "5.87 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 1497.1
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:Q9Y6W8",
      "conditions": "AlphaFold model, 1589 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
@@ -13825,6 +14089,10 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-Q9Y6W8-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 1497.1,
+     "CD8+ Naive T cell": 1497.1
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -13917,6 +14185,16 @@
    },
    "name": "IL-23 receptor (IL23R)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "2.63 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 670.8
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:Q5VWK5",
      "conditions": "AlphaFold model, 5047 atoms, 54% at pLDDT>=70 (mean pLDDT 69); extent computed over the confident atoms. Over all atoms it is 13.0 nm.",
@@ -13963,7 +14241,13 @@
      "Plasma cell": 2.63
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-Q5VWK5-F1"
+    "alphafold_model": "AF-Q5VWK5-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 622.3,
+     "CD8+ Naive T cell": 622.3,
+     "Memory B cell": 670.8,
+     "Naive B cell": 670.8
+    }
    }
   },
   {
@@ -14012,7 +14296,18 @@
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "IL-7 receptor alpha (CD127)",
-   "parameters": {},
+   "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "8.25 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 2104.1
+    }
+   },
    "sourced": {
     "abundance_measured_in": {
      "CD4+ T cell": "bulk CD4+ T cells",
@@ -14052,6 +14347,12 @@
      "T follicular helper (Tfh)": 41.5
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 2104.1,
+     "CD8+ Naive T cell": 2104.1,
+     "Memory B cell": 178.5,
+     "Naive B cell": 178.5
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -14129,6 +14430,16 @@
    },
    "name": "LPS co-receptor (CD14)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "2225 ppm of total protein molecules in Macrophage, measured in peripheral blood monocytes; cell volume 4989 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Macrophage, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 43.2% of it, which is impossible, so most of this pool is intracellular. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 24416637.2
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P08571",
      "conditions": "AlphaFold model, 2811 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 8.4 nm.",
@@ -14184,6 +14495,15 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P08571-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 7370.8,
+     "CD8+ Naive T cell": 7370.8,
+     "Macrophage": 24416637.2,
+     "Macrophage M1": 24416637.2,
+     "Memory B cell": 37236.4,
+     "Monocyte": 1375019.1,
+     "Naive B cell": 37236.4
+    },
     "hpa_bucket": "granule",
     "hpa_location": "Vesicles",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -14201,6 +14521,16 @@
    },
    "name": "Low-affinity IgE receptor (CD23)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "32.3 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.2% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 8237.9
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P06734",
      "conditions": "AlphaFold model, 2558 atoms, 81% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 21.1 nm.",
@@ -14233,7 +14563,11 @@
      "Plasma cell": 32.3
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
-    "alphafold_model": "AF-P06734-F1"
+    "alphafold_model": "AF-P06734-F1",
+    "copies_per_cell": {
+     "Memory B cell": 8237.9,
+     "Naive B cell": 8237.9
+    }
    }
   },
   {
@@ -14283,6 +14617,16 @@
    },
    "name": "NKG2D (KLRK1/CD314)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "4.99 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 1272.7
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P26718",
      "conditions": "AlphaFold model, 1774 atoms, 68% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 10.7 nm.",
@@ -14330,6 +14674,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P26718-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 1272.7,
+     "CD8+ Naive T cell": 1272.7,
+     "Memory B cell": 227.0,
+     "Naive B cell": 227.0
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -14427,6 +14777,16 @@
    },
    "name": "Neuropilin-1 (CD304/NRP1)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "0.01 ppm of total protein molecules in CD8+ Memory T cell, measured in bulk CD8+ T cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for CD8+ Memory T cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 2.6
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:O14786",
      "conditions": "AlphaFold model, 7259 atoms, 78% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 13.1 nm.",
@@ -14464,6 +14824,10 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-O14786-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 2.6,
+     "CD8+ Naive T cell": 2.6
+    },
     "hpa_bucket": "cytoplasm",
     "hpa_location": "Mitochondria",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -14667,6 +15031,16 @@
    },
    "name": "Thrombomodulin (CD141/THBD)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "2.67 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 681.0
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P07204",
      "conditions": "AlphaFold model, 4201 atoms, 78% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
@@ -14710,6 +15084,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P07204-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 135.2,
+     "CD8+ Naive T cell": 135.2,
+     "Memory B cell": 681.0,
+     "Naive B cell": 681.0
+    },
     "hpa_bucket": "nucleus",
     "hpa_location": "Nucleoplasm, Cytosol",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
@@ -14771,6 +15151,16 @@
    },
    "name": "c-Kit (CD117/KIT)",
    "parameters": {
+    "copies_per_cell": {
+     "calibrated_against": "25,000 PSGL-1 (CD162) copies on a human Neutrophil (PMID:9829984)",
+     "citation": "PaxDb+PMID:9829984",
+     "conditions": "0.07 ppm of total protein molecules in Memory B cell, measured in peripheral blood B cells; cell volume 116 um^3 from its evidenced radius. 2.2e+06 protein molecules per um^3, fixed by 25,000 PSGL-1 (CD162) copies on a Neutrophil of 303 um^3 (PMID:9829984) at 37.5 ppm. CHECK: this predicts 5.3e+09 proteins in a HeLa cell of 2425 um^3, against a literature range of 2e+09-1e+10.",
+     "provenance": "calibrated",
+     "rationale": "A ppm is a RATIO and cannot become a count without knowing how many molecules a cell holds. The scale comes from one absolute measurement rather than a sourced protein density -- the obvious BioNumbers record for that turned out to be 'number of proteins PRODUCED per cell', a flux and not a census.\nCALIBRATED, not MEASURED, and the weakest link is named: PaxDb has no Neutrophil dataset for PSGL-1 (CD162), so the anchor's ppm is the Monocyte value as the nearest myeloid proxy. Every count here inherits that assumption.\nStored for Memory B cell, where this receptor is most abundant of the cells whose size is evidence. The per-cell-type counts are in sourced['copies_per_cell'] -- averaging a count across cells of different volumes would mean nothing.\nTOTAL cellular copies, not surface. On the membrane alone this many would cover 0.0% of it, which is small enough that a large surface fraction is at least possible. surface_density_per_cell is left untouched; the surface fraction is its own measurement and this library has it for nothing.",
+     "source": "PaxDb abundance scaled by one absolute count; see cognisom/library/seed_copy_numbers.py",
+     "unit": "molecules/cell",
+     "value": 17.9
+    },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:P10721",
      "conditions": "AlphaFold model, 7725 atoms, 74% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
@@ -14830,6 +15220,12 @@
     },
     "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
     "alphafold_model": "AF-P10721-F1",
+    "copies_per_cell": {
+     "CD8+ Memory T cell": 7.7,
+     "CD8+ Naive T cell": 7.7,
+     "Memory B cell": 17.9,
+     "Naive B cell": 17.9
+    },
     "hpa_bucket": "membrane",
     "hpa_location": "Plasma membrane",
     "hpa_source": "Human Protein Atlas (proteinatlas.org), CC BY 4.0. Antibody-based immunofluorescence, subcellular main location."
