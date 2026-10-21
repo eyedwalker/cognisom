@@ -456,15 +456,123 @@ def _render_drug_molecule(entity, props: dict, height: int) -> bool:
     return _render_type_icon(entity, height)
 
 
-def _render_cell_3d(entity, height: int) -> bool:
-    """Render anatomically accurate 3D cell with internal structures.
+@st.cache_data(show_spinner=False, max_entries=256)
+def _cached_scene(name: str, mesh_type: str, scale_um: float,
+                  markers: tuple, grid: int):
+    """One entity's geometry, cached by what actually determines it.
 
-    Each cell type is a composite scene with:
-    - Cell membrane (semi-transparent surface with type-specific shape)
-    - Nucleus (correct shape: round, kidney, multilobed, eccentric)
-    - Organelles (mitochondria, ER, Golgi, granules as appropriate)
-    - Surface receptors (type-specific markers as small dots on membrane)
+    Keyed on the fields the scene depends on rather than on the entity
+    object, which is unhashable and whose identity changes per request.
+    Measured on this machine: a median builder is 34 ms at grid 32 and
+    the whole 32-builder catalogue 1.48 s, so an uncached grid of cards
+    would be seconds of marching cubes per page load.
     """
+    from cognisom.library.store import EntityStore
+    from cognisom.visualization import cell_profiles as cp
+    from cognisom.visualization import cell_scene as cs
+
+    store = EntityStore()
+    entity = store.find_entity_by_name(name)
+    if entity is None:
+        return None
+    return cs.scene_for(entity, grid=grid,
+                        compartments=cp.library_compartment_index(store))
+
+
+def _render_cell_from_library(entity, height: int) -> bool:
+    """Draw the shape the library says this cell has.
+
+    What this replaces drew cells from a parallel system that chose a
+    shape by substring-matching the entity's NAME -- fibroblast and
+    endothelial both to macrophage_m2, epithelial to plasma_cell, every
+    B cell and ILC to t_cell -- and then printed the entity's real
+    mesh_type underneath as a caption, so the page asserted a shape it
+    had not drawn.
+
+    This reads ``mesh_type``, which is the field that names the shape,
+    and builds it with the same 32 builders the USD exporter uses. The
+    cells are therefore the same object in the page and in the export,
+    which they have never been before.
+    """
+    import plotly.graph_objects as go
+
+    from cognisom.visualization import cell_scene as cs
+
+    markers = tuple(sorted(
+        (getattr(entity, "properties", None) or {}).get("surface_markers")
+        or (getattr(entity, "properties", None) or {}).get("markers") or []))
+    try:
+        scene = _cached_scene(entity.name, entity.mesh_type or "",
+                              float(entity.scale_um or 10.0), markers,
+                              cs.CARD_GRID)
+    except Exception as exc:                            # pragma: no cover
+        log.warning("library geometry failed for %s: %s", entity.name, exc)
+        return False
+    if scene is None or not scene.surfaces:
+        return False
+
+    fig = go.Figure()
+    for surface in scene.surfaces:
+        r, g, b = [int(c * 255) for c in surface.color]
+        v, f = surface.vertices, surface.faces
+        fig.add_trace(go.Mesh3d(
+            x=v[:, 0], y=v[:, 1], z=v[:, 2],
+            i=f[:, 0], j=f[:, 1], k=f[:, 2],
+            color=f"rgb({r},{g},{b})", opacity=surface.opacity,
+            flatshading=False, name=surface.name, hoverinfo="name",
+            lighting=dict(ambient=0.42, diffuse=0.72, specular=0.22,
+                          roughness=0.55, fresnel=0.1),
+            lightposition=dict(x=100, y=200, z=150),
+        ))
+
+    for detail in scene.details:
+        if len(detail.positions) == 0:
+            continue
+        r, g, b = [int(c * 255) for c in detail.color]
+        # Scaled to the feature's real radius against the cell's, so a
+        # 0.125 um granule in an 8 um cell reads as one.
+        size = max(1.5, 170.0 * detail.radius_um / max(scene.scale_um, 1e-6))
+        label = (f"{detail.name} ({detail.actual})" if detail.actual == detail.drawn
+                 else f"{detail.name} ({detail.drawn} of {detail.actual} drawn)")
+        fig.add_trace(go.Scatter3d(
+            x=detail.positions[:, 0], y=detail.positions[:, 1],
+            z=detail.positions[:, 2], mode="markers",
+            marker=dict(size=size, color=f"rgb({r},{g},{b})", opacity=0.85),
+            name=label, hoverinfo="name",
+        ))
+
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            zaxis=dict(visible=False), bgcolor="#0a0a1a",
+            camera=dict(eye=dict(x=1.8, y=1.8, z=1.1)), aspectmode="data",
+        ),
+        margin=dict(l=0, r=0, t=0, b=25), height=height,
+        paper_bgcolor="#0a0a1a", showlegend=False,
+        annotations=[dict(
+            text=scene.caption(), x=0.5, y=0, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=10, color="rgba(255,255,255,0.45)"),
+        )],
+    )
+    st.plotly_chart(fig, use_container_width=True,
+                    config={"displayModeBar": False})
+    return True
+
+
+def _render_cell_3d(entity, height: int) -> bool:
+    """Render a cell, from the library's own geometry where there is any.
+
+    The parallel parametric path below is kept only for entities whose
+    ``mesh_type`` names no builder. It picks a shape by substring, so
+    anything it draws is a guess about the name rather than a statement
+    about the cell, and the caption says so.
+    """
+    from cognisom.visualization.cell_scene import has_builder
+
+    if has_builder(getattr(entity, "mesh_type", None)):
+        if _render_cell_from_library(entity, height):
+            return True
+
     color = entity.color_rgb if hasattr(entity, "color_rgb") and entity.color_rgb else [0.8, 0.3, 0.3]
     r, g, b = [int(c * 255) for c in color[:3]]
     rng = np.random.RandomState(hash(entity.name) % 2**31)
@@ -773,8 +881,11 @@ def _render_cell_3d(entity, height: int) -> bool:
 
     # Caption
     scale = entity.scale_um if hasattr(entity, "scale_um") and entity.scale_um else ""
-    mesh = entity.mesh_type if hasattr(entity, "mesh_type") and entity.mesh_type else morphology
-    caption = mesh.replace("_", " ").title()
+    # The entity's mesh_type is NOT what this path drew. It routed on a
+    # substring of the name, so printing mesh_type here captioned a
+    # fibroblast drawn as a macrophage "Elongated Spindle". Name what
+    # was actually built, and mark it as the approximation it is.
+    caption = morphology.replace("_", " ").title() + " (approx)"
     if scale:
         caption += f" | ~{scale} um"
 

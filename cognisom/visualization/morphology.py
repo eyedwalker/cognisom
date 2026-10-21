@@ -65,6 +65,38 @@ def _grid(n: int = GRID):
     return np.stack(np.meshgrid(a, a, a, indexing="ij"), axis=-1).astype(np.float32)
 
 
+def _variation(seed, *, radius=0.05, axes=0.04, offset=0.03):
+    """Per-cell variation: how this one differs from its neighbours.
+
+    Seventeen of the thirty-two builders ignored their ``seed``
+    argument, and ``smooth_sphere`` -- shared by eighteen entities,
+    every CD4 and CD8 subset, both B cells, all three ILCs -- was one of
+    them. So :func:`morphology_usd.shape_seed`, added precisely to stop
+    entities sharing a mesh_type from being byte-identical, had no
+    effect on the builder that collides most. A Th1 and a Th2 were the
+    same object.
+
+    THIS ADDS NO INFORMATION, and it is important to be clear about
+    that. It does not claim a Th1 is rounder than a Th2. It says a
+    population of lymphocytes is a population rather than one cell
+    stamped out repeatedly, which is a weaker claim and a true one.
+    The cells still differ meaningfully only in the ways the library
+    records.
+
+    Amplitudes are small on purpose: a few per cent, against the ~10%
+    diameter spread the morphometry histograms show for a real WBC
+    population (PMID 6775712, Fig. 7). Large enough that two cells are
+    not the same mesh, small enough that nobody reads structure into it.
+
+    Returns ``(radius_scale, squash, offset)``.
+    """
+    rng = np.random.default_rng(int(seed) & 0xFFFFFFFF)
+    scale = 1.0 + rng.normal(0.0, radius)
+    squash = 1.0 + rng.normal(0.0, axes, size=3)
+    shift = rng.normal(0.0, offset, size=3)
+    return float(np.clip(scale, 0.85, 1.15)), np.clip(squash, 0.88, 1.12), shift
+
+
 def _sphere(g, centre=(0, 0, 0), r=1.0, squash=(1, 1, 1)):
     d = (g - np.asarray(centre, np.float32)) / np.asarray(squash, np.float32)
     return np.linalg.norm(d, axis=-1) <= r
@@ -266,9 +298,13 @@ LYMPHOCYTE_NUCLEAR_RADIUS = 0.92 * LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION ** (1 / 3)
 
 def _b_smooth_sphere(g, seed):
     # Offset slightly, because a perfectly concentric nucleus reads as a
-    # diagram; a real one sits a little to one side.
-    return {1: _sphere(g, r=0.92),
-            2: _sphere(g, (0.06, -0.04, 0), LYMPHOCYTE_NUCLEAR_RADIUS)}
+    # diagram; a real one sits a little to one side. The variation is
+    # what makes this cell this cell rather than the shared prototype --
+    # eighteen entities use this builder.
+    scale, squash, shift = _variation(seed)
+    return {1: _sphere(g, r=0.92 * scale, squash=squash),
+            2: _sphere(g, (0.06 + shift[0], -0.04 + shift[1], shift[2]),
+                       LYMPHOCYTE_NUCLEAR_RADIUS * scale, squash=squash)}
 
 
 def _b_granular_sphere(g, seed):
@@ -279,8 +315,10 @@ def _b_granular_sphere(g, seed):
     holds 63 +/- 23 of them (PMID 29592963), not the ~200 that reviews
     quote from the NK-92 and YTS cell lines.
     """
-    body = _sphere(g, r=0.92)
-    nuc = _sphere(g, (0.06, -0.04, 0), LYMPHOCYTE_NUCLEAR_RADIUS)
+    scale, squash, shift = _variation(seed)
+    body = _sphere(g, r=0.92 * scale, squash=squash)
+    nuc = _sphere(g, (0.06 + shift[0], -0.04 + shift[1], shift[2]),
+                  LYMPHOCYTE_NUCLEAR_RADIUS * scale, squash=squash)
     gran = _granules_to_fraction(g, body & ~nuc, 0.020, 0.052, seed)
     return {1: body, 2: nuc, 3: gran}
 
