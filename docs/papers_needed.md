@@ -16,12 +16,28 @@ browser and, for most, an institutional login.
 
 | # | PMID | Paper | Where | What it holds up |
 |---|------|-------|-------|------------------|
-| 3 | `25679760` | Confinement and low adhesion induce fast amoeboid migration of slow me<br>*Cell* 2015 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/25679760/) · [doi](https://doi.org/10.1016/j.cell.2015.01.007) | Amoeboid migration speed under confinement, which is how a T cell actually moves through tissue. |
 | 5 | `10381624` | Purification and catalytic properties of human caspase family members<br>*Cell Death Differ* 1999 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/10381624/) · [doi](https://doi.org/10.1038/sj.cdd.4400497) | Values behind: kcat_per_s |
 | 5 | `12451422` | Plasmalemmal concentration and affinity of mouse vascular endothelial <br>*Eur Biophys J* 2002 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/12451422/) · [doi](https://doi.org/10.1007/s00249-002-0248-9) | Values behind: kd_nm |
 | 5 | `15771445` | Binding thermodynamics as a tool to investigate the mechanisms of drug<br>*J Med Chem* 2005 — repository copy exists | [PubMed](https://pubmed.ncbi.nlm.nih.gov/15771445/) · [doi](https://doi.org/10.1021/jm040842z) | Values behind: kd_nm |
 | 5 | `16490769` | Screening for caspase-3 inhibitors: a new class of potent small-molecu<br>*J Biomol Screen* 2006 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/16490769/) · [doi](https://doi.org/10.1177/1087057105285048) | Values behind: km_um |
 | 5 | `20178337` | In vitro modulation of cytochrome P450 reductase supported indoleamine<br>*Biochemistry* 2010 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/20178337/) · [doi](https://doi.org/10.1021/bi100022c) | Values behind: kcat_per_s, km_um |
+
+## Obtained — 2026-10-21 (migration)
+
+`25679760` — Liu et al., *Cell* 2015. The stored `0.234 µm/min` is
+correct and is **the wrong regime for a tumour**. The same cells reach
+**1.7** (A1) and **5.3 µm/min** (A2) once confined to 3 µm without focal
+adhesions — **23×, with no genetic change**. The paper's own closing
+argument is that the confinement a growing tumour imposes on itself may
+be enough to trigger it.
+
+It also supplies the model the simulation was missing: a persistent
+random walk, `MSD(t) = 2 S² P (t − P(1 − e^(−t/P)))`, `D = S²P/2` — the
+conversion from a speed the library *has* to the cell diffusion
+coefficient the mechanics needs.
+
+**10 papers read, 8 changed something.**
+
 
 ## Obtained — 2026-10-21 (all four adhesion papers)
 

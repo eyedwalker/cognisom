@@ -1923,12 +1923,35 @@
    "parameters": {
     "migration_speed_um_per_min": {
      "citation": "PMID:25679760",
-     "conditions": "Human Homo sapiens; BioNumbers quantity: Speed of NHDF [normal human dermal fibroblast] mesenchymal cell; range \u00b10.09 \u00b5m/min; method: P.663 left column 2nd paragraph:\"To test whether this microenvironment-dependent switch in the mode of migration was restricted to NHDF cells, [researchers] inv; normal human dermal fibroblasts in mesenchymal migration mode, x1",
+     "conditions": "Normal human dermal fibroblasts and 20 other cell types, tracked by Hoechst-stained nuclei at 37 C and fitted as a persistent random walk (Fuerth model). THE SPEED IS THE MODE, NOT THE CELL: mesenchymal 0.234+/-0.09; amoeboid A1 1.7+/-0.4; amoeboid A2 (stable bleb) 5.3+/-1.5 um/min, all measured on the same cell types. The switch is triggered by 3 um confinement plus the absence of focal adhesions, which is why this matters for a tumour: the authors argue the confinement imposed by surrounding tissue 'might be enough to trigger a migratory switch toward a faster and more invasive mode of migration'. The 0.234 figure is the UNCONFINED 2D adherent regime and must not be read into a confined one.",
      "provenance": "measured",
-     "rationale": "P.663 left column 3rd paragraph:\"For all cell types, with the exception of normal epithelial cells, [researchers] found a sub-fraction of spontaneously polarizing cells moving fast with an amoeboid-like morphology (Figures 4A and 4B). Unexpectedly, [they] found two distinct types of fast-migrating cells (Figures 4A and S4A\u2013S4C). The first type, which [they] named A1, was similar to what was observ",
-     "source": "BioNumbers BNID:112237 (Liu YJ et al., Confinement and low adhesion induce fast amoeboid migration of slow mesenchymal cells. Cell. 2015 Feb 12 )",
+     "rationale": "Figure 4C, the mesenchymal control. The number was already correct; its conditions came from a BioNumbers record rather than the paper, and the sentence stored as its rationale is about EPITHELIAL cells -- an adjacent paragraph that BioNumbers picked up.\nWhat was missing is the finding: the same cells reach 1.7 um/min (A1) and 5.3 um/min (A2) once confined to 3 um without focal adhesions. Twenty-three fold, with no genetic change. A confined tissue simulation that reads 0.234 is using the one regime the paper excludes.",
+     "source": "Liu YJ, Le Berre M, Lautenschlaeger F, Maiuri P, Callan-Jones A, Heuze M, Takaki T, Voituriez R, Piel M. Cell 2015;160(4):659-672, Figure 4C",
      "unit": "um/min",
      "value": 0.234
+    }
+   },
+   "sourced": {
+    "migration_model": "Persistent random walk (Fuerth): MSD(t) = 2 S P (t - P(1 - exp(-t/P))), D = S^2 P / 2. Speed alone does not give a diffusion coefficient; persistence is the other half, and the two trade off with adhesion. PMID:25679760",
+    "migration_modes": {
+     "amoeboid_a1": {
+      "citation": "PMID:25679760",
+      "environment": "3 um confinement on a non-adhesive surface, LOW contractility: a round body with a small leading edge, driven by a retrograde actin flow localised to that protrusion",
+      "sd": 0.4,
+      "speed_um_per_min": 1.7
+     },
+     "amoeboid_a2": {
+      "citation": "PMID:25679760",
+      "environment": "3 um confinement on a non-adhesive surface, HIGH contractility: an elongated body with a uropod, driven by a GLOBAL cortical retrograde flow. Every leukocyte tested adopted this mode, and so did every transformed cell line",
+      "sd": 1.5,
+      "speed_um_per_min": 5.3
+     },
+     "mesenchymal": {
+      "citation": "PMID:25679760",
+      "environment": "2D adherent culture, unconfined: focal adhesions, stress fibres, spindle shape",
+      "sd": 0.09,
+      "speed_um_per_min": 0.234
+     }
     }
    }
   },
