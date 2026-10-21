@@ -1,91 +1,45 @@
-# Papers I need, and what each one is holding up
+# Papers I still need, and where each one is
 
-Generated from the library's own citations. Every value below is stored
-as MEASURED with the PMID beside it, and for these the full text could
-not be reached -- so the number came from an abstract, with no table and
-no method behind it.
+Generated 2026-10-21 by querying PubMed, PMC and Unpaywall for every
+remaining PMID. Save each as `docs/papers/<PMID>.pdf` -- that directory
+is gitignored and read before any network route, so a paper dropped
+there is used immediately and never fetched again.
 
-A PDF in `docs/papers/` named `PMID.pdf` is all I need; I parse them with
-pypdf. No credentials, no proxy, nothing shared.
+**Two of these are free right now** and need no institutional access:
+15209560 and 16840338 are both in PubMed Central. Open the PMC link,
+print to PDF, done.
 
-| PMID | DOI | What I need from it |
-|---|---|---|
-| 11404363 | 10.1074/jbc.m104844200 | Values behind: bond_lifetime_seconds, kd_nm, koff_per_s, kon_per_nm_per_s |
-| 9422729 | 10.1074/jbc.273.2.763 | Values behind: bond_lifetime_seconds, kd_nm, koff_per_s, kon_per_nm_per_s |
-| 9780171 | 10.4049/jimmunol.161.8.4016 | Values behind: bond_lifetime_seconds, kd_nm, koff_per_s, kon_per_nm_per_s |
-| 9829984 | 10.1074/jbc.273.49.32506 | Values behind: bond_lifetime_seconds, kd_nm, koff_per_s, kon_per_nm_per_s |
-| 20178337 | 10.1021/bi100022c | Values behind: kcat_per_s, km_um |
-| 10381624 | 10.1038/sj.cdd.4400497 | Values behind: kcat_per_s |
-| 12451422 | 10.1007/s00249-002-0248-9 | Values behind: kd_nm |
-| 15209560 | 10.1042/bj20040809 | Values behind: kcat_per_s |
-| 15771445 | 10.1021/jm040842z | Values behind: kd_nm |
-| 16490769 | 10.1177/1087057105285048 | Values behind: km_um |
-| 16840338 | 10.1128/jvi.01623-05 | Values behind: replication_cycle_hours |
-| 2272970 | 10.1152/jappl.1990.69.5.1767 | Leukocyte diameters by subtype. Holds up radius_um. |
-| 25679760 | 10.1016/j.cell.2015.01.007 | Amoeboid migration speeds under confinement. Holds up migration_speed_um_per_min. |
+The rest are paywalled to an automated fetch. Unpaywall reports several
+as bronze, hybrid or green, which means a copy is legally free to read
+somewhere and the publisher still blocks a script -- so they need a
+browser and, for most, an institutional login.
 
-**13 papers.** Priority order: 308396 (the nuclear fraction) next.
+| # | PMID | Paper | Where | What it holds up |
+|---|------|-------|-------|------------------|
+| 1 | `2272970` | Retention of leukocytes in capillaries: role of cell size and deformab<br>*J Appl Physiol (1985)* 1990 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/2272970/) · [doi](https://doi.org/10.1152/jappl.1990.69.5.1767) | Leukocyte diameters by subtype. The only paper on this list that would let a cell's SIZE be sourced; every radius in the library except the macrophage is a placeholder. |
+| 2 | `15209560` | Activation of caspases-8 and -10 by FLIP(L)<br>*Biochem J* 2004 — repository copy exists | **[PMC — FREE](https://pmc.ncbi.nlm.nih.gov/articles/PMC1133822/)** · [PubMed](https://pubmed.ncbi.nlm.nih.gov/15209560/) · [doi](https://doi.org/10.1042/bj20040809) | caspase-8/-10 kcat. FREE in PMC right now. |
+| 2 | `16840338` | Kinetics of influenza A virus infection in humans<br>*J Virol* 2006 — paywalled | **[PMC — FREE](https://pmc.ncbi.nlm.nih.gov/articles/PMC1563736/)** · [PubMed](https://pubmed.ncbi.nlm.nih.gov/16840338/) · [doi](https://doi.org/10.1128/jvi.01623-05) | Influenza replication cycle hours. FREE in PMC right now. |
+| 3 | `25679760` | Confinement and low adhesion induce fast amoeboid migration of slow me<br>*Cell* 2015 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/25679760/) · [doi](https://doi.org/10.1016/j.cell.2015.01.007) | Amoeboid migration speed under confinement, which is how a T cell actually moves through tissue. |
+| 4 | `11404363` | Affinity, kinetics, and thermodynamics of E-selectin binding to E-sele<br>*J Biol Chem* 2001 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/11404363/) · [doi](https://doi.org/10.1074/jbc.m104844200) | E-selectin kinetics: one of the four selectin papers behind the whole adhesion cascade. |
+| 4 | `9422729` | Affinity and kinetic analysis of L-selectin (CD62L) binding to glycosy<br>*J Biol Chem* 1998 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9422729/) · [doi](https://doi.org/10.1074/jbc.273.2.763) | L-selectin kinetics. |
+| 4 | `9780171` | Affinity and kinetic analysis of the molecular interaction of ICAM-1 a<br>*J Immunol* 1998 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9780171/) · [doi](https://doi.org/10.4049/jimmunol.161.8.4016) | PSGL-1 kinetics. |
+| 4 | `9829984` | Affinity and kinetic analysis of P-selectin binding to P-selectin glyc<br>*J Biol Chem* 1998 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9829984/) · [doi](https://doi.org/10.1074/jbc.273.49.32506) | P-selectin kinetics. |
+| 5 | `10381624` | Purification and catalytic properties of human caspase family members<br>*Cell Death Differ* 1999 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/10381624/) · [doi](https://doi.org/10.1038/sj.cdd.4400497) | Values behind: kcat_per_s |
+| 5 | `12451422` | Plasmalemmal concentration and affinity of mouse vascular endothelial <br>*Eur Biophys J* 2002 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/12451422/) · [doi](https://doi.org/10.1007/s00249-002-0248-9) | Values behind: kd_nm |
+| 5 | `15771445` | Binding thermodynamics as a tool to investigate the mechanisms of drug<br>*J Med Chem* 2005 — repository copy exists | [PubMed](https://pubmed.ncbi.nlm.nih.gov/15771445/) · [doi](https://doi.org/10.1021/jm040842z) | Values behind: kd_nm |
+| 5 | `16490769` | Screening for caspase-3 inhibitors: a new class of potent small-molecu<br>*J Biomol Screen* 2006 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/16490769/) · [doi](https://doi.org/10.1177/1087057105285048) | Values behind: km_um |
+| 5 | `20178337` | In vitro modulation of cytochrome P450 reductase supported indoleamine<br>*Biochemistry* 2010 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/20178337/) · [doi](https://doi.org/10.1021/bi100022c) | Values behind: kcat_per_s, km_um |
 
-## Done
+## Why these and not others
 
-**15130947 and 27647916** arrived 2026-10-21, and between them they
-corrected two of the three microvillus numbers this library ships.
+Every paper here is cited by a value this library already stores and
+grades MEASURED. The grade asserts somebody read the measurement; for
+these thirteen, nobody has. That is the gap, and it is why the TIER a
+retrieval reached is recorded alongside the citation.
 
-The density was 3.0/um^2 cited to PMID 27647916 and attributed to its
-Fig. S2 legend. That paper's full text contains **no density at all** --
-no "3 +/- 0.5", no figure per um^2. The note also called 3.0 "the
-midpoint of the 2-4 range" from PMID 15130947: that range is the
-ABSTRACT's summary across mouse, human and a B-lymphoma line, and the
-human row of its Table 2 is **4.1 +/- 1.2 over 28 cells**. Taking a
-midpoint of a cross-species range in place of the human measurement put
-the number a quarter low.
+Three papers have come in this way so far and the record is not
+reassuring: PMID 6775712 confirmed four stored values and revealed they
+are overestimates the Appendix quantifies; PMID 15130947 corrected two
+of three microvillus numbers; PMID 35676539 confirmed a kcat exactly.
+Two of three changed something.
 
-The length was 0.35 um, the midpoint of the same cross-species range.
-Table 2's human row is **0.38 +/- 0.22 over 1,200 microvilli**.
-
-The diameter, 0.085 um, survives: PMID 27647916 measures 70-100 nm on
-resting human T cells and the stored value is its midpoint.
-
-And PMID 15130947 settles the excess-membrane question it took two days
-to frame. It computes the answer itself: 4.1 villi/um^2 on a 92 um^2
-lymphocyte is 377 microvilli at 0.119 um^2 each, "a **49% increase in
-cell surface area**". Reproduced here exactly. Against the 130% excess
-membrane PMID 6775712 measures for a lymphocyte, microvilli account for
-about **38%** of it -- so roughly 60% is folds, which is what the 1980
-paper calls them throughout.
-
-
-**35676539** opened on 2026-10-21, the day the Unpaywall address was
-added -- and then only because the route was fixed to READ the PDF it
-fetches instead of noting that one exists. It confirms the stored value:
-the paper says `kcat of (18 +/- 4) s-1` and TMPRSS2 stores 18.0. It also
-reports `Km = (200 +/- 80) uM` on Boc-QAR-AMC, which is not stored and
-could be -- noting that the substrate is synthetic, so it is not a
-physiological Km.
-
-Unpaywall opened exactly one of sixteen. Eleven report a bronze, hybrid
-or green licence with no fetchable copy, which means a copy is legally
-free to read and the publisher blocks automated access anyway; four are
-not open access at all. An OA flag describes a licence, not a door.
-
-One lead that looked promising and was not: Unpaywall gives a PMC id for
-27647916 that Europe PMC never returned (PMC5056101), but NCBI efetch
-serves metadata and an abstract for it with no article body -- PNAS has
-not deposited the full text for redistribution. The code's existing
-judgement was right.
-
-
-**6775712** arrived 2026-10-20 and Table 2 is read. All four stored
-granule fractions match it exactly -- 23.0 / 15.4 / 2.6 / 0.2 -- so the
-BioNumbers transcription was faithful. What the BNIDs did not carry is
-the paper's Appendix: the four are overestimates, by up to 19% / 28% /
-29% / 44%, because a granule's diameter is comparable to the 0.08 um
-section and it gets counted too often. That bias is now recorded beside
-each value. The same Appendix clears the nuclear fraction explicitly.
-
-Reading it also found a reader bug: pypdf refuses any page whose font
-descriptor declares two embedded programs, and every page of a
-ScienceDirect PDF does. All ten pages extracted to nothing until that
-was fixed, so the next publisher PDF would have failed the same way.
-
-Everything else the library cites is already readable in full.
