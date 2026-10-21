@@ -1106,6 +1106,39 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
 
     # ── Molecular properties ──
     _spec(
+        "molecular_extent_nm", "nm",
+        "Longest axis of the folded molecule. The size a packing or "
+        "crowding calculation needs, and the one this library did not "
+        "have: scale_um records 0.005 um -- 50 angstrom -- for every "
+        "protein in the catalogue, from cytochrome c to a 1972-residue "
+        "myosin heavy chain. Measured from a structure, so it is DERIVED "
+        "rather than MEASURED, and the confident-atom fraction it was "
+        "computed over belongs in the conditions: a disordered tail "
+        "stretches a bounding box without making the molecule bigger.",
+        (EntityType.PROTEIN, EntityType.RECEPTOR, EntityType.CYTOKINE,
+         EntityType.ADHESION_MOLECULE, EntityType.ANTIBODY,
+         EntityType.COMPLEMENT_COMPONENT,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR,
+         EntityType.MHC_MOLECULE),
+        minimum=0.5, maximum=500.0,
+    ),
+    _spec(
+        "radius_of_gyration_nm", "nm",
+        "Root-mean-square distance of the atoms from the centre of "
+        "mass. Preferred over the longest axis wherever a single number "
+        "has to stand for a molecule's size, because it is robust to "
+        "the disordered tails that dominate a bounding box: perforin "
+        "measures 12.8 nm along its longest axis over all atoms and 9.8 "
+        "nm over the confident ones, while its radius of gyration is "
+        "3.5 nm either way.",
+        (EntityType.PROTEIN, EntityType.RECEPTOR, EntityType.CYTOKINE,
+         EntityType.ADHESION_MOLECULE, EntityType.ANTIBODY,
+         EntityType.COMPLEMENT_COMPONENT,
+         EntityType.PATTERN_RECOGNITION_RECEPTOR,
+         EntityType.MHC_MOLECULE),
+        minimum=0.2, maximum=200.0,
+    ),
+    _spec(
         "molecular_weight_kda", "kDa",
         "Molecular mass. Declared in kilodaltons because that is the unit "
         "the library already writes; mass_daltons is absent on every entity. "

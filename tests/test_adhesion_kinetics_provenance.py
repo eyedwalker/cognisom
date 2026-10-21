@@ -470,9 +470,17 @@ def test_a_freshly_seeded_library_carries_the_citations(seeded_store):
     }
     assert adhesion_kinetics <= cited
     # Every library also takes the repository's curated values on open
-    # (library/curated.py), which include these molecules' UniProt masses.
-    assert all(c.startswith("UniProt:") for c in cited - adhesion_kinetics), (
-        cited - adhesion_kinetics)
+    # (library/curated.py). Two sources contribute them: UniProt, for
+    # these molecules' masses, and AlphaFoldDB, for the molecular extent
+    # and radius of gyration measured from each predicted structure.
+    #
+    # The point of the assertion is that no citation arrives from an
+    # unnamed source, so adding a source means naming it here rather
+    # than loosening the check.
+    sources = ("UniProt:", "AlphaFoldDB:")
+    unknown = {c for c in cited - adhesion_kinetics
+               if not c.startswith(sources)}
+    assert not unknown, f"citations from an unnamed source: {unknown}"
 
 
 def test_the_curated_molecules_are_simulation_ready_and_the_gaps_are_not(

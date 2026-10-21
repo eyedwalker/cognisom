@@ -113,6 +113,35 @@
   {
    "entity_type": "adhesion_molecule",
    "identity": {
+    "gene_symbol": "CEACAM8",
+    "uniprot_id": "P31997",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Granulocyte activation antigen (CD66b/CEACAM8)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P31997",
+     "conditions": "AlphaFold model, 2687 atoms, 83% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.5802
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P31997",
+     "conditions": "AlphaFold model, 2687 atoms, 83% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.6712098146094108
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
     "gene_symbol": "ICAM1"
    },
    "name": "ICAM-1 (CD54)",
@@ -191,6 +220,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 251.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "ITGAX",
+    "uniprot_id": "P20702",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Integrin alpha-X (CD11c/ITGAX)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P20702",
+     "conditions": "AlphaFold model, 9001 atoms, 91% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 14.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.8899
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P20702",
+     "conditions": "AlphaFold model, 9001 atoms, 91% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 14.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.511877227738226
     }
    }
   },
@@ -344,6 +402,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 364.0
+    }
+   }
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "identity": {
+    "gene_symbol": "NCAM1",
+    "uniprot_id": "P13591",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NCAM-1 (CD56)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P13591",
+     "conditions": "AlphaFold model, 6651 atoms, 80% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 18.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 17.1884
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P13591",
+     "conditions": "AlphaFold model, 6651 atoms, 80% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 18.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.804626931062904
     }
    }
   },
@@ -1180,6 +1267,35 @@
   {
    "entity_type": "cytokine",
    "identity": {
+    "gene_symbol": "CCL19",
+    "uniprot_id": "Q99731",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCL19 (MIP-3beta)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q99731",
+     "conditions": "AlphaFold model, 770 atoms, 75% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 6.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.444
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q99731",
+     "conditions": "AlphaFold model, 770 atoms, 75% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 6.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.3206668370449877
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
     "gene_symbol": "CCL2"
    },
    "name": "CCL2 (MCP-1)",
@@ -1208,6 +1324,64 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 76.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "CCL21",
+    "uniprot_id": "O00585",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCL21 (SLC)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O00585",
+     "conditions": "AlphaFold model, 1023 atoms, 63% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 8.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.3818
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O00585",
+     "conditions": "AlphaFold model, 1023 atoms, 63% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 8.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.123934872178107
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "CXCL1",
+    "uniprot_id": "P09341",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CXCL1 (GRO-alpha)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P09341",
+     "conditions": "AlphaFold model, 788 atoms, 78% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 8.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.576099999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P09341",
+     "conditions": "AlphaFold model, 788 atoms, 78% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 8.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.452389364847556
     }
    }
   },
@@ -1486,6 +1660,35 @@
   {
    "entity_type": "cytokine",
    "identity": {
+    "gene_symbol": "IL13",
+    "uniprot_id": "P35225",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-13",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P35225",
+     "conditions": "AlphaFold model, 1104 atoms, 87% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.154000000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P35225",
+     "conditions": "AlphaFold model, 1104 atoms, 87% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.0182300134842333
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
     "gene_symbol": "IL15"
    },
    "name": "IL-15",
@@ -1548,6 +1751,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 132.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL17F",
+    "uniprot_id": "Q96PD4",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-17F",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q96PD4",
+     "conditions": "AlphaFold model, 1262 atoms, 83% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 10.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.801599999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q96PD4",
+     "conditions": "AlphaFold model, 1262 atoms, 83% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 10.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.6612398626821188
     }
    }
   },
@@ -1656,6 +1888,35 @@
   {
    "entity_type": "cytokine",
    "identity": {
+    "gene_symbol": "IL22",
+    "uniprot_id": "Q9GZX6",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-22",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9GZX6",
+     "conditions": "AlphaFold model, 1399 atoms, 82% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 8.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.1471
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9GZX6",
+     "conditions": "AlphaFold model, 1399 atoms, 82% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 8.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.467383130038035
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
     "gene_symbol": "IL33"
    },
    "name": "IL-33",
@@ -1718,6 +1979,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 129.0
+    }
+   }
+  },
+  {
+   "entity_type": "cytokine",
+   "identity": {
+    "gene_symbol": "IL5",
+    "uniprot_id": "P05113",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-5",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P05113",
+     "conditions": "AlphaFold model, 1071 atoms, 81% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 8.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.587000000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P05113",
+     "conditions": "AlphaFold model, 1071 atoms, 81% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 8.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.7929364547765398
     }
    }
   },
@@ -3754,6 +4044,180 @@
    }
   },
   {
+   "entity_type": "mhc",
+   "identity": {
+    "gene_symbol": "CD1C",
+    "uniprot_id": "P29017",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD1c (BDCA-1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P29017",
+     "conditions": "AlphaFold model, 2665 atoms, 89% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.5581
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P29017",
+     "conditions": "AlphaFold model, 2665 atoms, 89% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.8789604250990157
+    }
+   }
+  },
+  {
+   "entity_type": "mhc",
+   "identity": {
+    "gene_symbol": "HLA-DRA",
+    "uniprot_id": "P01903",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "HLA-DR alpha chain (HLA-DRA)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P01903",
+     "conditions": "AlphaFold model, 2022 atoms, 86% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 11.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.895900000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P01903",
+     "conditions": "AlphaFold model, 2022 atoms, 86% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 11.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.963733268379078
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CD38",
+    "uniprot_id": "P28907",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "ADP-ribosyl cyclase (CD38)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P28907",
+     "conditions": "AlphaFold model, 2405 atoms, 90% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 11.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.0076
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P28907",
+     "conditions": "AlphaFold model, 2405 atoms, 90% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 11.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.371439934157216
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "AMACR",
+    "uniprot_id": "Q9UHK6",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Alpha-methylacyl-CoA racemase (AMACR/P504S)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9UHK6",
+     "conditions": "AlphaFold model, 2980 atoms, 99% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 7.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.498400000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9UHK6",
+     "conditions": "AlphaFold model, 2980 atoms, 99% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 7.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.5486844881872313
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "ACTA2",
+    "uniprot_id": "P62736",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Alpha-smooth muscle actin (ACTA2)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P62736",
+     "conditions": "AlphaFold model, 2944 atoms, 97% at pLDDT>=70 (mean pLDDT 95); extent computed over the confident atoms. Over all atoms it is 6.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.2096
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P62736",
+     "conditions": "AlphaFold model, 2944 atoms, 97% at pLDDT>=70 (mean pLDDT 95); extent computed over the confident atoms. Over all atoms it is 6.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1392615232040515
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "ARG1",
+    "uniprot_id": "P05089",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Arginase-1 (ARG1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P05089",
+     "conditions": "AlphaFold model, 2447 atoms, 99% at pLDDT>=70 (mean pLDDT 97); extent computed over the confident atoms. Over all atoms it is 7.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.425399999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P05089",
+     "conditions": "AlphaFold model, 2447 atoms, 99% at pLDDT>=70 (mean pLDDT 97); extent computed over the confident atoms. Over all atoms it is 7.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.8940867992851786
+    }
+   }
+  },
+  {
    "entity_type": "protein",
    "identity": {
     "gene_symbol": "AURKA",
@@ -3762,6 +4226,15 @@
    },
    "name": "Aurora A (AURKA)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O14965",
+     "conditions": "AlphaFold model, 3229 atoms, 65% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 12.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.5968
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:O14965",
      "conditions": "UniProt O14965, Aurora kinase A; whole translated sequence",
@@ -3769,6 +4242,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 45.82338668
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O14965",
+     "conditions": "AlphaFold model, 3229 atoms, 65% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 12.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.9145429125660711
     },
     "sequence_length_aa": {
      "citation": "UniProt:O14965",
@@ -3783,12 +4265,50 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "MS4A1",
+    "uniprot_id": "P11836",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "B-lymphocyte antigen CD20 (MS4A1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P11836",
+     "conditions": "AlphaFold model, 2316 atoms, 55% at pLDDT>=70 (mean pLDDT 70); extent computed over the confident atoms. Over all atoms it is 15.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.0852
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P11836",
+     "conditions": "AlphaFold model, 2316 atoms, 55% at pLDDT>=70 (mean pLDDT 70); extent computed over the confident atoms. Over all atoms it is 15.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.9108038474576137
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "BAX",
     "uniprot_id": "Q07812",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "BAX",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q07812",
+     "conditions": "AlphaFold model, 1488 atoms, 89% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 6.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.4728
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:Q07812",
      "conditions": "UniProt Q07812, Apoptosis regulator BAX; whole translated sequence",
@@ -3796,6 +4316,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 21.18440798
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q07812",
+     "conditions": "AlphaFold model, 1488 atoms, 89% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 6.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.5038504386960143
     },
     "sequence_length_aa": {
      "citation": "UniProt:Q07812",
@@ -3816,6 +4345,15 @@
    },
    "name": "BCL-2",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P10415",
+     "conditions": "AlphaFold model, 1856 atoms, 62% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 7.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.1969
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P10415",
      "conditions": "UniProt P10415, Apoptosis regulator Bcl-2; whole translated sequence",
@@ -3823,6 +4361,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 26.265891579999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P10415",
+     "conditions": "AlphaFold model, 1856 atoms, 62% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 7.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.460849305680618
     },
     "sequence_length_aa": {
      "citation": "UniProt:P10415",
@@ -3843,6 +4390,15 @@
    },
    "name": "BTK",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q06187",
+     "conditions": "AlphaFold model, 5368 atoms, 87% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.491499999999998
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:Q06187",
      "conditions": "UniProt Q06187, Tyrosine-protein kinase BTK, residues 2-659 of 659; mature chain, not the translated precursor",
@@ -3850,6 +4406,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 76.15005198
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q06187",
+     "conditions": "AlphaFold model, 5368 atoms, 87% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.8147656432435797
     },
     "sequence_length_aa": {
      "citation": "UniProt:Q06187",
@@ -3864,12 +4429,108 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "CD40LG",
+    "uniprot_id": "P29965",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD40 ligand (CD40L/CD154)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P29965",
+     "conditions": "AlphaFold model, 2055 atoms, 77% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 12.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.1622
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P29965",
+     "conditions": "AlphaFold model, 2055 atoms, 77% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 12.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.6162138866408635
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "PTPRC",
+    "uniprot_id": "P08575-8",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD45RA (PTPRC)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08575-8",
+     "conditions": "AlphaFold model, 10377 atoms, 74% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 18.2819
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08575-8",
+     "conditions": "AlphaFold model, 10377 atoms, 74% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.024652858033763
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "PTPRC",
+    "uniprot_id": "P08575-4",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD45RO (PTPRC)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08575-4",
+     "conditions": "AlphaFold model, 10377 atoms, 74% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 18.2819
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08575-4",
+     "conditions": "AlphaFold model, 10377 atoms, 74% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.024652858033763
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "CDK4",
     "uniprot_id": "P11802",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "CDK4",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P11802",
+     "conditions": "AlphaFold model, 2376 atoms, 87% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 6.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.637099999999999
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P11802",
      "conditions": "UniProt P11802, Cyclin-dependent kinase 4, residues 2-303 of 303; mature chain, not the translated precursor",
@@ -3878,6 +4539,15 @@
      "unit": "kDa",
      "value": 33.598648479999994
     },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P11802",
+     "conditions": "AlphaFold model, 2376 atoms, 87% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 6.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.9837756812957603
+    },
     "sequence_length_aa": {
      "citation": "UniProt:P11802",
      "conditions": "UniProt P11802, Cyclin-dependent kinase 4, residues 2-303 of 303; mature chain, not the translated precursor",
@@ -3885,6 +4555,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 302.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "CNN1",
+    "uniprot_id": "P51911",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Calponin-1 (CNN1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51911",
+     "conditions": "AlphaFold model, 2331 atoms, 55% at pLDDT>=70 (mean pLDDT 72); extent computed over the confident atoms. Over all atoms it is 11.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 10.0917
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51911",
+     "conditions": "AlphaFold model, 2331 atoms, 55% at pLDDT>=70 (mean pLDDT 72); extent computed over the confident atoms. Over all atoms it is 11.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.282938445172101
     }
    }
   },
@@ -3914,6 +4613,24 @@
      "source": "BRENDA EC 3.4.22.56 (CC BY 4.0), 10 records across 5 papers",
      "unit": "uM",
      "value": 14.7
+    },
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P42574",
+     "conditions": "AlphaFold model, 2214 atoms, 83% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 6.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.6295
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P42574",
+     "conditions": "AlphaFold model, 2214 atoms, 83% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 6.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.7371942604091288
     }
    }
   },
@@ -3934,6 +4651,24 @@
      "source": "BRENDA EC 3.4.22.61 (CC BY 4.0), 4 records across 1 papers",
      "unit": "1/s",
      "value": 0.88
+    },
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q14790",
+     "conditions": "AlphaFold model, 3879 atoms, 83% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 7.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.248
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q14790",
+     "conditions": "AlphaFold model, 3879 atoms, 83% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 7.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.472836648546656
     }
    }
   },
@@ -3955,6 +4690,15 @@
      "unit": "1/s",
      "value": 0.15000000000000002
     },
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P55211",
+     "conditions": "AlphaFold model, 3249 atoms, 80% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 8.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.036699999999999
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P55211",
      "conditions": "UniProt P55211, Caspase-9 subunit p10, residues 331-416 of 416; mature chain, not the translated precursor",
@@ -3962,6 +4706,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 9.828237979999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P55211",
+     "conditions": "AlphaFold model, 3249 atoms, 80% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 8.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.2421171072902526
     },
     "sequence_length_aa": {
      "citation": "UniProt:P55211",
@@ -3976,12 +4729,50 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "CMA1",
+    "uniprot_id": "P23946",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Chymase (CMA1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P23946",
+     "conditions": "AlphaFold model, 1921 atoms, 91% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.1983999999999995
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P23946",
+     "conditions": "AlphaFold model, 1921 atoms, 91% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.652310095529766
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "CYCS",
     "uniprot_id": "P99999",
     "uniprot_resolved_by": "curated_alias"
    },
    "name": "Cytochrome c",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P99999",
+     "conditions": "AlphaFold model, 824 atoms, 100% at pLDDT>=70 (mean pLDDT 98); extent computed over the confident atoms. Over all atoms it is 3.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.7418
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P99999",
      "conditions": "UniProt P99999, Cytochrome c, residues 2-105 of 105; mature chain, not the translated precursor",
@@ -3989,6 +4780,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 11.61753178
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P99999",
+     "conditions": "AlphaFold model, 824 atoms, 100% at pLDDT>=70 (mean pLDDT 98); extent computed over the confident atoms. Over all atoms it is 3.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.2757132017015709
     },
     "sequence_length_aa": {
      "citation": "UniProt:P99999",
@@ -4003,12 +4803,166 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "KRT14",
+    "uniprot_id": "P02533",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Cytokeratin 14 (KRT14)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P02533",
+     "conditions": "AlphaFold model, 3606 atoms, 66% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 20.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 19.3325
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P02533",
+     "conditions": "AlphaFold model, 3606 atoms, 66% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 20.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.407534650955412
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "KRT18",
+    "uniprot_id": "P05783",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Cytokeratin 18 (KRT18)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P05783",
+     "conditions": "AlphaFold model, 3372 atoms, 73% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 21.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 20.6964
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P05783",
+     "conditions": "AlphaFold model, 3372 atoms, 73% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 21.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.277858359259868
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "KRT5",
+    "uniprot_id": "P13647",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Cytokeratin 5 (KRT5)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P13647",
+     "conditions": "AlphaFold model, 4380 atoms, 55% at pLDDT>=70 (mean pLDDT 69); extent computed over the confident atoms. Over all atoms it is 23.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 21.7512
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P13647",
+     "conditions": "AlphaFold model, 4380 atoms, 55% at pLDDT>=70 (mean pLDDT 69); extent computed over the confident atoms. Over all atoms it is 23.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.8982168074801775
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "KRT8",
+    "uniprot_id": "P05787",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Cytokeratin 8 (KRT8)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P05787",
+     "conditions": "AlphaFold model, 3762 atoms, 68% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 21.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 19.036099999999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P05787",
+     "conditions": "AlphaFold model, 3762 atoms, 68% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 21.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.619614327284492
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "DES",
+    "uniprot_id": "P17661",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Desmin (DES)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P17661",
+     "conditions": "AlphaFold model, 3760 atoms, 70% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 21.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 19.0151
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P17661",
+     "conditions": "AlphaFold model, 3760 atoms, 70% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 21.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.497810660309467
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "MAPK3",
     "uniprot_id": "P27361",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "ERK1/2 (MAPK3/1)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P27361",
+     "conditions": "AlphaFold model, 3036 atoms, 89% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 7.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.643100000000001
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P27361",
      "conditions": "UniProt P27361, Mitogen-activated protein kinase 3, residues 2-379 of 379; mature chain, not the translated precursor",
@@ -4016,6 +4970,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 43.00438078
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P27361",
+     "conditions": "AlphaFold model, 3036 atoms, 89% at pLDDT>=70 (mean pLDDT 89); extent computed over the confident atoms. Over all atoms it is 7.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1233114950680467
     },
     "sequence_length_aa": {
      "citation": "UniProt:P27361",
@@ -4030,12 +4993,108 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "ENPP3",
+    "uniprot_id": "O14638",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Ectonucleotide pyrophosphatase 3 (CD203c/ENPP3)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O14638",
+     "conditions": "AlphaFold model, 7032 atoms, 96% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 10.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 10.5695
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O14638",
+     "conditions": "AlphaFold model, 7032 atoms, 96% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 10.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.2257871812430254
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "PRG2",
+    "uniprot_id": "P13727",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Eosinophil major basic protein (PRG2)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P13727",
+     "conditions": "AlphaFold model, 1768 atoms, 61% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 8.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.9696
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P13727",
+     "conditions": "AlphaFold model, 1768 atoms, 61% at pLDDT>=70 (mean pLDDT 77); extent computed over the confident atoms. Over all atoms it is 8.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.4241432951397504
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "EPX",
+    "uniprot_id": "P11678",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Eosinophil peroxidase (EPX)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P11678",
+     "conditions": "AlphaFold model, 5702 atoms, 95% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.2325
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P11678",
+     "conditions": "AlphaFold model, 5702 atoms, 95% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.4912478107745764
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "FAS",
     "uniprot_id": "P25445",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "Fas (FAS/CD95)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P25445",
+     "conditions": "AlphaFold model, 2632 atoms, 69% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 12.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 11.9723
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P25445",
      "conditions": "UniProt P25445, Tumor necrosis factor receptor superfamily member 6, residues 26-335 of 335; mature chain, not the translated precursor",
@@ -4043,6 +5102,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 35.07997047999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P25445",
+     "conditions": "AlphaFold model, 2632 atoms, 69% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 12.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.559013698723748
     },
     "sequence_length_aa": {
      "citation": "UniProt:P25445",
@@ -4063,6 +5131,15 @@
    },
    "name": "Fas ligand (FASLG/CD178)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P48023",
+     "conditions": "AlphaFold model, 2217 atoms, 69% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 11.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.884800000000002
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P48023",
      "conditions": "type II membrane protein, membrane form",
@@ -4071,6 +5148,73 @@
      "source": "UniProt P48023, full translation product (281 aa)",
      "unit": "kDa",
      "value": 31.485
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P48023",
+     "conditions": "AlphaFold model, 2217 atoms, 69% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 11.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.229152595467607
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "FAP",
+    "uniprot_id": "Q12884",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Fibroblast activation protein alpha (FAP)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q12884",
+     "conditions": "AlphaFold model, 6205 atoms, 97% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 14.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.9712
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q12884",
+     "conditions": "AlphaFold model, 6205 atoms, 97% at pLDDT>=70 (mean pLDDT 96); extent computed over the confident atoms. Over all atoms it is 14.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.8037276946526397
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "S100A4",
+    "uniprot_id": "P26447",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Fibroblast-specific protein 1 (S100A4)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P26447",
+     "conditions": "AlphaFold model, 819 atoms, 82% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 5.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.7694
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P26447",
+     "conditions": "AlphaFold model, 819 atoms, 82% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 5.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.3034270595245006
     }
    }
   },
@@ -4083,6 +5227,15 @@
    },
    "name": "Fibronectin",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P02751",
+     "conditions": "AlphaFold model, 19149 atoms, 62% at pLDDT>=70 (mean pLDDT 70); extent computed over the confident atoms. Over all atoms it is 16.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 15.9475
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P02751",
      "conditions": "UniProt P02751, Fibronectin, residues 32-2477 of 2477; mature chain, not the translated precursor",
@@ -4090,6 +5243,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 269.25865778
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P02751",
+     "conditions": "AlphaFold model, 19149 atoms, 62% at pLDDT>=70 (mean pLDDT 70); extent computed over the confident atoms. Over all atoms it is 16.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.510376184742848
     },
     "sequence_length_aa": {
      "citation": "UniProt:P02751",
@@ -4110,6 +5272,15 @@
    },
    "name": "Granulysin (GNLY)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P22749",
+     "conditions": "AlphaFold model, 1142 atoms, 66% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 8.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.907299999999999
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P22749",
      "conditions": "UniProt P22749, Granulysin, residues 23-145 of 145; mature chain, not the translated precursor",
@@ -4117,6 +5288,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 14.08915628
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P22749",
+     "conditions": "AlphaFold model, 1142 atoms, 66% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 8.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1255776771344146
     },
     "sequence_length_aa": {
      "citation": "UniProt:P22749",
@@ -4137,6 +5317,15 @@
    },
    "name": "Granzyme A (GZMA)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P12544",
+     "conditions": "AlphaFold model, 2028 atoms, 88% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 8.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.1034999999999995
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P12544",
      "conditions": "UniProt P12544, Granzyme A, residues 29-262 of 262; mature chain, not the translated precursor",
@@ -4144,6 +5333,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 25.84707448
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P12544",
+     "conditions": "AlphaFold model, 2028 atoms, 88% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 8.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.6875279946431294
     },
     "sequence_length_aa": {
      "citation": "UniProt:P12544",
@@ -4164,6 +5362,15 @@
    },
    "name": "Granzyme B (GZMB)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P10144",
+     "conditions": "AlphaFold model, 1946 atoms, 92% at pLDDT>=70 (mean pLDDT 93); extent computed over the confident atoms. Over all atoms it is 8.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.563599999999999
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P10144",
      "conditions": "UniProt P10144, Granzyme B, residues 21-247 of 247; mature chain, not the translated precursor",
@@ -4171,6 +5378,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 25.53951758
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P10144",
+     "conditions": "AlphaFold model, 1946 atoms, 92% at pLDDT>=70 (mean pLDDT 93); extent computed over the confident atoms. Over all atoms it is 8.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.662524312654177
     },
     "sequence_length_aa": {
      "citation": "UniProt:P10144",
@@ -4218,6 +5434,15 @@
    },
    "name": "IRF3",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q14653",
+     "conditions": "AlphaFold model, 3333 atoms, 81% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.8941
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:Q14653",
      "conditions": "UniProt Q14653, Interferon regulatory factor 3; whole translated sequence",
@@ -4225,6 +5450,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 47.21927848
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q14653",
+     "conditions": "AlphaFold model, 3333 atoms, 81% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.5189924643198784
     },
     "sequence_length_aa": {
      "citation": "UniProt:Q14653",
@@ -4239,12 +5473,50 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "NOS2",
+    "uniprot_id": "P35228",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Inducible nitric oxide synthase (NOS2)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P35228",
+     "conditions": "AlphaFold model, 9229 atoms, 88% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 11.931899999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P35228",
+     "conditions": "AlphaFold model, 9229 atoms, 88% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.012285237413304
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "JAK1",
     "uniprot_id": "P23458",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "JAK1",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P23458",
+     "conditions": "AlphaFold model, 9355 atoms, 87% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 16.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 14.003
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P23458",
      "conditions": "UniProt P23458, Tyrosine-protein kinase JAK1; whole translated sequence",
@@ -4252,6 +5524,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 133.27704228
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P23458",
+     "conditions": "AlphaFold model, 9355 atoms, 87% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 16.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.2715652432627085
     },
     "sequence_length_aa": {
      "citation": "UniProt:P23458",
@@ -4272,6 +5553,15 @@
    },
    "name": "JAK2",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O60674",
+     "conditions": "AlphaFold model, 9192 atoms, 90% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 13.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.446100000000001
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:O60674",
      "conditions": "UniProt O60674, Tyrosine-protein kinase JAK2; whole translated sequence",
@@ -4279,6 +5569,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 130.67354928
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O60674",
+     "conditions": "AlphaFold model, 9192 atoms, 90% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 13.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.319311409665142
     },
     "sequence_length_aa": {
      "citation": "UniProt:O60674",
@@ -4326,6 +5625,15 @@
    },
    "name": "MEK1 (MAP2K1)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q02750",
+     "conditions": "AlphaFold model, 3048 atoms, 82% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 7.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.429600000000001
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:Q02750",
      "conditions": "UniProt Q02750, Dual specificity mitogen-activated protein kinase kinase 1; whole translated sequence",
@@ -4333,6 +5641,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 43.43901148
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q02750",
+     "conditions": "AlphaFold model, 3048 atoms, 82% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 7.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.005792324696823
     },
     "sequence_length_aa": {
      "citation": "UniProt:Q02750",
@@ -4353,6 +5670,15 @@
    },
    "name": "MMP-9 (Gelatinase B)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P14780",
+     "conditions": "AlphaFold model, 5538 atoms, 83% at pLDDT>=70 (mean pLDDT 83); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.641
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P14780",
      "conditions": "UniProt P14780, 82 kDa matrix metalloproteinase-9, residues 107-707 of 707; mature chain, not the translated precursor",
@@ -4360,6 +5686,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 66.60934618
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P14780",
+     "conditions": "AlphaFold model, 5538 atoms, 83% at pLDDT>=70 (mean pLDDT 83); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.7935595928572297
     },
     "sequence_length_aa": {
      "citation": "UniProt:P14780",
@@ -4374,12 +5709,137 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "CD68",
+    "uniprot_id": "P34810",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Macrosialin (CD68)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P34810",
+     "conditions": "AlphaFold model, 2634 atoms, 57% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 13.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.0977
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P34810",
+     "conditions": "AlphaFold model, 2634 atoms, 57% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 13.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.233886843796378
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "TPSAB1",
+    "uniprot_id": "Q15661",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Mast cell tryptase (TPSAB1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q15661",
+     "conditions": "AlphaFold model, 2152 atoms, 89% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 8.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.4703
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q15661",
+     "conditions": "AlphaFold model, 2152 atoms, 89% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 8.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.7120655771914108
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MPO",
+    "uniprot_id": "P05164",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Myeloperoxidase (MPO)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P05164",
+     "conditions": "AlphaFold model, 5890 atoms, 91% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 10.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.342
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P05164",
+     "conditions": "AlphaFold model, 5890 atoms, 91% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 10.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.498534794985618
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "MYH11",
+    "uniprot_id": "P35749",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Myosin-11 (MYH11)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P35749",
+     "conditions": "AlphaFold model, 15945 atoms, 67% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 24.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 21.5234
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P35749",
+     "conditions": "AlphaFold model, 15945 atoms, 67% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 24.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.928332963031762
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "RELA",
     "uniprot_id": "Q04206",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "NF-kappaB (p65/RELA)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q04206",
+     "conditions": "AlphaFold model, 4238 atoms, 57% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.4633
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:Q04206",
      "conditions": "UniProt Q04206, Transcription factor p65; whole translated sequence",
@@ -4387,6 +5847,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 60.21917768
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q04206",
+     "conditions": "AlphaFold model, 4238 atoms, 57% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.839031970210341
     },
     "sequence_length_aa": {
      "citation": "UniProt:Q04206",
@@ -4428,6 +5897,35 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "ENO2",
+    "uniprot_id": "P09104",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Neuron-specific enolase (ENO2)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P09104",
+     "conditions": "AlphaFold model, 3323 atoms, 100% at pLDDT>=70 (mean pLDDT 97); extent computed over the confident atoms. Over all atoms it is 6.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.286499999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P09104",
+     "conditions": "AlphaFold model, 3323 atoms, 100% at pLDDT>=70 (mean pLDDT 97); extent computed over the confident atoms. Over all atoms it is 6.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.114448543564028
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "PUMA",
     "uniprot_id": "Q96PG8",
     "uniprot_resolved_by": "gene_exact_name"
@@ -4461,6 +5959,15 @@
    },
    "name": "Perforin (PRF1)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P14222",
+     "conditions": "AlphaFold model, 4320 atoms, 94% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.7874
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P14222",
      "conditions": "UniProt P14222, Perforin-1, residues 22-555 of 555; mature chain, not the translated precursor",
@@ -4468,6 +5975,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 59.184484579999996
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P14222",
+     "conditions": "AlphaFold model, 4320 atoms, 94% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.4540988754594437
     },
     "sequence_length_aa": {
      "citation": "UniProt:P14222",
@@ -4482,12 +5998,79 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "PROM1",
+    "uniprot_id": "O43490",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Prominin-1 (CD133/PROM1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O43490",
+     "conditions": "AlphaFold model, 6838 atoms, 90% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 20.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 16.702199999999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O43490",
+     "conditions": "AlphaFold model, 6838 atoms, 90% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 20.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.1680337652282855
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "RORC",
+    "uniprot_id": "P51449",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "RORgt (RORC)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51449",
+     "conditions": "AlphaFold model, 4080 atoms, 67% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 10.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.4491
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51449",
+     "conditions": "AlphaFold model, 4080 atoms, 67% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 10.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.460211854397321
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "SRC",
     "uniprot_id": "P12931",
     "uniprot_resolved_by": "gene_exact_name"
    },
    "name": "SRC",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P12931",
+     "conditions": "AlphaFold model, 4214 atoms, 82% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.918200000000001
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P12931",
      "conditions": "UniProt P12931, Proto-oncogene tyrosine-protein kinase Src, residues 2-536 of 536; mature chain, not the translated precursor",
@@ -4495,6 +6078,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 59.70356828
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P12931",
+     "conditions": "AlphaFold model, 4214 atoms, 82% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.4079803721346793
     },
     "sequence_length_aa": {
      "citation": "UniProt:P12931",
@@ -4515,6 +6107,15 @@
    },
    "name": "STAT1",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P42224",
+     "conditions": "AlphaFold model, 6148 atoms, 88% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 12.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.5783
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P42224",
      "conditions": "UniProt P42224, Signal transducer and activator of transcription 1-alpha/beta, residues 2-750 of 750; mature chain, not the translated precursor",
@@ -4522,6 +6123,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 87.20356948
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P42224",
+     "conditions": "AlphaFold model, 6148 atoms, 88% at pLDDT>=70 (mean pLDDT 88); extent computed over the confident atoms. Over all atoms it is 12.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.534709857048201
     },
     "sequence_length_aa": {
      "citation": "UniProt:P42224",
@@ -4542,6 +6152,15 @@
    },
    "name": "STAT3",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P40763",
+     "conditions": "AlphaFold model, 6182 atoms, 85% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 12.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 11.1147
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P40763",
      "conditions": "UniProt P40763, Signal transducer and activator of transcription 3, residues 2-770 of 770; mature chain, not the translated precursor",
@@ -4549,6 +6168,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 87.93660348
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P40763",
+     "conditions": "AlphaFold model, 6182 atoms, 85% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 12.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.462724143551789
     },
     "sequence_length_aa": {
      "citation": "UniProt:P40763",
@@ -4590,12 +6218,50 @@
   {
    "entity_type": "protein",
    "identity": {
+    "gene_symbol": "SYP",
+    "uniprot_id": "P08247",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Synaptophysin (SYP)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08247",
+     "conditions": "AlphaFold model, 2391 atoms, 72% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 11.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.7212000000000005
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08247",
+     "conditions": "AlphaFold model, 2391 atoms, 72% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 11.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.4503835741559508
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
     "gene_symbol": "TIMP1",
     "uniprot_id": "P01033",
     "uniprot_resolved_by": "curated_alias"
    },
    "name": "TIMP-1",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P01033",
+     "conditions": "AlphaFold model, 1624 atoms, 91% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 8.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.4460999999999995
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P01033",
      "conditions": "UniProt P01033, Metalloproteinase inhibitor 1, residues 24-207 of 207; mature chain, not the translated precursor",
@@ -4603,6 +6269,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 20.708833979999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P01033",
+     "conditions": "AlphaFold model, 1624 atoms, 91% at pLDDT>=70 (mean pLDDT 90); extent computed over the confident atoms. Over all atoms it is 8.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.8938350189124857
     },
     "sequence_length_aa": {
      "citation": "UniProt:P01033",
@@ -4623,6 +6298,15 @@
    },
    "name": "TRAIL (TNFSF10/CD253)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P50591",
+     "conditions": "AlphaFold model, 2286 atoms, 74% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.4037
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P50591",
      "conditions": "UniProt P50591, Tumor necrosis factor ligand superfamily member 10; whole translated sequence",
@@ -4631,6 +6315,15 @@
      "unit": "kDa",
      "value": 32.50889548
     },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P50591",
+     "conditions": "AlphaFold model, 2286 atoms, 74% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.69613186831756
+    },
     "sequence_length_aa": {
      "citation": "UniProt:P50591",
      "conditions": "UniProt P50591, Tumor necrosis factor ligand superfamily member 10; whole translated sequence",
@@ -4638,6 +6331,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 281.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "VIM",
+    "uniprot_id": "P08670",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Vimentin (VIM)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08670",
+     "conditions": "AlphaFold model, 3765 atoms, 71% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 23.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 21.526400000000002
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08670",
+     "conditions": "AlphaFold model, 3765 atoms, 71% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 23.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.578059477165648
     }
    }
   },
@@ -4677,6 +6399,15 @@
    },
    "name": "XIAP (BIRC4)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P98170",
+     "conditions": "AlphaFold model, 3980 atoms, 70% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 9.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.6912
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P98170",
      "conditions": "UniProt P98170, E3 ubiquitin-protein ligase XIAP; whole translated sequence",
@@ -4684,6 +6415,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 56.68486558
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P98170",
+     "conditions": "AlphaFold model, 3980 atoms, 70% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 9.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.82706083691122
     },
     "sequence_length_aa": {
      "citation": "UniProt:P98170",
@@ -4704,6 +6444,15 @@
    },
    "name": "beta-catenin (CTNNB1)",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P35222",
+     "conditions": "AlphaFold model, 5988 atoms, 75% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 15.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.6273
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P35222",
      "conditions": "UniProt P35222, Catenin beta-1, residues 2-781 of 781; mature chain, not the translated precursor",
@@ -4711,6 +6460,15 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 85.36539328
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P35222",
+     "conditions": "AlphaFold model, 5988 atoms, 75% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 15.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.926424746766373
     },
     "sequence_length_aa": {
      "citation": "UniProt:P35222",
@@ -4731,6 +6489,15 @@
    },
    "name": "mTOR",
    "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P42345",
+     "conditions": "AlphaFold model, 20287 atoms, 83% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 16.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 14.2755
+    },
     "molecular_weight_kda": {
      "citation": "UniProt:P42345",
      "conditions": "UniProt P42345, Serine/threonine-protein kinase mTOR; whole translated sequence",
@@ -4739,6 +6506,15 @@
      "unit": "kDa",
      "value": 288.89161228
     },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P42345",
+     "conditions": "AlphaFold model, 20287 atoms, 83% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 16.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.809551149843466
+    },
     "sequence_length_aa": {
      "citation": "UniProt:P42345",
      "conditions": "UniProt P42345, Serine/threonine-protein kinase mTOR; whole translated sequence",
@@ -4746,6 +6522,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 2549.0
+    }
+   }
+  },
+  {
+   "entity_type": "protein",
+   "identity": {
+    "gene_symbol": "VWF",
+    "uniprot_id": "P04275",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "von Willebrand factor (VWF)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P04275",
+     "conditions": "AlphaFold model, 2706 atoms, 74% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 9.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.0273
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P04275",
+     "conditions": "AlphaFold model, 2706 atoms, 74% at pLDDT>=70 (mean pLDDT 76); extent computed over the confident atoms. Over all atoms it is 9.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.7041843552232345
     }
    }
   },
@@ -5078,6 +6883,354 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD80",
+    "uniprot_id": "P33681",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "B7-1 (CD80)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P33681",
+     "conditions": "AlphaFold model, 2320 atoms, 83% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.985800000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P33681",
+     "conditions": "AlphaFold model, 2320 atoms, 83% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 19.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.466489586984463
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD86",
+    "uniprot_id": "P42081",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "B7-2 (CD86)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P42081",
+     "conditions": "AlphaFold model, 2640 atoms, 69% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 20.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.6588
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P42081",
+     "conditions": "AlphaFold model, 2640 atoms, 69% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 20.2 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.6044587373645847
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CLEC4C",
+    "uniprot_id": "Q8WTT0",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "BDCA-2 (CD303/CLEC4C)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q8WTT0",
+     "conditions": "AlphaFold model, 1759 atoms, 95% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.1251
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q8WTT0",
+     "conditions": "AlphaFold model, 1759 atoms, 95% at pLDDT>=70 (mean pLDDT 92); extent computed over the confident atoms. Over all atoms it is 10.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.8771078481863377
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR2",
+    "uniprot_id": "P41597",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR2 (CD192)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P41597",
+     "conditions": "AlphaFold model, 2954 atoms, 73% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 14.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.063599999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P41597",
+     "conditions": "AlphaFold model, 2954 atoms, 73% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 14.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 1.9945547947036864
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR4",
+    "uniprot_id": "P51679",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR4 (CD194)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51679",
+     "conditions": "AlphaFold model, 2920 atoms, 78% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.0229
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51679",
+     "conditions": "AlphaFold model, 2920 atoms, 78% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 12.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.033016053090552
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR5",
+    "uniprot_id": "P51681",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR5 (CD195)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51681",
+     "conditions": "AlphaFold model, 2860 atoms, 85% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.5023
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51681",
+     "conditions": "AlphaFold model, 2860 atoms, 85% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 10.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.098898579100515
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR6",
+    "uniprot_id": "P51684",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR6 (CD196)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51684",
+     "conditions": "AlphaFold model, 2983 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.2811
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51684",
+     "conditions": "AlphaFold model, 2983 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 9.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1034580646293195
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR7",
+    "uniprot_id": "P32248",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR7 (CD197)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P32248",
+     "conditions": "AlphaFold model, 3012 atoms, 75% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 10.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.4834000000000005
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P32248",
+     "conditions": "AlphaFold model, 3012 atoms, 75% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 10.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.044482694413766
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR8",
+    "uniprot_id": "P51685",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CCR8 (CDw198)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51685",
+     "conditions": "AlphaFold model, 2875 atoms, 82% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 14.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.5789
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51685",
+     "conditions": "AlphaFold model, 2875 atoms, 82% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 14.5 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.120525361511936
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD27",
+    "uniprot_id": "P26842",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD27 (TNFRSF7)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P26842",
+     "conditions": "AlphaFold model, 2033 atoms, 53% at pLDDT>=70 (mean pLDDT 72); extent computed over the confident atoms. Over all atoms it is 16.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.178999999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P26842",
+     "conditions": "AlphaFold model, 2033 atoms, 53% at pLDDT>=70 (mean pLDDT 72); extent computed over the confident atoms. Over all atoms it is 16.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.999333150304921
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD3E",
+    "uniprot_id": "P07766",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD3 epsilon chain (CD3E)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P07766",
+     "conditions": "AlphaFold model, 1624 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.336499999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P07766",
+     "conditions": "AlphaFold model, 1624 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.2595715003774655
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD4",
+    "uniprot_id": "P01730",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD4 co-receptor (CD4)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P01730",
+     "conditions": "AlphaFold model, 3590 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 19.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.3837
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P01730",
+     "conditions": "AlphaFold model, 3590 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 19.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.219351487020914
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "CD47",
    "parameters": {
     "molecular_weight_kda": {
@@ -5122,6 +7275,93 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD8A",
+    "uniprot_id": "P01732",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CD8 alpha chain (CD8A)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P01732",
+     "conditions": "AlphaFold model, 1811 atoms, 69% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.927200000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P01732",
+     "conditions": "AlphaFold model, 1811 atoms, 69% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.4138036601747
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "PTGDR2",
+    "uniprot_id": "Q9Y5Y4",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CRTH2 (PTGDR2/CD294)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9Y5Y4",
+     "conditions": "AlphaFold model, 3047 atoms, 77% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 11.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.4803
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9Y5Y4",
+     "conditions": "AlphaFold model, 3047 atoms, 77% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 11.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1731659465489446
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CSF1R",
+    "uniprot_id": "P07333",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CSF-1 receptor (CSF1R/CD115)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P07333",
+     "conditions": "AlphaFold model, 7607 atoms, 75% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 10.0686
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P07333",
+     "conditions": "AlphaFold model, 7607 atoms, 75% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.614231031344181
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "CTLA-4 (CD152)",
    "parameters": {
     "molecular_weight_kda": {
@@ -5144,6 +7384,64 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CXCR3",
+    "uniprot_id": "P49682",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CXCR3 (CD183)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P49682",
+     "conditions": "AlphaFold model, 2859 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 11.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.9334
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P49682",
+     "conditions": "AlphaFold model, 2859 atoms, 77% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 11.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.062255904420263
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CXCR5",
+    "uniprot_id": "P32302",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "CXCR5 (CD185)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P32302",
+     "conditions": "AlphaFold model, 2955 atoms, 73% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.311400000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P32302",
+     "conditions": "AlphaFold model, 2955 atoms, 73% at pLDDT>=70 (mean pLDDT 81); extent computed over the confident atoms. Over all atoms it is 13.6 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.0209604293590653
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "EGFR",
    "parameters": {
     "molecular_weight_kda": {
@@ -5161,6 +7459,209 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 1186.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "ENTPD1",
+    "uniprot_id": "P49961",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Ectonucleoside triphosphate diphosphohydrolase 1 (CD39/ENTPD1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P49961",
+     "conditions": "AlphaFold model, 4088 atoms, 91% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 12.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 10.975200000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P49961",
+     "conditions": "AlphaFold model, 4088 atoms, 91% at pLDDT>=70 (mean pLDDT 91); extent computed over the confident atoms. Over all atoms it is 12.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.011331909260476
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CCR3",
+    "uniprot_id": "P51677",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Eotaxin receptor (CD193/CCR3)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P51677",
+     "conditions": "AlphaFold model, 2897 atoms, 84% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.683099999999999
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P51677",
+     "conditions": "AlphaFold model, 2897 atoms, 84% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.1108328071248734
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "FCGR3A",
+    "uniprot_id": "P08637",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Fc-gamma receptor III (CD16/FCGR3A)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08637",
+     "conditions": "AlphaFold model, 2056 atoms, 77% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.2994
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08637",
+     "conditions": "AlphaFold model, 2056 atoms, 77% at pLDDT>=70 (mean pLDDT 86); extent computed over the confident atoms. Over all atoms it is 11.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.869135618255871
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "FCER1A",
+    "uniprot_id": "P12319",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "FceRI alpha chain (FCER1A)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P12319",
+     "conditions": "AlphaFold model, 2094 atoms, 77% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 11.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.0505
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P12319",
+     "conditions": "AlphaFold model, 2094 atoms, 77% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 11.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.9635124766013052
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "TNFRSF18",
+    "uniprot_id": "Q9Y5U5",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "GITR (TNFRSF18/CD357)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9Y5U5",
+     "conditions": "AlphaFold model, 1808 atoms, 60% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.384200000000002
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9Y5U5",
+     "conditions": "AlphaFold model, 1808 atoms, 60% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.3172740639023033
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD163",
+    "uniprot_id": "Q86VB7",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Hemoglobin scavenger receptor (CD163)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q86VB7",
+     "conditions": "AlphaFold model, 8762 atoms, 78% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 16.0822
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q86VB7",
+     "conditions": "AlphaFold model, 8762 atoms, 78% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.091939350168793
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "ICOS",
+    "uniprot_id": "Q9Y6W8",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "ICOS (CD278)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9Y6W8",
+     "conditions": "AlphaFold model, 1589 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.536
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9Y6W8",
+     "conditions": "AlphaFold model, 1589 atoms, 58% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.6340011809224153
     }
    }
   },
@@ -5206,6 +7707,122 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "IL2RA",
+    "uniprot_id": "P01589",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-2 receptor alpha (CD25)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P01589",
+     "conditions": "AlphaFold model, 2147 atoms, 59% at pLDDT>=70 (mean pLDDT 73); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.3924
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P01589",
+     "conditions": "AlphaFold model, 2147 atoms, 59% at pLDDT>=70 (mean pLDDT 73); extent computed over the confident atoms. Over all atoms it is 10.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.5197788723175516
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "IL23R",
+    "uniprot_id": "Q5VWK5",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-23 receptor (IL23R)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q5VWK5",
+     "conditions": "AlphaFold model, 5047 atoms, 54% at pLDDT>=70 (mean pLDDT 69); extent computed over the confident atoms. Over all atoms it is 13.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.1974
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q5VWK5",
+     "conditions": "AlphaFold model, 5047 atoms, 54% at pLDDT>=70 (mean pLDDT 69); extent computed over the confident atoms. Over all atoms it is 13.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.3638017085957577
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "IL3RA",
+    "uniprot_id": "P26951",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "IL-3 receptor alpha (CD123/IL3RA)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P26951",
+     "conditions": "AlphaFold model, 3044 atoms, 80% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 16.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 10.6662
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P26951",
+     "conditions": "AlphaFold model, 3044 atoms, 80% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 16.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.438171354693033
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "KLRG1",
+    "uniprot_id": "Q96E93",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Killer cell lectin-like receptor G1 (KLRG1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q96E93",
+     "conditions": "AlphaFold model, 1527 atoms, 73% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 10.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.663500000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q96E93",
+     "conditions": "AlphaFold model, 1527 atoms, 73% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 10.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.0258897224856027
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "LAG-3 (CD223)",
    "parameters": {
     "molecular_weight_kda": {
@@ -5223,6 +7840,209 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 503.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "CD14",
+    "uniprot_id": "P08571",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "LPS co-receptor (CD14)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P08571",
+     "conditions": "AlphaFold model, 2811 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 8.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 6.9288
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P08571",
+     "conditions": "AlphaFold model, 2811 atoms, 83% at pLDDT>=70 (mean pLDDT 85); extent computed over the confident atoms. Over all atoms it is 8.4 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.238138669565977
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "FCER2",
+    "uniprot_id": "P06734",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Low-affinity IgE receptor (CD23)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P06734",
+     "conditions": "AlphaFold model, 2558 atoms, 81% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 21.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 17.1555
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P06734",
+     "conditions": "AlphaFold model, 2558 atoms, 81% at pLDDT>=70 (mean pLDDT 87); extent computed over the confident atoms. Over all atoms it is 21.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.78714985824765
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "MRC1",
+    "uniprot_id": "P22897",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Mannose receptor (CD206/MRC1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P22897",
+     "conditions": "AlphaFold model, 11697 atoms, 84% at pLDDT>=70 (mean pLDDT 83); extent computed over the confident atoms. Over all atoms it is 13.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.023599999999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P22897",
+     "conditions": "AlphaFold model, 11697 atoms, 84% at pLDDT>=70 (mean pLDDT 83); extent computed over the confident atoms. Over all atoms it is 13.8 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.188749504101316
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "KLRK1",
+    "uniprot_id": "P26718",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NKG2D (KLRK1/CD314)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P26718",
+     "conditions": "AlphaFold model, 1774 atoms, 68% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 10.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.625100000000001
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P26718",
+     "conditions": "AlphaFold model, 1774 atoms, 68% at pLDDT>=70 (mean pLDDT 78); extent computed over the confident atoms. Over all atoms it is 10.7 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.610094106037096
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "NCR2",
+    "uniprot_id": "O95944",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NKp44 (NCR2/CD336)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O95944",
+     "conditions": "AlphaFold model, 2158 atoms, 56% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 11.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 7.8736999999999995
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O95944",
+     "conditions": "AlphaFold model, 2158 atoms, 56% at pLDDT>=70 (mean pLDDT 75); extent computed over the confident atoms. Over all atoms it is 11.3 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.2329746763233618
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "NCR1",
+    "uniprot_id": "O76036",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "NKp46 (NCR1/CD335)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O76036",
+     "conditions": "AlphaFold model, 2429 atoms, 75% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 8.2905
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O76036",
+     "conditions": "AlphaFold model, 2429 atoms, 75% at pLDDT>=70 (mean pLDDT 84); extent computed over the confident atoms. Over all atoms it is 12.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 2.9294704744336775
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "NRP1",
+    "uniprot_id": "O14786",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Neuropilin-1 (CD304/NRP1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:O14786",
+     "conditions": "AlphaFold model, 7259 atoms, 78% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 13.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 9.485499999999998
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:O14786",
+     "conditions": "AlphaFold model, 7259 atoms, 78% at pLDDT>=70 (mean pLDDT 80); extent computed over the confident atoms. Over all atoms it is 13.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 3.2942256383765334
     }
    }
   },
@@ -5294,6 +8114,64 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "IL1RL1",
+    "uniprot_id": "Q01638",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "ST2 (IL1RL1)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q01638",
+     "conditions": "AlphaFold model, 4457 atoms, 81% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 15.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.4997
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q01638",
+     "conditions": "AlphaFold model, 4457 atoms, 81% at pLDDT>=70 (mean pLDDT 82); extent computed over the confident atoms. Over all atoms it is 15.0 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 5.654936866535648
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "SIGLEC8",
+    "uniprot_id": "Q9NYZ4",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Siglec-8 (SIGLEC8)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:Q9NYZ4",
+     "conditions": "AlphaFold model, 3798 atoms, 66% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 17.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.7837
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:Q9NYZ4",
+     "conditions": "AlphaFold model, 3798 atoms, 66% at pLDDT>=70 (mean pLDDT 74); extent computed over the confident atoms. Over all atoms it is 17.9 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.276522716627874
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "TIGIT",
    "parameters": {
     "molecular_weight_kda": {
@@ -5338,6 +8216,35 @@
   },
   {
    "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "THBD",
+    "uniprot_id": "P07204",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "Thrombomodulin (CD141/THBD)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P07204",
+     "conditions": "AlphaFold model, 4201 atoms, 78% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 12.5358
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P07204",
+     "conditions": "AlphaFold model, 4201 atoms, 78% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 14.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.943938345310039
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
    "name": "VEGFR2",
    "parameters": {
     "molecular_weight_kda": {
@@ -5377,6 +8284,35 @@
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "aa",
      "value": 279.0
+    }
+   }
+  },
+  {
+   "entity_type": "receptor",
+   "identity": {
+    "gene_symbol": "KIT",
+    "uniprot_id": "P10721",
+    "uniprot_resolved_by": "gene_exact_name"
+   },
+   "name": "c-Kit (CD117/KIT)",
+   "parameters": {
+    "molecular_extent_nm": {
+     "citation": "AlphaFoldDB:P10721",
+     "conditions": "AlphaFold model, 7725 atoms, 74% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 13.4994
+    },
+    "radius_of_gyration_nm": {
+     "citation": "AlphaFoldDB:P10721",
+     "conditions": "AlphaFold model, 7725 atoms, 74% at pLDDT>=70 (mean pLDDT 79); extent computed over the confident atoms. Over all atoms it is 16.1 nm.",
+     "provenance": "derived",
+     "rationale": "Computed from the predicted structure, not read off an instrument, which is why this is DERIVED and not MEASURED.",
+     "source": "AlphaFold Protein Structure Database (alphafold.ebi.ac.uk), CC BY 4.0. Jumper et al. Nature 2021; Varadi et al. NAR 2024.",
+     "unit": "nm",
+     "value": 4.494905359960944
     }
    }
   },
