@@ -456,7 +456,11 @@ def _render_drug_molecule(entity, props: dict, height: int) -> bool:
     return _render_type_icon(entity, height)
 
 
-@st.cache_data(show_spinner=False, max_entries=256)
+# 64 and not 256: a scene pickles to about 790 KB (a neutrophil,
+# with its granules), and the whole rendered catalogue is ~60
+# cells, so 64 holds all of them for ~50 MB where 256 would
+# reserve 200 MB to cache entities that do not exist.
+@st.cache_data(show_spinner=False, max_entries=64)
 def _cached_scene(name: str, mesh_type: str, scale_um: float,
                   markers: tuple, grid: int):
     """One entity's geometry, cached by what actually determines it.
