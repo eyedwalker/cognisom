@@ -407,6 +407,10 @@ class MultiGPUCellMechanics:
         #: on the last integrate(). A clamp that binds on nearly every
         #: cell on nearly every step is the model, not a stability guard.
         self._clamped_fraction: float = 0.0
+        #: Per-partition local contact stiffness from the last
+        #: compute_forces(), used to solve the contact step instead of
+        #: capping it.
+        self._stiffness: Dict[int, Any] = {}
 
         # Per-GPU neighbour state
         self._hashes: List[Optional[_Partition]] = [
@@ -583,7 +587,8 @@ class MultiGPUCellMechanics:
 
             with self._device_scope(gpu_id):
                 xp = _xp_for(ca.positions)
-                forces = self._pair_forces(xp, ca, part, n_real)
+                forces, stiffness = self._pair_forces(xp, ca, part, n_real)
+                self._stiffness[gpu_id] = stiffness
 
                 # Add chemotaxis forces if gradients provided
                 if gradients is not None and gradients[gpu_id] is not None:
@@ -633,10 +638,40 @@ class MultiGPUCellMechanics:
                 f = forces[gpu_id]
                 alive = ca.alive[:n_real]
 
-                # Overdamped: displacement = F * dt / gamma
-                # Convert dt from hours to seconds for force balance
+                # Overdamped: dx/dt = F/gamma. Stepping that explicitly
+                # needs k.dt/gamma < 2 for the contact stiffness k, and
+                # this engine runs it at 900-7200 -- 450 to 3600 times
+                # past its own stability limit, which would need 18,000
+                # substeps to fix by subdivision. The clamp at 1 um was
+                # what stood in for stability, and it fired on 99.98% of
+                # cell-substeps, so it was not a guard but the model.
+                #
+                # So solve the linear part instead of stepping it. For a
+                # contact of local stiffness k the overdamped relaxation
+                # has an exact solution, and the displacement over dt is
+                #
+                #     dx = (F/k) (1 - exp(-k dt / gamma))
+                #
+                # which is unconditionally stable. Small dt recovers
+                # F.dt/gamma exactly; large dt saturates at F/k, the
+                # offset where the contact balances. That bound is the
+                # physics, not a number someone picked.
                 dt_seconds = dt * 3600.0
-                displacement = f[:n_real] * dt_seconds / gamma
+                k = self._stiffness.get(gpu_id)
+                if k is not None and len(k) >= n_real:
+                    k = k[:n_real][:, None]
+                    rate = xp.clip(k * dt_seconds / gamma, 0.0, 60.0)
+                    # expm1 keeps the small-k limit accurate: the naive
+                    # (1 - exp(-x))/x loses all its significant digits as
+                    # x -> 0, which is exactly the isolated-cell case.
+                    factor = xp.where(
+                        k > 1e-12,
+                        -xp.expm1(-rate) / xp.maximum(k, 1e-12),
+                        dt_seconds / gamma,
+                    )
+                    displacement = f[:n_real] * factor
+                else:
+                    displacement = f[:n_real] * dt_seconds / gamma
 
                 # Clamp displacement for stability. A guard that fires
                 # on nearly every cell on nearly every step is not a
@@ -753,6 +788,13 @@ class MultiGPUCellMechanics:
             alive = alive.astype(bool)
 
         acc = xp.zeros((n_real, 3), dtype=xp.float64)
+        # Local stiffness |dF/dx| summed over a cell's contacts. This is
+        # what makes the step stable: an explicit step on a spring needs
+        # k.dt/gamma < 2, and at these settings it runs 900-7200, so the
+        # displacement clamp was the only thing stopping the simulation
+        # from exploding. Knowing k lets the step be solved instead of
+        # capped.
+        stiff = xp.zeros(n_real, dtype=xp.float64)
 
         for i_idx, j_idx in part.grid.iter_candidate_pairs(n_real):
             sel, dist = _select_pairs(
@@ -789,7 +831,17 @@ class MultiGPUCellMechanics:
                     ii, weights=contrib, minlength=n_real,
                 )
 
-        return acc.astype(xp.float32)
+            # Each branch of the force law differentiated once:
+            # repulsion F = -k_rep * overlap, so |dF/dx| = k_rep;
+            # adhesion F = k_adh (adh + overlap)/adh, so |dF/dx| =
+            # k_adh/adh. Outside both bands a neighbour contributes
+            # nothing, which is also true of its stiffness.
+            pair_k = xp.where(repulsive, k_rep,
+                              xp.where(adhesive, k_adh / adh, 0.0))
+            pair_k = xp.where(acting, pair_k, 0.0)
+            stiff += xp.bincount(ii, weights=pair_k, minlength=n_real)
+
+        return acc.astype(xp.float32), stiff.astype(xp.float32)
 
     def gather_force_stats(
         self,

@@ -99,21 +99,70 @@ def test_the_diffusive_term_is_invariant_under_subdivision():
 
 
 @pytest.mark.slow
-def test_what_remains_is_the_contact_force_saturating_the_clamp():
-    """Honest about the part that is NOT fixed. With adhesion back on,
-    the clamp binds on most cells and some step dependence returns. It
-    is much smaller than it was, and it is a different defect: a force
-    large enough to need clamping every step means the integrator is
-    under-resolved, not that motility is wrong."""
+def test_the_contact_step_is_invariant_too_once_it_is_solved():
+    """With the contact forces on as well.
+
+    This test used to assert the opposite -- that the clamp still bound
+    on most cells and some step dependence survived -- because it did.
+    Solving the contact relaxation instead of stepping it explicitly
+    removed that too: 2.49x before any of this, 1.17x with motility
+    fixed alone, and now level with the diffusion-only control.
+    """
     low, low_clamped = _run(5, adhesion=400.0, repulsion=2000.0)
     high, high_clamped = _run(20, adhesion=400.0, repulsion=2000.0)
 
-    assert high / low < 1.6, (
-        "step dependence is back to where it was before the fix")
-    assert high_clamped > 0.3, (
-        "the clamp no longer binds; this test is out of date and the "
-        "remaining dependence has another cause")
-    assert high_clamped > low_clamped
+    assert high / low == pytest.approx(1.0, abs=0.15), (
+        f"{high:.2f} um at 20 substeps against {low:.2f} at 5")
+
+    # The clamp is now a backstop rather than the model, and finer steps
+    # need it LESS -- the opposite of the explicit integrator, where
+    # more substeps meant more capped kicks.
+    assert high_clamped < 0.4
+    assert high_clamped <= low_clamped + 0.02
+
+
+def test_the_explicit_contact_step_was_far_past_its_stability_limit():
+    """Why subdividing could never have fixed it.
+
+    Overdamped relaxation stepped explicitly is stable only while
+    k.dt/gamma < 2. At this engine's settings a 0.05 h step cut into 40
+    substeps still runs that ratio at 900 for repulsion -- 450x past the
+    limit, and 18,000 substeps would be needed to get under it.
+    """
+    from cognisom.gpu.multi_gpu_mechanics import MechanicsConfig
+
+    cfg = MechanicsConfig()
+    dt_seconds = (0.05 / 40) * 3600.0
+    ratio = cfg.repulsion_stiffness * dt_seconds / cfg.damping_coeff
+    assert ratio > 2.0 * 100, (
+        f"k.dt/gamma = {ratio:.0f}; if this is now below 2 the engine "
+        "no longer needs the solved step and this test is obsolete")
+
+    substeps_needed = 0.05 / ((2.0 * cfg.damping_coeff
+                               / cfg.repulsion_stiffness) / 3600.0)
+    assert substeps_needed > 10_000
+
+
+def test_the_solved_step_recovers_the_explicit_one_for_a_small_step():
+    """dx = (F/k)(1 - exp(-k dt/gamma)) must reduce to F dt/gamma when
+    the step is short, or the fix would have changed the physics rather
+    than the numerics."""
+    gamma, k = 10.0, 2000.0
+    for dt_seconds in (1e-5, 1e-4):
+        solved = -np.expm1(-k * dt_seconds / gamma) / k
+        explicit = dt_seconds / gamma
+        assert solved == pytest.approx(explicit, rel=1e-2)
+
+
+def test_the_solved_step_saturates_at_the_equilibrium_offset():
+    """And for a long step it goes to F/k -- where the contact balances
+    -- instead of overshooting. That bound is the physics; the 1 um
+    clamp it replaces was a number someone picked."""
+    gamma, k = 10.0, 2000.0
+    long_step = 36.0
+    solved = -np.expm1(-k * long_step / gamma) / k
+    assert solved == pytest.approx(1.0 / k, rel=1e-6)
+    assert (long_step / gamma) / solved > 1000
 
 
 # ── the wiring ───────────────────────────────────────────────────────
