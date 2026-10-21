@@ -1370,10 +1370,11 @@
    "entity_type": "antibody",
    "name": "IgA1 (secretory)",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01876",
      "conditions": "UniProt P01876, Immunoglobulin heavy constant alpha 1; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgA1 (secretory) weighs 42.8 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 42.84851228
@@ -1386,16 +1387,20 @@
      "unit": "aa",
      "value": 398.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgD",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01880",
      "conditions": "UniProt P01880, Immunoglobulin heavy constant delta; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgD weighs 47.5 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 47.49979088
@@ -1408,16 +1413,20 @@
      "unit": "aa",
      "value": 430.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgE",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01854",
      "conditions": "UniProt P01854, Immunoglobulin heavy constant epsilon; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgE weighs 59.5 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 59.53916818
@@ -1430,16 +1439,20 @@
      "unit": "aa",
      "value": 546.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgG1",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01857",
      "conditions": "UniProt P01857, Immunoglobulin heavy constant gamma 1; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgG1 weighs 43.9 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 43.911908579999995
@@ -1452,16 +1465,20 @@
      "unit": "aa",
      "value": 399.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgG2",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01859",
      "conditions": "UniProt P01859, Immunoglobulin heavy constant gamma 2; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgG2 weighs 43.8 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 43.80576968
@@ -1474,16 +1491,20 @@
      "unit": "aa",
      "value": 395.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgG3",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01860",
      "conditions": "UniProt P01860, Immunoglobulin heavy constant gamma 3; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgG3 weighs 49.1 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 49.09295088
@@ -1496,16 +1517,20 @@
      "unit": "aa",
      "value": 446.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgG4",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01861",
      "conditions": "UniProt P01861, Immunoglobulin heavy constant gamma 4; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgG4 weighs 43.8 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 43.83166408
@@ -1518,16 +1543,20 @@
      "unit": "aa",
      "value": 396.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
    "entity_type": "antibody",
    "name": "IgM (pentameric)",
    "parameters": {
-    "molecular_weight_kda": {
+    "constant_region_mass_kda": {
      "citation": "UniProt:P01871",
      "conditions": "UniProt P01871, Immunoglobulin heavy constant mu; whole translated sequence",
      "provenance": "measured",
+     "rationale": "Moved from molecular_weight_kda, where it asserted that IgM (pentameric) weighs 51.9 kDa. The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true.",
      "source": "UniProt Knowledgebase, reviewed (Swiss-Prot)",
      "unit": "kDa",
      "value": 51.923554779999996
@@ -1540,6 +1569,9 @@
      "unit": "aa",
      "value": 474.0
     }
+   },
+   "sourced": {
+    "assembled_mass": "The assembled mass is NOT recorded. This library has no sourced value for it and will not invent one: a real IgG is ~146 kDa, a pentameric IgM ~970, secretory IgA ~385. What is stored is the one heavy-chain constant region UniProt translates, under a name that says so. molecular_weight_kda is deliberately absent, so assess() reports it missing -- which is true."
    }
   },
   {
@@ -14777,5 +14809,55 @@
    }
   }
  ],
- "format": 1
+ "format": 1,
+ "retracted": [
+  {
+   "entity_type": "antibody",
+   "name": "IgA1 (secretory)",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgD",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgE",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG1",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG2",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG3",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgG4",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "antibody",
+   "name": "IgM (pentameric)",
+   "parameter": "molecular_weight_kda",
+   "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  }
+ ]
 }

@@ -185,6 +185,16 @@ _HOURS = {"hour": 1.0, "hours": 1.0, "hr": 1.0, "hrs": 1.0, "h": 1.0,
           "min": 1 / 60, "week": 168.0, "weeks": 168.0}
 
 
+#: What a drug label's half-life IS. ``half_life_hours`` carried four
+#: unrelated quantities -- a drug's whole-body clearance, a transcript's
+#: decay, a cytokine's survival in circulation, a protein's turnover --
+#: and was split into four named parameters. This module went on writing
+#: the retired name, which has no spec at all any more, so set_parameter
+#: refused it and the one source that could close the drug half-lives
+#: reported no problem and wrote nothing.
+DRUG_HALF_LIFE = "elimination_half_life_hours"
+
+
 def extract(label: dict) -> List[PKCandidate]:
     """Every PK number the label states, each with its sentence."""
     set_id = label.get("set_id", "")
@@ -222,7 +232,7 @@ def extract(label: dict) -> List[PKCandidate]:
             f1, f2 = _HOURS.get(u1.rstrip(".")), _HOURS.get(u2.rstrip("."))
             if f1 and f2:
                 raw = (_to_float(lo) * f1 + _to_float(hi) * f2) / 2.0
-                add("half_life_hours", raw, "h", sentence, raw,
+                add(DRUG_HALF_LIFE, raw, "h", sentence, raw,
                     f"h (midpoint of {lo} {u1}-{hi} {u2})")
         if _BETWEEN.search(sentence):
             continue
@@ -235,12 +245,12 @@ def extract(label: dict) -> List[PKCandidate]:
             if high_end:
                 raw = (raw + _to_float(high_end)) / 2.0
                 unit = f"{unit} (midpoint of {low_end}-{high_end})"
-            add("half_life_hours", raw * factor, "h", sentence, raw, unit)
+            add(DRUG_HALF_LIFE, raw * factor, "h", sentence, raw, unit)
         for match in _HALF_PRE.finditer(sentence):
             raw, unit = _to_float(match.group(1)), match.group(2).lower().rstrip(".")
             factor = _HOURS.get(unit)
             if factor:
-                add("half_life_hours", raw * factor, "h", sentence, raw, unit.split(" (")[0])
+                add(DRUG_HALF_LIFE, raw * factor, "h", sentence, raw, unit.split(" (")[0])
         for match in _BIO.finditer(sentence):
             raw = _to_float(match.group(1))
             if 0 < raw <= 100:

@@ -96,7 +96,16 @@ c1, c2 = st.columns(2)
 with c1:
     if profile.hla_alleles:
         from cognisom.genomics.hla_typer import HLATyper
-        st.markdown(f"**HLA Type:** {HLATyper.format_alleles(profile.hla_alleles)}")
+        _formatted = HLATyper.format_alleles(profile.hla_alleles)
+        if getattr(profile, "hla_is_patient_specific", False):
+            st.markdown(f"**HLA Type:** {_formatted}")
+        else:
+            # A clinical report is the last place a default should pass
+            # as a genotype.
+            st.markdown(f"**HLA Type (population default):** {_formatted}")
+            st.caption(
+                "⚠️ Not typed for this patient. Neoantigen restrictions "
+                "below are computed against a population default.")
     else:
         st.markdown("**HLA Type:** Not determined")
 

@@ -115,3 +115,40 @@ def test_every_evidenced_value_in_the_library_has_more_than_a_citation(store):
     assert beyond / cited > 0.95, (
         f"only {beyond} of {cited} cited values carry more than a "
         "citation; the short-circuit hid that much")
+
+
+# ── two places evidence existed and was dropped on the way to a reader ──
+
+def test_library_detail_keeps_the_higher_grade_it_was_refusing():
+    """The order is PLACEHOLDER < ESTIMATED < CALIBRATED < DERIVED <
+    MEASURED. library_detail admitted MEASURED and CALIBRATED and
+    refused DERIVED -- dropping the higher grade and falling back to the
+    renderer's own constant, which is the exact substitution the
+    function exists to prevent."""
+    import inspect
+
+    from cognisom.visualization import cell_profiles
+
+    source = inspect.getsource(cell_profiles.library_detail)
+    assert "Provenance.DERIVED" in source
+    assert "Provenance.ESTIMATED" not in source, (
+        "ESTIMATED is a guess with a rationale; it does not belong here")
+
+
+def test_openfda_writes_a_parameter_name_that_still_exists():
+    """half_life_hours carried four unrelated quantities and was split
+    into four names. This module kept writing the retired one, which has
+    no spec, so the single source that could close 30 drug half-lives
+    reported success and wrote nothing."""
+    from cognisom.library.fda_labels import DRUG_HALF_LIFE, extract
+    from cognisom.library.parameters import PARAMETER_SPECS
+
+    assert DRUG_HALF_LIFE == "elimination_half_life_hours"
+    assert DRUG_HALF_LIFE in PARAMETER_SPECS
+    assert "half_life_hours" not in PARAMETER_SPECS
+
+    label = {"clinical_pharmacology": [
+        "The mean terminal elimination half-life is 11.7 hours."]}
+    found = extract(label)
+    assert found and all(c.parameter == DRUG_HALF_LIFE for c in found)
+    assert found[0].value == pytest.approx(11.7)

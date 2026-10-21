@@ -542,8 +542,15 @@ def library_detail(entity) -> Dict[str, float]:
                       "microvillus_diameter_um", "lytic_granule_count",
                       "lytic_granule_diameter_um"):
         pv = get_parameter(entity, parameter)
+        # DERIVED belongs here. The order is PLACEHOLDER < ESTIMATED <
+        # CALIBRATED < DERIVED < MEASURED, so admitting CALIBRATED while
+        # refusing DERIVED dropped the HIGHER grade and fell back to the
+        # renderer's own constant -- the exact substitution this function
+        # exists to prevent. ESTIMATED stays out: it is a guess that
+        # carries a rationale, not a value computed from something named.
         if pv is None or pv.provenance not in (Provenance.MEASURED,
-                                               Provenance.CALIBRATED):
+                                               Provenance.CALIBRATED,
+                                               Provenance.DERIVED):
             continue
         try:
             out[parameter] = float(pv.value)

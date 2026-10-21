@@ -56,7 +56,26 @@ if not hla_alleles:
     st.stop()
 
 hla_display = HLATyper.format_alleles(hla_alleles)
-st.markdown(f"**Patient HLA Type:** {hla_display}")
+
+# "Patient HLA Type" above a population-frequency default is the single
+# most misleading string in this product: every peptide-HLA restriction
+# below, and the vaccine designed from them, is only as good as this.
+# The fields have always been on the profile; nothing read them.
+_typed = bool(getattr(profile, "hla_is_patient_specific", False))
+_method = getattr(profile, "hla_typing_method", "") or "not recorded"
+if _typed:
+    st.markdown(f"**Patient HLA Type:** {hla_display}")
+    st.caption(f"Typing method: {_method}")
+else:
+    st.markdown(f"**HLA Type (population default):** {hla_display}")
+    st.warning(
+        "**This patient was not HLA typed.** The alleles above are a "
+        f"population-frequency default (`{_method}`), not this sample's "
+        "genotype. Every binding prediction, every peptide-HLA "
+        "restriction and the vaccine design below are computed against "
+        "them and are illustrative only. Wrong HLA means wrong "
+        "neoantigens means wrong vaccine targets.",
+        icon="⚠️")
 
 col_hla1, col_hla2, col_hla3 = st.columns(3)
 by_locus = {}
@@ -509,6 +528,10 @@ with st.expander("Export Neoantigen Data"):
     export_data = {
         "patient_id": profile.patient_id,
         "hla_alleles": hla_alleles,
+        # Travels with the alleles. Without it the caveat stops at the
+        # screen edge and the file reads as a typed patient's.
+        "hla_is_patient_specific": _typed,
+        "hla_typing_method": _method,
         "neoantigen_summary": summary,
         "vaccine_candidates": [n.to_dict() for n in vaccine_candidates],
         "all_predictions": [n.to_dict() for n in neoantigens[:50]],

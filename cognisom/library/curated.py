@@ -46,8 +46,20 @@ is lost the moment the machine that fetched it is reimaged.
 and commit it with the code that produced the values.
 
 Application is additive: it writes the file's records and never deletes
-one. A value retracted from the file stays in a library that had already
-applied it until that library is rebuilt.
+one, because an export is a snapshot of one machine and a value missing
+from it usually means that machine has not been sourced, not that the
+value is wrong.
+
+RETRACTION
+----------
+That leaves no way to take a value back. A fresh clone picks up a
+correction immediately -- the bad record simply is not in the file -- but
+a library that already applied it keeps it until it is rebuilt, and
+production is never rebuilt. So a value found to be WRONG, as opposed to
+merely absent, goes in ``RETRACTED`` below: an explicit list of
+(entity, type, parameter, why) that apply_curated deletes. It is written
+by hand, it is reviewed in a diff like any other code, and it is the only
+thing in this module that removes data.
 """
 from __future__ import annotations
 
@@ -73,6 +85,24 @@ IDENTITY_FIELDS = ("uniprot_id", "gene_symbol", "uniprot_resolved_by",
                    "referenced_as")
 META_KEY = "curated_parameters_sha256"
 
+#: Values that are WRONG, not merely absent: (entity, entity_type,
+#: parameter, why). apply_curated deletes each one wherever it finds it.
+#: Dropping a record from the export is not enough -- application is
+#: additive, so a library that already took the bad value would keep it.
+#:
+#: A retraction stays here permanently. Removing the entry would let the
+#: value return to any library that had not yet applied this file.
+RETRACTED: Tuple[Tuple[str, str, str, str], ...] = tuple(
+    (name, "antibody", "molecular_weight_kda",
+     "An IGH* accession translates to ONE heavy-chain constant region. "
+     "Stored as the antibody's molecular weight it was wrong by 3x to "
+     "19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The "
+     "chain mass is kept as constant_region_mass_kda; the assembled "
+     "mass is not recorded, because this library has no source for it.")
+    for name in ("IgA1 (secretory)", "IgD", "IgE", "IgG1", "IgG2",
+                 "IgG3", "IgG4", "IgM (pentameric)")
+)
+
 
 @dataclass
 class ApplyReport:
@@ -80,6 +110,8 @@ class ApplyReport:
     skipped: bool = False
     written: int = 0
     unchanged: int = 0
+    #: Values deleted because RETRACTED names them as wrong.
+    retracted: int = 0
     missing_entities: List[Tuple[str, str]] = field(default_factory=list)
     refused: List[str] = field(default_factory=list)
 
@@ -128,6 +160,11 @@ def export_curated(store, path: Path = CURATED_PATH) -> Tuple[int, int]:
         "about": ("Evidenced entity-library parameters, applied to any library "
                   "on open; see cognisom/library/curated.py."),
         "entities": entities,
+        "retracted": [
+            {"name": name, "entity_type": entity_type,
+             "parameter": parameter, "why": why}
+            for name, entity_type, parameter, why in RETRACTED
+        ],
     }
     path.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
     return (sum(len(e["parameters"]) for e in entities),
@@ -163,6 +200,24 @@ def apply_curated(store, path: Path = CURATED_PATH,
     if document.get("format") != FORMAT:
         raise ValueError(f"{path} is format {document.get('format')!r}; "
                          f"this code reads format {FORMAT}")
+
+    # Retractions first: a value that is wrong must go even if the same
+    # pass then writes other records onto that entity.
+    for item in document.get("retracted", []):
+        entity = store.find_entity_by_name(item["name"], item["entity_type"])
+        if entity is None:
+            continue
+        parameter = item["parameter"]
+        params = getattr(entity, "physics_params", None) or {}
+        sidecar = _sidecar(entity)
+        if parameter not in params and parameter not in sidecar:
+            continue
+        params.pop(parameter, None)
+        sidecar.pop(parameter, None)
+        store.update_entity(entity, changed_by="curated_retraction")
+        report.retracted += 1
+        log.info("retracted %s.%s: %s", item["name"], parameter,
+                 item.get("why", ""))
 
     for item in document.get("entities", []):
         entity = store.find_entity_by_name(item["name"], item["entity_type"])
@@ -212,8 +267,9 @@ def apply_curated(store, path: Path = CURATED_PATH,
                     *missing)
     for refusal in report.refused:
         log.warning("curated parameter refused: %s", refusal)
-    log.info("curated parameters: %d written, %d already current, %d refused",
-             report.written, report.unchanged, len(report.refused))
+    log.info("curated parameters: %d written, %d already current, "
+             "%d retracted, %d refused", report.written, report.unchanged,
+             report.retracted, len(report.refused))
     return report
 
 

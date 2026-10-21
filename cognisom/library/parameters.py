@@ -1245,6 +1245,22 @@ PARAMETER_SPECS: Dict[str, ParameterSpec] = dict([
         minimum=0.0, maximum=1e5,
     ),
     _spec(
+        "constant_region_mass_kda", "kDa",
+        "Mass of ONE immunoglobulin heavy-chain constant region. It is not "
+        "the mass of an antibody and must never be read as one: an IGH* "
+        "accession translates to a single CH region, with no VH, no light "
+        "chain, no multimer, no J chain and no secretory component. All "
+        "eight isotypes here carried that number as molecular_weight_kda, "
+        "graded MEASURED, so IgM (pentameric) read 51.9 kDa against a real "
+        "~970 and IgG1 read 43.9 against ~146 -- wrong by 3x to 19x, and "
+        "worst for the two entities whose names promise a multimer. "
+        "molecular_weight_kda has a floor of zero because a cytokine may "
+        "be 8 kDa, so the guard that existed could never refuse a value "
+        "for being too SMALL. Naming the quantity is the guard.",
+        (EntityType.ANTIBODY,),
+        minimum=5.0, maximum=200.0,
+    ),
+    _spec(
         "sequence_length_aa", "aa",
         "Residues in the mature chain. Sourced from the same UniProt record "
         "as the mass, so the two always describe the same molecule, and "

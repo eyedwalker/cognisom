@@ -153,6 +153,19 @@ if user is not None:
                         _profile = PatientProfile(
                             patient_id=_data["patient_id"], cancer_type=_data["cancer_type"],
                             tumor_mutational_burden=_data["tmb"], hla_alleles=_data["hla_alleles"],
+                            # Carried through, not defaulted. These six
+                            # alleles are a population-frequency default;
+                            # the repo's own OptiType run on the matched
+                            # normal gives A*29:02/B*45:01/C*06:02 and
+                            # shares no allele with them. Without these two
+                            # fields the page headed the default "Patient
+                            # HLA Type" and the vaccine on page 31 was
+                            # designed against restrictions that are not
+                            # this sample's.
+                            hla_typing_method=_data.get(
+                                "hla_typing_method", "population_default"),
+                            hla_is_patient_specific=bool(_data.get(
+                                "hla_is_patient_specific", False)),
                             affected_genes=_data["driver_genes_found"],
                             cancer_driver_mutations=[
                                 Variant(chrom="", pos=0, id=".", ref="", alt="", qual=0,

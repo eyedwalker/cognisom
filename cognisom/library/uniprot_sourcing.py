@@ -330,9 +330,22 @@ def source_entity(
         + ("; whole translated sequence" if is_whole
            else "; mature chain, not the translated precursor")
     )
+    # An antibody entity is an ASSEMBLY -- the names say so: "IgM
+    # (pentameric)", "IgA1 (secretory)". An IGH* accession translates to
+    # one heavy-chain constant region, which is 3x to 19x lighter, and
+    # writing that as molecular_weight_kda put eight MEASURED masses in
+    # the library that a scientist would quote and that are wrong. The
+    # chain mass is a real fact, so it is kept under a name that says
+    # what it is rather than discarded.
+    from cognisom.library.models import EntityType
+
+    mass_parameter = (
+        "constant_region_mass_kda"
+        if entity.entity_type is EntityType.ANTIBODY
+        else "molecular_weight_kda")
     for parameter, value, unit in (
         ("sequence_length_aa", float(result.mature_length), "aa"),
-        ("molecular_weight_kda", result.mature_mass_da / 1000.0, "kDa"),
+        (mass_parameter, result.mature_mass_da / 1000.0, "kDa"),
     ):
         problems = set_parameter(entity, parameter, ParameterValue(
             value=value, unit=unit, provenance=Provenance.MEASURED,

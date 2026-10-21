@@ -348,5 +348,13 @@
     }
   ],
   "elapsed_seconds": 11.136057615280151,
-  "method": "mhcflurry_2.1.5_real_models"
+  "method": "mhcflurry_2.1.5_real_models",
+  "hla_typing_method": "population_default",
+  "hla_is_patient_specific": false,
+  "hla_note": "These six alleles are a population-frequency default, NOT this sample's genotype. HCC1395 was typed from its matched normal (SRR7890874, HCC1395BL, WXS, 40M read pairs) and is HLA-A*29:02, B*45:01, C*06:02 -- homozygous at all three loci, sharing no allele with what is displayed. Every peptide-HLA restriction below was computed against the default, so the neoantigen list and its IC50s are not this sample's. The measured typing is in hla_typer.MEASURED_HLA_TYPINGS under the key 'SEQC2'; using it requires regenerating the neoantigens with MHCflurry.",
+  "hla_measured_alleles": [
+    "HLA-A*29:02",
+    "HLA-B*45:01",
+    "HLA-C*06:02"
+  ]
 }
