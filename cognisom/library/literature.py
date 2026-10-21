@@ -65,8 +65,67 @@ ABSTRACT = "abstract"
 NONE = "none"
 
 
+#: Credentials live in a gitignored ``.env`` at the repository root, and
+#: nothing read it.
+#:
+#: Both keys this module uses had been added there and neither had ever
+#: reached the code. The NCBI key was supplied days before this was
+#: noticed, during which every E-utilities call ran at the keyless rate
+#: of 3 requests a second instead of 10, and ``_ncbi_params`` attached
+#: nothing. The Unpaywall address was added and the third fetch route
+#: stayed switched off.
+#:
+#: A credential that is configured and unread fails exactly like one
+#: that was never supplied, except that somebody believes it is working.
+_ENV_LOADED = False
+
+
+def load_env(path: str = ".env") -> int:
+    """Read ``KEY=VALUE`` lines into the environment. Returns how many.
+
+    The real environment WINS: a value exported in a shell is more
+    deliberate than one sitting in a file, and silently overriding it
+    would be its own surprise. Values are never logged -- the whole
+    point of the file is that its contents do not appear anywhere.
+    """
+    global _ENV_LOADED
+    import pathlib
+
+    found = pathlib.Path(path)
+    if not found.exists():
+        # Also look beside the package, so a CLI run from elsewhere
+        # still finds it.
+        found = pathlib.Path(__file__).resolve().parents[2] / path
+    if not found.exists():
+        _ENV_LOADED = True
+        return 0
+
+    loaded = 0
+    try:
+        for line in found.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+                loaded += 1
+    except OSError as exc:                              # pragma: no cover
+        log.debug("could not read %s: %s", found, exc)
+    _ENV_LOADED = True
+    return loaded
+
+
+def _ensure_env() -> None:
+    if not _ENV_LOADED:
+        load_env()
+
+
 def api_key() -> str:
     """The NCBI key, or "" if none is configured."""
+    _ensure_env()
     return (os.environ.get(API_KEY_ENV) or "").strip()
 
 
@@ -185,6 +244,7 @@ def _unpaywall(article: Article, session) -> str:
     """Where else a copy might be, when neither repository has it."""
     if not article.doi:
         return "unpaywall: no doi"
+    _ensure_env()
     email = (os.environ.get(UNPAYWALL_EMAIL_ENV) or "").strip()
     if not email:
         return "unpaywall: no contact address configured"
@@ -205,15 +265,56 @@ def _unpaywall(article: Article, session) -> str:
             continue
         if got.status_code == 200 and len(got.content) > 20000 \
                 and "pdf" in (got.headers.get("content-type") or "").lower():
-            article.route = f"unpaywall:{location.get('host_type')}"
-            # The bytes are a PDF; this module does not parse one, so the
-            # tier does not improve. Recording the location is still
-            # worth it: it says a readable copy EXISTS, which is
-            # different from the paper being unavailable.
-            return f"unpaywall: pdf at {location.get('host_type')} ({len(got.content)//1024} KB)"
+            host = location.get("host_type")
+            size = len(got.content) // 1024
+            # The bytes are read, not merely noted. This used to record
+            # the location and stop -- "this module does not parse one"
+            # -- so a PDF that had been found and downloaded was thrown
+            # away and the paper went on reporting as abstract-only.
+            # pypdf is already here for the hand-fetched PDFs, and so is
+            # the font-descriptor repair that publisher exports need.
+            text = _pdf_text(got.content)
+            if text:
+                article.tier, article.text = FULL_TEXT, text
+                article.route = f"unpaywall:{host}"
+                return (f"unpaywall: full text from a {host} pdf "
+                        f"({size} KB, {len(text)} chars)")
+            article.route = f"unpaywall:{host}"
+            return (f"unpaywall: pdf at {host} ({size} KB) but no text "
+                    "could be extracted -- probably a scan")
     return (f"unpaywall: {data.get('oa_status')} but no fetchable copy "
             "(a bronze licence is free to read on the publisher's own site "
             "and routinely blocks automated access)")
+
+
+def _pdf_text(data: bytes) -> str:
+    """Text out of PDF bytes, with the publisher-export repair applied.
+
+    Shared by the hand-fetched copies in ``docs/papers`` and anything
+    Unpaywall manages to download, because a PDF from a publisher has
+    the same font-descriptor problem whichever way it arrived.
+    """
+    import io as _io
+
+    try:
+        import pypdf
+    except ImportError:                                 # pragma: no cover
+        log.warning("pypdf is not installed; a fetched PDF cannot be read")
+        return ""
+    try:
+        reader = pypdf.PdfReader(_io.BytesIO(data))
+        _drop_duplicate_font_files(reader)
+    except Exception as exc:
+        log.warning("could not open a fetched pdf: %s", exc)
+        return ""
+    pages = []
+    for number, page in enumerate(reader.pages, 1):
+        try:
+            pages.append(page.extract_text() or "")
+        except Exception as exc:
+            log.debug("fetched pdf page %d: %s", number, exc)
+    text = re.sub(r"\s+", " ", " ".join(pages)).strip()
+    return text if len(text) > 500 else ""
 
 
 def fetch(pmid: str, session=None) -> Article:

@@ -26,6 +26,7 @@ reported it as successfully fetched.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -317,3 +318,130 @@ def test_one_unreadable_page_does_not_discard_the_others(tmp_path, monkeypatch):
 
     text = lit.local_pdf("6775712", root=str(papers))
     assert text and "23.0%" in text
+
+
+# ── credentials that are configured and unread ───────────────────────
+
+def test_the_env_file_is_actually_loaded(tmp_path, monkeypatch):
+    """Both credentials this module uses had been added to .env and
+    neither ever reached the code, because nothing in the package read
+    the file. The NCBI key sat there for days while every E-utilities
+    call ran at the keyless 3 requests a second, and the Unpaywall
+    address sat there with the third fetch route switched off.
+
+    A credential that is configured and unread fails exactly like one
+    that was never supplied, except that somebody believes it works.
+    """
+    env = tmp_path / ".env"
+    env.write_text(
+        "# a comment\n"
+        "\n"
+        "NCBI_API_KEY=from-the-file\n"
+        'UNPAYWALL_EMAIL="quoted@example.org"\n'
+        "MALFORMED\n")
+    monkeypatch.delenv("NCBI_API_KEY", raising=False)
+    monkeypatch.delenv("UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.setattr(lit, "_ENV_LOADED", False)
+
+    assert lit.load_env(str(env)) == 2
+    assert os.environ["NCBI_API_KEY"] == "from-the-file"
+    assert os.environ["UNPAYWALL_EMAIL"] == "quoted@example.org"
+
+
+def test_the_real_environment_wins_over_the_file(tmp_path, monkeypatch):
+    """A value exported in a shell is more deliberate than one sitting
+    in a file, so overriding it would be its own surprise."""
+    env = tmp_path / ".env"
+    env.write_text("NCBI_API_KEY=from-the-file\n")
+    monkeypatch.setenv("NCBI_API_KEY", "from-the-shell")
+    monkeypatch.setattr(lit, "_ENV_LOADED", False)
+
+    lit.load_env(str(env))
+    assert os.environ["NCBI_API_KEY"] == "from-the-shell"
+
+
+def test_a_missing_env_file_is_not_an_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(lit, "_ENV_LOADED", False)
+    assert lit.load_env(str(tmp_path / "nothing-here")) == 0
+
+
+def test_api_key_loads_the_file_on_demand(tmp_path, monkeypatch):
+    """The point of the whole thing: a caller asks for the key and gets
+    it, without having to know a file exists."""
+    env = tmp_path / ".env"
+    env.write_text("NCBI_API_KEY=lazy-load\n")
+    monkeypatch.delenv("NCBI_API_KEY", raising=False)
+    monkeypatch.setattr(lit, "_ENV_LOADED", False)
+    monkeypatch.chdir(tmp_path)
+    assert lit.api_key() == "lazy-load"
+    assert 1 / lit._pause() > 9
+
+
+# ── a PDF Unpaywall finds is read, not just noted ────────────────────
+
+def test_a_fetched_pdf_is_parsed_rather_than_described(monkeypatch):
+    """This route used to record "pdf at publisher (5711 KB)" and stop,
+    so a paper that had been found AND downloaded went on reporting as
+    abstract-only. One of the sixteen the library still wants is
+    reachable exactly this way."""
+    pytest.importorskip("pypdf")
+
+    body = "Km of (200 plus-minus 80) uM, kcat of (18 plus-minus 4) per s. " * 40
+    monkeypatch.setattr(lit, "_pdf_text", lambda data: body)
+
+    class _R:
+        status_code = 200
+        content = b"%PDF-1.4" + b"x" * 30000
+        headers = {"content-type": "application/pdf"}
+
+        def json(self):
+            return {}
+
+    class _S:
+        def get(self, url, params=None, timeout=None):
+            if "unpaywall" in url:
+                class _J:
+                    @staticmethod
+                    def json():
+                        return {"is_oa": True, "oa_status": "bronze",
+                                "oa_locations": [{"host_type": "publisher",
+                                                  "url_for_pdf": "http://x/y.pdf"}]}
+                return _J()
+            return _R()
+
+    monkeypatch.setenv(lit.UNPAYWALL_EMAIL_ENV, "someone@example.org")
+    article = lit.Article(pmid="1", doi="10.1/x")
+    note = lit._unpaywall(article, _S())
+    assert article.full_text
+    assert article.route == "unpaywall:publisher"
+    assert "kcat" in article.text
+    assert "full text from a publisher pdf" in note
+
+
+def test_a_scanned_pdf_says_so_rather_than_claiming_full_text(monkeypatch):
+    """No text out of it is a scan, and reporting full_text for a scan
+    would be worse than reporting nothing."""
+    monkeypatch.setattr(lit, "_pdf_text", lambda data: "")
+
+    class _S:
+        def get(self, url, params=None, timeout=None):
+            if "unpaywall" in url:
+                class _J:
+                    @staticmethod
+                    def json():
+                        return {"is_oa": True, "oa_status": "green",
+                                "oa_locations": [{"host_type": "repository",
+                                                  "url_for_pdf": "http://x/y.pdf"}]}
+                return _J()
+
+            class _R:
+                status_code = 200
+                content = b"%PDF" + b"x" * 30000
+                headers = {"content-type": "application/pdf"}
+            return _R()
+
+    monkeypatch.setenv(lit.UNPAYWALL_EMAIL_ENV, "someone@example.org")
+    article = lit.Article(pmid="1", doi="10.1/x")
+    note = lit._unpaywall(article, _S())
+    assert not article.full_text
+    assert "no text could be extracted" in note

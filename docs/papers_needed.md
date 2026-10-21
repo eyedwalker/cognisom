@@ -25,12 +25,31 @@ pypdf. No credentials, no proxy, nothing shared.
 | 16840338 | 10.1128/jvi.01623-05 | Values behind: replication_cycle_hours |
 | 2272970 | 10.1152/jappl.1990.69.5.1767 | Leukocyte diameters by subtype. Holds up radius_um. |
 | 25679760 | 10.1016/j.cell.2015.01.007 | Amoeboid migration speeds under confinement. Holds up migration_speed_um_per_min. |
-| 35676539 | 10.1038/s41589-022-01059-7 | Values behind: kcat_per_s |
 
-**16 papers.** Priority order: 15130947 and 27647916 next (every
+**15 papers.** Priority order: 15130947 and 27647916 next (every
 microvillus number), then 308396 (the nuclear fraction).
 
 ## Done
+
+**35676539** opened on 2026-10-21, the day the Unpaywall address was
+added -- and then only because the route was fixed to READ the PDF it
+fetches instead of noting that one exists. It confirms the stored value:
+the paper says `kcat of (18 +/- 4) s-1` and TMPRSS2 stores 18.0. It also
+reports `Km = (200 +/- 80) uM` on Boc-QAR-AMC, which is not stored and
+could be -- noting that the substrate is synthetic, so it is not a
+physiological Km.
+
+Unpaywall opened exactly one of sixteen. Eleven report a bronze, hybrid
+or green licence with no fetchable copy, which means a copy is legally
+free to read and the publisher blocks automated access anyway; four are
+not open access at all. An OA flag describes a licence, not a door.
+
+One lead that looked promising and was not: Unpaywall gives a PMC id for
+27647916 that Europe PMC never returned (PMC5056101), but NCBI efetch
+serves metadata and an abstract for it with no article body -- PNAS has
+not deposited the full text for redistribution. The code's existing
+judgement was right.
+
 
 **6775712** arrived 2026-10-20 and Table 2 is read. All four stored
 granule fractions match it exactly -- 23.0 / 15.4 / 2.6 / 0.2 -- so the
