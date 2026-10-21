@@ -108,6 +108,20 @@ THIN_CELL_COUNT = 5_000
 #: against the median lineage, the claim is reported as unsupported.
 ENRICHMENT = 1.5
 
+#: A marker has to be seen in more than this fraction of its own lineage
+#: before an enrichment ratio means anything. scRNA-seq dropout puts a floor
+#: under what a low-abundance transcript can show, and an induced protein --
+#: iNOS and arginase-1 are the polarisation markers, not constitutive ones --
+#: sits under it even in cells that genuinely display it.
+DETECTION_FLOOR = 0.05
+
+#: Above this fraction in the median OTHER lineage, a marker is a shared
+#: attribute rather than a discriminator. CD3 is a true statement about an
+#: NKT cell and a useless one for telling it from any other T cell, so the
+#: enrichment ratio comes out at 1.0 by construction: the comparison set
+#: contains the thing being tested.
+UBIQUITY = 0.25
+
 MARKERS_PATH = Path(__file__).resolve().parent / "marker_molecules.json"
 
 
@@ -151,6 +165,11 @@ class MarkerCheck:
     pct_median_elsewhere: float = 0.0
     n_cells: int = 0
     note: str = ""
+    #: Other marker names the library backs with this same gene. Non-empty
+    #: means the distinction the marker names is not one the gene can make.
+    gene_shared_with: Tuple[str, ...] = ()
+    #: The library's own account of why, quoted from the entity record.
+    isoform_note: str = ""
 
     @property
     def enrichment(self) -> float:
@@ -159,8 +178,44 @@ class MarkerCheck:
         return self.pct_in_lineage / self.pct_median_elsewhere
 
     @property
+    def verdict(self) -> str:
+        """One of CONFIRMED, SHARED, BELOW_DETECTION, COLLAPSED, CONTRADICTED.
+
+        A single ``supported`` flag put four different situations in one bucket
+        and the bucket was read as "the atlas disagrees". Three of the four are
+        the test failing rather than the claim:
+
+        COLLAPSED -- the atlas cannot address the claim. CD45RA and CD45RO are
+        splice isoforms of PTPRC and the library says so in its own
+        ``isoform_note``: "CD45RA and CD45RO are the two isoforms whose
+        difference IS the marker". Transcript counts for PTPRC are the same
+        number for both, so 1.14x and 0.78x are measurements of nothing.
+
+        SHARED -- the attribute is there and is not distinctive. See
+        :data:`UBIQUITY`.
+
+        BELOW_DETECTION -- the enrichment points the right way and the
+        abundance is under what dropout resolves. See :data:`DETECTION_FLOOR`.
+
+        CONTRADICTED -- the marker is present at a detectable level, is not
+        broadly shared, and still is not enriched in the lineage that claims
+        it. Only this one is evidence against the library.
+        """
+        if self.gene_shared_with:
+            return "COLLAPSED"
+        if self.pct_in_lineage <= DETECTION_FLOOR:
+            return ("BELOW_DETECTION" if self.enrichment >= ENRICHMENT
+                    else "CONTRADICTED")
+        if self.enrichment >= ENRICHMENT:
+            return "CONFIRMED"
+        if (self.pct_median_elsewhere > UBIQUITY
+                and self.pct_in_lineage > UBIQUITY):
+            return "SHARED"
+        return "CONTRADICTED"
+
+    @property
     def supported(self) -> bool:
-        return self.enrichment >= ENRICHMENT and self.pct_in_lineage > 0.05
+        return self.verdict == "CONFIRMED"
 
 
 def marker_gene_map() -> Dict[str, str]:
@@ -215,6 +270,29 @@ def cell_counts(census=None) -> Dict[str, int]:
 SAMPLE_PER_LINEAGE = 1_500
 
 
+def _gene_siblings() -> Tuple[Dict[str, set], Dict[str, str]]:
+    """Which marker names share a gene, and what the library says about it.
+
+    One gene in the library backs two marker names -- PTPRC, for CD45RA and
+    CD45RO -- and both records carry an ``isoform_note`` stating that the
+    difference between the isoforms IS the marker. The library had already
+    written down the reason an RNA atlas cannot test these two, in a field
+    nothing read; this reads it.
+    """
+    rows = json.loads(MARKERS_PATH.read_text())
+    siblings: Dict[str, set] = {}
+    notes: Dict[str, str] = {}
+    for row in rows:
+        gene, name = row.get("gene"), row.get("referenced_as")
+        if not gene or not name:
+            continue
+        siblings.setdefault(gene, set()).add(name)
+        if row.get("isoform_note"):
+            notes[name] = str(row["isoform_note"])
+    return ({g: names for g, names in siblings.items() if len(names) > 1},
+            notes)
+
+
 def check_markers(store, *, census=None,
                   sample: int = SAMPLE_PER_LINEAGE
                   ) -> Tuple[List[MarkerCheck], List[str]]:
@@ -233,6 +311,7 @@ def check_markers(store, *, census=None,
     from .models import EntityType
 
     gene_of = marker_gene_map()
+    siblings_of, note_of = _gene_siblings()
     claims: Dict[str, List[Tuple[str, str]]] = {}
     unresolved: List[str] = []
     entities, _ = store.search(limit=10000)
@@ -308,7 +387,12 @@ def check_markers(store, *, census=None,
             others = [v for k, v in per_label.items() if k != label]
             median = float(np.median(others)) if others else 0.0
             n = int((cell_type == label).sum())
-            checks.append(MarkerCheck(lineage, marker, gene, mine, median, n))
+            checks.append(MarkerCheck(
+                lineage, marker, gene, mine, median, n,
+                gene_shared_with=tuple(
+                    sorted(siblings_of.get(gene, set()) - {marker})),
+                isoform_note=note_of.get(marker, ""),
+            ))
     return checks, unresolved
 
 
@@ -327,10 +411,23 @@ class Run:
     def unsupported(self) -> List[MarkerCheck]:
         return [m for m in self.markers if not m.supported]
 
+    @property
+    def contradicted(self) -> List[MarkerCheck]:
+        """The only markers the atlas argues with. See MarkerCheck.verdict."""
+        return [m for m in self.markers if m.verdict == "CONTRADICTED"]
+
+    def by_verdict(self) -> Dict[str, List[MarkerCheck]]:
+        out: Dict[str, List[MarkerCheck]] = {}
+        for m in self.markers:
+            out.setdefault(m.verdict, []).append(m)
+        return out
+
     def summary(self) -> str:
+        counts = ", ".join(f"{len(v)} {k.lower()}"
+                           for k, v in sorted(self.by_verdict().items()))
         return (f"{len(self.coverage)} lineages covered "
                 f"({len(self.thin)} thin), {len(self.markers)} markers "
-                f"tested ({len(self.unsupported)} unsupported), "
+                f"tested ({counts}), "
                 f"{len(self.unresolved)} markers not a single gene, "
                 f"{self.written} entities annotated")
 

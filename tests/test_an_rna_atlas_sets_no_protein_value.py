@@ -165,3 +165,112 @@ def test_a_marker_absent_from_its_own_lineage_is_unsupported():
     assert not absent.supported, (
         "a marker in 1% of its own lineage should not pass on a zero "
         "background")
+
+
+def test_a_gene_cannot_test_a_distinction_between_its_own_isoforms():
+    """The library had already written down why, in a field nothing read.
+
+    CD45RA and CD45RO are splice isoforms of PTPRC, and both entity records
+    carry an ``isoform_note`` saying so outright: "CD45RA and CD45RO are the
+    two isoforms whose difference IS the marker". Transcript counts for PTPRC
+    are therefore the SAME NUMBER for a naive cell's CD45RA claim and a memory
+    cell's CD45RO claim, and the atlas run duly returned 1.14x for one and
+    0.78x for the other -- two measurements of nothing, filed as two failures.
+
+    PTPRC is the only gene in the library backing two marker names, so this
+    is a small category; it is also the only one where a passing-looking
+    number is actively misleading.
+    """
+    from cognisom.library.cellxgene_sourcing import _gene_siblings, MarkerCheck
+
+    siblings, notes = _gene_siblings()
+    assert siblings == {"PTPRC": {"CD45RA", "CD45RO"}}, siblings
+    assert set(notes) == {"CD45RA", "CD45RO"}
+    for name in ("CD45RA", "CD45RO"):
+        assert "isoform" in notes[name].lower()
+
+    collapsed = MarkerCheck(
+        "CD8+ Naive T cell", "CD45RA", "PTPRC", 0.869, 0.760,
+        gene_shared_with=("CD45RO",))
+    assert collapsed.verdict == "COLLAPSED"
+    assert not collapsed.supported
+    # The enrichment ratio is computable and meaningless; the verdict must
+    # not be derived from it.
+    assert collapsed.enrichment == pytest.approx(0.869 / 0.760, rel=1e-6)
+
+
+def test_a_true_attribute_that_is_not_distinctive_is_not_a_contradiction():
+    """CD3 on an NKT cell: right about the cell, useless for telling it apart.
+
+    The enrichment rule compares a lineage against the median of the others,
+    and the others are mostly T cells, which all express CD3E. So the ratio
+    comes out at 1.04x by construction -- the comparison set contains the
+    thing being tested. Reading that as "the atlas disagrees" would be
+    backwards: 53.5% of NKT cells express it, which is the claim.
+    """
+    from cognisom.library.cellxgene_sourcing import MarkerCheck, UBIQUITY
+
+    shared = MarkerCheck("NKT cell", "CD3", "CD3E", 0.535, 0.512)
+    assert shared.verdict == "SHARED"
+    assert shared.pct_in_lineage > UBIQUITY
+    assert shared.pct_median_elsewhere > UBIQUITY
+
+    # Rare elsewhere and flat is a different thing entirely, and still counts
+    # against the library.
+    assert MarkerCheck("Naive B cell", "CD19", "CD19",
+                       0.08, 0.07).verdict == "CONTRADICTED"
+
+
+def test_an_induced_marker_under_the_dropout_floor_is_not_evidence():
+    """iNOS and arginase-1 are what polarisation DOES, not what a cell is.
+
+    All four markers that failed only the abundance floor pointed the right
+    way -- 4.5x for ARG1 and unbounded for NOS2 and NCR2, since no other
+    lineage expressed them at all -- at 0.1% to 4.7% of their own lineage.
+    scRNA-seq dropout puts a floor under a low-abundance transcript, so the
+    atlas is silent here, not contrary. CD80 at 4.7% against a 5% floor says
+    how little this verdict can bear: it is "not measurable", and a
+    threshold's near-misses must not be reported as refutations.
+    """
+    from cognisom.library.cellxgene_sourcing import (
+        MarkerCheck, DETECTION_FLOOR, ENRICHMENT)
+
+    for lineage, marker, gene, mine, other in (
+            ("Macrophage M1", "iNOS", "NOS2", 0.001, 0.0),
+            ("Macrophage M2", "arginase-1", "ARG1", 0.007, 0.002),
+            ("ILC3", "NKp44", "NCR2", 0.022, 0.0),
+            ("Macrophage M1", "CD80", "CD80", 0.047, 0.005)):
+        check = MarkerCheck(lineage, marker, gene, mine, other)
+        assert check.verdict == "BELOW_DETECTION", (marker, check.verdict)
+        assert check.pct_in_lineage <= DETECTION_FLOOR
+        assert check.enrichment >= ENRICHMENT, (
+            f"{marker} must still point the right way, or it belongs in "
+            "CONTRADICTED"
+        )
+
+
+def test_the_four_verdicts_that_are_not_evidence_are_kept_apart():
+    """One boolean put four situations in one bucket read as disagreement.
+
+    Of 85 markers tested against the census, 77 were confirmed and 8 were
+    not. Those 8 were three isoform collapses, one shared lineage attribute
+    and four markers under the dropout floor -- and nothing contradicted.
+    "8 unsupported" and "0 contradicted" describe the same run, and only one
+    of them is true about the library.
+    """
+    from cognisom.library.cellxgene_sourcing import MarkerCheck, Run
+
+    run = Run(markers=[
+        MarkerCheck("Eosinophil", "MBP", "PRG2", 0.706, 0.001),
+        MarkerCheck("CD8+ Naive T cell", "CD45RA", "PTPRC", 0.869, 0.760,
+                    gene_shared_with=("CD45RO",)),
+        MarkerCheck("NKT cell", "CD3", "CD3E", 0.535, 0.512),
+        MarkerCheck("Macrophage M1", "iNOS", "NOS2", 0.001, 0.0),
+    ])
+    assert len(run.unsupported) == 3
+    assert run.contradicted == []
+    assert set(run.by_verdict()) == {
+        "CONFIRMED", "COLLAPSED", "SHARED", "BELOW_DETECTION"}
+    text = run.summary()
+    for word in ("confirmed", "collapsed", "shared", "below_detection"):
+        assert word in text, text
