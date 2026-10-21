@@ -275,9 +275,37 @@ class MeshGenerator:
             if len(verts) == 0:
                 return None
 
+            # Reverse the triangle winding.
+            #
+            # skimage contradicts itself here, and quietly. The vertex
+            # normals it returns point OUTWARD -- measured on a control
+            # ball, mean dot with the outward radial +0.93 -- while the
+            # face order it returns puts the right-hand-rule normal
+            # INWARD, on 100% of faces. Its own documentation notes the
+            # left-hand rule for the default gradient_direction. So the
+            # two halves of one return value disagree about which way
+            # the surface faces.
+            #
+            # Nothing downstream reconciled them. Every mesh this
+            # repository builds came out inverted: all 62 parts of all
+            # 32 morphology builders have NEGATIVE signed volume, which
+            # for a closed surface is the definition of inside-out. No
+            # exporter authors `orientation`, so USD applies its default
+            # of rightHanded and single-sided, and the result is a cell
+            # that is backface-culled or lit from within. The one place
+            # it does not show is interaction_usd.py:644, which sets
+            # doubleSided -- that hides the symptom rather than fixing
+            # it.
+            #
+            # Reversing the order makes the face normal agree with the
+            # vertex normals already returned, so both now point out.
+            # Done here because this is the single chokepoint: morphology
+            # build() and build_parts() both arrive through it.
+            faces = faces[:, ::-1]
+
             return Mesh(
                 vertices=verts.astype(np.float32),
-                triangles=faces.astype(np.int32),
+                triangles=np.ascontiguousarray(faces).astype(np.int32),
                 normals=normals.astype(np.float32),
             )
 
