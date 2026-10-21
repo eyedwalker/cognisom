@@ -203,6 +203,85 @@ class TissueSimulationEngine:
         return diffusion_coefficient_um2_per_min(
             float(speed), self.DEFAULT_PERSISTENCE_MIN)
 
+
+    #: Centre-to-centre spacing of capillaries, um. Tissue is organised
+    #: so that no cell is further from a vessel than oxygen can diffuse
+    #: against consumption -- Krogh's observation -- which puts
+    #: intercapillary distance in well-perfused tissue in the tens of
+    #: micrometres. 60 um is inside that range and is an ESTIMATE: this
+    #: library has no sourced value for any tissue, and a tumour's
+    #: vasculature is irregular besides, which is part of why tumours go
+    #: hypoxic at all.
+    VESSEL_SPACING_UM = 60.0
+
+    def _place_vessels(self, cfg) -> None:
+        """Hold a lattice of voxels at arterial concentration.
+
+        A capillary is a boundary CONDITION on the tissue field, not a
+        source term: the vessel wall sits at whatever the blood carries,
+        and the mass that implies is whatever the surrounding tissue
+        draws out of it. That is the Krogh-Erlang inner boundary, and it
+        introduces no free parameter beyond the arterial level each
+        field already declares as its initial value.
+
+        Without it there is nothing for a gradient to form between. The
+        field was uniform and consumed uniformly, so oxygen varied by
+        0.4% across 240 um of tissue, and correcting the uptake rate
+        alone would only have lowered the whole field together -- which
+        is why a rate fix on its own was measured to kill 84% of the
+        tissue rather than produce a hypoxic core.
+        """
+        import numpy as np
+
+        if self._diffusion is None:
+            return
+        resolution = float(cfg.resolution_um)
+        stride = max(1, int(round(self.VESSEL_SPACING_UM / resolution)))
+        shape = tuple(cfg.grid_shape)
+
+        lattice = np.zeros(shape, dtype=bool)
+        # Offset by half a spacing so no vessel sits on the domain face:
+        # a vessel plane on the boundary would pin a whole face and make
+        # the gradient one-dimensional.
+        offset = stride // 2
+        lattice[offset::stride, offset::stride, :] = True
+        self._vessel_fraction = float(lattice.mean())
+
+        for name, fc in cfg.fields.items():
+            # Only the blood-borne fields. A chemokine is secreted by
+            # cells into tissue; pinning it at a vessel would invent a
+            # source the vasculature does not provide.
+            if name not in ("oxygen", "glucose"):
+                continue
+            masks = self._decomposer.scatter_field(lattice) \
+                if hasattr(self._decomposer, "scatter_field") else None
+            if masks is None:
+                masks = self._scatter_mask(lattice)
+            try:
+                self._diffusion.set_vessels(name, masks, fc.initial_value)
+            except Exception:                              # pragma: no cover
+                log.warning("vessels not applied to %r", name, exc_info=True)
+
+    def _scatter_mask(self, lattice):
+        """Split a global boolean grid into the solver's partitions."""
+        import numpy as np
+
+        out = []
+        for gpu_id, field in enumerate(
+                self._diffusion._fields[next(iter(self._diffusion._fields))]):
+            partition = self._decomposer.partitions[gpu_id]
+            axis = self._decomposer.split_axis
+            gw = self._decomposer._ghost_width
+            mask = np.zeros(tuple(field.shape), dtype=bool)
+            lo, hi = partition.start, partition.end
+            src = [slice(None)] * 3
+            src[axis] = slice(lo, hi)
+            dst = [slice(None)] * 3
+            dst[axis] = slice(gw, gw + (hi - lo))
+            mask[tuple(dst)] = lattice[tuple(src)]
+            out.append(mask)
+        return out
+
     def initialize(
         self,
         cell_positions: Optional[np.ndarray] = None,
@@ -280,6 +359,15 @@ class TissueSimulationEngine:
                 global_fields[name] = field_data
                 diff_coeffs[name] = fc.diffusion_coeff
             self._diffusion.initialize_fields(global_fields, diff_coeffs)
+            self._place_vessels(cfg)
+            # A saturating sink where the field config asks for one. Set once:
+            # the per-voxel rates are rebuilt every step, but what shape the
+            # sink has is not a function of where the cells are.
+            for name, fc in cfg.fields.items():
+                if fc.uptake_km > 0.0 and fc.uptake_per_cell_per_hour > 0.0:
+                    self._diffusion.set_saturating_uptake(
+                        name, fc.uptake_km, fc.initial_value,
+                    )
 
         # 8. Initialize mechanics
         if cfg.enable_mechanics:

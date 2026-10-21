@@ -42,16 +42,60 @@ class DiffusionFieldConfig:
     #: identically zero at every step.
     uptake_per_cell_per_hour: float = 0.0
 
+    #: Half-saturation concentration for the sink, in this field's own units.
+    #: Above 0 the sink saturates -- Vmax * C / (km + C), with Vmax set so the
+    #: draw at ``initial_value`` is exactly ``uptake_per_cell_per_hour`` -- and
+    #: the note above about first order no longer applies: a saturating sink
+    #: shuts itself off as the field approaches zero, so it cannot drive the
+    #: concentration negative, which is the one reason the rate was linearised
+    #: in the first place. Backward Euler on it has a closed-form positive
+    #: root; see ``implicit_diffusion._uptake_field_step``.
+    #:
+    #: It is not a refinement. A first-order sink draws hardest where the
+    #: field is richest -- the voxels against a vessel wall -- and weakest in
+    #: the tissue between vessels, so it relaxes to an exponential with no
+    #: front and no anoxic core at any rate. The gradient that a Krogh
+    #: geometry is supposed to produce needs the near-constant draw that
+    #: saturation gives.
+    uptake_km: float = 0.0
+
     @staticmethod
     def oxygen() -> DiffusionFieldConfig:
         # q = 0.15 (the archetypes' highest oxygen_consumption), C_art = 0.21.
+        #
+        # km = 1 mmHg / 760 mmHg per atm. Mitochondrial respiration holds a
+        # near-maximal rate down to about 1 mmHg -- cytochrome c oxidase's own
+        # half-saturation is lower still, a fraction of a mmHg -- so across
+        # the whole range this field occupies the draw is set by the cell's
+        # demand and not by the supply. Two orders below the supply is the
+        # whole point: it makes the sink flat where the tissue is perfused and
+        # zero only where oxygen has actually run out.
+        #
+        # This field's unit is not recorded anywhere, and the two readings of
+        # it disagree about this number. Read as an atmosphere fraction, 0.21
+        # is inspired air (160 mmHg) and km is 1/760 = 0.0013. Read as a
+        # dimensionless level anchored at arterial BLOOD (~95 mmHg), which is
+        # what ``uptake_per_cell_per_hour = q/C_art`` and cellular_module's
+        # ``oxygen < 0.02`` death test both behave like, km would be
+        # 0.21/95 = 0.0022. The two differ by 1.7x and nothing here
+        # distinguishes them; both sit ~100-160x below the supply, which is
+        # the only property the sink's behaviour depends on. Pinning the unit
+        # down is worth doing, and would move this by less than 2x.
         return DiffusionFieldConfig(
             "oxygen", diffusion_coeff=2000.0, initial_value=0.21,
-            uptake_per_cell_per_hour=0.15 / 0.21)
+            uptake_per_cell_per_hour=0.15 / 0.21,
+            uptake_km=1.0 / 760.0)
 
     @staticmethod
     def glucose() -> DiffusionFieldConfig:
         # q = 0.2 (archetypes' glucose_consumption), C_art = 5.0.
+        #
+        # No km: glucose keeps the first-order sink deliberately. Uptake is
+        # transporter-limited and GLUT1's Km is of the same order as blood
+        # glucose itself (a few mM against 5 mM here), not two orders below
+        # it, so the saturating and linear forms are not far apart over this
+        # field's range and nothing is gained by guessing which. The oxygen
+        # number is the one with a defensible gap between km and the supply.
         return DiffusionFieldConfig(
             "glucose", diffusion_coeff=600.0, initial_value=5.0,
             uptake_per_cell_per_hour=0.2 / 5.0)

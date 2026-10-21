@@ -142,6 +142,24 @@ class MultiGPUDiffusionSolver:
         self._n_threads = _default_thread_count(multi_gpu)
         #: Per-field, per-partition per-voxel uptake (1/s), implicit scheme.
         self._uptake: Optional[Dict[str, List[Any]]] = None
+        #: Per-field half-saturation concentration and reference level for a
+        #: saturating (Michaelis-Menten) sink. A field absent from these maps
+        #: keeps the first-order sink. See ``set_saturating_uptake``.
+        self._uptake_km: Dict[str, float] = {}
+        self._uptake_ref: Dict[str, float] = {}
+        #: Per-field, per-partition boolean mask of voxels pinned to a
+        #: fixed concentration, and the value to pin them to. This is the
+        #: Krogh-Erlang inner boundary: a capillary holds the tissue
+        #: beside it at the level the blood carries, and a gradient forms
+        #: between vessels because the cells in between consume.
+        #:
+        #: Without it there is no gradient to form. The field was
+        #: initialised uniform and consumed uniformly, so oxygen varied
+        #: by 0.4% across 240 um of tissue and hypoxia was unreachable at
+        #: any uptake rate -- correcting the rate alone just lowers the
+        #: whole field together.
+        self._vessels: Dict[str, List[Any]] = {}
+        self._vessel_values: Dict[str, float] = {}
         #: Thomas factorisations, keyed by (length, r, k*dt, dtype) inside
         #: adi_step. Shared across fields and partitions on purpose -- the key
         #: already distinguishes everything that changes the coefficients.
@@ -149,6 +167,9 @@ class MultiGPUDiffusionSolver:
         self._thread_min_voxels = _THREAD_MIN_VOXELS
         self._pool: Optional[ThreadPoolExecutor] = None
         self._warned_sources = False
+        #: Fields already warned about an invalid operator split, so the
+        #: warning names each field once rather than every step.
+        self._warned_split: set = set()
 
     @property
     def field_names(self) -> List[str]:
@@ -244,6 +265,47 @@ class MultiGPUDiffusionSolver:
 
     # ── implicit scheme ─────────────────────────────────────────────
 
+    def set_vessels(self, name: str, masks: List[Any], value: float) -> None:
+        """Pin ``name`` to ``value`` wherever ``masks`` is True.
+
+        One boolean array per partition, matching that partition's field
+        shape. A vessel voxel is a boundary CONDITION, not a source: it
+        is held at the concentration the blood carries, and how much
+        mass that implies is whatever the surrounding tissue draws. It
+        introduces no free parameter beyond the arterial level, which
+        the field already declares as its initial value.
+
+        Passing an empty list clears the field's vessels.
+        """
+        if name not in self._fields:
+            raise ValueError(f"vessels given for unknown field {name!r}")
+        if not masks:
+            self._vessels.pop(name, None)
+            self._vessel_values.pop(name, None)
+            return
+        for gpu_id, mask in enumerate(masks):
+            want = self._fields[name][gpu_id].shape
+            if mask is not None and tuple(mask.shape) != tuple(want):
+                raise ValueError(
+                    f"vessel mask[{gpu_id}] shape {tuple(mask.shape)} does "
+                    f"not match field shape {tuple(want)}")
+        self._vessels[name] = list(masks)
+        self._vessel_values[name] = float(value)
+
+    def vessel_fraction(self, name: str) -> float:
+        """Fraction of voxels held as vessel, for a run to report."""
+        masks = self._vessels.get(name)
+        if not masks:
+            return 0.0
+        held = total = 0
+        for mask in masks:
+            if mask is None:
+                continue
+            arr = self._mgpu.to_numpy(mask)
+            held += int(arr.sum())
+            total += int(arr.size)
+        return held / total if total else 0.0
+
     def set_uptake(self, uptake: Optional[Dict[str, List[Any]]]) -> None:
         """Per-voxel first-order uptake in **1/s**, per field, per partition.
 
@@ -266,6 +328,41 @@ class MultiGPUDiffusionSolver:
                         f"not match field shape {want}"
                     )
         self._uptake = dict(uptake)
+
+    def set_saturating_uptake(self, name: str, km: float,
+                              reference: float) -> None:
+        """Make ``name``'s sink saturate below ``km``, in the field's units.
+
+        A first-order sink draws hardest where the field is richest, which is
+        the voxel beside a vessel, so it flattens into an exponential with no
+        hypoxic front no matter how large the rate. Respiration instead runs at
+        a rate the cell sets, nearly constant until oxygen is almost gone, and
+        that constant draw is what carves a gradient between vessels.
+
+        ``reference`` is the concentration at which the saturating sink draws
+        at exactly the configured per-voxel rate, normally the arterial value,
+        so switching this on does not silently rescale the demand that
+        ``build_uptake_from_cells`` binned onto the grid.
+        """
+        if name not in self._fields:
+            raise ValueError(f"uptake given for unknown field {name!r}")
+        if km < 0:
+            raise ValueError(f"km must be non-negative, got {km}")
+        if reference <= 0:
+            raise ValueError(f"reference must be positive, got {reference}")
+        if km == 0:
+            self._uptake_km.pop(name, None)
+            self._uptake_ref.pop(name, None)
+            return
+        if km >= reference:
+            raise ValueError(
+                f"km {km} is not below the reference level {reference}: a sink "
+                "that half-saturates at or above the supply concentration is "
+                "first-order over the whole physiological range, which is the "
+                "behaviour this method exists to replace"
+            )
+        self._uptake_km[name] = float(km)
+        self._uptake_ref[name] = float(reference)
 
     def build_uptake_from_cells(
         self,
@@ -314,6 +411,43 @@ class MultiGPUDiffusionSolver:
             out.append(uptake)
         return out
 
+    #: The operator split carries a reaction-diffusion error of order k*dt
+    #: (``implicit_diffusion._uptake_field_step``), measured at 0.71% for
+    #: k*dt = 0.0071. Past roughly this the split stops being a small
+    #: correction: diffusion smooths the field, then the sink knocks only the
+    #: occupied voxels down, and the pair never reach the coupled steady
+    #: state. The visible symptom is a voxel-scale checkerboard -- a
+    #: consuming voxel sitting far below its empty neighbour even where
+    #: D*dt/dx^2 is in the hundreds and diffusion should have erased any such
+    #: step. It reads as a result and it is an artefact, which is why this is
+    #: checked rather than left in a docstring.
+    _SPLIT_ERROR_LIMIT = 0.1
+
+    def _check_split_validity(self, name: str, per_gpu, dt_seconds: float
+                              ) -> None:
+        """Warn once per field when k*dt leaves the split's valid range."""
+        if name in self._warned_split or not per_gpu:
+            return
+        k_max = 0.0
+        for arr in per_gpu:
+            if arr is None:
+                continue
+            k_max = max(k_max, float(self._mgpu.to_numpy(arr).max()))
+        kdt = k_max * dt_seconds
+        if kdt <= self._SPLIT_ERROR_LIMIT:
+            return
+        self._warned_split.add(name)
+        log.warning(
+            "%s: uptake k*dt = %.3g exceeds %.3g, so the operator split is "
+            "no longer a small correction and the field will show a "
+            "voxel-scale checkerboard that is an artefact of the splitting, "
+            "not a gradient. Either raise diffusion_substeps by about %dx or "
+            "solve the field to steady state; its relaxation time is far "
+            "below one step.",
+            name, kdt, self._SPLIT_ERROR_LIMIT,
+            max(2, int(kdt / self._SPLIT_ERROR_LIMIT)),
+        )
+
     def step_implicit(
         self,
         dt_seconds: float,
@@ -345,6 +479,9 @@ class MultiGPUDiffusionSolver:
             if D <= 0:
                 continue
             self._ghost_ex.exchange_field_ghosts(device_fields)
+            if self._uptake is not None:
+                self._check_split_validity(
+                    name, self._uptake.get(name), dt_seconds)
             for gpu_id, field in enumerate(device_fields):
                 uptake = None
                 if self._uptake is not None:
@@ -352,14 +489,29 @@ class MultiGPUDiffusionSolver:
                     if per_gpu is not None and gpu_id < len(per_gpu):
                         uptake = per_gpu[gpu_id]
                 with self._device_scope(gpu_id):
-                    device_fields[gpu_id] = adi_step(
+                    stepped = adi_step(
                         field,
                         D,
                         dt_seconds,
                         resolution,
                         uptake_k=uptake if uptake is not None else 0.0,
+                        uptake_km=self._uptake_km.get(name, 0.0),
+                        uptake_ref=self._uptake_ref.get(name, 1.0),
                         cache=self._thomas_cache,
                     )
+                    # Re-pin the vessel voxels. This is the method the
+                    # engine actually calls -- step() is the explicit
+                    # fallback -- so a boundary applied only there is a
+                    # boundary applied nowhere: masked voxels drifted to
+                    # 8.6% still at arterial, with oxygen reading LOWER
+                    # at a vessel than between vessels.
+                    masks = self._vessels.get(name)
+                    if masks is not None and gpu_id < len(masks) \
+                            and masks[gpu_id] is not None:
+                        xp = _xp_for(stepped)
+                        stepped = xp.where(masks[gpu_id],
+                                           self._vessel_values[name], stepped)
+                    device_fields[gpu_id] = stepped
 
     def sample_at_positions(
         self,
@@ -562,9 +714,18 @@ class MultiGPUDiffusionSolver:
     ) -> None:
         device_fields = self._fields[name]
         with self._device_scope(gpu_id):
-            device_fields[gpu_id] = self._diffuse_local(
+            field = self._diffuse_local(
                 device_fields[gpu_id], D, dt, resolution, slot=gpu_id,
             )
+            # Re-pin after the step, not before: diffusion and uptake both
+            # move a vessel voxel off its boundary value, and a boundary
+            # that is only imposed at t=0 is an initial condition.
+            masks = self._vessels.get(name)
+            if masks is not None and masks[gpu_id] is not None:
+                xp = _xp_for(field)
+                field = xp.where(masks[gpu_id],
+                                 self._vessel_values[name], field)
+            device_fields[gpu_id] = field
 
     def _voxel_indices(
         self,

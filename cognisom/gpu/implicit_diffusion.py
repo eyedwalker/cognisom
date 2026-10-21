@@ -305,7 +305,29 @@ def _apply_uptake_field(C, K, dt, i0, i1, j0, j1, k0, k1):
                 C[i, j, kk] = C[i, j, kk] / (1.0 + K[i, j, kk] * dt)
 
 
-def _uptake_field_step(C, uptake, dt_seconds) -> None:
+@njit(parallel=True, cache=True, fastmath=False)
+def _apply_uptake_field_mm(C, K, dt, km, ref, i0, i1, j0, j1, k0, k1):
+    for i in prange(i0, i1):
+        for j in range(j0, j1):
+            for kk in range(k0, k1):
+                c0 = C[i, j, kk]
+                b = km - c0 + K[i, j, kk] * ref * dt
+                q = c0 * km
+                disc = np.sqrt(b * b + 4.0 * q)
+                # Both branches are the same positive root. Taking
+                # (-b + disc)/2 when b > 0 subtracts two nearly equal
+                # numbers and loses the answer; the conjugate form does
+                # not. Measured 1.8e-4 relative error at large k*dt
+                # before this split.
+                if b >= 0.0:
+                    denom = b + disc
+                    C[i, j, kk] = 2.0 * q / denom if denom > 0.0 else 0.0
+                else:
+                    C[i, j, kk] = 0.5 * (-b + disc)
+
+
+def _uptake_field_step(C, uptake, dt_seconds,
+                       km: float = 0.0, ref: float = 1.0) -> None:
     """Backward Euler on dC/dt = -k(x)*C, interior only, in place.
 
     A per-voxel rate cannot go on the tridiagonal diagonal without making the
@@ -321,11 +343,50 @@ def _uptake_field_step(C, uptake, dt_seconds) -> None:
     point (k = 0.714/h, dt = 36 s, k*dt = 0.0071). Interior only, so pinned
     vessel and arterial voxels keep their values -- scaling those was what
     produced an error of exactly k*dt at the centre of a cosh profile.
+
+    With ``km > 0`` the sink saturates instead: dC/dt = -Vmax*C/(km + C) with
+    Vmax = k(x)*ref, so ``uptake`` keeps its meaning as the first-order rate
+    AT the reference concentration and the configured magnitude is unchanged
+    at ``C = ref``. Backward Euler on that ODE is a quadratic in C_new with
+    one positive root, written out in closed form -- unconditionally stable,
+    never negative, and exact in the km -> 0 limit, where it reduces to
+    max(0, C - Vmax*dt).
+
+    Why this matters more than the rate does: a first-order sink consumes
+    MOST where the concentration is HIGHEST, which is the voxels next to a
+    vessel, and least in the tissue between vessels. It decays exponentially
+    with no front, so no distance from a vessel is ever anoxic while its
+    neighbours are fed -- the Krogh profile cannot form at any k. Respiration
+    is not first-order: cytochrome c oxidase runs at a near-constant rate down
+    to about 1 mmHg, two orders below arterial pO2, so over the whole
+    physiological range a cell consumes oxygen at a rate set by its own demand
+    and not by the supply. That constant draw is what makes a sharp hypoxic
+    boundary and an anoxic core.
     """
     si, sj, sk = _interior_slices(C)
     if si.stop <= si.start or sj.stop <= sj.start or sk.stop <= sk.start:
         return
-    if _HAVE_NUMBA and C.flags["C_CONTIGUOUS"] and uptake.flags["C_CONTIGUOUS"]:
+    contiguous = (_HAVE_NUMBA and C.flags["C_CONTIGUOUS"]
+                  and uptake.flags["C_CONTIGUOUS"])
+    if km > 0.0:
+        if contiguous:
+            _apply_uptake_field_mm(C, uptake, float(dt_seconds), float(km),
+                                   float(ref),
+                                   si.start, si.stop, sj.start, sj.stop,
+                                   sk.start, sk.stop)
+        else:
+            c0 = C[si, sj, sk]
+            b = km - c0 + uptake[si, sj, sk] * ref * dt_seconds
+            q = c0 * km
+            disc = np.sqrt(b * b + 4.0 * q)
+            denom = b + disc
+            C[si, sj, sk] = np.where(
+                b >= 0.0,
+                2.0 * q / np.where(denom > 0.0, denom, 1.0),
+                0.5 * (-b + disc),
+            )
+        return
+    if contiguous:
         _apply_uptake_field(C, uptake, float(dt_seconds),
                             si.start, si.stop, sj.start, sj.stop,
                             sk.start, sk.stop)
@@ -340,6 +401,8 @@ def adi_step(
     dt_seconds: float,
     resolution_um: float,
     uptake_k: Any = 0.0,
+    uptake_km: float = 0.0,
+    uptake_ref: float = 1.0,
     cache: Optional[Dict] = None,
     use_numba: Optional[bool] = None,
 ) -> np.ndarray:
@@ -352,6 +415,14 @@ def adi_step(
             hours; multiply by 3600 before calling. Passing hours here is the
             unit bug this module's docstring describes.
         resolution_um: voxel edge length in um.
+        uptake_km: half-saturation concentration for a saturating sink, in the
+            field's own units. 0 (the default) keeps the first-order sink.
+            Only honoured when ``uptake_k`` is a field; see
+            ``_uptake_field_step`` for why a saturating sink is what a Krogh
+            profile needs.
+        uptake_ref: the concentration at which the saturating sink draws at
+            exactly ``uptake_k``, so that Vmax = uptake_k * uptake_ref.
+            Normally the arterial value.
         uptake_k: first-order uptake in 1/s, as ``spatial_module.add_uptake``
             defines it (k = q_volumetric / C_arterial). Zeroth-order sinks
             cannot be used in a steady-state solve; see that module.
@@ -404,7 +475,8 @@ def adi_step(
         # it goes on implicitly so it stays stable at any dt.
         out = np.array(field, copy=True)
         if uptake_is_field:
-            _uptake_field_step(out, uptake_k, dt_seconds)
+            _uptake_field_step(out, uptake_k, dt_seconds,
+                           uptake_km, uptake_ref)
         else:
             out /= (1.0 + scalar_k * dt_seconds)
         _clamp_interior(out)
@@ -428,7 +500,8 @@ def adi_step(
             (_sweep0, _sweep1, _sweep2)[ax](
                 C, C.dtype.type(r), cp, den, a0, a1, b0, b1)
         if uptake_is_field:
-            _uptake_field_step(C, uptake_k, dt_seconds)
+            _uptake_field_step(C, uptake_k, dt_seconds,
+                               uptake_km, uptake_ref)
         _clamp_interior(C)
         if C is not field:
             field[...] = C
@@ -444,6 +517,7 @@ def adi_step(
         cp, den = cache[key]
         out = np.ascontiguousarray(_sweep_numpy(out, ax, r, cp, den))
     if uptake_is_field:
-        _uptake_field_step(out, uptake_k, dt_seconds)
+        _uptake_field_step(out, uptake_k, dt_seconds,
+                           uptake_km, uptake_ref)
     _clamp_interior(out)
     return out
