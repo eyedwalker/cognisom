@@ -1864,6 +1864,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 1018446,
+     "census_version": "2025-01-30",
+     "note": "1,018,446 cells typed 'natural killer cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "natural killer cell"
+    }
    }
   },
   {
@@ -4529,6 +4537,19 @@
   },
   {
    "entity_type": "immune_cell",
+   "name": "Basophil",
+   "parameters": {},
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 2219,
+     "census_version": "2025-01-30",
+     "note": "2,219 cells typed 'basophil' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "basophil"
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
    "name": "CD4+ Th1 cell",
    "parameters": {
     "granule_volume_fraction": {
@@ -4575,6 +4596,14 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 3325,
+     "census_version": "2025-01-30",
+     "note": "3,325 cells typed 'T-helper 1 cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "T-helper 1 cell"
     }
    }
   },
@@ -4627,6 +4656,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 6010,
+     "census_version": "2025-01-30",
+     "note": "6,010 cells typed 'T-helper 17 cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "T-helper 17 cell"
+    }
    }
   },
   {
@@ -4677,6 +4714,14 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 55,
+     "census_version": "2025-01-30",
+     "note": "55 cells typed 'T-helper 2 cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "T-helper 2 cell"
     }
    }
   },
@@ -4765,6 +4810,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 72884,
+     "census_version": "2025-01-30",
+     "note": "72,884 cells typed 'effector CD8-positive, alpha-beta T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "effector CD8-positive, alpha-beta T cell"
+    }
    }
   },
   {
@@ -4827,6 +4880,12 @@
     }
    },
    "sourced": {
+    "atlas_coverage": {
+     "cells": 70645,
+     "census_version": "2025-01-30",
+     "note": "70,645 cells typed 'central memory CD8-positive, alpha-beta T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "central memory CD8-positive, alpha-beta T cell"
+    },
     "diameter_convention": "ruffle-inclusive (functional), per PMID:2272970; the granule fractions in this library are ruffle-excluded, PMID:6775712"
    }
   },
@@ -4890,7 +4949,26 @@
     }
    },
    "sourced": {
+    "atlas_coverage": {
+     "cells": 330899,
+     "census_version": "2025-01-30",
+     "note": "330,899 cells typed 'naive thymus-derived CD8-positive, alpha-beta T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "naive thymus-derived CD8-positive, alpha-beta T cell"
+    },
     "diameter_convention": "ruffle-inclusive (functional), per PMID:2272970; the granule fractions in this library are ruffle-excluded, PMID:6775712"
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Conventional dendritic cell (cDC)",
+   "parameters": {},
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 119784,
+     "census_version": "2025-01-30",
+     "note": "119,784 cells typed 'conventional dendritic cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "conventional dendritic cell"
+    }
    }
   },
   {
@@ -4905,6 +4983,14 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115197)",
      "unit": "dimensionless",
      "value": 0.23
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 480,
+     "census_version": "2025-01-30",
+     "note": "480 cells typed 'eosinophil' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "eosinophil"
     }
    }
   },
@@ -4957,6 +5043,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 141805,
+     "census_version": "2025-01-30",
+     "note": "141,805 cells typed 'gamma-delta T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "gamma-delta T cell"
+    }
    }
   },
   {
@@ -5007,6 +5101,14 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 1227,
+     "census_version": "2025-01-30",
+     "note": "1,227 cells typed 'group 1 innate lymphoid cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "group 1 innate lymphoid cell"
     }
    }
   },
@@ -5059,6 +5161,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 3269,
+     "census_version": "2025-01-30",
+     "note": "3,269 cells typed 'group 2 innate lymphoid cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. THIN: fewer than 5,000 cells. Anything resting on this lineage rests on that sample.",
+     "ontology_label": "group 2 innate lymphoid cell"
+    }
    }
   },
   {
@@ -5110,6 +5220,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 7275,
+     "census_version": "2025-01-30",
+     "note": "7,275 cells typed 'group 3 innate lymphoid cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "group 3 innate lymphoid cell"
+    }
    }
   },
   {
@@ -5134,6 +5252,14 @@
      "unit": "um",
      "value": 10.6
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 1053258,
+     "census_version": "2025-01-30",
+     "note": "1,053,258 cells typed 'macrophage' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. The atlas does not separate this from 'Macrophage M2': they share one ontology label, so no comparison between them can be made here.",
+     "ontology_label": "macrophage"
+    }
    }
   },
   {
@@ -5148,6 +5274,27 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
      "unit": "dimensionless",
      "value": 0.026
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 1053258,
+     "census_version": "2025-01-30",
+     "note": "1,053,258 cells typed 'macrophage' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation. The atlas does not separate this from 'Macrophage M1': they share one ontology label, so no comparison between them can be made here.",
+     "ontology_label": "macrophage"
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Mast cell",
+   "parameters": {},
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 118505,
+     "census_version": "2025-01-30",
+     "note": "118,505 cells typed 'mast cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "mast cell"
     }
    }
   },
@@ -5211,6 +5358,12 @@
     }
    },
    "sourced": {
+    "atlas_coverage": {
+     "cells": 178468,
+     "census_version": "2025-01-30",
+     "note": "178,468 cells typed 'memory B cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "memory B cell"
+    },
     "diameter_convention": "ruffle-inclusive (functional), per PMID:2272970; the granule fractions in this library are ruffle-excluded, PMID:6775712"
    }
   },
@@ -5367,6 +5520,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 137371,
+     "census_version": "2025-01-30",
+     "note": "137,371 cells typed 'mature NK T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "mature NK T cell"
+    }
    }
   },
   {
@@ -5429,6 +5590,12 @@
     }
    },
    "sourced": {
+    "atlas_coverage": {
+     "cells": 386524,
+     "census_version": "2025-01-30",
+     "note": "386,524 cells typed 'naive B cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "naive B cell"
+    },
     "diameter_convention": "ruffle-inclusive (functional), per PMID:2272970; the granule fractions in this library are ruffle-excluded, PMID:6775712"
    }
   },
@@ -5473,7 +5640,39 @@
     }
    },
    "sourced": {
+    "atlas_coverage": {
+     "cells": 164587,
+     "census_version": "2025-01-30",
+     "note": "164,587 cells typed 'neutrophil' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "neutrophil"
+    },
     "diameter_convention": "ruffle-inclusive (functional), per PMID:2272970; the granule fractions in this library are ruffle-excluded, PMID:6775712"
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Plasma cell",
+   "parameters": {},
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 377088,
+     "census_version": "2025-01-30",
+     "note": "377,088 cells typed 'plasma cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "plasma cell"
+    }
+   }
+  },
+  {
+   "entity_type": "immune_cell",
+   "name": "Plasmacytoid dendritic cell (pDC)",
+   "parameters": {},
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 62572,
+     "census_version": "2025-01-30",
+     "note": "62,572 cells typed 'plasmacytoid dendritic cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "plasmacytoid dendritic cell"
+    }
    }
   },
   {
@@ -5525,6 +5724,14 @@
      "unit": "dimensionless",
      "value": 0.444
     }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 211455,
+     "census_version": "2025-01-30",
+     "note": "211,455 cells typed 'regulatory T cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "regulatory T cell"
+    }
    }
   },
   {
@@ -5575,6 +5782,14 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    }
+   },
+   "sourced": {
+    "atlas_coverage": {
+     "cells": 45810,
+     "census_version": "2025-01-30",
+     "note": "45,810 cells typed 'T follicular helper cell' in CZ CELLxGENE Census, version 2025-01-30, cellxgene.cziscience.com. Aggregates the Human Cell Atlas, Tabula Sapiens and others; each dataset carries its own citation.",
+     "ontology_label": "T follicular helper cell"
     }
    }
   },
