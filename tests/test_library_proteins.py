@@ -35,7 +35,18 @@ from cognisom.library.proteins import (
     gene_symbol_for,
 )
 
-ACCESSION = re.compile(r"^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$")
+#: A UniProt accession, optionally naming an ISOFORM.
+#:
+#: The suffix is not decoration. CD45RA and CD45RO are isoforms of one
+#: gene, PTPRC, and the difference between them IS the marker -- it is
+#: how a naive T cell is told from a memory one, which is why both are
+#: in this library's marker lists. Recording them both as the bare
+#: P08575 would say they are the same molecule. They are P08575-8
+#: (isoform 6, 1211 aa) and P08575-4 (isoform 2, 1145 aa); the bare
+#: accession displays isoform 1, CD45RABC, which is neither.
+ACCESSION = re.compile(
+    r"^(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})"
+    r"(?:-[0-9]{1,2})?$")
 
 
 # ── the four that motivated symbol-only resolution ───────────────────────

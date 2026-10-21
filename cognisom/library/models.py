@@ -797,20 +797,54 @@ class Receptor(BioEntity):
     ligands: List[str] = field(default_factory=list)
     signaling_pathway: str = ""
     gene_source: str = ""
+    gene_symbol: str = ""
+
+    # ── UniProt identity ──────────────────────────────────────────
+    # A receptor, a cytokine, an adhesion molecule and an MHC chain are
+    # all proteins and all have an accession. Only Protein carried these
+    # fields, and _extra_properties is a FIXED key set -- anything not
+    # named in it is dropped on save without complaint. So 94 curated
+    # molecules whose accessions had been re-resolved against UniProt
+    # (gene symbol, recommended name AND length, 86 of 86) were written
+    # with their identity and stored without it.
+    uniprot_id: str = ""
+    uniprot_recommended_name: str = ""
+    #: How the accession was arrived at. The library requires this
+    #: of every stored accession: curated_alias is model-asserted
+    #: and gene_exact_name is not, and a reader has to be able to
+    #: tell which.
+    uniprot_resolved_by: str = ""
+    sequence_length_aa: int = 0
+    #: The string a marker list calls this molecule, so the reference
+    #: that motivated the entity can be traced back to it.
+    referenced_as: str = ""
 
     def _extra_properties(self) -> dict:
         return {
+            "uniprot_id": self.uniprot_id,
+            "uniprot_recommended_name": self.uniprot_recommended_name,
+            "uniprot_resolved_by": self.uniprot_resolved_by,
+            "sequence_length_aa": self.sequence_length_aa,
+            "referenced_as": self.referenced_as,
             "receptor_type": self.receptor_type,
             "ligands": self.ligands,
             "signaling_pathway": self.signaling_pathway,
             "gene_source": self.gene_source,
+            "gene_symbol": self.gene_symbol,
         }
 
     def _apply_properties(self, props: dict):
+        self.uniprot_id = props.get("uniprot_id", "")
+        self.uniprot_recommended_name = props.get(
+            "uniprot_recommended_name", "")
+        self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
+        self.sequence_length_aa = props.get("sequence_length_aa", 0)
+        self.referenced_as = props.get("referenced_as", "")
         self.receptor_type = props.get("receptor_type", "")
         self.ligands = props.get("ligands", [])
         self.signaling_pathway = props.get("signaling_pathway", "")
         self.gene_source = props.get("gene_source", "")
+        self.gene_symbol = props.get("gene_symbol", "")
 
 
 @dataclass
@@ -1702,8 +1736,33 @@ class Cytokine(BioEntity):
     gene_symbol: str = ""           # Gene encoding this cytokine (e.g. "IL2", "IFNG")
     molecular_weight_kda: float = 0.0
 
+    # ── UniProt identity ──────────────────────────────────────────
+    # A receptor, a cytokine, an adhesion molecule and an MHC chain are
+    # all proteins and all have an accession. Only Protein carried these
+    # fields, and _extra_properties is a FIXED key set -- anything not
+    # named in it is dropped on save without complaint. So 94 curated
+    # molecules whose accessions had been re-resolved against UniProt
+    # (gene symbol, recommended name AND length, 86 of 86) were written
+    # with their identity and stored without it.
+    uniprot_id: str = ""
+    uniprot_recommended_name: str = ""
+    #: How the accession was arrived at. The library requires this
+    #: of every stored accession: curated_alias is model-asserted
+    #: and gene_exact_name is not, and a reader has to be able to
+    #: tell which.
+    uniprot_resolved_by: str = ""
+    sequence_length_aa: int = 0
+    #: The string a marker list calls this molecule, so the reference
+    #: that motivated the entity can be traced back to it.
+    referenced_as: str = ""
+
     def _extra_properties(self) -> dict:
         return {
+            "uniprot_id": self.uniprot_id,
+            "uniprot_recommended_name": self.uniprot_recommended_name,
+            "uniprot_resolved_by": self.uniprot_resolved_by,
+            "sequence_length_aa": self.sequence_length_aa,
+            "referenced_as": self.referenced_as,
             "cytokine_family": self.cytokine_family,
             "receptor": self.receptor,
             "producing_cells": self.producing_cells,
@@ -1717,6 +1776,12 @@ class Cytokine(BioEntity):
         }
 
     def _apply_properties(self, props: dict):
+        self.uniprot_id = props.get("uniprot_id", "")
+        self.uniprot_recommended_name = props.get(
+            "uniprot_recommended_name", "")
+        self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
+        self.sequence_length_aa = props.get("sequence_length_aa", 0)
+        self.referenced_as = props.get("referenced_as", "")
         self.cytokine_family = props.get("cytokine_family", "")
         self.receptor = props.get("receptor", "")
         self.producing_cells = props.get("producing_cells", [])
@@ -1827,8 +1892,33 @@ class MHCMolecule(BioEntity):
     binding_groove: str = ""        # Structural description
     population_frequency: float = 0.0  # Allele frequency in population
 
+    # ── UniProt identity ──────────────────────────────────────────
+    # A receptor, a cytokine, an adhesion molecule and an MHC chain are
+    # all proteins and all have an accession. Only Protein carried these
+    # fields, and _extra_properties is a FIXED key set -- anything not
+    # named in it is dropped on save without complaint. So 94 curated
+    # molecules whose accessions had been re-resolved against UniProt
+    # (gene symbol, recommended name AND length, 86 of 86) were written
+    # with their identity and stored without it.
+    uniprot_id: str = ""
+    uniprot_recommended_name: str = ""
+    #: How the accession was arrived at. The library requires this
+    #: of every stored accession: curated_alias is model-asserted
+    #: and gene_exact_name is not, and a reader has to be able to
+    #: tell which.
+    uniprot_resolved_by: str = ""
+    sequence_length_aa: int = 0
+    #: The string a marker list calls this molecule, so the reference
+    #: that motivated the entity can be traced back to it.
+    referenced_as: str = ""
+
     def _extra_properties(self) -> dict:
         return {
+            "uniprot_id": self.uniprot_id,
+            "uniprot_recommended_name": self.uniprot_recommended_name,
+            "uniprot_resolved_by": self.uniprot_resolved_by,
+            "sequence_length_aa": self.sequence_length_aa,
+            "referenced_as": self.referenced_as,
             "mhc_class": self.mhc_class,
             "hla_allele": self.hla_allele,
             "gene_symbol": self.gene_symbol,
@@ -1841,6 +1931,12 @@ class MHCMolecule(BioEntity):
         }
 
     def _apply_properties(self, props: dict):
+        self.uniprot_id = props.get("uniprot_id", "")
+        self.uniprot_recommended_name = props.get(
+            "uniprot_recommended_name", "")
+        self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
+        self.sequence_length_aa = props.get("sequence_length_aa", 0)
+        self.referenced_as = props.get("referenced_as", "")
         self.mhc_class = props.get("mhc_class", "")
         self.hla_allele = props.get("hla_allele", "")
         self.gene_symbol = props.get("gene_symbol", "")
@@ -1870,8 +1966,33 @@ class AdhesionMolecule(BioEntity):
     gene_symbol: str = ""
     structure_type: str = ""  # type_I_transmembrane, heterodimer, GPI_anchored, homophilic
 
+    # ── UniProt identity ──────────────────────────────────────────
+    # A receptor, a cytokine, an adhesion molecule and an MHC chain are
+    # all proteins and all have an accession. Only Protein carried these
+    # fields, and _extra_properties is a FIXED key set -- anything not
+    # named in it is dropped on save without complaint. So 94 curated
+    # molecules whose accessions had been re-resolved against UniProt
+    # (gene symbol, recommended name AND length, 86 of 86) were written
+    # with their identity and stored without it.
+    uniprot_id: str = ""
+    uniprot_recommended_name: str = ""
+    #: How the accession was arrived at. The library requires this
+    #: of every stored accession: curated_alias is model-asserted
+    #: and gene_exact_name is not, and a reader has to be able to
+    #: tell which.
+    uniprot_resolved_by: str = ""
+    sequence_length_aa: int = 0
+    #: The string a marker list calls this molecule, so the reference
+    #: that motivated the entity can be traced back to it.
+    referenced_as: str = ""
+
     def _extra_properties(self) -> Dict[str, Any]:
         return {
+            "uniprot_id": self.uniprot_id,
+            "uniprot_recommended_name": self.uniprot_recommended_name,
+            "uniprot_resolved_by": self.uniprot_resolved_by,
+            "sequence_length_aa": self.sequence_length_aa,
+            "referenced_as": self.referenced_as,
             "molecule_family": self.molecule_family,
             "expressed_on": self.expressed_on,
             "ligands": self.ligands,
@@ -1886,6 +2007,12 @@ class AdhesionMolecule(BioEntity):
         }
 
     def _apply_properties(self, props: Dict[str, Any]):
+        self.uniprot_id = props.get("uniprot_id", "")
+        self.uniprot_recommended_name = props.get(
+            "uniprot_recommended_name", "")
+        self.uniprot_resolved_by = props.get("uniprot_resolved_by", "")
+        self.sequence_length_aa = props.get("sequence_length_aa", 0)
+        self.referenced_as = props.get("referenced_as", "")
         self.molecule_family = props.get("molecule_family", "")
         self.expressed_on = props.get("expressed_on", [])
         self.ligands = props.get("ligands", [])

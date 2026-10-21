@@ -89,12 +89,30 @@ def records() -> List[dict]:
         return json.load(handle)
 
 
+#: entity_type -> the model class that can actually hold an accession.
+#:
+#: A bare BioEntity cannot. Its to_dict() does not serialise an ad-hoc
+#: ``.properties`` dict, and each subclass's ``_extra_properties`` is a
+#: FIXED key set that drops anything it does not name. Built as
+#: BioEntity and given .properties, all 94 of these molecules were
+#: stored with no uniprot_id at all -- the accessions that were
+#: re-resolved against UniProt on every one of gene symbol, recommended
+#: name and length, 86 of 86, and that are the entire reason to trust
+#: this batch, reached the database and were dropped on the way in.
+_CLASS_FOR = {
+    "protein": "Protein", "receptor": "Receptor", "cytokine": "Cytokine",
+    "adhesion_molecule": "AdhesionMolecule", "mhc": "MHCMolecule",
+}
+
+
 def build(record: dict):
     """One record as a library entity."""
+    from . import models
     from .models import BioEntity, EntityType
 
-    entity = BioEntity(name=record["entity_name"],
-                       entity_type=EntityType(record["entity_type"]))
+    cls = getattr(models, _CLASS_FOR.get(record["entity_type"], ""), BioEntity)
+    entity = cls(name=record["entity_name"],
+                 entity_type=EntityType(record["entity_type"]))
     entity.display_name = record["entity_name"]
     entity.description = record.get("description", "")
     entity.synonyms = list(record.get("synonyms") or [])
@@ -103,18 +121,33 @@ def build(record: dict):
     entity.source = "curated"
     entity.source_url = (
         f"https://www.uniprot.org/uniprotkb/{record['accession'].split('-')[0]}")
-    entity.properties = {
-        "uniprot_id": record["accession"],
-        "gene_symbol": record["gene"],
-        "uniprot_recommended_name": record["uniprot_name"],
-        "sequence_length_aa": record["length"],
-        # What the marker list calls it. Without this the entity exists
-        # and the reference to it still does not resolve, which was the
-        # original failure.
-        "referenced_as": record["referenced_as"],
-    }
+    # Typed fields, so they survive to_dict().
+    entity.uniprot_id = record["accession"]
+    entity.uniprot_recommended_name = record["uniprot_name"]
+    # Protein already had a length field of its own; the four classes
+    # that gained one use the newer name. Writing the wrong one creates
+    # an attribute nothing serialises, which is the failure this whole
+    # function was just fixed for.
+    if hasattr(entity, "amino_acid_length"):
+        entity.amino_acid_length = record["length"]
+    else:
+        entity.sequence_length_aa = record["length"]
+    # What the marker list calls it. Without this the entity exists and
+    # the reference to it still does not resolve, which was the original
+    # failure.
+    entity.referenced_as = record["referenced_as"]
+    # How the accession was arrived at, which the library requires of
+    # every stored one. These were curated per molecule and then
+    # re-resolved by a separate pass that checked the primary gene
+    # symbol, the recommended protein name AND the sequence length
+    # against each submission -- 86 of 86. That is gene_exact_name:
+    # the entry whose exact gene symbol and name match.
+    entity.uniprot_resolved_by = "gene_exact_name"
+    if hasattr(entity, "gene_symbol"):
+        entity.gene_symbol = record["gene"]
     if record.get("isoform_note"):
-        entity.properties["isoform_note"] = record["isoform_note"]
+        entity.description = (entity.description + "\n\nISOFORM NOTE: "
+                              + record["isoform_note"])
     entity.scale_um = _SCALE_UM.get(record["entity_type"], 0.005)
     entity.mesh_type = "sphere"
     entity.usd_prim_type = "BioProtein"
