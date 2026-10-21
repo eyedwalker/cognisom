@@ -101,6 +101,19 @@ RETRACTED: Tuple[Tuple[str, str, str, str], ...] = tuple(
      "mass is not recorded, because this library has no source for it.")
     for name in ("IgA1 (secretory)", "IgD", "IgE", "IgG1", "IgG2",
                  "IgG3", "IgG4", "IgM (pentameric)")
+) + tuple(
+    # The bare Kd on an adhesion molecule, after the value moved to the
+    # alias that names its ligand. Without this a fresh library re-seeds
+    # the nameless one beside the evidenced one and holds the same
+    # constant twice, one of them saying nothing about which bond it is.
+    (name, "adhesion_molecule", "kd_nm",
+     "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / "
+     "kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds "
+     "several partners with constants orders of magnitude apart, so a "
+     "bare kd_nm does not say which bond it is.")
+    for name in ("P-selectin (CD62P)", "E-selectin (CD62E)",
+                 "L-selectin (CD62L)", "ICAM-1 (CD54)",
+                 "PSGL-1 (CD162)", "LFA-1 (CD11a/CD18)")
 )
 
 

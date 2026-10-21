@@ -1621,6 +1621,31 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
         "Km for the Ac-IETD-AFC peptide substrate, in micromolar",
         substrate="Ac-IETD-AFC peptide",
     ),
+    # Each selectin binds several ligands with constants that differ by
+    # orders of magnitude: P-selectin binds PSGL-1 at 0.32 uM while
+    # E-selectin binds ESL-1 at 62 uM -- 200x weaker -- and E-selectin
+    # binds PSGL-1 as well. A bare kd_nm on "E-selectin" does not say
+    # which bond it is, and the adhesion cascade is where that matters.
+    ParameterAlias(
+        "kd_psgl1_nm", "kd_nm", 1.0,
+        "Kd for PSGL-1, in nanomolar", substrate="PSGL-1",
+    ),
+    ParameterAlias(
+        "kd_esl1_nm", "kd_nm", 1.0,
+        "Kd for ESL-1, in nanomolar", substrate="ESL-1",
+    ),
+    ParameterAlias(
+        "kd_glycam1_nm", "kd_nm", 1.0,
+        "Kd for GlyCAM-1, in nanomolar", substrate="GlyCAM-1",
+    ),
+    ParameterAlias(
+        "kd_icam1_nm", "kd_nm", 1.0,
+        "Kd for ICAM-1, in nanomolar", substrate="ICAM-1",
+    ),
+    ParameterAlias(
+        "kd_lfa1_nm", "kd_nm", 1.0,
+        "Kd for LFA-1, in nanomolar", substrate="LFA-1",
+    ),
     ParameterAlias(
         "km_collagen_iv_um", "km_um", 1.0,
         "Km for collagen IV, in micromolar",
@@ -1779,6 +1804,31 @@ def get_parameter(entity: BioEntity, name: str) -> Optional[ParameterValue]:
                 "origin unknown"
             ),
         )
+
+    # An alias that carries its OWN evidence. A substrate-named
+    # parameter -- km_ietd_um, kd_lfa1_nm -- is not a legacy spelling
+    # lying around; it is where the curated record deliberately lives,
+    # because the bare name cannot say which substrate or which ligand
+    # the constant belongs to. Falling through to the PLACEHOLDER branch
+    # below would report a fully cited, graded value as a number of
+    # unknown origin, which is how a correction turns into a regression.
+    for alias in _ALIASES_BY_CANONICAL.get(name, ()):
+        record = _sidecar(entity).get(alias.legacy)
+        if record is None:
+            continue
+        pv = ParameterValue.from_dict(record)
+        if alias.factor == 1.0:
+            return pv
+        spec = PARAMETER_SPECS.get(name)
+        return ParameterValue(
+            value=pv.value * alias.factor,
+            unit=spec.unit if spec else pv.unit,
+            provenance=pv.provenance, citation=pv.citation,
+            source=pv.source, conditions=pv.conditions,
+            rationale=(pv.rationale + f"\nRead through {alias.legacy!r} "
+                       f"(x{alias.factor:g}): {alias.note}"),
+            calibrated_against=pv.calibrated_against,
+            confidence=pv.confidence)
 
     # Last resort: the value may be present under a legacy name. This
     # stays PLACEHOLDER -- a unit conversion does not create evidence,

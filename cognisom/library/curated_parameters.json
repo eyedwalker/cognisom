@@ -156,35 +156,37 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:11404363",
-     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance at 37 C. SPECIES: MOUSE -- both partners. Kd 62000 nM, koff 4.6 s-1. Cellular off-rate from tether lifetimes under flow: 0.7 s-1 for human leukocyte tethers at 25 C, ~4x slower than the 2.7 s-1 measured here at 25 C. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. koff over the measured range: 1.1 / 1.9 / 2.7 / 4.6 s-1 at 5 / 15 / 25 / 37 C. Affinity is flat with temperature (56-62 uM throughout), so binding is entropically driven -- unusual for a protein-carbohydrate interaction. ESL-1 sits on the LATERAL surfaces of microvilli, not the tips where PSGL-1 and L-selectin are, which fits a role in strengthening rolling rather than first capture.",
      "provenance": "derived",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/4.6 1/s",
-     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "rationale": "1/koff = 1/4.6 s-1, so it inherits everything the off-rate does: species mouse, 37 C, and a monomeric bond.",
+     "source": "Wild MK, Huang MC, Schulze-Horsel U, van der Merwe PA, Vestweber D. J Biol Chem 2001;276(34):31602-31612, Tables II-IV",
      "unit": "s",
      "value": 0.217391304348
     },
-    "kd_nm": {
+    "kd_esl1_nm": {
      "citation": "PMID:11404363",
-     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance at 37 C. SPECIES: MOUSE -- both partners. Kd 62000 nM, koff 4.6 s-1. Cellular off-rate from tether lifetimes under flow: 0.7 s-1 for human leukocyte tethers at 25 C, ~4x slower than the 2.7 s-1 measured here at 25 C. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. koff over the measured range: 1.1 / 1.9 / 2.7 / 4.6 s-1 at 5 / 15 / 25 / 37 C. Affinity is flat with temperature (56-62 uM throughout), so binding is entropically driven -- unusual for a protein-carbohydrate interaction. ESL-1 sits on the LATERAL surfaces of microvilli, not the tips where PSGL-1 and L-selectin are, which fits a role in strengthening rolling rather than first capture.",
      "provenance": "measured",
-     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "rationale": "Table IV, the mouse 37 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Wild MK, Huang MC, Schulze-Horsel U, van der Merwe PA, Vestweber D. J Biol Chem 2001;276(34):31602-31612, Tables II-IV",
      "unit": "nM",
      "value": 62000.0
     },
     "koff_per_s": {
      "citation": "PMID:11404363",
-     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance at 37 C. SPECIES: MOUSE -- both partners. Kd 62000 nM, koff 4.6 s-1. Cellular off-rate from tether lifetimes under flow: 0.7 s-1 for human leukocyte tethers at 25 C, ~4x slower than the 2.7 s-1 measured here at 25 C. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. koff over the measured range: 1.1 / 1.9 / 2.7 / 4.6 s-1 at 5 / 15 / 25 / 37 C. Affinity is flat with temperature (56-62 uM throughout), so binding is entropically driven -- unusual for a protein-carbohydrate interaction. ESL-1 sits on the LATERAL surfaces of microvilli, not the tips where PSGL-1 and L-selectin are, which fits a role in strengthening rolling rather than first capture.",
      "provenance": "measured",
-     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "rationale": "Table IV, the mouse 37 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Wild MK, Huang MC, Schulze-Horsel U, van der Merwe PA, Vestweber D. J Biol Chem 2001;276(34):31602-31612, Tables II-IV",
      "unit": "1/s",
      "value": 4.6
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:11404363",
-     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance; mouse ligand; monomeric E-selectin over ESL-1 from mouse bone marrow cells; affinity flat from 5 to 37 C; recombinant ESL-1 gave a similar Kd of 66 uM; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "E-selectin (CD62E) / ESL-1; surface plasmon resonance at 37 C. SPECIES: MOUSE -- both partners. Kd 62000 nM, koff 4.6 s-1. Cellular off-rate from tether lifetimes under flow: 0.7 s-1 for human leukocyte tethers at 25 C, ~4x slower than the 2.7 s-1 measured here at 25 C. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. koff over the measured range: 1.1 / 1.9 / 2.7 / 4.6 s-1 at 5 / 15 / 25 / 37 C. Affinity is flat with temperature (56-62 uM throughout), so binding is entropically driven -- unusual for a protein-carbohydrate interaction. ESL-1 sits on the LATERAL surfaces of microvilli, not the tips where PSGL-1 and L-selectin are, which fits a role in strengthening rolling rather than first capture.",
      "provenance": "derived",
-     "rationale": "kon = koff/Kd = 4.6/6.2e+04 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
-     "source": "Wild et al., J Biol Chem 2001;276:31602-12",
+     "rationale": "CALCULATED as koff/Kd, not observed. The selectin papers state the association phase was too fast to measure -- equilibrium inside 2-3 s -- so kon there is not a direct observation.",
+     "source": "Wild MK, Huang MC, Schulze-Horsel U, van der Merwe PA, Vestweber D. J Biol Chem 2001;276(34):31602-31612, Tables II-IV",
      "unit": "1/(nM*s)",
      "value": 7.4e-05
     },
@@ -241,7 +243,8 @@
      "Regulatory T cell (Treg)": 0.79,
      "T follicular helper (Tfh)": 0.79
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "selectin_bond": "ESL-1, mouse, 37 C, monomeric (PMID:11404363)"
    }
   },
   {
@@ -388,35 +391,37 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:9780171",
-     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
      "provenance": "derived",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/0.1 1/s",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "rationale": "1/koff = 1/0.1 s-1, so it inherits everything the off-rate does: species human, 25 C, and a monomeric bond.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "s",
      "value": 10.0
     },
-    "kd_nm": {
+    "kd_lfa1_nm": {
      "citation": "PMID:9780171",
-     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
-     "provenance": "measured",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
+     "provenance": "derived",
+     "rationale": "CALCULATED, not measured: the paper says 'Kd was calculated from the ratio kdiss/kass'. Stored MEASURED it asserted an equilibrium experiment that was never run, on the one number a reader quotes.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "nM",
      "value": 500.0
     },
     "koff_per_s": {
      "citation": "PMID:9780171",
-     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
      "provenance": "measured",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "1/s",
      "value": 0.1
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:9780171",
-     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera. ICAM-1 also binds MAC-1, at a separate site in Ig domain 3, for which no affinity could be sourced",
-     "provenance": "derived",
-     "rationale": "kon = koff/Kd = 0.1/500 nM; the cited paper reports only Kd and koff",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
+     "provenance": "measured",
+     "rationale": "OBSERVED: fitted directly to the association phase. It is the Kd here that is calculated, from kdiss/kass -- the reverse of the selectin papers, where the association was too fast to fit.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "1/(nM*s)",
      "value": 0.0002
     },
@@ -483,7 +488,8 @@
      "Regulatory T cell (Treg)": 16.6,
      "T follicular helper (Tfh)": 16.6
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "selectin_bond": "LFA-1, human, 25 C, monomeric (PMID:9780171)"
    }
   },
   {
@@ -725,36 +731,37 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:9422729",
-     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
-     "provenance": "estimated",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/10.0 1/s; an upper bound, because the cited koff is a lower bound; an upper bound, inherited from a cited off-rate that is itself only a lower bound",
-     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance at 25 C. SPECIES: RAT CD62L BINDING MOUSE GLYCAM-1 -- A CROSS-SPECIES PAIR, NOT ONE ORGANISM. Kd 108000 nM, koff >=10 s-1. Cellular off-rate from tether lifetimes under flow: ~7 s-1 intrinsic, from L-selectin tethers extrapolated to zero flow, which agrees with this. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. SPECIES, FROM THE PRIMARY SOURCE. PMID:11404363 Table IV lists this interaction as 'Mouse'. It is not: the authors expressed a soluble monomeric RAT CD62L and bound it to GlyCAM-1 purified from MOUSE serum, and flag it themselves -- 'One caveat is that we measured the affinity and kinetics of rat CD62L binding to mouse GlyCAM-1.' They argue it is tolerable because the two CD62L lectin domains are 93% identical. A secondary table simplified it, and this library had taken the simplification.\nWHY koff IS A BOUND AND NOT A MEASUREMENT: the observed decay, half-time ~0.07 s, is the time to WASH THE SAMPLE OUT OF THE FLOW CELL, not dissociation -- the control surface falls at the same rate, and the instrument cannot sample faster than 0.1 s. So >=10 s-1 is a floor set by the apparatus. kon >=1e5 is then calculated from one bound and one affinity, so it is a bound too.\nHOW FAR THE MONOMERIC FLOOR IS BELOW AVIDITY, measured in this same paper: soluble GlyCAM-1 binding to IMMOBILISED CD62L is detectable at ~30 nM and comes off with koff <=0.001 s-1 -- at least 10,000x slower than the 10 s-1 monovalent rate. That is multivalent binding at serum concentration, and it is how GlyCAM-1 is thought to signal by cross-linking CD62L.\nAffinity is flat with temperature (108 +/- 4 uM at 25 C, n=8; 100 +/- 6 at 37 C), so like E-selectin-ESL-1 this bond is entropically driven. If CD62L-CD4 were in fact a dimer the authors note both Kd and koff would be UNDERestimates.",
+     "provenance": "derived",
+     "rationale": "1/koff = 1/10 s-1, so it inherits everything the off-rate does: species RAT CD62L binding MOUSE GlyCAM-1 -- a cross-species pair, not one organism, 25 C, and a monomeric bond.",
+     "source": "Nicholson MW, Barclay AN, Singer MS, Rosen SD, van der Merwe PA. J Biol Chem 1998;273(2):763-770, Tables II and III",
      "unit": "s",
      "value": 0.1
     },
-    "kd_nm": {
+    "kd_glycam1_nm": {
      "citation": "PMID:9422729",
-     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance at 25 C. SPECIES: RAT CD62L BINDING MOUSE GLYCAM-1 -- A CROSS-SPECIES PAIR, NOT ONE ORGANISM. Kd 108000 nM, koff >=10 s-1. Cellular off-rate from tether lifetimes under flow: ~7 s-1 intrinsic, from L-selectin tethers extrapolated to zero flow, which agrees with this. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. SPECIES, FROM THE PRIMARY SOURCE. PMID:11404363 Table IV lists this interaction as 'Mouse'. It is not: the authors expressed a soluble monomeric RAT CD62L and bound it to GlyCAM-1 purified from MOUSE serum, and flag it themselves -- 'One caveat is that we measured the affinity and kinetics of rat CD62L binding to mouse GlyCAM-1.' They argue it is tolerable because the two CD62L lectin domains are 93% identical. A secondary table simplified it, and this library had taken the simplification.\nWHY koff IS A BOUND AND NOT A MEASUREMENT: the observed decay, half-time ~0.07 s, is the time to WASH THE SAMPLE OUT OF THE FLOW CELL, not dissociation -- the control surface falls at the same rate, and the instrument cannot sample faster than 0.1 s. So >=10 s-1 is a floor set by the apparatus. kon >=1e5 is then calculated from one bound and one affinity, so it is a bound too.\nHOW FAR THE MONOMERIC FLOOR IS BELOW AVIDITY, measured in this same paper: soluble GlyCAM-1 binding to IMMOBILISED CD62L is detectable at ~30 nM and comes off with koff <=0.001 s-1 -- at least 10,000x slower than the 10 s-1 monovalent rate. That is multivalent binding at serum concentration, and it is how GlyCAM-1 is thought to signal by cross-linking CD62L.\nAffinity is flat with temperature (108 +/- 4 uM at 25 C, n=8; 100 +/- 6 at 37 C), so like E-selectin-ESL-1 this bond is entropically driven. If CD62L-CD4 were in fact a dimer the authors note both Kd and koff would be UNDERestimates.",
      "provenance": "measured",
-     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "rationale": "Published as a LOWER BOUND, not a point estimate. The decay the instrument saw was the washing time -- how long it takes to clear the sample from the flow cell, half-time ~0.07 s -- and the control surface falls at the same rate, so no dissociation was observed at all. The floor is set by the apparatus, which cannot sample faster than 0.1 s. Stored as a plain number because the library has no way to hold an inequality, which is exactly why the bound is spelled out here.",
+     "source": "Nicholson MW, Barclay AN, Singer MS, Rosen SD, van der Merwe PA. J Biol Chem 1998;273(2):763-770, Tables II and III",
      "unit": "nM",
      "value": 108000.0
     },
     "koff_per_s": {
      "citation": "PMID:9422729",
-     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance at 25 C. SPECIES: RAT CD62L BINDING MOUSE GLYCAM-1 -- A CROSS-SPECIES PAIR, NOT ONE ORGANISM. Kd 108000 nM, koff >=10 s-1. Cellular off-rate from tether lifetimes under flow: ~7 s-1 intrinsic, from L-selectin tethers extrapolated to zero flow, which agrees with this. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. SPECIES, FROM THE PRIMARY SOURCE. PMID:11404363 Table IV lists this interaction as 'Mouse'. It is not: the authors expressed a soluble monomeric RAT CD62L and bound it to GlyCAM-1 purified from MOUSE serum, and flag it themselves -- 'One caveat is that we measured the affinity and kinetics of rat CD62L binding to mouse GlyCAM-1.' They argue it is tolerable because the two CD62L lectin domains are 93% identical. A secondary table simplified it, and this library had taken the simplification.\nWHY koff IS A BOUND AND NOT A MEASUREMENT: the observed decay, half-time ~0.07 s, is the time to WASH THE SAMPLE OUT OF THE FLOW CELL, not dissociation -- the control surface falls at the same rate, and the instrument cannot sample faster than 0.1 s. So >=10 s-1 is a floor set by the apparatus. kon >=1e5 is then calculated from one bound and one affinity, so it is a bound too.\nHOW FAR THE MONOMERIC FLOOR IS BELOW AVIDITY, measured in this same paper: soluble GlyCAM-1 binding to IMMOBILISED CD62L is detectable at ~30 nM and comes off with koff <=0.001 s-1 -- at least 10,000x slower than the 10 s-1 monovalent rate. That is multivalent binding at serum concentration, and it is how GlyCAM-1 is thought to signal by cross-linking CD62L.\nAffinity is flat with temperature (108 +/- 4 uM at 25 C, n=8; 100 +/- 6 at 37 C), so like E-selectin-ESL-1 this bond is entropically driven. If CD62L-CD4 were in fact a dimer the authors note both Kd and koff would be UNDERestimates.",
      "provenance": "estimated",
-     "rationale": "the cited paper gives this only as a lower bound (koff >= 10 1/s); dissociation was faster than the method could resolve, so the stored number is the bound, not a fitted value",
-     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "rationale": "Published as a LOWER BOUND, not a point estimate. The decay the instrument saw was the washing time -- how long it takes to clear the sample from the flow cell, half-time ~0.07 s -- and the control surface falls at the same rate, so no dissociation was observed at all. The floor is set by the apparatus, which cannot sample faster than 0.1 s. Stored as a plain number because the library has no way to hold an inequality, which is exactly why the bound is spelled out here.",
+     "source": "Nicholson MW, Barclay AN, Singer MS, Rosen SD, van der Merwe PA. J Biol Chem 1998;273(2):763-770, Tables II and III",
      "unit": "1/s",
      "value": 10.0
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:9422729",
-     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance; human CD62L; soluble monomeric CD62L over immobilized GlyCAM-1; the off-rate agrees with CD62L-mediated leukocyte tethers; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "L-selectin (CD62L) / GlyCAM-1; surface plasmon resonance at 25 C. SPECIES: RAT CD62L BINDING MOUSE GLYCAM-1 -- A CROSS-SPECIES PAIR, NOT ONE ORGANISM. Kd 108000 nM, koff >=10 s-1. Cellular off-rate from tether lifetimes under flow: ~7 s-1 intrinsic, from L-selectin tethers extrapolated to zero flow, which agrees with this. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. SPECIES, FROM THE PRIMARY SOURCE. PMID:11404363 Table IV lists this interaction as 'Mouse'. It is not: the authors expressed a soluble monomeric RAT CD62L and bound it to GlyCAM-1 purified from MOUSE serum, and flag it themselves -- 'One caveat is that we measured the affinity and kinetics of rat CD62L binding to mouse GlyCAM-1.' They argue it is tolerable because the two CD62L lectin domains are 93% identical. A secondary table simplified it, and this library had taken the simplification.\nWHY koff IS A BOUND AND NOT A MEASUREMENT: the observed decay, half-time ~0.07 s, is the time to WASH THE SAMPLE OUT OF THE FLOW CELL, not dissociation -- the control surface falls at the same rate, and the instrument cannot sample faster than 0.1 s. So >=10 s-1 is a floor set by the apparatus. kon >=1e5 is then calculated from one bound and one affinity, so it is a bound too.\nHOW FAR THE MONOMERIC FLOOR IS BELOW AVIDITY, measured in this same paper: soluble GlyCAM-1 binding to IMMOBILISED CD62L is detectable at ~30 nM and comes off with koff <=0.001 s-1 -- at least 10,000x slower than the 10 s-1 monovalent rate. That is multivalent binding at serum concentration, and it is how GlyCAM-1 is thought to signal by cross-linking CD62L.\nAffinity is flat with temperature (108 +/- 4 uM at 25 C, n=8; 100 +/- 6 at 37 C), so like E-selectin-ESL-1 this bond is entropically driven. If CD62L-CD4 were in fact a dimer the authors note both Kd and koff would be UNDERestimates.",
      "provenance": "estimated",
-     "rationale": "kon = koff/Kd = 10.0/1.08e+05 nM. The cited paper reports this as a calculated rather than a directly fitted constant; a lower bound, following koff",
-     "source": "Nicholson et al., J Biol Chem 1998;273:763-70",
+     "rationale": "CALCULATED as koff/Kd, not observed. The selectin papers state the association phase was too fast to measure -- equilibrium inside 2-3 s -- so kon there is not a direct observation.",
+     "source": "Nicholson MW, Barclay AN, Singer MS, Rosen SD, van der Merwe PA. J Biol Chem 1998;273(2):763-770, Tables II and III",
      "unit": "1/(nM*s)",
      "value": 0.0001
     },
@@ -821,7 +828,8 @@
      "Regulatory T cell (Treg)": 42.4,
      "T follicular helper (Tfh)": 42.4
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "selectin_bond": "GlyCAM-1, RAT CD62L binding MOUSE GlyCAM-1 -- a cross-species pair, not one organism, 25 C, monomeric (PMID:9422729)"
    }
   },
   {
@@ -833,38 +841,43 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:9780171",
-     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
      "provenance": "derived",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/0.1 1/s",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "rationale": "1/koff = 1/0.1 s-1, so it inherits everything the off-rate does: species human, 25 C, and a monomeric bond.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "s",
      "value": 10.0
     },
-    "kd_nm": {
+    "kd_lfa1_nm": {
      "citation": "PMID:9780171",
-     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
-     "provenance": "measured",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
+     "provenance": "derived",
+     "rationale": "CALCULATED, not measured: the paper says 'Kd was calculated from the ratio kdiss/kass'. Stored MEASURED it asserted an equilibrium experiment that was never run, on the one number a reader quotes.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "nM",
      "value": 500.0
     },
     "koff_per_s": {
      "citation": "PMID:9780171",
-     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
      "provenance": "measured",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "1/s",
      "value": 0.1
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:9780171",
-     "conditions": "LFA-1 (CD11a/CD18) / ICAM-1; surface plasmon resonance; human; soluble monomeric LFA-1 over an ICAM-1 D1D2-IgG chimera; membrane-purified monomeric LFA-1 gave similar kinetics. This is the resting ectodomain: locking the alphaL I domain open raises ICAM-1 affinity 9,000-fold (PMID:11353828), so one scalar cannot describe both conformational states",
-     "provenance": "derived",
-     "rationale": "kon = koff/Kd = 0.1/500 nM; the cited paper reports only Kd and koff",
-     "source": "Tominaga et al., J Immunol 1998;161:4016-22",
+     "conditions": "ICAM-1 (CD54) / LFA-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 500 nM, koff 0.1 s-1. Cellular off-rate from tether lifetimes under flow: not reported; this is the firm-adhesion bond, not a rolling tether, and it has no tether lifetime. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. STATE: Mg2+-INDUCED HIGH-AFFINITY STATE, and that is a choice the authors made: 1 mM Ca2+ cut binding by 20%, so they ran 'in the absence of Ca2+, but in the presence of Mg2+ to induce high affinity state of LFA-1'. LFA-1 on an UNSTIMULATED T cell binds ICAM-1 at about 100 uM -- 200x weaker than this. A resting lymphocyte modelled with 500 nM is wrong by that factor, and this is the only bond in the cascade with two states this far apart. Binding is to D1D2 of ICAM-1 as an IgG chimera; D1D5 has the same potency. Native ICAM-1 is a DIMER, and dimerising soluble ICAM-1 raises affinity for LFA-1 'by two orders of magnitude' -- so the monomeric floor is especially far below the cellular avidity here. Other reported values: 100 nM and 130 nM by receptor-binding assay, 400 nM on phorbol-activated T cells.",
+     "provenance": "measured",
+     "rationale": "OBSERVED: fitted directly to the association phase. It is the Kd here that is calculated, from kdiss/kass -- the reverse of the selectin papers, where the association was too fast to fit.",
+     "source": "Tominaga Y, Kita Y, Satoh A, Asai S, Kato K, Ishikawa K, Horiuchi T, Takashi T. J Immunol 1998;161(8):4016-4022, Table I",
      "unit": "1/(nM*s)",
      "value": 0.0002
     }
+   },
+   "sourced": {
+    "selectin_bond": "LFA-1, human, 25 C, monomeric (PMID:9780171)"
    }
   },
   {
@@ -959,35 +972,37 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:9829984",
-     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "derived",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/1.4 1/s",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "1/koff = 1/1.4 s-1, so it inherits everything the off-rate does: species human, 25 C, and a monomeric bond.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "s",
      "value": 0.714285714286
     },
-    "kd_nm": {
+    "kd_psgl1_nm": {
      "citation": "PMID:9829984",
-     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "measured",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "nM",
      "value": 320.0
     },
     "koff_per_s": {
      "citation": "PMID:9829984",
-     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "measured",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "1/s",
      "value": 1.4
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:9829984",
-     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; Ca2+-dependent, abolished by sialidase; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "derived",
-     "rationale": "kon = koff/Kd = 1.4/320 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "CALCULATED as koff/Kd, not observed. The selectin papers state the association phase was too fast to measure -- equilibrium inside 2-3 s -- so kon there is not a direct observation.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "1/(nM*s)",
      "value": 0.0044
     },
@@ -1054,7 +1069,8 @@
      "Regulatory T cell (Treg)": 0.57,
      "T follicular helper (Tfh)": 0.57
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "selectin_bond": "PSGL-1, human, 25 C, monomeric (PMID:9829984)"
    }
   },
   {
@@ -1066,35 +1082,37 @@
    "parameters": {
     "bond_lifetime_seconds": {
      "citation": "PMID:9829984",
-     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "derived",
-     "rationale": "mean lifetime of a bond breaking as a first-order process is 1/koff = 1/1.4 1/s",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "1/koff = 1/1.4 s-1, so it inherits everything the off-rate does: species human, 25 C, and a monomeric bond.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "s",
      "value": 0.714285714286
     },
-    "kd_nm": {
+    "kd_psgl1_nm": {
      "citation": "PMID:9829984",
-     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "measured",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "nM",
      "value": 320.0
     },
     "koff_per_s": {
      "citation": "PMID:9829984",
-     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "measured",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "Table IV, the human 25 C row. The number was already correct in this library; what it lacked was the species, the temperature, and the name of the ligand it is a constant for.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "1/s",
      "value": 1.4
     },
     "kon_per_nm_per_s": {
      "citation": "PMID:9829984",
-     "conditions": "PSGL-1 (CD162) / P-selectin; surface plasmon resonance; human; soluble monomeric P-selectin over PSGL-1 purified from human neutrophils; PSGL-1 also binds E- and L-selectin, whose constants differ; monomeric selectin ectodomain; the physiological bond is multivalent and force-dependent, so this affinity is not a bond strength under shear",
+     "conditions": "P-selectin (CD62P) / PSGL-1; surface plasmon resonance at 25 C. SPECIES: HUMAN -- both partners. Kd 320 nM, koff 1.4 s-1. Cellular off-rate from tether lifetimes under flow: 0.95 +/- 0.17 s-1 for unstressed neutrophil tethers. MONOMERIC affinity, deliberately: both papers exclude oligomers by gel filtration, high flow and short injections, because an earlier radiolabel study of P-selectin read ~70 nM and its authors ascribe the difference to a trace of dimers binding multivalently. On a cell the bond is multivalent and stronger, so this is a floor on avidity rather than an estimate of it. PSGL-1 purified from human NEUTROPHILS, so its O-glycans are those of a real leukocyte rather than of a transfected line expressing one fucosyltransferase. The nine consensus repeats contribute nothing measurable: Lec-EGF alone reads 422 +/- 89 nM.",
      "provenance": "derived",
-     "rationale": "kon = koff/Kd = 1.4/320 nM. The cited paper reports this as a calculated rather than a directly fitted constant",
-     "source": "Mehta, Cummings & McEver, J Biol Chem 1998;273:32506-13",
+     "rationale": "CALCULATED as koff/Kd, not observed. The selectin papers state the association phase was too fast to measure -- equilibrium inside 2-3 s -- so kon there is not a direct observation.",
+     "source": "Mehta P, Cummings RD, McEver RP. J Biol Chem 1998;273(49):32506-32513, Table I",
      "unit": "1/(nM*s)",
      "value": 0.0044
     },
@@ -1149,7 +1167,8 @@
      "Naive B cell": 16.8,
      "Plasma cell": 16.8
     },
-    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations."
+    "abundance_source": "PaxDb (pax-db.org) v6.1, CC BY 4.0. Abundances from Kim et al., Nature 2014 (doi:10.1038/nature13302), human draft proteome, spectral counting on sorted peripheral blood populations.",
+    "selectin_bond": "PSGL-1, human, 25 C, monomeric (PMID:9829984)"
    }
   },
   {
@@ -14858,6 +14877,42 @@
    "name": "IgM (pentameric)",
    "parameter": "molecular_weight_kda",
    "why": "An IGH* accession translates to ONE heavy-chain constant region. Stored as the antibody's molecular weight it was wrong by 3x to 19x -- IgM (pentameric) read 51.9 kDa against a real ~970. The chain mass is kept as constant_region_mass_kda; the assembled mass is not recorded, because this library has no source for it."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "P-selectin (CD62P)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "E-selectin (CD62E)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "L-selectin (CD62L)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "ICAM-1 (CD54)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "PSGL-1 (CD162)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
+  },
+  {
+   "entity_type": "adhesion_molecule",
+   "name": "LFA-1 (CD11a/CD18)",
+   "parameter": "kd_nm",
+   "why": "Moved to a ligand-named alias (kd_psgl1_nm / kd_esl1_nm / kd_glycam1_nm / kd_lfa1_nm). Each of these molecules binds several partners with constants orders of magnitude apart, so a bare kd_nm does not say which bond it is."
   }
  ]
 }

@@ -17,15 +17,31 @@ browser and, for most, an institutional login.
 | # | PMID | Paper | Where | What it holds up |
 |---|------|-------|-------|------------------|
 | 3 | `25679760` | Confinement and low adhesion induce fast amoeboid migration of slow me<br>*Cell* 2015 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/25679760/) · [doi](https://doi.org/10.1016/j.cell.2015.01.007) | Amoeboid migration speed under confinement, which is how a T cell actually moves through tissue. |
-| 4 | `11404363` | Affinity, kinetics, and thermodynamics of E-selectin binding to E-sele<br>*J Biol Chem* 2001 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/11404363/) · [doi](https://doi.org/10.1074/jbc.m104844200) | E-selectin kinetics: one of the four selectin papers behind the whole adhesion cascade. |
-| 4 | `9422729` | Affinity and kinetic analysis of L-selectin (CD62L) binding to glycosy<br>*J Biol Chem* 1998 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9422729/) · [doi](https://doi.org/10.1074/jbc.273.2.763) | L-selectin kinetics. |
-| 4 | `9780171` | Affinity and kinetic analysis of the molecular interaction of ICAM-1 a<br>*J Immunol* 1998 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9780171/) · [doi](https://doi.org/10.4049/jimmunol.161.8.4016) | PSGL-1 kinetics. |
-| 4 | `9829984` | Affinity and kinetic analysis of P-selectin binding to P-selectin glyc<br>*J Biol Chem* 1998 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9829984/) · [doi](https://doi.org/10.1074/jbc.273.49.32506) | P-selectin kinetics. |
 | 5 | `10381624` | Purification and catalytic properties of human caspase family members<br>*Cell Death Differ* 1999 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/10381624/) · [doi](https://doi.org/10.1038/sj.cdd.4400497) | Values behind: kcat_per_s |
 | 5 | `12451422` | Plasmalemmal concentration and affinity of mouse vascular endothelial <br>*Eur Biophys J* 2002 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/12451422/) · [doi](https://doi.org/10.1007/s00249-002-0248-9) | Values behind: kd_nm |
 | 5 | `15771445` | Binding thermodynamics as a tool to investigate the mechanisms of drug<br>*J Med Chem* 2005 — repository copy exists | [PubMed](https://pubmed.ncbi.nlm.nih.gov/15771445/) · [doi](https://doi.org/10.1021/jm040842z) | Values behind: kd_nm |
 | 5 | `16490769` | Screening for caspase-3 inhibitors: a new class of potent small-molecu<br>*J Biomol Screen* 2006 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/16490769/) · [doi](https://doi.org/10.1177/1087057105285048) | Values behind: km_um |
 | 5 | `20178337` | In vitro modulation of cytochrome P450 reductase supported indoleamine<br>*Biochemistry* 2010 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/20178337/) · [doi](https://doi.org/10.1021/bi100022c) | Values behind: kcat_per_s, km_um |
+
+## Obtained — 2026-10-21 (all four adhesion papers)
+
+`9829984` · `11404363` · `9780171` · `9422729` — the whole adhesion
+cascade, read and applied (`seed_adhesion_bonds.py`).
+
+**Every stored number was already correct.** All four had been sourced
+against the right PMID by an agent that had not read the papers, and
+each value survived. What did not survive was the context:
+
+| | |
+|---|---|
+| **Species** | L-selectin's conditions said "human CD62L". The secondary table said "Mouse". The primary says **rat CD62L binding mouse GlyCAM-1** — a cross-species pair the authors flag themselves. E-selectin/ESL-1 is mouse throughout; both carry human UniProt accessions. |
+| **Temperature** | None recorded, while E-selectin's koff runs 1.1 → 4.6 s⁻¹ from 5 to 37 °C. The library silently mixed 25 °C and 37 °C constants across one cascade. |
+| **Which bond** | Every value sat under a bare `kd_nm`. P-selectin binds PSGL-1 200× more tightly than E-selectin binds ESL-1, and E-selectin binds PSGL-1 too. Now under ligand-named aliases. |
+| **Which state** | LFA-1's 500 nM is the **Mg²⁺-induced high-affinity state**, measured deliberately without Ca²⁺. Resting LFA-1 on an unstimulated T cell is ~100 µM — **200× weaker**. |
+| **Observed vs calculated** | The two paper families are mirror images. Selectins: association too fast to fit, so kon = koff/Kd. ICAM-1/LFA-1: kass fitted, and "Kd was calculated from the ratio kdiss/kass". The library had both graded the same way. |
+
+**9 papers read, 7 changed something.**
+
 
 ## Obtained — 2026-10-21
 
