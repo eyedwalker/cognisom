@@ -176,6 +176,24 @@ class EntityStore:
                     log.warning("Cytotoxic effector seed failed "
                                 "(non-fatal): %s", e)
 
+                # The molecules the marker lists name. The library
+                # described its cells by molecules it did not hold: of
+                # 151 names in the marker and secretion lists, 16
+                # resolved. Every accession here was re-resolved against
+                # UniProt by a separate pass that checked gene symbol,
+                # recommended name and sequence length -- 86 of 86. Must
+                # run before the synonym pass below, which is what makes
+                # "CCL19" in a marker list reach the entity.
+                try:
+                    from .seed_marker_molecules import seed as seed_markers
+                    added, notes = seed_markers(self)
+                    log.info("Marker molecules: %d added", added)
+                    for note in notes:
+                        log.debug("  %s", note)
+                except Exception as e:
+                    log.warning("Marker molecule seed failed "
+                                "(non-fatal): %s", e)
+
                 # Enrich with visualization/physics defaults
                 try:
                     from .enrichment import EntityEnricher

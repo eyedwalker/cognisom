@@ -1,0 +1,1899 @@
+[
+ {
+  "referenced_as": "CD66b",
+  "entity_name": "Granulocyte activation antigen (CD66b/CEACAM8)",
+  "gene": "CEACAM8",
+  "accession": "P31997",
+  "uniprot_name": "Cell adhesion molecule CEACAM8",
+  "length": 349,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD66b",
+   "CEACAM8",
+   "CGM6",
+   "NCA-95",
+   "CD67 antigen",
+   "carcinoembryonic antigen-related cell adhesion molecule 8"
+  ],
+  "description": "GPI-anchored CEA-family glycoprotein restricted to granulocytes, stored in secondary granules and mobilised to the plasma membrane within minutes of activation. It is the standard flow marker both for identifying a neutrophil and for telling whether that neutrophil has degranulated, which is the distinction this platform needs to separate a tumour-associated neutrophil from a bystander. Surface density, not mere presence, carries the signal -- and because the protein is GPI-anchored even in the granule, the surface is where it belongs when drawn.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD34",
+  "entity_name": "Hematopoietic progenitor antigen (CD34)",
+  "gene": "CD34",
+  "accession": "P28906",
+  "uniprot_name": "Hematopoietic progenitor cell antigen CD34",
+  "length": 385,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD34",
+   "hematopoietic progenitor cell antigen CD34"
+  ],
+  "description": "Sialomucin on haematopoietic stem and progenitor cells and on vascular endothelium, where it serves as an L-selectin ligand. The library's L-selectin (CD62L) entity already lists CD34 among its ligands and that reference resolved to nothing, so the rolling step named a counter-receptor the library did not hold. In a tumour twin it is also how microvessel density is counted and how the stem-like compartment is identified.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD44",
+  "entity_name": "Hyaluronan receptor (CD44)",
+  "gene": "CD44",
+  "accession": "P16070",
+  "uniprot_name": "CD44 antigen",
+  "length": 742,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD44",
+   "CDw44",
+   "Epican",
+   "Hermes antigen",
+   "HUTCH-I",
+   "PGP-1",
+   "phagocytic glycoprotein 1",
+   "hyaluronate receptor",
+   "ECMR-III",
+   "extracellular matrix receptor III",
+   "GP90 lymphocyte homing/adhesion receptor"
+  ],
+  "description": "The principal hyaluronan receptor, and a leukocyte homing and rolling receptor that also serves as an E-selectin ligand. Three things already in this library converge on it: Hyaluronan is an entity that names CD44 as its receptor, the adhesion cascade lists CD44 among the selectin ligands, and the prostate cancer-stem-cell record is defined CD44+/ALDH+/CD133+ -- all three pointing at a molecule that did not exist. UniProt localises it to the microvillus as well as the plasma membrane, which bears on the geometry pass that just put measured microvilli on these cells; note the canonical 742-residue sequence is the full variant-exon form, whereas leukocytes mostly carry the shorter CD44s isoform.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD11c",
+  "entity_name": "Integrin alpha-X (CD11c/ITGAX)",
+  "gene": "ITGAX",
+  "accession": "P20702",
+  "uniprot_name": "Integrin alpha-X",
+  "length": 1163,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD11c",
+   "ITGAX",
+   "integrin alpha-X",
+   "p150,95",
+   "CR4",
+   "Leu M5",
+   "leukocyte adhesion glycoprotein p150,95 alpha chain",
+   "CD11 antigen-like family member C"
+  ],
+  "description": "Alpha chain of the alphaX/beta2 integrin (CR4, p150,95), which pairs with CD18 to bind iC3b, ICAM-1 and fibrinogen. It is the defining surface marker of conventional dendritic cells and is high on tumour-associated macrophages and monocytic MDSCs, so it is the string that tells this platform a myeloid cell is a DC rather than a lymphocyte. The library already holds LFA-1 (CD11a/CD18) and MAC-1 (CD11b/CD18); this is the third beta2 alpha chain and the one its DC entities actually name.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD56",
+  "entity_name": "NCAM-1 (CD56)",
+  "gene": "NCAM1",
+  "accession": "P13591",
+  "uniprot_name": "Neural cell adhesion molecule 1",
+  "length": 858,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD56",
+   "NCAM1",
+   "NCAM-1",
+   "N-CAM-1",
+   "NCAM",
+   "neural cell adhesion molecule 1"
+  ],
+  "description": "Immunoglobulin-superfamily homophilic adhesion molecule, first characterised in neural tissue, which on lymphocytes is the defining NK-cell marker. Its expression level is the standard NK subsetting axis -- CD56-bright cells are the cytokine producers, CD56-dim cells carry the cytotoxic machinery -- which is exactly the distinction the renderer cannot presently draw, since every NK and ILC entity collapses to the same smooth sphere. It is a prerequisite for the platform's innate arm, which the capability audit still lists as open.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD138",
+  "entity_name": "Syndecan-1 (CD138)",
+  "gene": "SDC1",
+  "accession": "P18827",
+  "uniprot_name": "Syndecan-1",
+  "length": 310,
+  "entity_type": "adhesion_molecule",
+  "synonyms": [
+   "CD138",
+   "SDC1",
+   "SYND1",
+   "syndecan-1"
+  ],
+  "description": "Transmembrane heparan sulfate proteoglycan whose GAG chains bind ECM components and sequester heparin-binding growth factors, so it acts both as an adhesion receptor and as a growth-factor co-receptor. It is the library's plasma-cell marker, recorded beside CD38, BLIMP-1 and XBP1, and the standard identifying antigen of multiple myeloma. Its ectodomain is constitutively shed and the soluble form is a myeloma prognostic marker; the compartment is membrane because that is where the molecule resides on the cell being drawn, shedding being a downstream event rather than a second location.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCL19",
+  "entity_name": "CCL19 (MIP-3beta)",
+  "gene": "CCL19",
+  "accession": "Q99731",
+  "uniprot_name": "C-C motif chemokine 19",
+  "entity_type": "cytokine",
+  "length": 98,
+  "synonyms": [
+   "CCL19",
+   "ELC",
+   "MIP3B",
+   "SCYA19",
+   "MIP-3-beta",
+   "EBI1 ligand chemokine",
+   "CK beta-11",
+   "Beta-chemokine exodus-3",
+   "Macrophage inflammatory protein 3 beta"
+  ],
+  "description": "98-residue CC chemokine secreted by fibroblastic reticular cells and mature dendritic cells in the T-cell zone of the lymph node, and one of the two agonists of CCR7. Unlike its partner CCL21 it has no basic glycosaminoglycan-binding tail, so it acts as a freely soluble gradient and drives stronger CCR7 internalisation and desensitisation. The library's HEV entity already lists CCL19 among its secreted mediators and models.py's own comment calls it a CCR7 ligand \"that arrests lymphocytes\", yet neither the ligand nor the receptor existed as an entity -- so the lymph-node homing mechanism the HEV row exists to describe was two unresolvable strings. Being genuinely diffusible, it is also the half of the CCR7 pair a tissue-scale diffusion field can actually transport.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "CCL21",
+  "entity_name": "CCL21 (SLC)",
+  "gene": "CCL21",
+  "accession": "O00585",
+  "uniprot_name": "C-C motif chemokine 21",
+  "entity_type": "cytokine",
+  "length": 134,
+  "synonyms": [
+   "CCL21",
+   "SCYA21",
+   "SLC",
+   "6Ckine",
+   "Secondary lymphoid-tissue chemokine",
+   "Beta-chemokine exodus-2",
+   "Small-inducible cytokine A21"
+  ],
+  "description": "At 134 residues the longest human CC chemokine: a basic C-terminal extension beyond the usual chemokine fold binds heparan sulfate, which immobilises CCL21 on the luminal surface of high endothelial venules and along fibroblastic reticular conduits instead of letting it wash away in flow. Bound there it signals CCR7 on rolling lymphocytes and triggers LFA-1 activation -- the chemokine step of the multistep homing cascade the library already models through its HEV and diapedesis rows. Note for rendering: the HEV entity carries CCL21 in both its secreted list and its surface-marker list, and because it is absent from the renderer's COMPARTMENT table it currently falls through to \"unknown\" and is drawn as a transmembrane stud, though it has zero transmembrane helices. Its surface presentation is real but it is a GAG-tethered soluble protein sitting in the glycocalyx, not an integral membrane receptor.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "CXCL1",
+  "entity_name": "CXCL1 (GRO-alpha)",
+  "gene": "CXCL1",
+  "accession": "P09341",
+  "uniprot_name": "Growth-regulated alpha protein",
+  "entity_type": "cytokine",
+  "length": 107,
+  "synonyms": [
+   "CXCL1",
+   "GRO",
+   "GRO1",
+   "GROA",
+   "GRO-alpha",
+   "MGSA",
+   "SCYB1",
+   "NAP-3",
+   "C-X-C motif chemokine 1",
+   "Melanoma growth stimulatory activity",
+   "Neutrophil-activating protein 3"
+  ],
+  "description": "ELR-motif CXC chemokine secreted by activated endothelium, epithelium and tumour cells, signalling mainly through CXCR2 and weakly through CXCR1; the N-terminally truncated forms GRO-alpha(4-73)/(5-73)/(6-73) that UniProt lists as cleavage products are substantially more potent than the full-length protein. Its job is neutrophil recruitment, and in tumours the same axis recruits granulocytic MDSCs, which is the arm of myeloid suppression the twin's immune module currently has no molecular handle on. The library's inflamed-endothelial entity secretes CXCL1 and several macrophage and stromal descriptions name \"CXCL1/CXCL8\" as the neutrophil-recruiting pair, but only CXCL8 was ever an entity. Worth noting that its receptor CXCR2 is still absent too, so adding CXCL1 alone leaves the axis half-built.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "IL13",
+  "entity_name": "IL-13",
+  "gene": "IL13",
+  "accession": "P35225",
+  "uniprot_name": "Interleukin-13",
+  "entity_type": "cytokine",
+  "length": 146,
+  "synonyms": [
+   "Interleukin-13"
+  ],
+  "description": "Secreted 146-residue type-2 effector cytokine (signal peptide 1-24) that signals through the type II receptor IL4RA/IL13RA1 to STAT6 and is also captured by the high-affinity decoy receptor IL13RA2. In tumors it is a principal driver of alternative (M2) macrophage polarization, fibroblast collagen deposition and MDSC induction, while IL13RA2 is overexpressed in glioblastoma and is itself a CAR-T target. Five separate cell entities in this library (Th2, mast cell, basophil, eosinophil, ILC2) name IL13 as output and all five dangle; it shares IL4RA with the IL-4 entity already present, so adding it completes the dupilumab-blockable pair rather than duplicating either half.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "IL17F",
+  "entity_name": "IL-17F",
+  "gene": "IL17F",
+  "accession": "Q96PD4",
+  "uniprot_name": "Interleukin-17F",
+  "entity_type": "cytokine",
+  "length": 163,
+  "synonyms": [
+   "Interleukin-17F",
+   "Cytokine ML-1"
+  ],
+  "description": "Secreted 163-residue IL-17 family cytokine (signal peptide 1-30) that acts both as a homodimer and as an IL-17A/IL-17F heterodimer, signalling through IL17RA/IL17RC to induce CXCL1, CXCL8 and G-CSF from stroma and epithelium. It is the weaker partner of IL-17A at the same receptor, so it broadens that axis rather than duplicating it. The library already has IL-17A, which leaves Th17 effector output half-modelled; IL-17-driven neutrophil recruitment is a documented pro-tumorigenic axis and also a mechanism of checkpoint-inhibitor colitis, both of which a treatment simulator should be able to represent.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "IL22",
+  "entity_name": "IL-22",
+  "gene": "IL22",
+  "accession": "Q9GZX6",
+  "uniprot_name": "Interleukin-22",
+  "entity_type": "cytokine",
+  "length": 179,
+  "synonyms": [
+   "Interleukin-22",
+   "IL-TIF",
+   "Cytokine Zcyto18",
+   "IL-10-related T-cell-derived-inducible factor"
+  ],
+  "description": "Secreted 179-residue IL-10 family cytokine (signal peptide 1-33), unusual in that its receptor IL22RA1/IL10RB is restricted to non-haematopoietic cells, so it signals from leukocytes onto epithelium via STAT3 and is restrained by the soluble decoy IL22RA2. Its physiological role is tissue protection and regeneration, which in cancer inverts into a pro-tumorigenic signal: STAT3-driven epithelial proliferation, anti-apoptosis and stemness in colorectal and lung tumors. It is the only cytokine in the Th17 and ILC3 secretion lists whose target is the tumor cell itself rather than another leukocyte, so without it the twin has no modelled route from an innate lymphoid population to epithelial proliferation.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "IL5",
+  "entity_name": "IL-5",
+  "gene": "IL5",
+  "accession": "P05113",
+  "uniprot_name": "Interleukin-5",
+  "entity_type": "cytokine",
+  "length": 134,
+  "synonyms": [
+   "Interleukin-5",
+   "Eosinophil differentiation factor",
+   "B-cell differentiation factor I",
+   "T-cell replacing factor",
+   "TRF"
+  ],
+  "description": "Secreted 134-residue type-2 cytokine (signal peptide 1-19) that circulates as a disulfide-linked homodimer and signals through IL5RA paired with the common beta chain CSF2RB to JAK2/STAT5. It is the lineage factor for eosinophils -- driving differentiation in marrow, release into blood, and survival and priming in tissue -- and does very little else, which makes it an unusually clean one-to-one axis to simulate. The Th2, ILC2 and eosinophil entities here all name IL5 as secreted output with no molecule behind it, so the twin currently has no path from a type-2 skew to an eosinophil compartment: an axis that is prognostically real if ambiguous in solid tumors, and the target of mepolizumab and benralizumab.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "CD1c",
+  "entity_name": "CD1c (BDCA-1)",
+  "gene": "CD1C",
+  "accession": "P29017",
+  "uniprot_name": "T-cell surface glycoprotein CD1c",
+  "length": 333,
+  "entity_type": "mhc",
+  "synonyms": [
+   "CD1c",
+   "CD1C",
+   "BDCA-1",
+   "BDCA1",
+   "T-cell surface glycoprotein CD1c"
+  ],
+  "description": "MHC class I-like, beta-2-microglobulin-associated molecule that presents LIPID rather than peptide antigen to T cells, cycling through endosomes to load its cargo. It is typed here as an MHC molecule for exactly that reason: this library's entire antigen-presentation path is peptide-MHC, and CD1c is the branch that is not, which matters for a platform whose neoantigen pipeline only ever considers peptides. B2M, already an entity here, is its obligate partner, and CD1c is also the defining marker of the cDC2 dendritic-cell subset.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "HLA-DR",
+  "entity_name": "HLA-DR alpha chain (HLA-DRA)",
+  "gene": "HLA-DRA",
+  "accession": "P01903",
+  "uniprot_name": "HLA class II histocompatibility antigen, DR alpha chain",
+  "length": 254,
+  "entity_type": "mhc",
+  "synonyms": [
+   "HLA-DRA",
+   "HLA-DRA1",
+   "DR alpha",
+   "MHC class II antigen DRA",
+   "HLA class II histocompatibility antigen DR alpha chain"
+  ],
+  "description": "The invariant alpha chain of the HLA-DR class II heterodimer; the library's \"HLA-DR\" marker on its M1 macrophage and dendritic cell entities means the assembled dimer, whose polymorphic side already exists in the library as MHC entities such as HLA-DRB1*04:01. JUDGMENT CALL: HLA-DRA is non-polymorphic and obligate -- no DRA, no DR on the surface -- and the library already curates exactly this kind of invariant chain as its own entity for class I (\"B2M (beta-2 microglobulin)\"), so this completes the pair rather than inventing a complex. For a twin it decides whether a cell can present to CD4+ T cells at all, and HLA-DR loss on tumour cells and on monocytes is a measured immune-evasion and immunoparalysis phenotype, not a theoretical one.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD38",
+  "entity_name": "ADP-ribosyl cyclase (CD38)",
+  "gene": "CD38",
+  "accession": "P28907",
+  "uniprot_name": "ADP-ribosyl cyclase/cyclic ADP-ribose hydrolase 1",
+  "length": 300,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD38",
+   "T10",
+   "ADP-ribosyl cyclase 1",
+   "ADPRC 1",
+   "cyclic ADP-ribose hydrolase 1",
+   "cADPR hydrolase 1"
+  ],
+  "description": "A type II transmembrane ectoenzyme rather than a bare marker: its catalytic site faces outward, hydrolysing extracellular NAD+ to ADP-ribose and cyclising a fraction to cyclic ADP-ribose, a calcium-mobilising second messenger. That NAD+ consumption is itself immunosuppressive in a tumour microenvironment, blunting T- and NK-cell function, which makes CD38 a mechanistic lever and not a label. Clinically it is the daratumumab and isatuximab target and, with CD138, the library's plasma-cell and myeloma pair; its real parameters are kcat and Km, which this repo's BRENDA sourcing path can reach.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "ACTA2+ / alpha-SMA+",
+  "entity_name": "Alpha-smooth muscle actin (ACTA2)",
+  "gene": "ACTA2",
+  "accession": "P62736",
+  "uniprot_name": "Actin, aortic smooth muscle",
+  "length": 377,
+  "entity_type": "protein",
+  "synonyms": [
+   "ACTA2",
+   "alpha-SMA",
+   "aSMA",
+   "alpha-actin-2",
+   "Alpha-actin-2",
+   "ACTSA",
+   "smooth muscle alpha-actin",
+   "Actin, aortic smooth muscle"
+  ],
+  "description": "The actin isoform that polymerises into the contractile stress fibres of myofibroblasts and vascular smooth muscle, generating the traction that stiffens stroma. The library names it twice under two different strings that both resolve to nothing: ACTA2+ on the stromal fibroblast and alpha-SMA+ on the cancer-associated fibroblast, where alpha-SMA positivity IS the operational definition of the activated CAF that remodels matrix and excludes T cells. Worth noting for the synonym table: UniProt carries no \"alpha-smooth muscle actin\" name string at all (only \"Alpha-actin-2\"), so the CAF reference stays broken unless the alias is stored explicitly. Cytoplasmic cytoskeleton, not a surface marker.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "arginase-1",
+  "entity_name": "Arginase-1 (ARG1)",
+  "gene": "ARG1",
+  "accession": "P05089",
+  "uniprot_name": "Arginase-1",
+  "length": 322,
+  "entity_type": "protein",
+  "synonyms": [
+   "ARG1",
+   "arginase-1",
+   "arginase 1",
+   "liver-type arginase",
+   "type I arginase"
+  ],
+  "description": "Cytosolic manganese metalloenzyme that hydrolyses L-arginine to ornithine and urea; the library lists \"arginase-1\" on its M2 macrophage entity, and the M1/M2 descriptions already turn on it because arginase and iNOS compete for the same substrate. COMPARTMENT CORRECTION: it sits in the surface_markers field but it is a soluble cytosolic enzyme (human neutrophils additionally hold a granule pool, which UniProt also annotates), so drawing it as a membrane stud would be the perforin error repeated on a macrophage. For this platform it is the central myeloid suppression mechanism -- arginine depletion by ARG1+ macrophages and MDSCs downregulates the T-cell CD3-zeta chain and arrests T cells in G0/G1, and arginase inhibitors are in trials on exactly that rationale.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CD20",
+  "entity_name": "B-lymphocyte antigen CD20 (MS4A1)",
+  "gene": "MS4A1",
+  "accession": "P11836",
+  "uniprot_name": "B-lymphocyte antigen CD20",
+  "length": 297,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD20",
+   "MS4A1",
+   "B1",
+   "Bp35",
+   "Leu-16",
+   "B-lymphocyte surface antigen B1",
+   "membrane-spanning 4-domains subfamily A member 1"
+  ],
+  "description": "Four-pass membrane protein of the MS4A family with no identified ligand; it associates with the BCR and modulates store-operated calcium entry. Its ectodomain is tiny -- two short extracellular loops -- which is the structural reason CD20 is an excellent naked-antibody target (rituximab, obinutuzumab) and a poor CAR target, a distinction a therapy-simulating twin ought to be able to make. Typed as a protein rather than a receptor deliberately, so that this repo's enrichment pass does not fabricate a ligand Kd for a molecule with no known ligand.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD40L",
+  "entity_name": "CD40 ligand (CD40L/CD154)",
+  "gene": "CD40LG",
+  "accession": "P29965",
+  "uniprot_name": "CD40 ligand",
+  "length": 261,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD40L",
+   "CD154",
+   "CD40LG",
+   "CD40-L",
+   "sCD40L",
+   "TNFSF5",
+   "TRAP",
+   "T-cell antigen Gp39",
+   "TNF-related activation protein"
+  ],
+  "description": "TNF-superfamily ligand on activated CD4 T cells and platelets that engages CD40 on dendritic cells, macrophages and B cells. This is the licensing signal: without CD40L-CD40 a dendritic cell does not upregulate CD80/CD86 or make IL-12, so the CD4 help that this library's Th1 entity describes in prose currently has no molecular carrier. It is the counterpart to the FasL and TRAIL entities already here -- same superfamily and same membrane-plus-shed-soluble behaviour, but activating myeloid cells instead of killing targets.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD45RA",
+  "entity_name": "CD45RA (PTPRC)",
+  "gene": "PTPRC",
+  "accession": "P08575-8",
+  "uniprot_name": "Receptor-type tyrosine-protein phosphatase C",
+  "length": 1211,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD45RA",
+   "PTPRC isoform 6",
+   "P08575-8"
+  ],
+  "description": "The high-molecular-weight CD45 isoform -- UniProt isoform 6, P08575-8, 1211 residues -- which retains alternatively spliced exon A and so carries the long, heavily O-glycosylated ectodomain; the accession and length fields hold the parent PTPRC entry's canonical values because tests/test_library_proteins.py accepts only six-character accessions, so the isoform identity is recorded here instead. CD45 is a receptor-type protein tyrosine phosphatase and one of the most abundant proteins on a leukocyte surface, setting the TCR signalling threshold by dephosphorylating the inhibitory tyrosine of LCK. The library uses CD45RA as its naive marker, present on the naive CD8 T cell and absent from the effector, making it one of the two strings the renderer needs in order to tell a naive cell from a memory one.",
+  "isoform_note": "UniProt P08575-8 = isoform 6 / CD45RA. The curation pass recorded P08575 with length 1306 for BOTH this and its sibling; 1306 is isoform 1 / CD45RABC, the displayed canonical, and neither of them. CD45RA and CD45RO are the two isoforms whose difference IS the marker.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD45RO",
+  "entity_name": "CD45RO (PTPRC)",
+  "gene": "PTPRC",
+  "accession": "P08575-4",
+  "uniprot_name": "Receptor-type tyrosine-protein phosphatase C",
+  "length": 1145,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD45RO",
+   "CD45R0",
+   "PTPRC isoform 2",
+   "P08575-4"
+  ],
+  "description": "The shortest CD45 isoform -- UniProt isoform 2, P08575-4, 1145 residues -- with all three alternatively spliced exons (A, B and C) removed, giving the smallest ectodomain of the eight isoforms; accession and length are the parent PTPRC entry's canonical values, as for CD45RA. It is the same phosphatase as CD45RA differing only by splicing, and the short ectodomain is thought to let apposed membranes sit closer and lower the activation threshold, which is the mechanistic account of why a memory cell responds faster than a naive one. The library carries it on the CD8 effector and both memory T-cell records; note UniProt lists the synonym both as CD45RO and as CD45R0 with a digit zero, a spelling trap worth holding in the synonym set given this repo's measured name-hygiene problem.",
+  "isoform_note": "UniProt P08575-4 = isoform 2 / CD45RO. The curation pass recorded P08575 with length 1306 for BOTH this and its sibling; 1306 is isoform 1 / CD45RABC, the displayed canonical, and neither of them. CD45RA and CD45RO are the two isoforms whose difference IS the marker.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CHGA+",
+  "entity_name": "Chromogranin A (CHGA)",
+  "gene": "CHGA",
+  "accession": "P10645",
+  "uniprot_name": "Chromogranin-A",
+  "length": 457,
+  "entity_type": "protein",
+  "synonyms": [
+   "CHGA",
+   "CgA",
+   "chromogranin A",
+   "chromogranin-A",
+   "pituitary secretory protein I",
+   "SP-I",
+   "vasostatin",
+   "pancreastatin",
+   "catestatin"
+  ],
+  "description": "The acidic matrix protein that builds the dense-core secretory granule itself: it aggregates with calcium at low intragranular pH, condenses the granule against the SCG3-cholesterol raft, and is proteolysed into active peptides (vasostatin, pancreastatin, catestatin, serpinin). THIS IS GRANULE CARGO, exactly like perforin, and it currently sits in a field named surface_markers on the neuroendocrine cell record - the same setup that drew perforin as studs on the outside of a cytotoxic T cell, on the one cell type whose identity is dense-core granules. Serum CgA is the clinical marker of neuroendocrine prostate cancer, the AR-independent state this platform treats as the endpoint of ADT resistance.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "chymase",
+  "entity_name": "Chymase (CMA1)",
+  "gene": "CMA1",
+  "accession": "P23946",
+  "uniprot_name": "Chymase",
+  "length": 247,
+  "entity_type": "protein",
+  "synonyms": [
+   "CMA1",
+   "chymase",
+   "alpha-chymase",
+   "mast cell protease I",
+   "CYH",
+   "MCT1"
+  ],
+  "description": "Chymotryptic serine protease of the mast cell secretory granule, co-stored with tryptase on heparin and co-released on degranulation; the library lists \"chymase\" on its mast cell entity and UniProt annotates P23946 to the cytoplasmic granule. It generates angiotensin II independently of ACE, activates IL-1beta and TGF-beta and degrades extracellular matrix, putting it on both the fibrosis and the cytokine-processing sides of the microenvironment. Its presence or absence defines the classical MC-TC versus MC-T mast cell subsets -- the one axis along which this library's single mast cell entity is currently undifferentiated.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "COL1A1+",
+  "entity_name": "Collagen alpha-1(I) chain (COL1A1)",
+  "gene": "COL1A1",
+  "accession": "P02452",
+  "uniprot_name": "Collagen alpha-1(I) chain",
+  "length": 1464,
+  "entity_type": "protein",
+  "synonyms": [
+   "COL1A1",
+   "alpha-1 type I collagen",
+   "Alpha-1 type I collagen",
+   "collagen I alpha 1",
+   "pro-alpha-1(I) chain",
+   "collagen type I alpha 1 chain"
+  ],
+  "description": "Two alpha-1(I) chains plus one alpha-2(I) chain form the type I collagen triple helix, secreted as procollagen, trimmed by propeptidases and lysyl-oxidase cross-linked into the fibrils that are the bulk of tumour stroma. NEAR-DUPLICATE TO RECONCILE, NOT MERGE: the library already holds a \"Collagen I\" entity, but it is the assembled fibril with an empty uniprot_id and an empty gene_symbol, so the COL1A1+ marker on the stromal fibroblast record still resolves to nothing - this entity is the gene product and should be linked to that one as its chain. Desmoplastic COL1A1 deposition is what sets the drug-diffusion barrier and the aligned fibre tracks that gate T-cell infiltration, both of which the tissue module is meant to simulate.",
+  "compartments": [
+   "secreted"
+  ]
+ },
+ {
+  "referenced_as": "CK14+",
+  "entity_name": "Cytokeratin 14 (KRT14)",
+  "gene": "KRT14",
+  "accession": "P02533",
+  "uniprot_name": "Keratin, type I cytoskeletal 14",
+  "length": 472,
+  "entity_type": "protein",
+  "synonyms": [
+   "KRT14",
+   "CK14",
+   "CK-14",
+   "cytokeratin-14",
+   "Cytokeratin-14",
+   "keratin 14",
+   "Keratin-14",
+   "K14"
+  ],
+  "description": "Type I (acidic) keratin and the obligate heterodimer partner of keratin 5 - neither assembles alone, so K5/K14 is one filament rather than two independent markers, and that is better encoded as a relationship between the two entities than left implicit. CK14+ marks the basal/progenitor compartment on this library's basal epithelial cell record: the compartment that survives androgen deprivation and can act as the cell of origin for basal-type tumours, which is precisely the reservoir an ADT-resistance simulation has to represent. Cytoplasmic.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CK18+",
+  "entity_name": "Cytokeratin 18 (KRT18)",
+  "gene": "KRT18",
+  "accession": "P05783",
+  "uniprot_name": "Keratin, type I cytoskeletal 18",
+  "length": 430,
+  "entity_type": "protein",
+  "synonyms": [
+   "KRT18",
+   "CK18",
+   "CK-18",
+   "cytokeratin-18",
+   "Cytokeratin-18",
+   "keratin 18",
+   "Keratin-18",
+   "K18",
+   "cell proliferation-inducing gene 46 protein"
+  ],
+  "description": "Type I keratin and obligate partner of keratin 8, protecting simple epithelium from mechanical and apoptotic stress. Its caspase-3 cleavage site is a direct hook into the cascade this library already holds: caspase-3 is an entity, its keratin substrate is not, and the cleaved neo-epitope is what the M30 assay measures as a circulating pharmacodynamic readout of tumour cell death - so CK18 closes a chain the way the granzymes did, and gives the apoptosis module an observable the clinic actually reports. CK18+ defines the luminal epithelial record. Cytoplasmic.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CK5+",
+  "entity_name": "Cytokeratin 5 (KRT5)",
+  "gene": "KRT5",
+  "accession": "P13647",
+  "uniprot_name": "Keratin, type II cytoskeletal 5",
+  "length": 590,
+  "entity_type": "protein",
+  "synonyms": [
+   "KRT5",
+   "CK5",
+   "CK-5",
+   "cytokeratin-5",
+   "Cytokeratin-5",
+   "keratin 5",
+   "Keratin-5",
+   "K5",
+   "58 kDa cytokeratin",
+   "type-II keratin Kb5"
+  ],
+  "description": "Type II (basic) keratin that pairs obligately with the type I keratin 14 to build the intermediate filament network of basal epithelium, mechanically anchoring basal cells to the basement membrane; mutations in the pair cause epidermolysis bullosa simplex. CK5+ is one of the three markers defining this library's prostate basal/progenitor cell, and loss of the CK5+/p63+ basal layer is the histological line between HGPIN and invasive adenocarcinoma - the most diagnostic transition the epithelial module could represent. \"CK5\" is not a gene symbol (gene_exact:\"CK5\" returns nothing); it resolves only through UniProt's own CK-5 alias. Cytoplasmic filament.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CK8+",
+  "entity_name": "Cytokeratin 8 (KRT8)",
+  "gene": "KRT8",
+  "accession": "P05787",
+  "uniprot_name": "Keratin, type II cytoskeletal 8",
+  "length": 483,
+  "entity_type": "protein",
+  "synonyms": [
+   "KRT8",
+   "CK8",
+   "CK-8",
+   "cytokeratin-8",
+   "Cytokeratin-8",
+   "keratin 8",
+   "Keratin-8",
+   "K8",
+   "type-II keratin Kb8"
+  ],
+  "description": "Type II keratin of simple and glandular epithelia and the obligate partner of keratin 18; the K8/K18 filament carries mechanical and TNF-induced apoptotic stress in secretory cells. CK8+ together with CK18+ defines the luminal secretory cell that this library models as the AR+/PSA+ cell of origin for most prostate adenocarcinoma, so the luminal-versus-basal distinction the twin draws rests entirely on two keratin pairs the library does not hold. Cytoplasmic, and the one caution is that a marker list called surface_markers will render it as a surface stud unless the compartment is read.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CD203c",
+  "entity_name": "Ectonucleotide pyrophosphatase 3 (CD203c/ENPP3)",
+  "gene": "ENPP3",
+  "accession": "O14638",
+  "uniprot_name": "Ectonucleotide pyrophosphatase/phosphodiesterase family member 3",
+  "length": 875,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD203c",
+   "ENPP3",
+   "NPP3",
+   "E-NPP 3",
+   "PD-Ibeta",
+   "phosphodiesterase I beta",
+   "B10"
+  ],
+  "description": "Type II transmembrane ectoenzyme that hydrolyses extracellular nucleotides, held largely in intracellular granule membranes on a resting basophil and translocated to the surface on IgE cross-linking. That upregulation is the readout of the clinical basophil activation test, which makes CD203c a state change rather than a lineage label -- the only such marker in this batch. It also sits in the extracellular purine pathway alongside CD39 and CD73, and this library already holds CD73 (NT5E) as the adenosine-producing immunosuppressive step.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "MBP",
+  "entity_name": "Eosinophil major basic protein (PRG2)",
+  "gene": "PRG2",
+  "accession": "P13727",
+  "uniprot_name": "Bone marrow proteoglycan",
+  "length": 222,
+  "entity_type": "protein",
+  "synonyms": [
+   "PRG2",
+   "EMBP",
+   "eosinophil granule major basic protein",
+   "eosinophil major basic protein",
+   "bone marrow proteoglycan",
+   "BMPG",
+   "proteoglycan 2"
+  ],
+  "description": "The crystalloid core of the eosinophil specific granule, which the library lists as \"MBP\" on its eosinophil entity in both the marker list and the secreted list. A cationic, catalytically dead member of the ribonuclease family that is toxic to helminth tegument and, in asthma, to respiratory epithelium. TRAP: the gene is PRG2 and UniProt's recommended name is \"Bone marrow proteoglycan\" -- MBP is only the name of the cleaved mature chain. gene_exact:\"MBP\" returns P02686, myelin basic protein, 304 aa, a different molecule and a well-known autoimmune antigen, so the bare string \"MBP\" must not become a synonym; fix the eosinophil marker list to PRG2 or EMBP instead.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "EPO",
+  "entity_name": "Eosinophil peroxidase (EPX)",
+  "gene": "EPX",
+  "accession": "P11678",
+  "uniprot_name": "Eosinophil peroxidase",
+  "length": 715,
+  "entity_type": "protein",
+  "synonyms": [
+   "EPX",
+   "eosinophil peroxidase",
+   "EPO-H",
+   "EPO-L",
+   "eosinophil peroxidase heavy chain",
+   "eosinophil peroxidase light chain"
+  ],
+  "description": "The peroxidase of the eosinophil specific granule matrix, listed by the library as \"EPO\" on its eosinophil entity; UniProt annotates P11678 to the cytoplasmic granule. It prefers bromide over chloride, generating hypobromous acid rather than the HOCl of neutrophil MPO, so the two cells leave distinguishable oxidative signatures. TRAP: the gene symbol is EPX, not EPO -- gene_exact:\"EPO\" returns P01588, erythropoietin, a 193-aa hormone, and this platform has a tissue hypoxia module in which erythropoietin is a real and entirely separate molecule. Register this entity under EPX only and rename the eosinophil marker; do not give it the bare synonym \"EPO\".",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "FAP+ / FAP-",
+  "entity_name": "Fibroblast activation protein alpha (FAP)",
+  "gene": "FAP",
+  "accession": "Q12884",
+  "uniprot_name": "Prolyl endopeptidase FAP",
+  "length": 760,
+  "entity_type": "protein",
+  "synonyms": [
+   "FAP",
+   "FAPalpha",
+   "FAP-alpha",
+   "seprase",
+   "Seprase",
+   "prolyl endopeptidase FAP",
+   "dipeptidyl peptidase FAP",
+   "APCE",
+   "integral membrane serine protease",
+   "SIMP",
+   "170 kDa melanoma membrane-bound gelatinase"
+  ],
+  "description": "A single-pass type II membrane serine protease with both dipeptidyl-peptidase and the rare post-proline endopeptidase activity, concentrated at invadopodia and lamellipodia where it degrades collagen I and clears a path for invasion. Near-absent on normal adult fibroblasts and strongly induced on cancer-associated fibroblasts, which makes it the canonical CAF marker and a live clinical target (FAPI PET tracers, FAP-directed CAR T). This library uses it as a discriminator in both directions - FAP+ on the CAF record, FAP- on the normal stromal fibroblast - and a negative marker means nothing if the molecule is not an entity. Compartment is the cell surface; the shed APCE form is secreted into plasma but is not what the marker stains.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "S100A4+",
+  "entity_name": "Fibroblast-specific protein 1 (S100A4)",
+  "gene": "S100A4",
+  "accession": "P26447",
+  "uniprot_name": "Protein S100-A4",
+  "length": 101,
+  "entity_type": "protein",
+  "synonyms": [
+   "S100A4",
+   "FSP1",
+   "FSP-1",
+   "metastasin",
+   "Metastasin",
+   "Mts1",
+   "Protein Mts1",
+   "calvasculin",
+   "Calvasculin",
+   "placental calcium-binding protein",
+   "S100 calcium-binding protein A4"
+  ],
+  "description": "A 101-residue calcium-binding S100 dimer that binds non-muscle myosin IIA and tropomyosin to loosen the cytoskeleton for migration, and is also released extracellularly where it is pro-angiogenic and chemotactic for macrophages. It was named metastasin because its expression tracks metastatic capacity across carcinomas; here it is S100A4+ on the CAF record with no entity behind it. UniProt gives it secreted, nucleus and cytoplasm; the compartment is set to cytoplasm because the CAF marker is the cytoplasmic stain, and the secreted pool is a separate pro-metastatic activity worth modelling on its own.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "NANOG+",
+  "entity_name": "Homeobox protein NANOG (NANOG)",
+  "gene": "NANOG",
+  "accession": "Q9H9S0",
+  "uniprot_name": "Homeobox protein NANOG",
+  "length": 305,
+  "entity_type": "protein",
+  "synonyms": [
+   "NANOG",
+   "hNanog",
+   "Nanog",
+   "homeobox transcription factor Nanog",
+   "homeobox protein NANOG"
+  ],
+  "description": "Homeodomain transcription factor of the core pluripotency circuit, mutually reinforcing with OCT4 and SOX2 and sufficient with them to sustain self-renewal. NANOG+ is one of six markers on this library's prostate cancer stem cell record, whose modelled claim is that a small slow-cycling subpopulation survives ADT, chemotherapy and radiation and reseeds the tumour; with no entity behind the markers, that claim has no molecular substrate to simulate. Nuclear.",
+  "compartments": [
+   "nucleus"
+  ]
+ },
+ {
+  "referenced_as": "iNOS",
+  "entity_name": "Inducible nitric oxide synthase (NOS2)",
+  "gene": "NOS2",
+  "accession": "P35228",
+  "uniprot_name": "Nitric oxide synthase, inducible",
+  "length": 1153,
+  "entity_type": "protein",
+  "synonyms": [
+   "NOS2",
+   "NOS2A",
+   "iNOS",
+   "inducible NO synthase",
+   "inducible NOS",
+   "NOS type II",
+   "hepatocyte NOS",
+   "nitric oxide synthase inducible"
+  ],
+  "description": "Calcium-independent, cytokine-inducible NOS that makes nitric oxide from L-arginine; the library lists \"iNOS\" on its M1 macrophage entity and already describes the peroxynitrite it forms with superoxide. COMPARTMENT CORRECTION: like arginase-1 it is in the surface_markers field but is in fact a soluble cytosolic homodimer (UniProt: cytoplasm, cytosol), so it must not be rendered as a surface receptor. It is the other half of the arginine fork that defines M1 against M2 in this library, and it is genuinely double-edged in a tumour twin -- high-output NO is tumouricidal and damages tumour vasculature, while sustained low-output NO from MDSCs nitrates the TCR and CCL2 and keeps T cells out of the tumour.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "CD68",
+  "entity_name": "Macrosialin (CD68)",
+  "gene": "CD68",
+  "accession": "P34810",
+  "uniprot_name": "Macrosialin",
+  "length": 354,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD68",
+   "macrosialin",
+   "Gp110",
+   "SCARD1"
+  ],
+  "description": "Heavily glycosylated LAMP-family protein of late endosomal and lysosomal membranes, with only a small fraction ever reaching the plasma membrane. It is the pan-macrophage marker that essentially every tumour-associated-macrophage count in the literature rests on, and it is an INTRACELLULAR one -- CD68 immunostaining requires permeabilisation, so drawing it as a surface stud would repeat the perforin bug on the macrophage. Compartment is set to granule rather than membrane for that reason; strictly it sits in the limiting membrane of the lysosome, so if the renderer ever gains a vesicle-membrane compartment this entity should move there.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "tryptase",
+  "entity_name": "Mast cell tryptase (TPSAB1)",
+  "gene": "TPSAB1",
+  "accession": "Q15661",
+  "uniprot_name": "Tryptase alpha/beta-1",
+  "length": 275,
+  "entity_type": "protein",
+  "synonyms": [
+   "TPSAB1",
+   "tryptase alpha/beta-1",
+   "tryptase-1",
+   "tryptase I",
+   "tryptase alpha-1",
+   "beta-tryptase",
+   "mast cell tryptase"
+  ],
+  "description": "The dominant protein of the mast cell secretory granule, stored as an active tetramer stabilised on heparin proteoglycan and released on FceRI crosslinking; the library lists \"tryptase\" on its mast cell entity. Once released it cleaves PAR-2 and activates matrix metalloproteinases and pro-angiogenic pathways, which is why mast cell density and serum tryptase track with angiogenesis and stromal remodelling in several tumours. IDENTITY CAVEAT: human tryptase is a two-locus family -- TPSAB1 (alpha/beta-1) and TPSB2 (beta-2, P20231) are nearly identical and clinical assays do not separate them; TPSAB1 is chosen here as the canonical beta-tryptase locus and the one whose copy number causes hereditary alpha-tryptasemia. Note UniProt lists only \"Secreted\" for Q15661, but the resting-cell location that gets rendered is the granule.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "MPO",
+  "entity_name": "Myeloperoxidase (MPO)",
+  "gene": "MPO",
+  "accession": "P05164",
+  "uniprot_name": "Myeloperoxidase",
+  "length": 745,
+  "entity_type": "protein",
+  "synonyms": [
+   "MPO",
+   "myeloperoxidase",
+   "proMPO",
+   "promyeloperoxidase"
+  ],
+  "description": "Heme peroxidase that is the defining cargo of the neutrophil azurophilic (primary) granule; the library lists \"MPO\" on its neutrophil entity, and UniProt's own subcellular annotation for P05164 reads cytolytic granule, lysosome and phagosome. It converts the NADPH-oxidase product H2O2 plus chloride into hypochlorous acid, the most aggressive microbicide a human cell makes -- this is what makes a neutrophil a chemical weapon and not just a phagocyte. It is granule cargo, not a surface marker, which is the exact distinction this repo got wrong for perforin; in tumours its HOCl output and its role in NET formation are both bystander mutagenesis and an MDSC-associated suppression mechanism.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "NSE+",
+  "entity_name": "Neuron-specific enolase (ENO2)",
+  "gene": "ENO2",
+  "accession": "P09104",
+  "uniprot_name": "Gamma-enolase",
+  "length": 434,
+  "entity_type": "protein",
+  "synonyms": [
+   "ENO2",
+   "NSE",
+   "gamma-enolase",
+   "Gamma-enolase",
+   "neuron-specific enolase",
+   "neural enolase",
+   "enolase 2",
+   "Enolase 2",
+   "2-phospho-D-glycerate hydro-lyase"
+  ],
+  "description": "The gamma isoform of the glycolytic enzyme enolase, cytosolic and restricted to neurons and neuroendocrine cells; the clinical analyte \"NSE\" is its gamma-gamma homodimer, released into serum when those cells lyse, and it is a standard NEPC and small-cell marker. \"NSE\" is not a gene symbol - gene_exact:\"NSE\" returns zero reviewed human entries - so it resolves only through UniProt's free-text alias on ENO2, which UniProt does carry verbatim as \"(NSE)\". The third marker on this library's neuroendocrine cell record, and being a glycolytic enzyme it is also a real input to the metabolic side of the twin rather than only a label.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "PDPN+",
+  "entity_name": "Podoplanin (PDPN)",
+  "gene": "PDPN",
+  "accession": "Q86YL7",
+  "uniprot_name": "Podoplanin",
+  "length": 162,
+  "entity_type": "protein",
+  "synonyms": [
+   "PDPN",
+   "podoplanin",
+   "gp36",
+   "Gp36",
+   "glycoprotein 36",
+   "Aggrus",
+   "T1-alpha",
+   "T1A",
+   "PA2.26 antigen",
+   "D2-40 antigen"
+  ],
+  "description": "A small (162 aa) single-pass type I transmembrane mucin that sits in lipid rafts and in filopodia, lamellipodia and invadopodia, where raft association is required for the EMT and matrix degradation it drives. Through the platelet receptor CLEC-2 it triggers platelet aggregation, which is the mechanistic link from PDPN+ tumour stroma to cancer-associated thrombosis; it is also the lymphatic endothelial marker stained by D2-40. One of the four markers on this library's CAF record, and the one that separates the prognostically distinct CAF subsets. Typed as protein rather than adhesion_molecule deliberately: that model class exists for leukocyte-endothelial diapedesis with curated kon/koff, and none exist for PDPN.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD133",
+  "entity_name": "Prominin-1 (CD133/PROM1)",
+  "gene": "PROM1",
+  "accession": "O43490",
+  "uniprot_name": "Prominin-1",
+  "length": 865,
+  "entity_type": "protein",
+  "synonyms": [
+   "CD133",
+   "PROM1",
+   "prominin-1",
+   "AC133",
+   "antigen AC133",
+   "prominin-like protein 1"
+  ],
+  "description": "Pentaspan glycoprotein concentrated in apical plasma-membrane protrusions and microvilli, where its role is still structural rather than signalling. It is the most-used cancer-stem-cell marker in solid tumours, and this library already holds a 'Prostate cancer stem cell' entity whose marker list names it with nothing behind the name. The claim deserves care in a twin: CD133 positivity is epitope- and glycosylation-dependent, which is why reported CSC frequencies based on it vary widely between studies.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "SYP+",
+  "entity_name": "Synaptophysin (SYP)",
+  "gene": "SYP",
+  "accession": "P08247",
+  "uniprot_name": "Synaptophysin",
+  "length": 313,
+  "entity_type": "protein",
+  "synonyms": [
+   "SYP",
+   "synaptophysin",
+   "p38",
+   "major synaptic vesicle protein p38",
+   "SYP1"
+  ],
+  "description": "A multi-pass transmembrane glycoprotein of synaptic and synaptic-like microvesicle membranes, where it regulates vesicle biogenesis and synaptobrevin availability for fusion. The compartment here is a deliberate call and the interesting one in this batch: it is an integral MEMBRANE protein, but of the VESICLE membrane, not the plasma membrane - UniProt gives \"Cytoplasmic vesicle, secretory vesicle, synaptic vesicle membrane\" - so granule is where it renders and a surface stud would be wrong. With chromogranin A it is the diagnostic pair for neuroendocrine differentiation, and SYP+ heads the marker list on this library's neuroendocrine cell record and its NEPC gene set.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "SOX2+",
+  "entity_name": "Transcription factor SOX-2 (SOX2)",
+  "gene": "SOX2",
+  "accession": "P48431",
+  "uniprot_name": "Transcription factor SOX-2",
+  "length": 317,
+  "entity_type": "protein",
+  "synonyms": [
+   "SOX2",
+   "SOX-2",
+   "Sox2",
+   "SRY-box 2",
+   "SRY (sex determining region Y)-box 2",
+   "transcription factor SOX-2"
+  ],
+  "description": "HMG-box pluripotency transcription factor that binds and bends DNA and, with OCT4 and NANOG, holds the stem programme open. This library invokes it for two distinct mechanisms: SOX2+ on the prostate cancer stem cell record, and \"RB1/TP53 loss plus EZH2/SOX2 upregulation\" as the driver of neuroendocrine transdifferentiation under androgen deprivation - the resistance route the treatment simulator is supposed to produce, currently named only as a string. Nuclear (UniProt also records cytoplasmic delocalisation after HDAC3 deacetylation, which is a regulatory state rather than the marker's location).",
+  "compartments": [
+   "nucleus"
+  ]
+ },
+ {
+  "referenced_as": "VIM+",
+  "entity_name": "Vimentin (VIM)",
+  "gene": "VIM",
+  "accession": "P08670",
+  "uniprot_name": "Vimentin",
+  "length": 466,
+  "entity_type": "protein",
+  "synonyms": [
+   "VIM",
+   "vimentin",
+   "intermediate filament protein vimentin",
+   "type III intermediate filament"
+  ],
+  "description": "The type III intermediate filament of mesenchymal cells, forming a cytoplasmic cage that bears mechanical load, positions organelles and is the classic readout of epithelial-to-mesenchymal transition. The platform names it three times - VIM+ on the stromal fibroblast, vimentin+ in the CAF activation prose, and \"VIM, ZEB1/2\" in its own EMT record - so an EMT trajectory currently has no protein to attach to. Cytoplasmic: drawn as a membrane stud it would misplace the single marker that separates a mesenchymal cell from an epithelial one.",
+  "compartments": [
+   "cytoplasm"
+  ]
+ },
+ {
+  "referenced_as": "XBP1",
+  "entity_name": "X-box binding protein 1 (XBP1)",
+  "gene": "XBP1",
+  "accession": "P17861",
+  "uniprot_name": "X-box-binding protein 1",
+  "length": 261,
+  "entity_type": "protein",
+  "synonyms": [
+   "XBP1",
+   "XBP-1",
+   "XBP1s",
+   "XBP1u",
+   "TREB5",
+   "TREB-5",
+   "Tax-responsive element-binding protein 5",
+   "X-box-binding protein 1"
+  ],
+  "description": "A bZIP transcription factor activated unconventionally: under ER stress IRE1 excises 26 nucleotides from its mRNA, and only the spliced product XBP1s is the active nuclear factor that expands the ER and the secretory machinery. The library's plasma cell record lists XBP1 among its markers for exactly that function - a plasma cell is an ER factory - and XBP1s is also the arm of the unfolded protein response that drives immunosuppressive dendritic and myeloid states in tumours, which makes it a mechanism and not a label. Nucleus is right for the marker as used; the unspliced XBP1u is cytoplasmic and ER-membrane-bound, so the isoform distinction should be recorded on the entity rather than flattened.",
+  "compartments": [
+   "nucleus"
+  ]
+ },
+ {
+  "referenced_as": "p63+",
+  "entity_name": "p63 (TP63)",
+  "gene": "TP63",
+  "accession": "Q9H3D4",
+  "uniprot_name": "Tumor protein 63",
+  "length": 680,
+  "entity_type": "protein",
+  "synonyms": [
+   "TP63",
+   "p63",
+   "deltaNp63",
+   "dNp63",
+   "p40",
+   "p51",
+   "p73L",
+   "tumor protein p73-like",
+   "KET",
+   "keratinocyte transcription factor KET",
+   "CUSP",
+   "transformation-related protein 63"
+  ],
+  "description": "A p53-family transcription factor whose deltaNp63-alpha isoform is the master regulator of basal and stem epithelial identity; nuclear p63 is the basal-cell stain in prostate and breast pathology, and its absence from a gland is diagnostic of invasion. RESOLUTION WARNING: \"p63\" alone is ambiguous - six reviewed human entries carry it as a name, including UVRAG (Q9P2Y5) and CKAP4/CLIMP-63 (Q07065), the latter a membrane protein that would have landed in the wrong compartment as well as the wrong entity. This resolves only because the library's own prose writes \"p63 (TP63)\"; the free-text route alone is exactly the trap that returned fatty acid synthase for Fas ligand. Also record the isoform caveat: the accession is the canonical gene product while the basal marker is specifically deltaNp63, an ambiguity of the same kind as PUMA. Nucleus - on the membrane this would be the FOXP3 error again.",
+  "compartments": [
+   "nucleus"
+  ]
+ },
+ {
+  "referenced_as": "vWF+",
+  "entity_name": "von Willebrand factor (VWF)",
+  "gene": "VWF",
+  "accession": "P04275",
+  "uniprot_name": "von Willebrand factor",
+  "length": 2813,
+  "entity_type": "protein",
+  "synonyms": [
+   "VWF",
+   "vWF",
+   "von Willebrand factor",
+   "F8VWF",
+   "von Willebrand antigen 2",
+   "von Willebrand antigen II"
+  ],
+  "description": "A 2,813-residue multimeric adhesive glycoprotein made only by endothelium and megakaryocytes, stored as ultra-large multimers in Weibel-Palade bodies and released under stimulation to catch platelets at high shear until ADAMTS13 cuts it down. Compartment is granule for a documented reason: vWF+ on this library's endothelial cell record is the Weibel-Palade body stain, and UniProt's own entry says \"Localized to storage granules\" alongside Secreted - the secreted pool is plasma vWF, not what the endothelial marker shows. For this platform it is the honest endothelial identity marker and the mechanistic bridge to tumour-associated thrombosis and to PDPN-driven platelet aggregation, both of which the vasculature the tissue module still lacks would need.",
+  "compartments": [
+   "granule"
+  ]
+ },
+ {
+  "referenced_as": "CD80",
+  "entity_name": "B7-1 (CD80)",
+  "gene": "CD80",
+  "accession": "P33681",
+  "uniprot_name": "T-lymphocyte activation antigen CD80",
+  "length": 288,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD80",
+   "B7-1",
+   "B7.1",
+   "B7",
+   "BB1",
+   "activation B7-1 antigen",
+   "CTLA-4 counter-receptor B7.1"
+  ],
+  "description": "Co-stimulatory ligand on activated dendritic cells and macrophages that engages CD28 to license a T cell and CTLA-4 to shut it down, binding CTLA-4 roughly an order of magnitude more tightly. The library holds CTLA-4 (CD152) and ipilimumab but neither of CTLA-4's two ligands, so the checkpoint had a blocker and nothing being blocked. CTLA-4 strips CD80 and CD86 off the antigen-presenting cell by trans-endocytosis -- the suppressive mechanism this platform's Treg entity already describes in prose and could not previously represent.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD86",
+  "entity_name": "B7-2 (CD86)",
+  "gene": "CD86",
+  "accession": "P42081",
+  "uniprot_name": "T-lymphocyte activation antigen CD86",
+  "length": 329,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD86",
+   "B7-2",
+   "B7.2",
+   "B70",
+   "BU63",
+   "FUN-1",
+   "activation B7-2 antigen",
+   "CTLA-4 counter-receptor B7.2"
+  ],
+  "description": "The second CD28/CTLA-4 ligand, present at low level on resting antigen-presenting cells and induced earlier than CD80 after activation, which makes it the one that initiates priming. It is the standard readout of dendritic-cell maturation, so a twin simulating whether a DC can prime a CD8 response needs it as a state variable rather than an assumption. Its ratio to CD80 is what decides whether CD28 co-stimulation or CTLA-4 inhibition dominates at a given synapse.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD303",
+  "entity_name": "BDCA-2 (CD303/CLEC4C)",
+  "gene": "CLEC4C",
+  "accession": "Q8WTT0",
+  "uniprot_name": "C-type lectin domain family 4 member C",
+  "length": 213,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD303",
+   "CLEC4C",
+   "BDCA-2",
+   "BDCA2",
+   "blood dendritic cell antigen 2",
+   "dendritic lectin",
+   "CLECSF7"
+  ],
+  "description": "C-type lectin found on plasmacytoid dendritic cells and essentially nowhere else, making it the lineage marker for that subset -- which this library already holds as an entity. Ligating it potently SUPPRESSES the type I interferon output that defines a pDC, so it is an inhibitory receptor and not merely a label. That is the part a tumour twin should care about: intratumoral pDCs are typically interferon-poor and tolerogenic, and CD303 is one of the switches that puts them in that state.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCR4",
+  "entity_name": "CCR4 (CD194)",
+  "gene": "CCR4",
+  "accession": "P51679",
+  "uniprot_name": "C-C chemokine receptor type 4",
+  "entity_type": "receptor",
+  "length": 360,
+  "synonyms": [
+   "CCR4",
+   "CMKBR4",
+   "CD194",
+   "C-C CKR-4",
+   "CC-CKR-4",
+   "K5-5"
+  ],
+  "description": "Seven-transmembrane Gi-coupled receptor for CCL17 (TARC) and CCL22 (MDC), carried by Th2 cells, skin-homing memory T cells and regulatory T cells. The library's Th2 entity already lists CCR4 and its Treg description already states that Tregs are recruited into tumours by CCL22, so the receptor closing that loop was the missing piece. It is also directly druggable: mogamulizumab, a defucosylated anti-CCR4 antibody approved for adult T-cell leukaemia/lymphoma and mycosis fungoides, depletes CCR4+ cells and has been pursued precisely for its Treg-depleting effect, making CCR4 both a trafficking receptor and a depletion target a treatment arm could represent.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCR5",
+  "entity_name": "CCR5 (CD195)",
+  "gene": "CCR5",
+  "accession": "P51681",
+  "uniprot_name": "C-C chemokine receptor type 5",
+  "entity_type": "receptor",
+  "length": 352,
+  "synonyms": [
+   "CCR5",
+   "CMKBR5",
+   "CD195",
+   "C-C CKR-5",
+   "CC-CKR-5",
+   "CHEMR13",
+   "HIV-1 fusion coreceptor"
+  ],
+  "description": "Gi-coupled 7TM receptor for CCL3, CCL4 and CCL5 (MIP-1alpha, MIP-1beta, RANTES), expressed on Th1 cells, effector CD8 T cells, monocytes and macrophages. The library references it from two unrelated directions with no entity at either end: the Th1 cell carries CCR5 as a lineage marker, and the HIV entity lists it as the R5-tropic entry coreceptor alongside maraviroc. It is also the one trafficking receptor in this batch the DNA-ingest path could genuinely personalise, since the common CCR5-delta32 null allele is a 32-bp germline deletion a patient VCF can carry and which abolishes surface expression -- relevant both to HIV resistance and to CCL5-driven recruitment in tumours.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCR6",
+  "entity_name": "CCR6 (CD196)",
+  "gene": "CCR6",
+  "accession": "P51684",
+  "uniprot_name": "C-C chemokine receptor type 6",
+  "entity_type": "receptor",
+  "length": 374,
+  "synonyms": [
+   "CCR6",
+   "CMKBR6",
+   "CKRL3",
+   "GPR29",
+   "STRL22",
+   "CD196",
+   "C-C CKR-6",
+   "CC-CKR-6",
+   "CKR-L3",
+   "LARC receptor",
+   "DRY6"
+  ],
+  "description": "Gi-coupled 7TM receptor whose only chemokine ligand is CCL20 (LARC/MIP-3alpha) -- UniProt's alternative name for it is literally \"LARC receptor\" -- and which also responds to beta-defensins, linking barrier antimicrobial peptides to lymphocyte recruitment. It defines the Th17 lineage and the Th17-like memory compartment, and the library's Th17 entity carries CCR6 alongside IL23R and RORgt. That makes it the only one of that cell's three lineage markers which is a surface receptor rather than a transcription factor, so it is the one the renderer can legitimately place on the membrane; CCL20-CCR6 also draws both Th17 cells and Tregs into tumours, so the axis cuts in two directions at once.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCR7",
+  "entity_name": "CCR7 (CD197)",
+  "gene": "CCR7",
+  "accession": "P32248",
+  "uniprot_name": "C-C chemokine receptor type 7",
+  "entity_type": "receptor",
+  "length": 378,
+  "synonyms": [
+   "CCR7",
+   "CMKBR7",
+   "EBI1",
+   "CD197",
+   "CDw197",
+   "BLR2",
+   "C-C CKR-7",
+   "CC-CKR-7",
+   "MIP-3 beta receptor",
+   "Epstein-Barr virus-induced G protein-coupled receptor 1"
+  ],
+  "description": "Gi-coupled 7TM receptor for CCL19 and CCL21, and by a wide margin the most heavily referenced molecule in this batch: it defines the naive and central-memory T-cell states in the library, it is what moves an antigen-loaded dendritic cell out of tissue into the lymph-node T-cell zone, and models.py names the HEV's CCL21/CCL19 as \"the CCR7 ligands that arrest lymphocytes\". It is already load-bearing in the kill model as a bare string, because the cytotoxicity parameterisation keys off \"CCR7+\" to mark the least cytotoxic memory state. Without it the twin's priming phase has no molecular representation of the step that actually brings antigen and naive T cell into the same place.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CCR8",
+  "entity_name": "CCR8 (CDw198)",
+  "gene": "CCR8",
+  "accession": "P51685",
+  "uniprot_name": "C-C chemokine receptor type 8",
+  "entity_type": "receptor",
+  "length": 355,
+  "synonyms": [
+   "CCR8",
+   "CMKBR8",
+   "CKRL1",
+   "CMKBRL2",
+   "CDw198",
+   "CD198",
+   "C-C CKR-8",
+   "CC-CKR-8",
+   "CKR-L1",
+   "CC chemokine receptor CHEMR1",
+   "TER1"
+  ],
+  "description": "Gi-coupled 7TM receptor for CCL1 (I-309), listed by UniProt under the provisional workshop designation CDw198 rather than a settled CD number. Its significance to a cancer-immunology twin is almost entirely compartmental: CCR8 is the most tumour-selective Treg surface marker identified so far, high on intratumoral regulatory T cells and near-absent on circulating Tregs and on conventional effector T cells, which is why depleting anti-CCR8 antibodies are the current strategy for removing suppressive Tregs from a tumour without triggering systemic autoimmunity. The library's Th2 entity carries CCR8 next to CCR4 and GATA3, and it is exactly the marker needed to tell a tumour-infiltrating Treg from a blood one -- a distinction the twin cannot currently make.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD19",
+  "entity_name": "CD19 co-receptor (CD19)",
+  "gene": "CD19",
+  "accession": "P15391",
+  "uniprot_name": "B-lymphocyte antigen CD19",
+  "length": 556,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD19",
+   "B4",
+   "Leu-12",
+   "B-lymphocyte surface antigen B4",
+   "differentiation antigen CD19"
+  ],
+  "description": "B-cell co-receptor that associates with CD21 and CD81 in a membrane raft and, once phosphorylated, recruits PI3K to amplify BCR signalling; it is carried from the pro-B stage until plasma-cell differentiation. For this platform it is the reference CAR-T target: a twin that cannot represent CD19 cannot represent CD19-directed therapy, nor the CD19-negative relapse that follows it in a substantial minority of responders. Curated alongside CD20 so the two antibody and CAR targets on the same B cell are separately addressable.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD27",
+  "entity_name": "CD27 (TNFRSF7)",
+  "gene": "CD27",
+  "accession": "P26842",
+  "uniprot_name": "CD27 antigen",
+  "length": 260,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD27",
+   "TNFRSF7",
+   "T14",
+   "CD27L receptor",
+   "T-cell activation antigen CD27",
+   "tumor necrosis factor receptor superfamily member 7"
+  ],
+  "description": "TNF-receptor-superfamily costimulatory receptor whose ligation by CD70 recruits TRAF2 and TRAF5 and drives NF-kB signalling that favours survival and memory formation over terminal effector differentiation. The library uses CD27 to distinguish a memory B cell from a naive one, and the same receptor marks memory T cells, so it is load-bearing for any simulation of recall response. Its ligand CD70 is not yet an entity and I verified it is absent from the resolve index, so the pair cannot currently be engaged -- the obvious follow-on.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD3",
+  "entity_name": "CD3 epsilon chain (CD3E)",
+  "gene": "CD3E",
+  "accession": "P07766",
+  "uniprot_name": "T-cell surface glycoprotein CD3 epsilon chain",
+  "length": 207,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD3",
+   "CD3e",
+   "CD3 epsilon",
+   "T3e",
+   "Leu-4",
+   "T-cell surface antigen T3/Leu-4 epsilon chain"
+  ],
+  "description": "Signalling subunit of the CD3 complex that assembles with the TCR alpha/beta heterodimer; its single cytoplasmic ITAM is phosphorylated by LCK to begin T-cell activation. The library's T-cell records reference 'CD3' bare, which denotes the whole gamma/delta/epsilon(+zeta) complex, so this entity is the epsilon chain specifically -- the chain anti-CD3 antibodies and the CD3-engaging arm of every bispecific T-cell engager bind. It matters because 'CD3' is among the most-referenced T-cell markers in the library and resolved to nothing, leaving the renderer with no molecule for the antigen that defines a T cell.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD4",
+  "entity_name": "CD4 co-receptor (CD4)",
+  "gene": "CD4",
+  "accession": "P01730",
+  "uniprot_name": "T-cell surface glycoprotein CD4",
+  "length": 458,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD4",
+   "T4",
+   "Leu-3",
+   "T-cell surface antigen T4/Leu-3"
+  ],
+  "description": "Four-immunoglobulin-domain co-receptor that binds the beta-2 domain of MHC class II and delivers LCK to the engaged TCR, lowering the threshold for peptide-MHC-II recognition. It is the lineage marker shared by every helper subset the twin already models -- Th1, Th2, Th17, Tfh and Treg -- five entities whose common marker resolved to nothing. It is also the HIV-1 entry receptor, which is why its ectodomain is among the best-characterised structures available to the platform's structure-prediction track.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD8",
+  "entity_name": "CD8 alpha chain (CD8A)",
+  "gene": "CD8A",
+  "accession": "P01732",
+  "uniprot_name": "T-cell surface glycoprotein CD8 alpha chain",
+  "length": 235,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD8",
+   "CD8a",
+   "CD8 alpha",
+   "T8",
+   "Leu-2",
+   "T-lymphocyte differentiation antigen T8/Leu-2"
+  ],
+  "description": "The MHC class I-binding chain of the CD8 co-receptor: it binds the alpha-3 domain of class I and holds LCK at the TCR, stabilising a peptide-MHC-I contact otherwise too weak to signal. On a T cell the functional receptor is the CD8 alpha/beta heterodimer, so this entity is the alpha chain named as the alpha chain -- the chain flow cytometry stains, the chain that forms the CD8 alpha/alpha homodimer on intestinal and some NK subsets, and the only one of the two carrying a 'CD8a' CD-antigen designation. Every kill the platform counts is scored on a CD8+ cell, and the co-receptor that licenses the recognition step was absent from the library.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CRTH2",
+  "entity_name": "CRTH2 (PTGDR2/CD294)",
+  "gene": "PTGDR2",
+  "accession": "Q9Y5Y4",
+  "uniprot_name": "Prostaglandin D2 receptor 2",
+  "length": 395,
+  "entity_type": "receptor",
+  "synonyms": [
+   "PTGDR2",
+   "CRTH2",
+   "CD294",
+   "GPR44",
+   "DP2",
+   "prostaglandin D2 receptor 2",
+   "chemoattractant receptor-homologous molecule expressed on Th2 cells"
+  ],
+  "description": "Gi-coupled receptor for prostaglandin D2, listed by the library on ILC2 beside ST2 and GATA3. PGD2 released by degranulating mast cells drives CRTH2-dependent chemotaxis of ILC2s, Th2 cells, eosinophils and basophils, making this receptor the direct bridge from mast-cell activation to type-2 cell recruitment. For a tissue-scale simulation it is the chemotactic term that would actually move the type-2 compartment, and it is the one drugged target in this batch with oral antagonists taken to phase III.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CSF1R+",
+  "entity_name": "CSF-1 receptor (CSF1R/CD115)",
+  "gene": "CSF1R",
+  "accession": "P07333",
+  "uniprot_name": "Macrophage colony-stimulating factor 1 receptor",
+  "length": 972,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CSF1R",
+   "CD115",
+   "CSF-1R",
+   "CSF-1 receptor",
+   "CSF-1-R",
+   "M-CSF-R",
+   "M-CSFR",
+   "c-Fms",
+   "FMS",
+   "proto-oncogene c-Fms"
+  ],
+  "description": "Class III receptor tyrosine kinase for CSF1 (M-CSF) and IL-34, and the switch controlling monocyte and macrophage survival, differentiation and recruitment. This one closes an existing half-connection rather than adding a new molecule: the library's M-CSF cytokine entity already carries \"CSF1R\" in its receptor field, pointing at an entity that does not exist, and CSF1R+ is a marker on the macrophage/TAM record - a ligand wired to nothing, the same shape of hole as caspase-8 at a DISC with no receptor. It is also the most advanced TAM-depletion target in the clinic (pexidartinib, anti-CSF1R antibodies), so simulating macrophage reprogramming needs the receptor the drug binds. Single-pass type I plasma membrane.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CXCR3",
+  "entity_name": "CXCR3 (CD183)",
+  "gene": "CXCR3",
+  "accession": "P49682",
+  "uniprot_name": "C-X-C chemokine receptor type 3",
+  "entity_type": "receptor",
+  "length": 368,
+  "synonyms": [
+   "CXCR3",
+   "GPR9",
+   "CD183",
+   "CXC-R3",
+   "CXCR-3",
+   "CKR-L2",
+   "IP-10 receptor",
+   "Interferon-inducible protein 10 receptor",
+   "G protein-coupled receptor 9"
+  ],
+  "description": "Gi-coupled 7TM receptor for the interferon-gamma-induced chemokines CXCL9, CXCL10 and CXCL11; UniProt's own alternative name for it is \"IP-10 receptor\". The library already holds CXCL10 (IP-10) as an entity whose receptor field is the string \"CXCR3\" with nothing behind it, and that entity's description turns on the CXCR3-A versus CXCR3-B splice variants -- chemotactic on T cells, angiostatic on endothelium -- which the library could not represent without the receptor. CXCR3 is how Th1 and CD8 effectors actually enter a tumour, and intratumoral CXCL9/CXCL10-CXCR3 signalling is among the strongest known correlates of checkpoint-blockade response, which is the outcome the twin is built to predict.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CXCR5",
+  "entity_name": "CXCR5 (CD185)",
+  "gene": "CXCR5",
+  "accession": "P32302",
+  "uniprot_name": "C-X-C chemokine receptor type 5",
+  "entity_type": "receptor",
+  "length": 372,
+  "synonyms": [
+   "CXCR5",
+   "BLR1",
+   "MDR15",
+   "CD185",
+   "CXC-R5",
+   "CXCR-5",
+   "Burkitt lymphoma receptor 1",
+   "Monocyte-derived receptor 15",
+   "MDR-15"
+  ],
+  "description": "Gi-coupled 7TM receptor for CXCL13, originally cloned as Burkitt lymphoma receptor 1, and the receptor that positions B cells and follicular helper T cells inside the follicle and germinal centre. The library's Tfh entity carries CXCR5 with PD-1, ICOS and BCL6, and its naive B-cell description already attributes follicular positioning to CXCR5/CXCL13 -- both referring to a molecule that did not exist. It matters beyond B-cell help because CXCR5+ PD-1+ stem-like CD8 T cells in tertiary lymphoid structures are the population that actually proliferates in response to PD-1 blockade, so CXCR5 is what lets the twin distinguish a terminally exhausted CD8 cell from the progenitor it should predict will respond.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD193",
+  "entity_name": "Eotaxin receptor (CD193/CCR3)",
+  "gene": "CCR3",
+  "accession": "P51677",
+  "uniprot_name": "C-C chemokine receptor type 3",
+  "length": 355,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD193",
+   "CCR3",
+   "CCR-3",
+   "CC-CKR-3",
+   "CKR3",
+   "eosinophil eotaxin receptor",
+   "C-C chemokine receptor type 3"
+  ],
+  "description": "Chemokine GPCR for CCL11, CCL24 and CCL26, and the receptor that recruits eosinophils and basophils -- both already entities here. Chemokine receptors are the second-largest absent class in this library (eleven referenced, none resolving), so this closes one recruitment path that currently terminates at a bare name. In tumours, CCR3-driven eosinophil infiltration is context-dependent and can be anti- or pro-tumour, which makes it a parameter to fit rather than a sign to read.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD16",
+  "entity_name": "Fc-gamma receptor III (CD16/FCGR3A)",
+  "gene": "FCGR3A",
+  "accession": "P08637",
+  "uniprot_name": "Low affinity immunoglobulin gamma Fc region receptor III-A",
+  "length": 254,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD16",
+   "CD16a",
+   "FCGR3A",
+   "Fc-gamma RIIIa",
+   "Fc-gamma RIII-alpha",
+   "FcgammaRIIIA",
+   "CD16-II",
+   "IgG Fc receptor III-A"
+  ],
+  "description": "Low-affinity IgG Fc receptor on NK cells and non-classical monocytes, and the receptor that performs antibody-dependent cellular cytotoxicity. Every therapeutic IgG in this library -- rituximab, the ADCC-competent anti-CTLA-4 -- recruits its killer cell through this molecule, so a twin modelling antibody therapy without it models only the binding half; the FCGR3A V158F polymorphism measurably shifts rituximab and trastuzumab response, making it a patient-specific parameter rather than a constant. Note the neutrophil CD16 is the separate GPI-anchored paralog FCGR3B (O75015), which this entity is deliberately not.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "FceRI",
+  "entity_name": "FceRI alpha chain (FCER1A)",
+  "gene": "FCER1A",
+  "accession": "P12319",
+  "uniprot_name": "High affinity immunoglobulin epsilon receptor subunit alpha",
+  "length": 257,
+  "entity_type": "receptor",
+  "synonyms": [
+   "FCER1A",
+   "FceRI alpha",
+   "Fc-epsilon RI-alpha",
+   "FcERI alpha chain",
+   "IgE Fc receptor subunit alpha",
+   "high affinity IgE receptor alpha chain"
+  ],
+  "description": "The IgE-binding subunit of the high-affinity IgE receptor, which the library lists on both its mast cell and its basophil entity. JUDGMENT CALL: \"FceRI\" names a multi-subunit receptor -- an alpha chain plus the signalling FCER1G gamma dimer (P30273) and, on mast cells and basophils, the MS4A2 beta chain (Q01362) -- so this entity is deliberately the alpha chain alone, because that is the chain that binds IgE and sets surface expression, and the other two are not in the library. Crosslinking of IgE-loaded FceRI is the trigger for the degranulation that releases the tryptase and chymase curated in this same batch, so this receptor and that cargo should be wired together.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "GITR+",
+  "entity_name": "GITR (TNFRSF18/CD357)",
+  "gene": "TNFRSF18",
+  "accession": "Q9Y5U5",
+  "uniprot_name": "Tumor necrosis factor receptor superfamily member 18",
+  "length": 241,
+  "entity_type": "receptor",
+  "synonyms": [
+   "TNFRSF18",
+   "GITR",
+   "CD357",
+   "AITR",
+   "activation-inducible TNFR family receptor",
+   "glucocorticoid-induced TNFR-related protein"
+  ],
+  "description": "TNF-receptor-family costimulatory receptor, constitutively high on Tregs and induced on activated conventional T cells; the library's Treg record lists it as the literal string \"GITR+\". Ligation by GITRL (TNFSF18) costimulates effectors and abrogates Treg-mediated suppression, which is the rationale for the agonist anti-GITR antibodies that reached the clinic. Note the stored string carries a \"+\" expression-level suffix: cell_profiles strips that before lookup but library/seed_synonyms resolve_index does not, so \"GITR+\" will still resolve to nothing even after this entity exists unless the suffix is stripped or carried as a synonym.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD163",
+  "entity_name": "Hemoglobin scavenger receptor (CD163)",
+  "gene": "CD163",
+  "accession": "Q86VB7",
+  "uniprot_name": "Scavenger receptor cysteine-rich type 1 protein M130",
+  "length": 1156,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD163",
+   "M130",
+   "sCD163",
+   "hemoglobin scavenger receptor",
+   "scavenger receptor cysteine-rich type 1 protein M130"
+  ],
+  "description": "Scavenger-receptor cysteine-rich protein that clears haptoglobin-haemoglobin complexes, restricted to the monocyte/macrophage lineage and strongly induced by IL-10 and glucocorticoids. It is the cleanest single marker of the M2/alternatively-activated state, and CD163+ TAM density is among the better-replicated poor-prognosis signals across solid tumours. The library holds IL-10 and a macrophage entity whose M1/M2 plasticity exists only in prose; this is the surface molecule that makes that polarisation state observable and simulable.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "ICOS",
+  "entity_name": "ICOS (CD278)",
+  "gene": "ICOS",
+  "accession": "Q9Y6W8",
+  "uniprot_name": "Inducible T-cell costimulator",
+  "length": 199,
+  "entity_type": "receptor",
+  "synonyms": [
+   "ICOS",
+   "CD278",
+   "AILIM",
+   "inducible T-cell costimulator",
+   "activation-inducible lymphocyte immunomediatory molecule"
+  ],
+  "description": "CD28-family costimulatory receptor, induced rather than constitutive, which the library lists on its Tfh entity -- whose own description already states that Tfh differentiation requires ICOS costimulation. It binds ICOSLG (B7-H2/CD275) and signals through PI3K to sustain IL-21 and IL-4 output. It is two-faced in cancer and so worth modelling: ICOS is highest on tumour-infiltrating Tregs, making it a depletion target, while ICOS+ CD4 T cells are the established pharmacodynamic readout of anti-CTLA-4 response.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD25",
+  "entity_name": "IL-2 receptor alpha (CD25)",
+  "gene": "IL2RA",
+  "accession": "P01589",
+  "uniprot_name": "Interleukin-2 receptor subunit alpha",
+  "length": 272,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD25",
+   "IL2RA",
+   "IL-2R alpha",
+   "IL-2RA",
+   "TAC antigen",
+   "p55"
+  ],
+  "description": "Non-signalling alpha chain that combines with IL-2R beta and the common gamma chain to raise IL-2 affinity by about two orders of magnitude; alpha alone binds IL-2 but cannot transduce. It is half of this library's Treg definition (CD4, CD25, FOXP3, CTLA4, CD127lo) and the receptor through which the library's existing Aldesleukin (IL-2) entity acts. Without it the IL-2 sink by which Tregs starve effector cells -- a central immunosuppression mechanism in any tumour twin -- had no molecule to run on.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "IL23R",
+  "entity_name": "IL-23 receptor (IL23R)",
+  "gene": "IL23R",
+  "accession": "Q5VWK5",
+  "uniprot_name": "Interleukin-23 receptor",
+  "entity_type": "receptor",
+  "length": 629,
+  "synonyms": [
+   "Interleukin-23 receptor",
+   "IL-23R"
+  ],
+  "description": "Single-pass type I membrane receptor, 629 residues, with a 332-residue extracellular domain, one transmembrane segment at 356-376 and a cytoplasmic tail (UniProt topology, signal peptide 1-23); it pairs with IL12RB1 to form the functional IL-23 receptor and signals JAK2/STAT3. STAT3 then sustains RORgamma-t and the Th17 transcriptional program, making this receptor the switch that keeps IL-17 and IL-22 output running, and the gene carries well-replicated protective and risk coding variants in IBD and psoriasis. Note the compartment deliberately: the CD4+ Th17 entity lists IL23R under surface_markers, not under secreted cytokines, so this is the one molecule in this batch that genuinely belongs on the membrane -- and since the library already holds the IL-23 ligand, adding it closes a ligand-receptor pair whose receptor half was dangling.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD123",
+  "entity_name": "IL-3 receptor alpha (CD123/IL3RA)",
+  "gene": "IL3RA",
+  "accession": "P26951",
+  "uniprot_name": "Interleukin-3 receptor subunit alpha",
+  "length": 378,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD123",
+   "IL3RA",
+   "IL-3R-alpha",
+   "IL-3 receptor subunit alpha",
+   "IL-3R subunit alpha"
+  ],
+  "description": "Ligand-binding alpha chain of the IL-3 receptor, signalling through the shared beta chain CD131. It is the lineage marker of plasmacytoid dendritic cells and basophils, both already entities in this library, and it is strongly over-expressed on AML blasts and leukaemic stem cells -- the target of tagraxofusp and of several CD123 CAR-T programmes. A twin scoring a CAR-T target needs the antigen's normal-tissue distribution as much as its tumour expression, and pDCs and basophils are exactly that distribution.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD127",
+  "entity_name": "IL-7 receptor alpha (CD127)",
+  "gene": "IL7R",
+  "accession": "P16871",
+  "uniprot_name": "Interleukin-7 receptor subunit alpha",
+  "length": 459,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD127",
+   "CDw127",
+   "IL7R",
+   "IL-7R alpha",
+   "IL-7RA",
+   "interleukin-7 receptor subunit alpha"
+  ],
+  "description": "Alpha chain of the IL-7 receptor, pairing with the common gamma chain to signal through JAK1/JAK3 and STAT5; IL-7 signalling is what keeps naive and memory T cells alive, and loss-of-function mutations cause T-negative SCID. The library references it twice and in opposite senses: CD127 on the memory CD8 T cell, and CD127lo as part of the Treg definition, since Tregs downregulate it and therefore do not compete for IL-7. For a twin run over long simulated time this is the receptor that decides whether a memory pool persists or decays.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "KLRG1",
+  "entity_name": "Killer cell lectin-like receptor G1 (KLRG1)",
+  "gene": "KLRG1",
+  "accession": "Q96E93",
+  "uniprot_name": "Killer cell lectin-like receptor subfamily G member 1",
+  "length": 195,
+  "entity_type": "receptor",
+  "synonyms": [
+   "KLRG1",
+   "CLEC15A",
+   "MAFA",
+   "MAFA-L",
+   "MAFA-like receptor",
+   "C-type lectin domain family 15 member A",
+   "mast cell function-associated antigen"
+  ],
+  "description": "Inhibitory receptor with a cytoplasmic ITIM, carried by the library's CD8+ Effector T cell and by the short-lived effector population its description names. Its ligands are E-, N- and R-cadherin, so a KLRG1+ CTL is inhibited by precisely the cadherin-bearing epithelium it is meant to kill, and KLRG1 accumulates with repeated division as a terminal-differentiation marker. In this platform it is the brake that explains why a CD8 count alone overpredicts killing -- KLRG1+ cells are abundant in tumours and poorly proliferative.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD14",
+  "entity_name": "LPS co-receptor (CD14)",
+  "gene": "CD14",
+  "accession": "P08571",
+  "uniprot_name": "Monocyte differentiation antigen CD14",
+  "length": 375,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD14",
+   "sCD14",
+   "presepsin",
+   "My23 antigen",
+   "myeloid cell-specific leucine-rich glycoprotein",
+   "monocyte differentiation antigen CD14"
+  ],
+  "description": "GPI-anchored leucine-rich glycoprotein that captures LPS and hands it to TLR4/MD-2; the marker that defines a classical monocyte. The library already holds TLR4 as a pattern-recognition receptor and had nothing to deliver ligand to it. CD14 also separates classical (CD14++CD16-) from non-classical (CD14+CD16++) monocytes, which differ in whether they become tumour-promoting macrophages, and its shed soluble form is a circulating readout.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD23",
+  "entity_name": "Low-affinity IgE receptor (CD23)",
+  "gene": "FCER2",
+  "accession": "P06734",
+  "uniprot_name": "Low affinity immunoglobulin epsilon Fc receptor",
+  "length": 321,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD23",
+   "FCER2",
+   "FceRII",
+   "Fc-epsilon-RII",
+   "BLAST-2",
+   "CLEC4J",
+   "lymphocyte IgE receptor",
+   "immunoglobulin E-binding factor"
+  ],
+  "description": "Type II transmembrane C-type lectin that binds IgE with low affinity and exerts feedback control on IgE synthesis by the B cell. It is this library's own marker for the naive follicular B cell, where it is recorded beside CD19, CD20, IgM and IgD, and it anchors the IgE arm the library already touches through FceRI and omalizumab. UniProt annotates both a membrane-bound and a shed soluble form; the compartment is membrane because that is where the molecule sits on the cell being drawn, while the released fragment acts separately as a B-cell growth factor.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD206",
+  "entity_name": "Mannose receptor (CD206/MRC1)",
+  "gene": "MRC1",
+  "accession": "P22897",
+  "uniprot_name": "Macrophage mannose receptor 1",
+  "length": 1456,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD206",
+   "MRC1",
+   "MMR",
+   "mannose receptor",
+   "macrophage mannose receptor 1",
+   "CLEC13D",
+   "C-type lectin domain family 13 member D"
+  ],
+  "description": "C-type lectin that binds terminal mannose on pathogens and on endogenous glycoproteins, and recycles continuously between endosomes and the plasma membrane. With CD163 it is the standard pair for identifying M2-polarised tumour-associated macrophages, and it is induced by the IL-4 and IL-13 this library already holds -- so the Th2-to-TAM axis becomes a chain rather than two unconnected facts. Most of the receptor pool is intracellular at steady state, but the surface fraction is what flow cytometry measures and what this renderer should show.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "NKG2D",
+  "entity_name": "NKG2D (KLRK1/CD314)",
+  "gene": "KLRK1",
+  "accession": "P26718",
+  "uniprot_name": "NKG2-D type II integral membrane protein",
+  "length": 216,
+  "entity_type": "receptor",
+  "synonyms": [
+   "KLRK1",
+   "NKG2D",
+   "NKG2-D",
+   "CD314",
+   "killer cell lectin-like receptor subfamily K member 1",
+   "NK cell receptor D",
+   "NKG2-D-activating NK receptor"
+  ],
+  "description": "Activating C-type-lectin-like receptor on NK cells, CD8+ T cells and gamma-delta T cells; the library lists NKG2D on its NK cell, gamma-delta T cell and NKT entities. It reads cellular stress rather than foreignness -- its ligands MICA, MICB and ULBP1-3 are induced by the DNA-damage response, so a tumour cell replicating badly marks itself for killing. That makes it the one receptor in this set that couples the genomics half of this platform to the immune half: the same damage signal that drives TMB and HRD drives NKG2D ligand surface load, and tumours shed soluble MICA to blunt it.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "NKp44",
+  "entity_name": "NKp44 (NCR2/CD336)",
+  "gene": "NCR2",
+  "accession": "O95944",
+  "uniprot_name": "Natural cytotoxicity triggering receptor 2",
+  "length": 276,
+  "entity_type": "receptor",
+  "synonyms": [
+   "NCR2",
+   "NKp44",
+   "NK-p44",
+   "CD336",
+   "natural cytotoxicity triggering receptor 2",
+   "natural killer cell p44-related protein",
+   "lymphocyte antigen 95 homolog"
+  ],
+  "description": "Natural cytotoxicity receptor that the library lists on ILC3; unlike NKp46 it is absent from resting NK cells and appears only after activation, so it marks a state rather than a lineage. Ligands include platelet-derived growth factor DD and, through an ITIM-bearing isoform, PCNA -- which inverts the signal, so NKp44 can be activating or inhibitory on the same cell. In this library it is specifically what separates the IL-22-producing NKp44+ ILC3 subset from the IL-17A-producing NKp44- subset that the ILC3 record already describes but cannot represent.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "NKp46",
+  "entity_name": "NKp46 (NCR1/CD335)",
+  "gene": "NCR1",
+  "accession": "O76036",
+  "uniprot_name": "Natural cytotoxicity triggering receptor 1",
+  "length": 304,
+  "entity_type": "receptor",
+  "synonyms": [
+   "NCR1",
+   "NKp46",
+   "NK-p46",
+   "hNKp46",
+   "CD335",
+   "natural cytotoxicity triggering receptor 1",
+   "lymphocyte antigen 94 homolog"
+  ],
+  "description": "The most lineage-restricted human NK marker, and the one the library already uses twice -- on its NK cell entity and on its ILC1 entity. An activating Ig-superfamily receptor that signals through ITAM-bearing CD3-zeta and FcepsilonRI-gamma and triggers degranulation on engagement. For a twin that counts kills on every step, NKp46 is the surface identity of the cell doing the killing, and it is the targeting arm of the NK-cell engagers now in trials.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD304",
+  "entity_name": "Neuropilin-1 (CD304/NRP1)",
+  "gene": "NRP1",
+  "accession": "O14786",
+  "uniprot_name": "Neuropilin-1",
+  "length": 923,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD304",
+   "NRP1",
+   "neuropilin-1",
+   "NRP",
+   "BDCA-4",
+   "BDCA4",
+   "vascular endothelial cell growth factor 165 receptor"
+  ],
+  "description": "Co-receptor that raises VEGF-A affinity for VEGFR2 and also binds class-3 semaphorins, carried by endothelium, pericytes, pDCs and Tregs. The library holds VEGF-A, its splice variants and VEGFR2 but not the co-receptor that forms the high-affinity complex, so modelled angiogenesis is missing the component that VEGF165 engages and VEGF121 cannot. NRP1 on Tregs also stabilises their intratumoral suppression, so this one molecule couples the platform's angiogenesis and immunosuppression arms.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "ST2",
+  "entity_name": "ST2 (IL1RL1)",
+  "gene": "IL1RL1",
+  "accession": "Q01638",
+  "uniprot_name": "Interleukin-1 receptor-like 1",
+  "length": 556,
+  "entity_type": "receptor",
+  "synonyms": [
+   "IL1RL1",
+   "ST2",
+   "ST2L",
+   "T1",
+   "DER4",
+   "IL-33 receptor",
+   "interleukin-1 receptor-like 1",
+   "protein ST2"
+  ],
+  "description": "The IL-33 receptor alpha chain, which pairs with IL1RAP and signals through MyD88-IRAK-NF-kappaB; the library lists \"ST2\" on ILC2 and its IL-33 cytokine record already names \"IL1RL1 (ST2)\" as the receptor -- so the ligand side existed and the receptor it names did not. An alternative promoter yields a soluble decoy form, sST2, which the library's IL-33 description also mentions. In a tumour twin the IL-33/ST2 axis is what recruits and licenses ILC2s, Th2 cells and mast cells into the microenvironment: the type-2 arm this platform currently cannot close.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "Siglec-8",
+  "entity_name": "Siglec-8 (SIGLEC8)",
+  "gene": "SIGLEC8",
+  "accession": "Q9NYZ4",
+  "uniprot_name": "Sialic acid-binding Ig-like lectin 8",
+  "length": 499,
+  "entity_type": "receptor",
+  "synonyms": [
+   "SIGLEC8",
+   "Siglec-8",
+   "SAF-2",
+   "sialoadhesin family member 2",
+   "sialic acid-binding Ig-like lectin 8"
+  ],
+  "description": "Inhibitory sialic-acid-binding lectin restricted to eosinophils, mast cells and basophils; the library lists it on its eosinophil entity. Engaging its sialylated ligand triggers eosinophil apoptosis and suppresses mast-cell degranulation, so it is an off-switch rather than an activating receptor -- the opposite sign from most markers in this batch. It is the target of lirentelimab, which is what makes the eosinophil and mast-cell compartments addressable in a treatment simulation rather than merely present.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD141",
+  "entity_name": "Thrombomodulin (CD141/THBD)",
+  "gene": "THBD",
+  "accession": "P07204",
+  "uniprot_name": "Thrombomodulin",
+  "length": 575,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD141",
+   "THBD",
+   "thrombomodulin",
+   "TM",
+   "fetomodulin",
+   "BDCA-3",
+   "BDCA3"
+  ],
+  "description": "Endothelial transmembrane receptor that binds thrombin and switches it from a procoagulant into an activator of protein C -- the main anticoagulant brake on the vessel wall. This platform models endothelium explicitly (it holds Endothelial cell, HEV cell and postcapillary venule entities), and loss of thrombomodulin is much of what makes tumour vasculature prothrombotic. CD141 is simultaneously the defining marker of cDC1 dendritic cells, the subset that cross-presents tumour antigen to CD8 T cells, so the same referenced string means two different things depending on the cell carrying it.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ },
+ {
+  "referenced_as": "CD117",
+  "entity_name": "c-Kit (CD117/KIT)",
+  "gene": "KIT",
+  "accession": "P10721",
+  "uniprot_name": "Mast/stem cell growth factor receptor Kit",
+  "length": 976,
+  "entity_type": "receptor",
+  "synonyms": [
+   "CD117",
+   "KIT",
+   "c-Kit",
+   "SCFR",
+   "proto-oncogene c-Kit",
+   "p145 c-kit",
+   "piebald trait protein",
+   "mast/stem cell growth factor receptor"
+  ],
+  "description": "Receptor tyrosine kinase for stem cell factor, carried by haematopoietic progenitors, mast cells and melanocytes. The library already holds its ligand, SCF (Kit ligand), as a cytokine with no receptor to bind, so the pair can finally form. KIT is also a directly druggable oncogenic driver -- activating mutations in GIST, mastocytosis and AML, targeted by imatinib -- which makes it one of the few molecules in this batch that is both an immune marker and a variant this platform may read out of a patient VCF.",
+  "compartments": [
+   "cell_membrane"
+  ]
+ }
+]

@@ -436,10 +436,30 @@ def seeded_store(tmp_path_factory):
     return EntityStore(db_path=str(path))
 
 
+
+#: Adhesion molecules that arrived with the marker-molecule batch rather
+#: than with the diapedesis curation. They are correctly typed -- CD44 is
+#: the hyaluronan receptor, CD56 is neural cell adhesion molecule, CD11c
+#: is an integrin -- and none of them carries a ligand Kd. That is a real
+#: gap, newly created, and it is named here rather than defined away: the
+#: alternative considered was to declare kd_nm inapplicable to them,
+#: which would have made the cascade's coverage look complete by
+#: excluding six molecules that genuinely adhere to something.
+FROM_MARKER_BATCH = (
+    "Granulocyte activation antigen (CD66b/CEACAM8)",
+    "Hematopoietic progenitor antigen (CD34)",
+    "Hyaluronan receptor (CD44)",
+    "Integrin alpha-X (CD11c/ITGAX)",
+    "NCAM-1 (CD56)",
+    "Syndecan-1 (CD138)",
+)
+
+
 def test_a_freshly_seeded_library_carries_the_citations(seeded_store):
     entities, _ = seeded_store.search(
         entity_type=EntityType.ADHESION_MOLECULE.value, limit=100)
-    assert len(entities) == 15
+    # 15 from the diapedesis curation, 6 from the marker batch.
+    assert len(entities) == 15 + len(FROM_MARKER_BATCH) == 21
     cited = {
         pv.citation
         for e in entities for _, pv in iter_parameters(e) if pv.citation
@@ -460,21 +480,33 @@ def test_the_curated_molecules_are_simulation_ready_and_the_gaps_are_not(
     entities, _ = seeded_store.search(
         entity_type=EntityType.ADHESION_MOLECULE.value, limit=100)
     report = coverage(entities)
-    assert report.total == 15
+    assert report.total == 21
     assert report.ready == len(BY_MOLECULE) == 9
-    assert {r.entity_name for r in report.not_ready} == set(UNSOURCED)
+    # The six from the marker batch are not ready either, and should not
+    # be: an adhesion molecule with no ligand Kd cannot parameterize an
+    # adhesion. They are listed separately so the two gaps are not
+    # conflated -- UNSOURCED is six molecules whose Kd exists and is not
+    # yet evidenced, FROM_MARKER_BATCH is six that have none at all.
+    assert {r.entity_name for r in report.not_ready} == (
+        set(UNSOURCED) | set(FROM_MARKER_BATCH))
 
 
-def test_no_adhesion_molecule_is_missing_its_kd_any_more(seeded_store):
+def test_absent_and_unevidenced_kds_are_counted_apart(seeded_store):
     """Before this, assess() reported kd_nm absent on all fifteen while
     a number sat in the dataclass. Absent and unevidenced need
     different work, so the report must not conflate them."""
     entities, _ = seeded_store.search(
         entity_type=EntityType.ADHESION_MOLECULE.value, limit=100)
     report = coverage(entities)
-    assert report.by_parameter_missing.get("kd_nm", 0) == 0
     assert report.by_parameter_placeholder.get("kd_nm", 0) == len(UNSOURCED)
-    assert report.by_parameter_uncurated["kd_nm"] == len(UNSOURCED)
+    # Not zero any more, and the number is the whole point: six adhesion
+    # molecules joined with the marker batch and none brought a Kd. The
+    # original claim -- that no adhesion molecule is missing one -- was
+    # true of the fifteen it was written about and is false of the
+    # twenty-one now here. Sourcing these six is the work this names.
+    assert report.by_parameter_missing.get("kd_nm", 0) == len(FROM_MARKER_BATCH)
+    assert report.by_parameter_uncurated["kd_nm"] == (
+        len(UNSOURCED) + len(FROM_MARKER_BATCH))
 
 
 def test_provenance_survives_the_store_round_trip(seeded_store):
@@ -506,8 +538,14 @@ def test_the_curation_report_separates_absent_from_unevidenced(seeded_store):
     from cognisom.library.curation_report import build_report
 
     text = build_report(seeded_store, (EntityType.ADHESION_MOLECULE,))
-    assert "present but unevidenced  kd_nm" in text
-    assert "absent  kd_nm" not in text
+    # Both kinds are present now and the report keeps them apart: six
+    # molecules carry a Kd with placeholder provenance, and six carry
+    # none at all. They need different work -- the first needs a
+    # citation found, the second needs a measurement -- so a single
+    # "uncurated" count would hide which.
+    assert "6 absent, 6 unevidenced" in text
+    assert "kd_nm" in text
+    assert "12 uncurated" in text
 
 
 # ── Nothing the enricher used to supply goes missing ─────────────────

@@ -84,6 +84,95 @@ COMPARTMENT: Dict[str, str] = {
     "elastase": "granule", "lactoferrin": "granule", "defensins": "granule",
 }
 
+#: The six places a marker can be drawn. ``unknown`` is not a place; it
+#: is an admission, and it is kept separate so it can be counted.
+BUCKETS: Tuple[str, ...] = ("membrane", "nucleus", "granule", "cytoplasm",
+                            "secreted", "unknown")
+
+#: The library's OWN compartment vocabulary, mapped to those buckets.
+#:
+#: :data:`COMPARTMENT` above is a hand-written table of marker strings, and
+#: it does not scale: 115 of the 173 marker strings this library refers to
+#: are not in it, and every one of them was drawn as a stud on the plasma
+#: membrane. That is not a missing entry here and there -- it is 66% of
+#: the vocabulary, and it put nuclear transcription factors, granule
+#: cargo, cytoskeleton and secreted chemokines on the cell surface.
+#:
+#: The entities already record where they live. 188 of 302 carry a
+#: ``compartments`` field, in 23 distinct strings, and nothing read it.
+#: So the table stays as the hand-checked authority and this map lets the
+#: library answer for everything the table never mentioned.
+#:
+#: Two readings deserve stating. An INTERNAL membrane is not the plasma
+#: membrane: a lysosomal or mitochondrial membrane protein is inside the
+#: cell, and drawing it as a surface receptor is the same error one
+#: organelle further in, so those map to ``cytoplasm``. And
+#: ``extracellular`` maps to ``secreted`` only because it is safe to here:
+#: it is carried by cytokines, drugs, metabolites, complement, antibodies
+#: and soluble proteins, and by no receptor or adhesion molecule in this
+#: library. If that ever stops being true this map is wrong.
+LIBRARY_COMPARTMENT: Dict[str, str] = {
+    # the plasma membrane itself, and structures in it
+    "cell_membrane": "membrane", "plasma membrane": "membrane",
+    "plasma_membrane": "membrane", "cell membrane": "membrane",
+    "target plasma membrane": "membrane",
+    "killer cell plasma membrane": "membrane",
+    "adherens_junction": "membrane", "focal_adhesions": "membrane",
+    "invadopodia": "membrane", "tight_junction": "membrane",
+    # the DISC assembles ON the membrane, around a ligated death receptor
+    "DISC": "membrane",
+    # nucleus
+    "nucleus": "nucleus", "nucleolus": "nucleus", "spindle": "nucleus",
+    "chromatin": "nucleus",
+    # stored cargo -- the bucket that implies granules exist to store it
+    "cytotoxic granule": "granule", "granule": "granule",
+    "azurophilic granule": "granule", "secretory granule": "granule",
+    "specific granule": "granule", "weibel-palade body": "granule",
+    # the interior: cytosol, and the organelles and their membranes
+    "cytoplasm": "cytoplasm", "cytosol": "cytoplasm",
+    "target cytosol": "cytoplasm", "mitochondria": "cytoplasm",
+    "mitochondrion": "cytoplasm",
+    "mitochondrial_outer_membrane": "cytoplasm",
+    "mitochondrial_intermembrane_space": "cytoplasm",
+    "mitochondrial_matrix": "cytoplasm",
+    "lysosome": "cytoplasm", "lysosome_membrane": "cytoplasm",
+    "endosome": "cytoplasm", "centrosome": "cytoplasm",
+    "apoptosome": "cytoplasm", "cytoskeleton": "cytoplasm",
+    "endoplasmic_reticulum": "cytoplasm", "golgi": "cytoplasm",
+    "er membrane": "cytoplasm", "peroxisome": "cytoplasm",
+    # outside the cell
+    "extracellular": "secreted", "secreted": "secreted",
+    "blood": "secreted", "plasma": "secreted", "serum": "secreted",
+    "ECM": "secreted", "extracellular_matrix": "secreted",
+    "basement_membrane": "secreted",
+}
+
+#: Which bucket wins when one entity declares several, most decisive
+#: first. A molecule stored in a granule and released onto a target
+#: membrane is granule cargo: that is what shapes the cell holding it.
+#: Membrane beats cytoplasm so a receptor with a cytoplasmic tail stays a
+#: receptor, and secreted is last because almost anything soluble also
+#: passes through the cytosol on its way out.
+BUCKET_PRECEDENCE: Tuple[str, ...] = ("granule", "nucleus", "membrane",
+                                      "cytoplasm", "secreted")
+
+
+def bucket_for_compartments(compartments: Sequence[str]) -> Optional[str]:
+    """The one bucket a list of library compartment strings resolves to."""
+    found = set()
+    for raw in compartments or ():
+        key = str(raw).strip()
+        bucket = (LIBRARY_COMPARTMENT.get(key)
+                  or LIBRARY_COMPARTMENT.get(key.lower())
+                  or LIBRARY_COMPARTMENT.get(key.replace(" ", "_").lower()))
+        if bucket:
+            found.add(bucket)
+    for bucket in BUCKET_PRECEDENCE:
+        if bucket in found:
+            return bucket
+    return None
+
+
 #: Colours for the markers that appear most, so a CD4 reads as the same
 #: blue on every cell that carries it. Anything else gets a stable colour
 #: derived from its name: stable so two renders agree, derived so a new
@@ -204,6 +293,16 @@ class Profile:
     membrane_markers: List[str] = field(default_factory=list)
     nuclear_markers: List[str] = field(default_factory=list)
     granule_markers: List[str] = field(default_factory=list)
+    #: Cytoskeleton, enzymes and internal-membrane proteins. Drawn inside
+    #: the cell, which for a vimentin or a cytokeratin is the whole
+    #: point: they are the markers that say mesenchymal or epithelial,
+    #: and on the surface they say nothing.
+    cytoplasmic_markers: List[str] = field(default_factory=list)
+    #: Chemokines, interleukins and matrix proteins. NOT drawn on this
+    #: cell at all -- a secreted molecule has left. Recorded so the
+    #: secretory repertoire stays legible without being painted onto the
+    #: membrane it crossed.
+    secreted_markers: List[str] = field(default_factory=list)
     unknown_markers: List[str] = field(default_factory=list)
 
     #: Short account of why this cell got this detail.
@@ -281,6 +380,21 @@ def classify(mesh_type: str) -> str:
 #: Trailing flow-cytometry notation: a level, not part of the name.
 _LEVEL = re.compile(r"(hi|lo|low|high|int|dim|bright|\+|-)$", re.I)
 
+#: A trailing word describing the marker's STATE on this cell rather than
+#: naming a different molecule. ``VCAM1_inducible`` is VCAM-1, and
+#: ``CXCL8_displayed`` is CXCL8 presented on the surface instead of
+#: released -- both are the molecule the library already holds.
+#:
+#: Six marker strings failed to resolve on this alone: ICAM-1_,
+#: VCAM-1_, ICAM1_inducible, VCAM1_inducible, E-selectin_inducible and
+#: CXCL8_displayed, every one of which has an entity. It is the same
+#: failure as CD8 against CD8+, one qualifier along, and it has the same
+#: consequence -- the molecule is counted absent and drawn as an
+#: anonymous stud.
+_STATE = re.compile(
+    r"[_\s-]+(inducible|displayed|induced|soluble|bound|surface|"
+    r"secreted|cleaved|activated|total|cytoplasmic|nuclear)$", re.I)
+
 
 def normalise_marker(marker: str) -> str:
     """The molecule underneath a marker string as the library writes it.
@@ -301,7 +415,10 @@ def normalise_marker(marker: str) -> str:
     out = str(marker).strip()
     # Strip repeatedly: "CD127lo+" occurs.
     for _ in range(3):
-        stripped = _LEVEL.sub("", out).strip()
+        stripped = _STATE.sub("", _LEVEL.sub("", out)).strip()
+        # A trailing separator is left behind by the library's own
+        # "ICAM-1_" and would otherwise survive into the lookup key.
+        stripped = stripped.rstrip("_- ")
         if stripped == out:
             break
         out = stripped
@@ -317,25 +434,69 @@ def _canonical(marker: str) -> str:
 _COMPARTMENT_BY_KEY = None
 
 
-def compartment_of(marker: str) -> Optional[str]:
-    """Where this molecule resides, however the marker is written."""
+def compartment_of(marker: str,
+                   index: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """Where this molecule resides, however the marker is written.
+
+    The hand-checked :data:`COMPARTMENT` table answers first, because it
+    was written deliberately and a curated placement should not be
+    overturned by a bulk import. ``index`` -- from
+    :func:`library_compartment_index` -- answers for everything the table
+    never mentioned, which is most of the vocabulary.
+    """
     global _COMPARTMENT_BY_KEY
     if _COMPARTMENT_BY_KEY is None:
         _COMPARTMENT_BY_KEY = {_canonical(k): v
                                for k, v in COMPARTMENT.items()}
-    return _COMPARTMENT_BY_KEY.get(_canonical(marker))
+    key = _canonical(marker)
+    found = _COMPARTMENT_BY_KEY.get(key)
+    if found is not None:
+        return found
+    return (index or {}).get(key)
 
 
-def partition_markers(markers: Sequence[str]) -> Dict[str, List[str]]:
+def library_compartment_index(store) -> Dict[str, str]:
+    """``canonical marker key -> bucket``, from the entities themselves.
+
+    Built from every name form an entity answers to, so a marker list
+    saying ``CCL19`` reaches the entity named ``CCL19 (MIP-3beta)`` and
+    is placed where that entity says it lives.
+
+    A form two entities claim is DROPPED when they disagree about the
+    bucket, and kept when they agree. Guessing between them would put a
+    molecule somewhere it is not, which is the failure this whole
+    function exists to stop; agreeing is not a guess.
+    """
+    import json as _json
+
+    from cognisom.library import seed_synonyms as _syn
+
+    rows = [tuple(r) for r in store._conn.execute(
+        "SELECT name, data_json FROM entities")]
+    claims: Dict[str, set] = {}
+    for name, blob in rows:
+        data = _json.loads(blob or "{}")
+        bucket = bucket_for_compartments(data.get("compartments") or ())
+        if bucket is None:
+            continue
+        forms = {name} | set(data.get("synonyms") or [])
+        forms |= set(_syn.derive(name, data.get("properties") or {}))
+        for form in forms:
+            key = _canonical(form)
+            if key:
+                claims.setdefault(key, set()).add(bucket)
+    return {key: next(iter(buckets)) for key, buckets in claims.items()
+            if len(buckets) == 1}
+
+
+def partition_markers(markers: Sequence[str],
+                      index: Optional[Dict[str, str]] = None
+                      ) -> Dict[str, List[str]]:
     """Split a marker list by where each molecule actually resides."""
-    out: Dict[str, List[str]] = {"membrane": [], "nucleus": [],
-                                 "granule": [], "unknown": []}
+    out: Dict[str, List[str]] = {bucket: [] for bucket in BUCKETS}
     for marker in markers or ():
-        where = compartment_of(marker)
-        if where is None:
-            out["unknown"].append(str(marker))
-        else:
-            out[where].append(str(marker))
+        where = compartment_of(marker, index)
+        out[where if where in out else "unknown"].append(str(marker))
     return out
 
 
@@ -379,6 +540,7 @@ def library_detail(entity) -> Dict[str, float]:
 def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
                 scale_um: float = 8.0,
                 library: Optional[Dict[str, float]] = None,
+                compartments: Optional[Dict[str, str]] = None,
                 **overrides) -> Profile:
     """The detail profile for one library entity.
 
@@ -428,7 +590,7 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
         why.append(f"{kind}: a smooth surface, mitochondria and few "
                    "lysosomes")
 
-    placed = partition_markers(markers)
+    placed = partition_markers(markers, compartments)
     lytic_keys = {_canonical(c) for c in LYTIC_CARGO}
     carried = sorted(m for m in placed["granule"]
                      if _canonical(m) in lytic_keys)
@@ -442,6 +604,14 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
         why.append("nuclear markers " + ", ".join(sorted(placed["nucleus"])) +
                    " are transcription factors, drawn in the nucleus and "
                    "not on the membrane")
+    if placed["cytoplasm"]:
+        why.append("cytoplasmic markers " +
+                   ", ".join(sorted(placed["cytoplasm"])) +
+                   " are drawn inside the cell, not on it")
+    if placed["secreted"]:
+        why.append("secreted markers " +
+                   ", ".join(sorted(placed["secreted"])) +
+                   " are not drawn on this cell: they have left it")
     if placed["unknown"]:
         log.debug("%s: markers with no recorded compartment: %s",
                   name, placed["unknown"])
@@ -477,6 +647,14 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     profile.sources = sources
     # Spread the stud budget across the receptors the cell carries, so the
     # complement is visible rather than a single anonymous density.
+    # Unknown markers still go on the membrane: the field is called
+    # surface_markers and that is the declared default. What changed is
+    # that unknown no longer means "not in a hand-written table" -- the
+    # library answers first, so what lands here is genuinely unplaced.
+    # Cytoplasmic and secreted markers are deliberately NOT here. A
+    # vimentin drawn as a surface stud is the error this module exists
+    # to prevent, one compartment further out than the perforin it
+    # already prevents.
     receptors = placed["membrane"] + placed["unknown"]
     total = int(base.get("receptor_stud_count", 0) or 0)
     if receptors and total:
@@ -488,6 +666,8 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     profile.membrane_markers = placed["membrane"]
     profile.nuclear_markers = placed["nucleus"]
     profile.granule_markers = placed["granule"]
+    profile.cytoplasmic_markers = placed["cytoplasm"]
+    profile.secreted_markers = placed["secreted"]
     profile.unknown_markers = placed["unknown"]
     profile.rationale = "; ".join(why) or "no detail class matched"
     return profile

@@ -56,15 +56,22 @@ def rows(store):
 
 
 def _referenced(rows):
-    """Molecules the library's own records name, normalised."""
+    """Molecules the library's own records name, normalised.
+
+    Through the renderer's own normaliser rather than a copy of it. The
+    copy that used to live here stripped levels but not state suffixes,
+    so it and ``cell_profiles`` disagreed about ``CXCL8_displayed`` --
+    one called the molecule absent while the other resolved it. A second
+    implementation of a rule is a second answer to the same question.
+    """
+    from cognisom.visualization.cell_profiles import normalise_marker
+
     out = set()
     for _t, _n, blob in rows:
         props = (json.loads(blob or "{}").get("properties") or {})
         for field in ("surface_markers", "markers", "cytokines_secreting"):
             for value in (props.get(field) or []):
-                v = re.sub(r"(hi|lo|low|high|int|dim|bright)$", "",
-                           str(value).strip(), flags=re.I)
-                out.add(re.sub(r"[+\-]$", "", v).strip())
+                out.add(normalise_marker(value))
     return {x for x in out if x}
 
 
@@ -189,30 +196,63 @@ def test_a_parenthetical_that_is_prose_is_not_made_into_a_molecule():
 
 # ── what is still missing, stated rather than implied ────────────────
 
-def test_most_referenced_molecules_are_still_not_entities(store, rows):
-    """This is the open gap and the test exists to keep it visible. If
-    it starts failing because the number fell, that is the work landing
-    -- update the bound and say what was added."""
+def test_most_referenced_molecules_are_entities_now(store, rows):
+    """This was the open gap and the test existed to keep it visible.
+
+    It fell, which is the work landing: 118 of 151 referenced molecules
+    were not entities, and 29 are. The 87 that closed it came from a
+    seven-agent curation pass whose accessions were then re-resolved
+    against UniProt by a separate verifier -- gene symbol, recommended
+    protein name and sequence length, 86 of 86.
+
+    What remains is the honest residue, and it is a different shape from
+    what it replaced. Six are lineage transcription factors with
+    accessions already verified and simply not yet written. The rest are
+    mostly NOT single proteins -- TCR, KIR, class-switched Ig and
+    Va24Ja18TCR are rearranged or multigene receptors, ALDH is a family,
+    NO is a gas -- and an entity for each would be a category error, not
+    a curation win.
+    """
     index = syn.resolve_index(store)
     referenced = _referenced(rows)
     missing = {v for v in referenced if v.lower() not in index}
     assert len(referenced) > 140
-    assert 80 < len(missing) <= 118, (
+    assert len(missing) <= 35, (
         f"{len(missing)} of {len(referenced)} referenced molecules are not "
-        "entities; if this fell, the entity set grew -- raise the bound")
+        f"entities, up from 29: {sorted(missing)}")
+    # and the direction of travel is pinned, so this cannot quietly rot
+    assert len(missing) / len(referenced) < 0.25
 
 
-def test_the_biggest_absent_classes_are_the_expected_ones(store, rows):
+def test_the_cd_markers_and_chemokines_are_no_longer_the_gap(store, rows):
+    """They were the two biggest absent classes: 51 CD markers and 11
+    chemokines. Both are closed."""
     index = syn.resolve_index(store)
     missing = {v for v in _referenced(rows) if v.lower() not in index}
     cd = {m for m in missing if m.startswith("CD")}
     chemokine = {m for m in missing if m.startswith(("CCL", "CXCL", "CCR", "CXCR"))}
-    factors = {"FOXP3", "T-bet", "GATA3", "RORgt", "BCL6"} & missing
-    assert len(cd) > 30, len(cd)
-    assert len(chemokine) > 5, chemokine
-    # These are the lineage definers the renderer uses to tell a Treg
-    # from a Th1. None of them is an entity.
-    assert len(factors) >= 4, factors
+    assert len(cd) <= 3, sorted(cd)
+    assert not chemokine, sorted(chemokine)
+
+
+def test_the_lineage_transcription_factors_are_the_named_remaining_gap(
+        store, rows):
+    """FOXP3, T-bet, GATA3, RORgt, BCL6 and BLIMP-1 are what the
+    renderer would tell a Treg from a Th1 by, and none is an entity.
+
+    Their accessions are verified and sitting in the notes -- FOXP3
+    Q9BZS1, TBX21 Q9UL17, GATA3 P23771, RORC P51449, BCL6 P41182, PRDM1
+    O75626 -- so this is writing, not research. The test names them so
+    the gap cannot be reported as closed while they are absent, and so
+    that whoever adds them deletes this test rather than editing a
+    number.
+    """
+    index = syn.resolve_index(store)
+    missing = {v for v in _referenced(rows) if v.lower() not in index}
+    factors = {"FOXP3", "T-bet", "GATA3", "RORgt", "BCL6", "BLIMP-1"} & missing
+    assert len(factors) >= 4, (
+        f"some arrived: {sorted({'FOXP3','T-bet','GATA3','RORgt','BCL6','BLIMP-1'} - factors)}"
+        " -- finish the set and delete this test")
 
 
 # ── the effectors reach the simulation ───────────────────────────────
