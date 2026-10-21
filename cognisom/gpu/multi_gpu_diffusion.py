@@ -412,15 +412,32 @@ class MultiGPUDiffusionSolver:
         return out
 
     #: The operator split carries a reaction-diffusion error of order k*dt
-    #: (``implicit_diffusion._uptake_field_step``), measured at 0.71% for
-    #: k*dt = 0.0071. Past roughly this the split stops being a small
-    #: correction: diffusion smooths the field, then the sink knocks only the
-    #: occupied voxels down, and the pair never reach the coupled steady
-    #: state. The visible symptom is a voxel-scale checkerboard -- a
-    #: consuming voxel sitting far below its empty neighbour even where
-    #: D*dt/dx^2 is in the hundreds and diffusion should have erased any such
-    #: step. It reads as a result and it is an artefact, which is why this is
-    #: checked rather than left in a docstring.
+    #: (``implicit_diffusion._uptake_field_step``), measured at 0.71% for the
+    #: k*dt = 0.0071 the engine runs at. That 0.71% is relative to the FIELD
+    #: VALUE, and it is the most misleading number in this module.
+    #:
+    #: What the simulation wants from this field is the DEPLETION -- how far
+    #: below arterial the tissue between vessels falls -- and at the shipped
+    #: consumption rate the true depletion is 4.77e-06 against a field of
+    #: 0.21, or 0.002%. An error worth 0.71% of the field is therefore 300
+    #: times the entire quantity of interest. Measured against an exact
+    #: Newton solve of the 7-point operator: at dt = 36 s the fixed point
+    #: depletes by 1.49e-03 where the truth is 4.77e-06, over by 312x. At
+    #: dt = 0.168 s it is over by 3.3x. Every error in this module has to be
+    #: quoted against the depletion or it sounds benign.
+    #:
+    #: It is dimension-independent -- 1-D and 3-D geometries give the same
+    #: 1.49e-03 to three figures -- so it is the reaction split and not the
+    #: ADI directional one, and no amount of iterating helps: the iterate
+    #: goes bit-for-bit stationary with the 7-point equation still out of
+    #: balance, because the split's fixed point solves a modified equation.
+    #:
+    #: The uncomfortable consequence: resolving the true depletion to 10%
+    #: needs dt near 0.005 s, about 7,000 substeps per engine step, which is
+    #: the same order as the 4,320 the EXPLICIT scheme needs for stability.
+    #: The implicit solver bought unconditional stability and did not buy a
+    #: long step for this quantity. A steady-state elliptic solve, rather
+    #: than time-stepping at all, is the way out.
     _SPLIT_ERROR_LIMIT = 0.1
 
     def _check_split_validity(self, name: str, per_gpu, dt_seconds: float
@@ -438,12 +455,14 @@ class MultiGPUDiffusionSolver:
             return
         self._warned_split.add(name)
         log.warning(
-            "%s: uptake k*dt = %.3g exceeds %.3g, so the operator split is "
-            "no longer a small correction and the field will show a "
+            "%s: uptake k*dt = %.3g exceeds %.3g, so the reaction operator "
+            "split is no longer a small correction and the field will show a "
             "voxel-scale checkerboard that is an artefact of the splitting, "
-            "not a gradient. Either raise diffusion_substeps by about %dx or "
-            "solve the field to steady state; its relaxation time is far "
-            "below one step.",
+            "not a gradient. Raise diffusion_substeps by about %dx. Note "
+            "that even k*dt BELOW this limit is not safe for a depletion: at "
+            "the shipped 0.0071 the fixed point over-depletes by 312x, "
+            "because 0.71%% of the field is 300 times the depletion the "
+            "field is being asked for.",
             name, kdt, self._SPLIT_ERROR_LIMIT,
             max(2, int(kdt / self._SPLIT_ERROR_LIMIT)),
         )

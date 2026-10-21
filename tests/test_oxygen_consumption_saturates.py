@@ -217,19 +217,18 @@ def test_oxygen_asks_for_saturation_and_glucose_does_not():
 
 
 def test_an_invalid_operator_split_says_so(caplog):
-    """The limit was documented and unenforced, and it cost three measurements.
+    """The limit was documented and unenforced, and the number reassured.
 
-    ``_uptake_field_step`` states that the split carries an error of order
-    k*dt and that the engine operates at k*dt = 0.0071. Nothing checked it.
-    Raising the uptake to chase hypoxia drove k*dt to 0.71, and the field came
-    back with a 112% step between neighbouring voxels where D*dt/dx^2 = 720 --
-    a checkerboard that looks exactly like structure and is entirely an
-    artefact of the splitting. Against an exact coupled steady state of the
-    same discrete operator, that field was 71.6% wrong, and the error tracked
-    k*dt across three decades (0.714 -> 71.6%, 0.0198 -> 2.0%, 0.0010 -> 0.1%).
+    ``_uptake_field_step`` states the split carries an error of order k*dt and
+    that the engine operates at 0.0071, "0.71%". Raising the uptake to chase
+    hypoxia drove it to 0.71, and the field came back with a 112% step between
+    neighbouring voxels -- a checkerboard that looks exactly like structure.
+    So the limit belongs in the code, where it fires.
 
-    So the check belongs in the code, where it fires, and not in a docstring,
-    where it did not.
+    The warning also has to say that being UNDER the limit is not safety,
+    because that 0.71% is a fraction of the field value while the depletion
+    the field is being asked for is 0.002% of the field value. See
+    test_the_error_is_tiny_against_the_field_and_huge_against_the_depletion.
     """
     import logging
     from cognisom.gpu.multi_gpu_diffusion import MultiGPUDiffusionSolver
@@ -238,8 +237,6 @@ def test_an_invalid_operator_split_says_so(caplog):
     assert 0 < limit < 1
 
     dt = 36.0
-    too_big = 10.0 * limit / dt
-    fine = 0.01 * limit / dt
 
     class _Stub:
         """Only what _check_split_validity touches."""
@@ -254,19 +251,22 @@ def test_an_invalid_operator_split_says_so(caplog):
         stub = _Stub()
         with caplog.at_level(logging.WARNING):
             caplog.clear()
-            stub._check_split_validity(
-                "oxygen", [np.full((2, 2, 2), k)], dt)
-            stub._check_split_validity(          # again: must not repeat
-                "oxygen", [np.full((2, 2, 2), k)], dt)
-        return [r for r in caplog.records if r.levelno >= logging.WARNING]
+            for _ in range(2):          # twice: must warn once, not twice
+                stub._check_split_validity(
+                    "oxygen", [np.full((2, 2, 2), k)], dt)
+        return [r.getMessage() for r in caplog.records
+                if r.levelno >= logging.WARNING]
 
-    assert warnings_for(fine) == [], "a valid split must stay quiet"
+    assert warnings_for(0.01 * limit / dt) == [], "a valid split stays quiet"
 
-    warned = warnings_for(too_big)
+    warned = warnings_for(10.0 * limit / dt)
     assert len(warned) == 1, "warn once per field, not once per step"
-    text = warned[0].getMessage()
-    assert "oxygen" in text
-    assert "checkerboard" in text, (
+    assert "oxygen" in warned[0]
+    assert "checkerboard" in warned[0], (
         "the warning has to name the symptom, or it will be read as a "
         "tolerance notice and ignored"
+    )
+    assert "312x" in warned[0], (
+        "and it has to say that staying under the limit is not enough, or "
+        "the limit itself becomes the reassurance"
     )
