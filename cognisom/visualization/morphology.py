@@ -210,12 +210,6 @@ def _veil(g, centre, direction, reach, width, thickness):
 #: between these cells. The builders gave an eosinophil 2.4% and a
 #: neutrophil 1.5% -- tenfold low, and close enough to each other that
 #: the discriminator was flattened to nothing.
-GRANULE_FRACTION = {
-    "eosinophil": 0.230,
-    "neutrophil": 0.154,
-    "monocyte": 0.026,
-    "lymphocyte": 0.002,
-}
 
 
 def _granules_to_fraction(g, body, fraction, radius, seed, spread=0.35):
@@ -262,41 +256,81 @@ def _spikes(g, n, inner, outer, thickness, seed):
     return out
 
 
+@dataclass(frozen=True)
+class ShapeParams:
+    """The proportions an ENTITY supplies, as opposed to its type.
+
+    These numbers lived as module constants, and the library stored the
+    same numbers again as provenanced parameters. Two copies of one
+    measurement is one copy too many, and the module's copy won:
+    ``cell_profiles.library_detail`` fetched seven parameters off the
+    entity and ``FROM_LIBRARY`` mapped two of them, so
+    ``nuclear_volume_fraction`` -- 0.444, read out of PMID 6775712 Table
+    2 by hand, agreeing with Petrzilka's independent 0.458, and cleared
+    by that paper's own Appendix as the one fraction whose
+    section-thickness error is negligible -- was fetched, graded
+    MEASURED on 20 entities, and then overridden by a constant.
+
+    The copies agreed, which is why it went unnoticed, and they agreed
+    only because one person wrote both in one pass. One had already
+    drifted: ``granular_sphere`` carved granules at 0.020 while the NK
+    cell entity stored 0.002, a factor of ten, and the hardcoded one was
+    what rendered.
+
+    A field left None means the caller supplied nothing and the builder
+    falls back to the documented default below. That is not the same as
+    a measurement and the scene records which it got.
+    """
+
+    nuclear_volume_fraction: Optional[float] = None
+    granule_volume_fraction: Optional[float] = None
+
+    def nuclear_radius(self, body_radius: float = 0.92) -> float:
+        """Nuclear radius as a fraction of the grid, from the fraction.
+
+        A RADIUS is the cube root of a volume fraction. Using the
+        fraction directly would put a lymphocyte nucleus at 8.8% of the
+        cell instead of 76%.
+        """
+        fraction = (self.nuclear_volume_fraction
+                    if self.nuclear_volume_fraction is not None
+                    else DEFAULT_NUCLEAR_VOLUME_FRACTION)
+        return body_radius * float(fraction) ** (1.0 / 3.0)
+
+    def granules(self, default: float) -> float:
+        """Granule volume fraction, or the builder's own default."""
+        return (float(self.granule_volume_fraction)
+                if self.granule_volume_fraction is not None else default)
+
+
+#: Used only when no entity supplies one. The measured value for a
+#: resting human lymphocyte (PMID 6775712 Table 2, 44.4%); it is here as
+#: a fallback for a bare build_parts() call, not as the source of truth.
+#: An entity that carries the parameter overrides it.
+DEFAULT_NUCLEAR_VOLUME_FRACTION = 0.444
+
+#: Per-builder granule fallbacks, same status: the measured values, used
+#: when the caller supplies nothing. The eosinophil and neutrophil
+#: numbers are PMID 6775712 Table 2 and agree with the entities; the
+#: 0.020 that granular_sphere used to carry agreed with nothing and is
+#: now the lymphocyte's measured 0.002.
+DEFAULT_GRANULE_FRACTION: Dict[str, float] = {
+    "eosinophil": 0.230, "neutrophil": 0.154,
+    "monocyte": 0.026, "lymphocyte": 0.002,
+}
+
+#: No entity supplied anything.
+NO_PARAMS = ShapeParams()
+
+
 # ── builders ─────────────────────────────────────────────────────────────
 # Each returns a dict of label -> boolean volume. Label 1 is always the body.
 
-def _b_sphere(g, seed):
+def _b_sphere(g, seed, p):
     return {1: _sphere(g, r=0.92)}
 
 
-#: Nuclear radius as a fraction of the cell's, for a lymphocyte.
-#:
-#: A resting lymphocyte is described in every histology text as a nucleus
-#: with a rim of cytoplasm: the nucleus takes most of the cell. This was
-#: 0.42 against a body of 0.92, a volume ratio of (0.42/0.92)^3 = 0.095 --
-#: a dot in an empty ball, and the main reason the library's eighteen
-#: smooth_sphere entities read as featureless spheres rather than as
-#: lymphocytes.
-#:
-#: The replacement is measured, and it is NOT the 0.66 that "a nucleus
-#: with a rim of cytoplasm" suggests. Two groups, two stereological
-#: models, agree the nuclear VOLUME fraction is about 0.45:
-#:
-#:   0.444  Schmid-Schonbein, PMID 6775712 Table 2 (BNID 115194:
-#:          "nucleus 44.4%: granules 0.2%: mitochondria 3.8%:
-#:          cytoplasm 51.6%")
-#:   0.458  Petrzilka, PMID 308396 -- nucleus 47.5 um^3 in a cell of
-#:          103.8 um^3
-#:
-#: A radius is not a volume fraction. f^(1/3) = 0.767, so against a body
-#: of 0.92 the nuclear radius is 0.705. Setting the radius from f
-#: directly would give a nucleus at f^3 = 9% of the cell -- which is
-#: exactly the bug this replaces, arrived at from the right number.
-LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION = 0.444
-LYMPHOCYTE_NUCLEAR_RADIUS = 0.92 * LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION ** (1 / 3)
-
-
-def _b_smooth_sphere(g, seed):
+def _b_smooth_sphere(g, seed, p):
     # Offset slightly, because a perfectly concentric nucleus reads as a
     # diagram; a real one sits a little to one side. The variation is
     # what makes this cell this cell rather than the shared prototype --
@@ -304,10 +338,10 @@ def _b_smooth_sphere(g, seed):
     scale, squash, shift = _variation(seed)
     return {1: _sphere(g, r=0.92 * scale, squash=squash),
             2: _sphere(g, (0.06 + shift[0], -0.04 + shift[1], shift[2]),
-                       LYMPHOCYTE_NUCLEAR_RADIUS * scale, squash=squash)}
+                       p.nuclear_radius() * scale, squash=squash)}
 
 
-def _b_granular_sphere(g, seed):
+def _b_granular_sphere(g, seed, p):
     """NK / NKT: a lymphocyte carrying lytic granules.
 
     Still a lymphocyte, so it keeps the lymphocyte nucleus; the granules
@@ -318,12 +352,17 @@ def _b_granular_sphere(g, seed):
     scale, squash, shift = _variation(seed)
     body = _sphere(g, r=0.92 * scale, squash=squash)
     nuc = _sphere(g, (0.06 + shift[0], -0.04 + shift[1], shift[2]),
-                  LYMPHOCYTE_NUCLEAR_RADIUS * scale, squash=squash)
-    gran = _granules_to_fraction(g, body & ~nuc, 0.020, 0.052, seed)
+                  p.nuclear_radius() * scale, squash=squash)
+    # 0.002 and not the 0.020 this carried: the NK cell entity stores
+    # the measured lymphocyte fraction and the hardcoded one was ten
+    # times it.
+    gran = _granules_to_fraction(
+        g, body & ~nuc, p.granules(DEFAULT_GRANULE_FRACTION["lymphocyte"]),
+        0.052, seed)
     return {1: body, 2: nuc, 3: gran}
 
 
-def _b_dense_granular(g, seed):
+def _b_dense_granular(g, seed, p):
     """Mast cell / basophil: so densely granulated that the granules,
     not the nucleus, are what you see. Taken at the eosinophil's measured
     fraction, which is the highest in the table and the closest
@@ -331,11 +370,12 @@ def _b_dense_granular(g, seed):
     body = _sphere(g, r=0.92)
     nuc = _sphere(g, (0.10, 0.06, 0), 0.40)
     gran = _granules_to_fraction(g, body & ~nuc,
-                                 GRANULE_FRACTION["eosinophil"], 0.062, seed)
+                                 p.granules(DEFAULT_GRANULE_FRACTION["eosinophil"]),
+                                 0.062, seed)
     return {1: body, 2: nuc, 3: gran}
 
 
-def _b_multilobed_granular(g, seed):
+def _b_multilobed_granular(g, seed, p):
     """Neutrophil: three to five nuclear lobes on a thread, dense granules.
 
     15.4% of the cell by volume (PMID 6775712), against the 1.5% this
@@ -345,11 +385,12 @@ def _b_multilobed_granular(g, seed):
     body = _sphere(g, r=0.92)
     nuc = _lobes(g, 4, 0.30, 0.44, seed)
     gran = _granules_to_fraction(g, body & ~nuc,
-                                 GRANULE_FRACTION["neutrophil"], 0.058, seed)
+                                 p.granules(DEFAULT_GRANULE_FRACTION["neutrophil"]),
+                                 0.058, seed)
     return {1: body, 2: nuc & body, 3: gran}
 
 
-def _b_bilobed_granular(g, seed):
+def _b_bilobed_granular(g, seed, p):
     """Eosinophil: two nuclear lobes, and packed with coarse granules.
 
     23.0% of the cell by volume (PMID 6775712), the highest in the
@@ -361,11 +402,12 @@ def _b_bilobed_granular(g, seed):
     body = _sphere(g, r=0.92)
     nuc = _sphere(g, (-0.34, 0.10, 0), 0.36) | _sphere(g, (0.34, -0.10, 0), 0.36)
     gran = _granules_to_fraction(g, body & ~nuc,
-                                 GRANULE_FRACTION["eosinophil"], 0.085, seed)
+                                 p.granules(DEFAULT_GRANULE_FRACTION["eosinophil"]),
+                                 0.085, seed)
     return {1: body, 2: nuc & body, 3: gran}
 
 
-def _b_ruffled_pseudopod(g, seed):
+def _b_ruffled_pseudopod(g, seed, p):
     """Macrophage: a spread body with broad lamellipodia and ruffles."""
     rng = np.random.default_rng(seed)
     # Adherent macrophages spread, so the body is flattened rather than
@@ -388,7 +430,7 @@ def _b_ruffled_pseudopod(g, seed):
     return {1: body, 2: _sphere(g, (0.10, 0.05, 0), 0.30)}
 
 
-def _b_irregular_ruffled(g, seed):
+def _b_irregular_ruffled(g, seed, p):
     rng = np.random.default_rng(seed)
     body = _sphere(g, r=0.70)
     for _ in range(14):
@@ -397,14 +439,14 @@ def _b_irregular_ruffled(g, seed):
     return {1: body, 2: _sphere(g, (0, 0, 0), 0.30)}
 
 
-def _b_stellate_branching(g, seed):
+def _b_stellate_branching(g, seed, p):
     """Dendritic cell: a small body and long thin radiating processes."""
     body = _sphere(g, r=0.38)
     body |= _spikes(g, 11, 0.25, 0.98, 0.055, seed)
     return {1: body, 2: _sphere(g, (0, 0, 0), 0.21)}
 
 
-def _b_eccentric_nucleus_er(g, seed):
+def _b_eccentric_nucleus_er(g, seed, p):
     """Plasma cell: nucleus pushed to one side, ER filling the rest."""
     body = _sphere(g, r=0.92)
     nuc = _sphere(g, (-0.34, 0.0, 0.0), 0.42)
@@ -444,7 +486,7 @@ def _b_eccentric_nucleus_er(g, seed):
     return {1: body, 2: nuc & body, 4: er & body & ~nuc}
 
 
-def _b_elongated_spindle(g, seed):
+def _b_elongated_spindle(g, seed, p):
     """Fibroblast: a long thin cell with tapered ends.
 
     The nucleus has to fit. It was r=0.30 squashed (1.5, 1, 1), giving
@@ -458,7 +500,7 @@ def _b_elongated_spindle(g, seed):
             2: _sphere(g, (0, 0, 0), 0.155, squash=(2.4, 1.0, 0.82))}
 
 
-def _b_flat_squamous(g, seed):
+def _b_flat_squamous(g, seed, p):
     """Endothelium: a thin plate that bulges where the nucleus is.
 
     The nucleus was half-extent 0.17 in z inside a cell of 0.152 -- the
@@ -475,25 +517,25 @@ def _b_flat_squamous(g, seed):
     return {1: body, 2: nuc & body}
 
 
-def _b_polarized_columnar(g, seed):
+def _b_polarized_columnar(g, seed, p):
     """Columnar epithelium: tall, with the nucleus held basally."""
     body = _rounded_box(g, (0.44, 0.44, 0.96), roundness=4.0)
     return {1: body, 2: _sphere(g, (0, 0, -0.56), 0.28, squash=(1, 1, 1.15))}
 
 
-def _b_cuboidal(g, seed):
+def _b_cuboidal(g, seed, p):
     """Basal epithelium: about as tall as it is wide, edges rounded."""
     body = _rounded_box(g, (0.70, 0.70, 0.70), roundness=4.5)
     return {1: body, 2: _sphere(g, (0, 0, 0), 0.30)}
 
 
-def _b_cuboidal_tall(g, seed):
+def _b_cuboidal_tall(g, seed, p):
     """HEV cell: plump for endothelium, which is how it is recognised."""
     body = _rounded_box(g, (0.52, 0.52, 0.90), roundness=4.0)
     return {1: body, 2: _sphere(g, (0, 0, -0.38), 0.27)}
 
 
-def _b_flat_activated_adhesion(g, seed):
+def _b_flat_activated_adhesion(g, seed, p):
     """Inflamed endothelium: flat, thickened, with a nuclear bulge."""
     nuc = _sphere(g, (0, 0, 0), 0.28, squash=(1, 1, 0.55))
     body = _sphere(g, r=0.95, squash=(1.0, 0.85, 0.18))
@@ -503,34 +545,34 @@ def _b_flat_activated_adhesion(g, seed):
 
 
 # viruses
-def _b_enveloped_corona_spikes(g, seed):
+def _b_enveloped_corona_spikes(g, seed, p):
     return {1: _sphere(g, r=0.62) | _spikes(g, 54, 0.58, 0.95, 0.055, seed),
             5: _sphere(g, r=0.34)}
 
 
-def _b_enveloped_ha_na_spikes(g, seed):
+def _b_enveloped_ha_na_spikes(g, seed, p):
     return {1: _sphere(g, r=0.66) | _spikes(g, 72, 0.62, 0.92, 0.042, seed),
             5: _sphere(g, r=0.36)}
 
 
-def _b_enveloped_sparse_spikes(g, seed):
+def _b_enveloped_sparse_spikes(g, seed, p):
     return {1: _sphere(g, r=0.74) | _spikes(g, 16, 0.70, 0.95, 0.05, seed),
             5: _sphere(g, r=0.40)}
 
 
-def _b_enveloped_smooth(g, seed):
+def _b_enveloped_smooth(g, seed, p):
     return {1: _sphere(g, r=0.85), 5: _sphere(g, r=0.48)}
 
 
-def _b_enveloped_small(g, seed):
+def _b_enveloped_small(g, seed, p):
     return {1: _sphere(g, r=0.55), 5: _sphere(g, r=0.30)}
 
 
-def _b_enveloped_smooth_small(g, seed):
+def _b_enveloped_smooth_small(g, seed, p):
     return {1: _sphere(g, r=0.52), 5: _sphere(g, r=0.28)}
 
 
-def _b_enveloped_pleomorphic(g, seed):
+def _b_enveloped_pleomorphic(g, seed, p):
     rng = np.random.default_rng(seed)
     body = _sphere(g, r=0.60, squash=(1.0, 0.78, 0.62))
     for _ in range(5):
@@ -538,7 +580,7 @@ def _b_enveloped_pleomorphic(g, seed):
     return {1: body, 5: _sphere(g, r=0.26)}
 
 
-def _b_bullet_shape(g, seed):
+def _b_bullet_shape(g, seed, p):
     """Rhabdovirus: one rounded end, one flat."""
     z = g[..., 2]
     # Rhabdovirus: a cylinder with one hemispherical end and one flat, the
@@ -552,7 +594,7 @@ def _b_bullet_shape(g, seed):
 
 
 # bacteria
-def _b_rod_flagellated(g, seed):
+def _b_rod_flagellated(g, seed, p):
     rng = np.random.default_rng(seed)
     body = _capsule(g, (-0.46, 0, 0), (0.46, 0, 0), 0.26)
     fla = np.zeros(g.shape[:3], bool)
@@ -570,23 +612,23 @@ def _b_rod_flagellated(g, seed):
     return {1: body, 6: fla}
 
 
-def _b_rod_acid_fast(g, seed):
+def _b_rod_acid_fast(g, seed, p):
     return {1: _capsule(g, (-0.58, 0, 0), (0.58, 0, 0), 0.21)}
 
 
-def _b_rod_spore_forming(g, seed):
+def _b_rod_spore_forming(g, seed, p):
     body = _capsule(g, (-0.58, 0, 0), (0.46, 0, 0), 0.24)
     return {1: body, 7: _sphere(g, (0.40, 0, 0), 0.22)}
 
 
-def _b_coccus_chain(g, seed):
+def _b_coccus_chain(g, seed, p):
     out = np.zeros(g.shape[:3], bool)
     for i in range(5):
         out |= _sphere(g, (-0.72 + i * 0.36, 0, 0), 0.20)
     return {1: out}
 
 
-def _b_coccus_cluster(g, seed):
+def _b_coccus_cluster(g, seed, p):
     """Staphylococcus: cocci dividing in several planes, so they stay in
     an irregular cluster rather than a chain or a pair.
 
@@ -609,13 +651,13 @@ def _b_coccus_cluster(g, seed):
     return {1: out}
 
 
-def _b_diplococcus(g, seed):
+def _b_diplococcus(g, seed, p):
     return {1: _sphere(g, (-0.26, 0, 0), 0.34, squash=(0.9, 1, 1))
                | _sphere(g, (0.26, 0, 0), 0.34, squash=(0.9, 1, 1))}
 
 
 # molecular
-def _b_y_shape(g, seed):
+def _b_y_shape(g, seed, p):
     """Immunoglobulin: two Fab arms and an Fc stem."""
     body = _capsule(g, (0, 0, -0.85), (0, 0, -0.05), 0.15)
     body |= _capsule(g, (0, 0, -0.05), (-0.62, 0, 0.72), 0.13)
@@ -623,7 +665,7 @@ def _b_y_shape(g, seed):
     return {1: body}
 
 
-def _b_groove(g, seed):
+def _b_groove(g, seed, p):
     """MHC: a platform carrying a peptide-binding groove."""
     x, y, z = g[..., 0], g[..., 1], g[..., 2]
     plat = (np.abs(x) < 0.82) & (np.abs(y) < 0.52) & (np.abs(z) < 0.26)
@@ -737,7 +779,8 @@ def smooth_surface(vertices: np.ndarray, triangles: np.ndarray,
     return out
 
 
-def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID
+def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID,
+                params: Optional[ShapeParams] = None
                 ) -> Tuple[Dict[str, np.ndarray], bool]:
     """The builder's own occupancy masks, before any surface is extracted.
 
@@ -752,14 +795,17 @@ def build_masks(mesh_type: str, seed: int = 0, grid: int = GRID
     fell_back = builder is None
     if fell_back:
         builder = _b_sphere
+    # The entity's own proportions, or the documented fallbacks.
+    p = params if params is not None else NO_PARAMS
     g = _grid(grid)
     return ({PART_NAMES.get(label, str(label)): mask
-             for label, mask in builder(g, seed).items()}, fell_back)
+             for label, mask in builder(g, seed, p).items()}, fell_back)
 
 
 def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
                 grid: int = GRID, cut: bool = False,
-                smooth: int = SMOOTH_PASSES
+                smooth: int = SMOOTH_PASSES,
+                params: Optional[ShapeParams] = None
                 ) -> Tuple[Dict[str, Tuple[np.ndarray, np.ndarray]], bool]:
     """Geometry per named part, so a nucleus can be coloured as a nucleus.
 
@@ -777,9 +823,11 @@ def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
     fell_back = builder is None
     if fell_back:
         builder = _b_sphere
+    # The entity's own proportions, or the documented fallbacks.
+    p = params if params is not None else NO_PARAMS
 
     g = _grid(grid)
-    raw = builder(g, seed)
+    raw = builder(g, seed, p)
     resolution = float(scale_um) / grid
 
     out: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
@@ -821,7 +869,8 @@ def build_parts(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
 
 
 def build(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
-          grid: int = GRID) -> Morphology:
+          grid: int = GRID,
+          params: Optional[ShapeParams] = None) -> Morphology:
     """Build geometry for one ``mesh_type``, in micrometres.
 
     An unknown type falls back to a sphere and says so in ``fell_back``. The
@@ -837,8 +886,10 @@ def build(mesh_type: str, scale_um: float = 10.0, seed: int = 0,
         log.info("no builder for mesh_type %r; falling back to a sphere", mesh_type)
         builder = _b_sphere
 
+    # The entity's own proportions, or the documented fallbacks.
+    p = params if params is not None else NO_PARAMS
     g = _grid(grid)
-    parts = builder(g, seed)
+    parts = builder(g, seed, p)
 
     labels = np.zeros(g.shape[:3], np.int32)
     for label in sorted(parts):

@@ -111,12 +111,15 @@ def test_the_nuclear_fraction_is_a_fraction_not_a_radius(store):
     assert pv.unit == "dimensionless"
     assert 0.40 < pv.value < 0.50
 
-    from cognisom.visualization.morphology import (
-        LYMPHOCYTE_NUCLEAR_RADIUS, LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION)
-    assert LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION == pytest.approx(pv.value)
-    assert LYMPHOCYTE_NUCLEAR_RADIUS == pytest.approx(
-        0.92 * pv.value ** (1 / 3))
-    assert LYMPHOCYTE_NUCLEAR_RADIUS > pv.value, "radius set from the fraction"
+    # Through the live path, not against a second copy of the number.
+    # This used to compare the entity's value with a module constant
+    # holding the same value, which passed because one person wrote both
+    # -- and said nothing about whether the renderer used either.
+    from cognisom.visualization.morphology import ShapeParams
+
+    shape = ShapeParams(nuclear_volume_fraction=pv.value)
+    assert shape.nuclear_radius() == pytest.approx(0.92 * pv.value ** (1 / 3))
+    assert shape.nuclear_radius() > pv.value, "radius set from the fraction"
 
 
 def test_the_lytic_granule_count_is_the_primary_cell_one(store):
@@ -231,3 +234,95 @@ def test_a_measured_value_without_a_citation_is_refused(store):
                        provenance=Provenance.MEASURED, citation=""),
         strict=False)
     assert any("citation" in p for p in problems), problems
+
+
+# ── the two that shape the cell, not only decorate it ────────────────
+
+def _nucleus_share(mesh_type, fraction, grid=40):
+    """What fraction of the built body the built nucleus occupies."""
+    from cognisom.visualization.morphology import ShapeParams, build_masks
+
+    masks, _ = build_masks(mesh_type, seed=1, grid=grid,
+                           params=ShapeParams(nuclear_volume_fraction=fraction))
+    return masks["nucleus"].sum() / masks["body"].sum()
+
+
+def _granule_share(mesh_type, fraction, grid=44):
+    from cognisom.visualization.morphology import ShapeParams, build_masks
+
+    masks, _ = build_masks(mesh_type, seed=1, grid=grid,
+                           params=ShapeParams(granule_volume_fraction=fraction))
+    cytoplasm = masks["body"].sum() - masks["nucleus"].sum()
+    return masks["granules"].sum() / cytoplasm
+
+
+def test_the_nuclear_fraction_changes_the_mesh():
+    """The decisive test of the claim that the library drives geometry.
+
+    ``library_detail`` fetched seven parameters and ``FROM_LIBRARY``
+    mapped two, so ``nuclear_volume_fraction`` was fetched, graded
+    MEASURED on 20 entities, and then overridden by a module constant.
+    The copies agreed -- they were written by one person in one pass --
+    which is exactly why nothing caught it.
+    """
+    small, measured, large = (_nucleus_share("smooth_sphere", f)
+                              for f in (0.20, 0.444, 0.70))
+    assert small < measured < large
+    # and it is the fraction itself that comes out, not something
+    # proportional to it: a RADIUS is the cube root of a volume.
+    assert measured == pytest.approx(0.444, abs=0.02)
+    assert small == pytest.approx(0.20, abs=0.02)
+    assert large == pytest.approx(0.70, abs=0.02)
+
+
+def test_the_granule_fraction_changes_the_mesh():
+    thin, thick = _granule_share("granular_sphere", 0.002), \
+        _granule_share("granular_sphere", 0.23)
+    assert thin < thick
+    assert thin == pytest.approx(0.002, abs=0.004)
+    assert thick == pytest.approx(0.23, abs=0.02)
+
+
+def test_the_builder_no_longer_keeps_its_own_copy():
+    """Two copies of one measurement is one copy too many, and the
+    module's copy won. One had already drifted: granular_sphere carved
+    granules at 0.020 while the NK cell entity stored 0.002."""
+    import cognisom.visualization.morphology as mo
+
+    assert not hasattr(mo, "GRANULE_FRACTION")
+    assert not hasattr(mo, "LYMPHOCYTE_NUCLEAR_VOLUME_FRACTION")
+    assert not hasattr(mo, "LYMPHOCYTE_NUCLEAR_RADIUS")
+    # the fallbacks that remain are named as fallbacks
+    assert mo.DEFAULT_NUCLEAR_VOLUME_FRACTION == 0.444
+    assert mo.DEFAULT_GRANULE_FRACTION["lymphocyte"] == 0.002
+
+
+def test_an_nk_cell_gets_its_stored_fraction_not_the_old_constant():
+    """granular_sphere hardcoded 0.020 against a stored, measured 0.002
+    -- a factor of ten, and the hardcoded one was what rendered."""
+    import contextlib
+    import io
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        from cognisom.library.store import EntityStore
+        store = EntityStore()
+    from cognisom.visualization import cell_profiles as cp
+    from cognisom.visualization import cell_scene as cs
+
+    entity = store.find_entity_by_name("NK cell")
+    scene = cs.scene_for(entity, grid=40,
+                         compartments=cp.library_compartment_index(store))
+    assert scene.profile.granule_volume_fraction == pytest.approx(0.002)
+    assert scene.sources["granule_volume_fraction"] == "library"
+    assert scene.sources["nuclear_volume_fraction"] == "library"
+
+
+def test_a_caller_supplying_nothing_still_gets_a_cell():
+    """A bare build is a legitimate call -- a test, a preview, an entity
+    with no sourced proportions. It gets the documented fallback, and
+    the profile records that it was a fallback rather than evidence."""
+    from cognisom.visualization.morphology import build_masks
+
+    masks, _ = build_masks("smooth_sphere", seed=1, grid=40)
+    share = masks["nucleus"].sum() / masks["body"].sum()
+    assert share == pytest.approx(0.444, abs=0.02)

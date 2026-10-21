@@ -39,7 +39,7 @@ pytest.importorskip("skimage")
 
 from cognisom.visualization import cell_detail as cd            # noqa: E402
 from cognisom.visualization.morphology import (                  # noqa: E402
-    LYMPHOCYTE_NUCLEAR_RADIUS, build_masks, build_parts)
+    ShapeParams, build_masks, build_parts)
 
 GRID = 32
 SCALE = 7.0
@@ -72,8 +72,8 @@ def test_a_lymphocyte_is_mostly_nucleus(lymphocyte):
     # itself -- setting the radius to 0.444 would give a nucleus at 8.8%
     # of the cell, which is the bug this replaced, reached from the right
     # number.
-    assert LYMPHOCYTE_NUCLEAR_RADIUS == pytest.approx(
-        0.92 * 0.444 ** (1 / 3), rel=1e-6)
+    assert ShapeParams(nuclear_volume_fraction=0.444).nuclear_radius() == \
+        pytest.approx(0.92 * 0.444 ** (1 / 3), rel=1e-6)
 
 
 def test_the_cytoplasm_is_a_thin_shell(lymphocyte):

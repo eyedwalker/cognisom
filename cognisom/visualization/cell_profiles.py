@@ -263,6 +263,19 @@ class Profile:
     #: lymphocyte's microvilli are a tenth of that.
     ruffle_amplitude_um: float = 0.0
 
+    #: Proportions that shape the cell itself rather than decorate it.
+    #: None means the entity supplied nothing and the builder should use
+    #: its own documented default -- which is not the same as a
+    #: measurement, and the difference is recorded in ``sources``.
+    #:
+    #: These two were fetched by ``library_detail`` and mapped by
+    #: nothing, so 0.444 -- read out of PMID 6775712 Table 2 by hand,
+    #: agreeing with Petrzilka's independent 0.458, and the one fraction
+    #: that paper's own Appendix clears as unbiased -- was graded
+    #: MEASURED on 20 entities and then overridden by a module constant.
+    nuclear_volume_fraction: Optional[float] = None
+    granule_volume_fraction: Optional[float] = None
+
     #: Interior populations, as a fraction of cytoplasmic volume where
     #: morphometry reports one, and a count where it reports a count.
     mitochondrial_volume_fraction: float = 0.0
@@ -507,6 +520,8 @@ def partition_markers(markers: Sequence[str],
 FROM_LIBRARY: Dict[str, str] = {
     "microvillus_length_um": "microvillus_length_um",
     "lytic_granule_count": "lytic_granule_count",
+    "nuclear_volume_fraction": "nuclear_volume_fraction",
+    "granule_volume_fraction": "granule_volume_fraction",
 }
 
 
@@ -631,6 +646,13 @@ def profile_for(name: str, mesh_type: str, markers: Sequence[str] = (),
     if "microvillus_diameter_um" in library and base.get("microvilli_count"):
         base["microvillus_radius_um"] = library["microvillus_diameter_um"] / 2.0
         sources["microvillus_radius_um"] = "library"
+    # The two that shape the cell. Unlike the detail values below,
+    # these reach the BUILDER rather than the profile's own fields, so a
+    # change in them changes the mesh and not only the decoration.
+    for parameter in ("nuclear_volume_fraction", "granule_volume_fraction"):
+        if parameter in library:
+            base[parameter] = library[parameter]
+            sources[parameter] = "library"
     if "lytic_granule_count" in library:
         base["lytic_granule_count"] = int(round(library["lytic_granule_count"]))
         sources["lytic_granule_count"] = "library"

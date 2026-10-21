@@ -38,7 +38,8 @@ import numpy as np
 
 from cognisom.visualization import cell_detail as cd
 from cognisom.visualization import cell_profiles as cp
-from cognisom.visualization.morphology import BUILDERS, build_parts
+from cognisom.visualization.morphology import (
+    BUILDERS, ShapeParams, build_parts)
 from cognisom.visualization.morphology_usd import (
     DETAIL_COLORS, PART_COLORS, PART_OPACITY, shape_seed)
 
@@ -159,11 +160,22 @@ def scene_for(entity, *, grid: int = CARD_GRID,
     scene = CellScene(entity_name=name, mesh_type=mesh_type,
                       scale_um=scale_um, from_library=has_builder(mesh_type))
 
+    # The proportions the entity itself records, read BEFORE the mesh is
+    # built because they change the mesh. library_detail fetched these
+    # and nothing consumed them, so an entity's measured 0.444 nuclear
+    # fraction was overridden by a module constant that happened to
+    # agree -- and the granule fraction by one that did not, 0.020
+    # against a stored 0.002.
+    library = cp.library_detail(entity)
+    shape = ShapeParams(
+        nuclear_volume_fraction=library.get("nuclear_volume_fraction"),
+        granule_volume_fraction=library.get("granule_volume_fraction"))
+
     # The seed is the entity's own name, so two cells sharing a
     # mesh_type and a size are not the same object.
     seed = shape_seed(name)
     parts, fell_back = build_parts(mesh_type or "sphere", scale_um=scale_um,
-                                   seed=seed, grid=grid)
+                                   seed=seed, grid=grid, params=shape)
     scene.fell_back = bool(fell_back)
 
     for part, (vertices, faces) in sorted(parts.items()):
@@ -176,7 +188,6 @@ def scene_for(entity, *, grid: int = CARD_GRID,
             opacity=PART_OPACITY.get(part, 1.0)))
 
     # ── the detail the library can pay for ───────────────────────────
-    library = cp.library_detail(entity)
     markers = cp.markers_of(getattr(entity, "properties", None) or {})
     profile = cp.profile_for(name, mesh_type, markers, scale_um=scale_um,
                              library=library, compartments=compartments)
@@ -227,7 +238,7 @@ def scene_for(entity, *, grid: int = CARD_GRID,
             scene.surfaces = [s for s in scene.surfaces if s.name != "granules"]
         actual = int(profile.lytic_granule_count)
         drawn, _ = cd.capped(actual, max_detail)
-        mask = _body_mask(mesh_type, seed, grid)
+        mask = _body_mask(mesh_type, seed, grid, shape)
         if mask is not None:
             frame = cd.mask_frame(mask, body.vertices, scale_um)
             instances = cd.organelles(
@@ -243,7 +254,8 @@ def scene_for(entity, *, grid: int = CARD_GRID,
     return scene
 
 
-def _body_mask(mesh_type: str, seed: int, grid: int):
+def _body_mask(mesh_type: str, seed: int, grid: int,
+               params: Optional["ShapeParams"] = None):
     """The builder's own occupancy grid for the body, or None.
 
     Organelles are placed inside the MASK rather than inside the mesh:
@@ -252,7 +264,7 @@ def _body_mask(mesh_type: str, seed: int, grid: int):
     """
     try:
         from cognisom.visualization.morphology import build_masks
-        masks, _ = build_masks(mesh_type, seed=seed, grid=grid)
+        masks, _ = build_masks(mesh_type, seed=seed, grid=grid, params=params)
     except Exception as exc:                            # pragma: no cover
         log.debug("no mask for %s: %s", mesh_type, exc)
         return None
