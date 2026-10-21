@@ -16,9 +16,6 @@ browser and, for most, an institutional login.
 
 | # | PMID | Paper | Where | What it holds up |
 |---|------|-------|-------|------------------|
-| 1 | `2272970` | Retention of leukocytes in capillaries: role of cell size and deformab<br>*J Appl Physiol (1985)* 1990 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/2272970/) · [doi](https://doi.org/10.1152/jappl.1990.69.5.1767) | Leukocyte diameters by subtype. The only paper on this list that would let a cell's SIZE be sourced; every radius in the library except the macrophage is a placeholder. |
-| 2 | `15209560` | Activation of caspases-8 and -10 by FLIP(L)<br>*Biochem J* 2004 — repository copy exists | **[PMC — FREE](https://pmc.ncbi.nlm.nih.gov/articles/PMC1133822/)** · [PubMed](https://pubmed.ncbi.nlm.nih.gov/15209560/) · [doi](https://doi.org/10.1042/bj20040809) | caspase-8/-10 kcat. FREE in PMC right now. |
-| 2 | `16840338` | Kinetics of influenza A virus infection in humans<br>*J Virol* 2006 — paywalled | **[PMC — FREE](https://pmc.ncbi.nlm.nih.gov/articles/PMC1563736/)** · [PubMed](https://pubmed.ncbi.nlm.nih.gov/16840338/) · [doi](https://doi.org/10.1128/jvi.01623-05) | Influenza replication cycle hours. FREE in PMC right now. |
 | 3 | `25679760` | Confinement and low adhesion induce fast amoeboid migration of slow me<br>*Cell* 2015 — free on publisher site (blocks scripts) | [PubMed](https://pubmed.ncbi.nlm.nih.gov/25679760/) · [doi](https://doi.org/10.1016/j.cell.2015.01.007) | Amoeboid migration speed under confinement, which is how a T cell actually moves through tissue. |
 | 4 | `11404363` | Affinity, kinetics, and thermodynamics of E-selectin binding to E-sele<br>*J Biol Chem* 2001 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/11404363/) · [doi](https://doi.org/10.1074/jbc.m104844200) | E-selectin kinetics: one of the four selectin papers behind the whole adhesion cascade. |
 | 4 | `9422729` | Affinity and kinetic analysis of L-selectin (CD62L) binding to glycosy<br>*J Biol Chem* 1998 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/9422729/) · [doi](https://doi.org/10.1074/jbc.273.2.763) | L-selectin kinetics. |
@@ -29,6 +26,20 @@ browser and, for most, an institutional login.
 | 5 | `15771445` | Binding thermodynamics as a tool to investigate the mechanisms of drug<br>*J Med Chem* 2005 — repository copy exists | [PubMed](https://pubmed.ncbi.nlm.nih.gov/15771445/) · [doi](https://doi.org/10.1021/jm040842z) | Values behind: kd_nm |
 | 5 | `16490769` | Screening for caspase-3 inhibitors: a new class of potent small-molecu<br>*J Biomol Screen* 2006 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/16490769/) · [doi](https://doi.org/10.1177/1087057105285048) | Values behind: km_um |
 | 5 | `20178337` | In vitro modulation of cytochrome P450 reductase supported indoleamine<br>*Biochemistry* 2010 — paywalled | [PubMed](https://pubmed.ncbi.nlm.nih.gov/20178337/) · [doi](https://doi.org/10.1021/bi100022c) | Values behind: kcat_per_s, km_um |
+
+## Obtained — 2026-10-21
+
+Three arrived today and all three are read, applied and committed
+(`847a4e6`). Two of the three changed a stored value.
+
+| PMID | What it settled |
+|---|---|
+| `2272970` | **6 cell radii.** Monocyte was 1.85x too large (6.3x in volume). The neutrophil already cited this PMID at 4.2 um — the Coulter column — written before the paper was read; it is 4.167 by the flow column the authors lead with. 19 entities deliberately left placeholder: the paper measured *unactivated* leukocytes. |
+| `15209560` | **caspase-8 kcat 0.88 → 0.65.** The 0.88 was a median across three different molecular species, three of them in 0.7 M sodium citrate. Km 55.2 uM added, stored as `km_ietd_um` because it is a tetrapeptide constant. |
+| `16840338` | **Confirmed** `replication_cycle_hours` = 6.0, and gained its 95% CI plus the two neighbouring quantities a reader could take by mistake. |
+
+Running total: **5 papers read, 4 changed something.**
+
 
 ## Why these and not others
 
