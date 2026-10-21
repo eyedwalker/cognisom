@@ -18,6 +18,29 @@ to date with it, and EntityStore runs it on open whenever the file's
 content has changed, so a deployed library picks up a new curation pass on
 its next start. After a sourcing pass, regenerate the file with
 
+NOT EVERY SOURCED FACT IS A PARAMETER
+-------------------------------------
+For a long time this module carried parameters and three identity fields
+and nothing else, which quietly recreated on a smaller scale the exact
+problem it was written to solve. A sourcing pass also writes to
+``entity.sourced`` -- the generic slot that survives ``to_dict()`` -- and
+none of it was exported: 148 PaxDb abundances, 113 AlphaFold accessions,
+91 HPA subcellular locations and the leukocyte diameter convention existed
+on one developer's machine. A fresh clone got the numbers and not the
+record of where they came from, and twelve tests that check them were red
+anywhere but there.
+
+So the file now carries a ``sourced`` section per entity as well. The test
+of what belongs in it is reproducibility: a seeded fact (a cytokine's
+``signaling_pathway``, a drug's ``mechanism``) is written by a module in
+this repository and any fresh library rebuilds it, so it is not exported.
+A fact that came off the network cannot be rebuilt without going back to
+the network, so it is.
+
+This roughly doubles the file. That is the right trade: the alternative is
+that a measured protein abundance, with the datasets it was measured in,
+is lost the moment the machine that fetched it is reimaged.
+
     python -m cognisom.library.curated export
 
 and commit it with the code that produced the values.
@@ -41,7 +64,13 @@ CURATED_PATH = Path(__file__).resolve().parent / "curated_parameters.json"
 FORMAT = 1
 #: Identity fields the UniProt sourcing writes onto an entity. A mass with
 #: no accession beside it cannot be re-verified, so they travel together.
-IDENTITY_FIELDS = ("uniprot_id", "gene_symbol", "uniprot_resolved_by")
+#:
+#: The last three were sourced and not exported: a recommended name, a
+#: sequence length and the string a paper referred the protein by are each
+#: the thing that lets a reader check the accession is the right protein.
+IDENTITY_FIELDS = ("uniprot_id", "gene_symbol", "uniprot_resolved_by",
+                   "uniprot_recommended_name", "sequence_length_aa",
+                   "referenced_as")
 META_KEY = "curated_parameters_sha256"
 
 
@@ -64,23 +93,34 @@ def _all_entities(store):
             yield entity
 
 
-def export_curated(store, path: Path = CURATED_PATH) -> int:
-    """Write every evidenced record in ``store`` to ``path``. Returns the count."""
+def export_curated(store, path: Path = CURATED_PATH) -> Tuple[int, int]:
+    """Write every evidenced record in ``store`` to ``path``.
+
+    Returns ``(parameter records, sourced facts)``.
+    """
     from cognisom.library.parameters import Provenance, _sidecar
 
     entities = []
     for entity in _all_entities(store):
         records = {name: record for name, record in sorted(_sidecar(entity).items())
                    if record.get("provenance") != Provenance.PLACEHOLDER.value}
-        if not records:
-            continue
         identity = {f: getattr(entity, f) for f in IDENTITY_FIELDS
                     if getattr(entity, f, "")}
+        # Everything a sourcing module fetched that is not a parameter.
+        # Exported whole rather than by an allow-list of key names: the
+        # slot exists precisely so a new source need not amend this
+        # module, and an allow-list would silently drop the next one.
+        sourced = {k: v for k, v in sorted(
+            (getattr(entity, "sourced", None) or {}).items())
+            if v not in (None, "", [], {})}
+        if not (records or sourced):
+            continue
         entities.append({
             "name": entity.name,
             "entity_type": entity.entity_type.value,
             **({"identity": identity} if identity else {}),
             "parameters": records,
+            **({"sourced": sourced} if sourced else {}),
         })
     entities.sort(key=lambda e: (e["entity_type"], e["name"]))
     document = {
@@ -90,7 +130,8 @@ def export_curated(store, path: Path = CURATED_PATH) -> int:
         "entities": entities,
     }
     path.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
-    return sum(len(e["parameters"]) for e in entities)
+    return (sum(len(e["parameters"]) for e in entities),
+            sum(len(e.get("sourced", ())) for e in entities))
 
 
 def _digest(path: Path) -> str:
@@ -133,8 +174,17 @@ def apply_curated(store, path: Path = CURATED_PATH,
             if hasattr(entity, name) and getattr(entity, name) != value:
                 setattr(entity, name, value)
                 changed = True
+        # Merged, not setattr'd. ``hasattr(entity, "abundance_ppm")`` is
+        # False -- BioEntity has no __getattr__ and these never were
+        # attributes -- so the identity loop above cannot carry them, and
+        # a wholesale assignment would drop anything a later pass added.
+        for key, value in (item.get("sourced") or {}).items():
+            if entity.sourced.get(key) != value:
+                entity.sourced[key] = value
+                changed = True
+
         sidecar = _sidecar(entity)
-        for name, record in item["parameters"].items():
+        for name, record in item.get("parameters", {}).items():
             if sidecar.get(name) == record:
                 report.unchanged += 1
                 continue
@@ -179,7 +229,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     with contextlib.redirect_stdout(io.StringIO()):
         store = EntityStore()
     if args.command == "export":
-        print(f"wrote {export_curated(store)} records to {CURATED_PATH}")
+        params, sourced = export_curated(store)
+        print(f"wrote {params} parameter records and {sourced} sourced "
+              f"facts to {CURATED_PATH}")
     else:
         report = apply_curated(store, force=True)
         print(f"{report.written} written, {report.unchanged} current, "

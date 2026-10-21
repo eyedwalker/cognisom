@@ -293,7 +293,14 @@ if results:
             "PFS": r.format_progression_free_survival(),
             "T-cell Reactivation": f"{r.t_cell_reactivation_fraction:.0%}",
             "irAE Risk": f"{r.immune_related_adverse_events:.0%}",
-            "Confidence": f"{r.confidence:.0%}",
+            # NOT "Confidence". _estimate_confidence's own docstring
+            # says it scores "how complete the INPUT was -- not how
+            # accurate the output is", and PARAMETER_PROVENANCE records
+            # its seven weights as illustrative. A column labelled
+            # Confidence beside a PFS in months reads as the probability
+            # the prediction holds, which is the one number on this page
+            # that invites a decision.
+            "Input Completeness": f"{r.confidence:.0%}",
             # The one per-drug input that is evidence: the label half-life,
             # which governs washout after a last dose.
             "Elimination t½": " + ".join(
@@ -306,7 +313,18 @@ if results:
         })
 
     comp_df = pd.DataFrame(comparison_data)
-    st.dataframe(comp_df, use_container_width=True, hide_index=True)
+    st.dataframe(
+        comp_df, use_container_width=True, hide_index=True,
+        column_config={
+            "Input Completeness": st.column_config.TextColumn(
+                "Input Completeness",
+                help=("The fraction of expected inputs that were present "
+                      "for this patient. It is NOT the probability that "
+                      "the prediction is correct, and it does not rise "
+                      "when a prediction is better supported."),
+            ),
+        },
+    )
 
     # ─────────────────────────────────────────────────────────────────
     # DETAILED RESULTS PER TREATMENT

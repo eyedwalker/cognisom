@@ -294,10 +294,42 @@ class ParameterValue:
             confidence=d.get("confidence"),
         )
 
+    def evidence_lines(self) -> List[Tuple[str, str]]:
+        """Every evidence field that is set, in the order a reader needs.
+
+        The fields are not alternatives and must not be rendered with
+        ``a or b or c``: a citation names the paper, ``conditions`` says
+        what was measured and in what buffer, and ``rationale`` says how
+        the stored number was got from the paper. Short-circuiting on the
+        citation is how a DERIVED median over four orders of magnitude
+        came to render as a plain PMID -- and every DERIVED value is
+        required to carry a rationale precisely because for a derived
+        number the rationale IS the evidence.
+        """
+        pairs = (("citation", self.citation),
+                 ("calibrated against", self.calibrated_against),
+                 ("source", self.source),
+                 ("conditions", self.conditions),
+                 ("rationale", self.rationale))
+        return [(label, str(value)) for label, value in pairs if value]
+
     def describe(self) -> str:
-        """One-line human summary, for reports and dashboards."""
-        evidence = (self.citation or self.calibrated_against or self.source
-                    or self.rationale or "no evidence")
+        """One line, which says what it is leaving out.
+
+        A single line cannot carry a 400-character rationale, so it names
+        the first evidence field and then NAMES THE REST rather than
+        dropping them silently. A reader who sees "(+conditions,
+        +rationale)" knows to look; a reader who saw only the PMID did
+        not.
+        """
+        lines = self.evidence_lines()
+        if not lines:
+            evidence = "no evidence"
+        else:
+            rest = [label for label, _ in lines[1:]]
+            evidence = lines[0][1]
+            if rest:
+                evidence += " (+" + ", +".join(rest) + ")"
         return f"{self.value} {self.unit} [{self.provenance.value}: {evidence}]"
 
 

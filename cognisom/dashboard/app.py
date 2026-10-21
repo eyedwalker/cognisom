@@ -1162,7 +1162,7 @@ immune system's complexity with each patient's unique tumor biology.
 **What Cognisom delivers today:**
 - **GPU variant calling** — Parabricks on HealthOmics, real 30x WGS
 - **OncoKB evidence** — 700+ actionable genes with FDA-level annotations
-- **MHCflurry binding** — Neural network, 14,847 HLA alleles, >90% accuracy
+- **MHCflurry binding** — Neural network, 14,847 HLA alleles (published benchmarks; not revalidated here)
 - **MAD Agent Board** — 3 specialist agents, evidence-traced consensus
 - **Clinical trials** — Live ClinicalTrials.gov matching
 - **429-patient analytical validation** — SU2C mCRPC cohort, TMB and biomarker concordance

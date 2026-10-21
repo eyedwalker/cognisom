@@ -162,18 +162,32 @@ if entities:
                         st.markdown("**Physics / Simulation Parameters**")
                         for name, pv in sorted(params):
                             label = name.replace("_", " ").title()
-                            evidence = (
-                                pv.citation or pv.source or pv.rationale
-                                or "no recorded source"
-                            )
+                            # Not `citation or source or rationale`. Those
+                            # are not alternatives: the citation names the
+                            # paper, conditions says what was measured and
+                            # in what buffer, rationale says how the stored
+                            # number was got from the paper. Short-circuiting
+                            # on the citation suppressed `conditions` for all
+                            # 731 evidenced values and the mandatory
+                            # rationale for all 264 DERIVED ones -- so IDO1's
+                            # Km read "20 uM — derived (PMID:20178337)" while
+                            # the hidden rationale said it was a median over
+                            # 0.72 to 6809 uM.
+                            evidence = pv.evidence_lines()
+                            head = evidence[0][1] if evidence \
+                                else "no recorded source"
                             badge = (
                                 "" if pv.is_simulation_grade else " ⚠"
                             )
                             st.markdown(
                                 f"- {label}: `{pv.value} {pv.unit}`"
                                 f" — _{pv.provenance.value}{badge}_"
-                                f" ({evidence})"
+                                f" ({head})"
                             )
+                            for field, text in evidence[1:]:
+                                st.caption(f"&nbsp;&nbsp;&nbsp;&nbsp;"
+                                           f"**{field}:** {text}",
+                                           unsafe_allow_html=True)
 
                     readiness = assess(entity)
                     if not readiness.is_ready:

@@ -567,7 +567,8 @@ with v4:
         <div class="inv-stat-val">14,847</div>
         <div class="inv-stat-label">HLA Alleles (MHCflurry)</div>
         <div class="inv-card-text" style="margin-top: 0.5rem;">
-            >90% binding prediction accuracy. Neural network model.
+            Neural network model. Published benchmarks
+            (O'Donnell 2020); not independently revalidated here.
         </div>
     </div>
     """, unsafe_allow_html=True)

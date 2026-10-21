@@ -413,8 +413,9 @@ with st.expander("Step 9: Neoantigen Prediction (The Cancer Keys)"):
         **MHCflurry 2.0 (integrated):**
         - Neural network trained on >400,000 experimental binding measurements
         - Predicts: IC50 (nM), percentile rank, and presentation score
-        - **14,847 alleles supported** — covers virtually all human HLA types
-        - AUC >0.95 for most alleles
+        - **14,847 alleles supported** — MHCflurry's published allele set
+        - AUC >0.95 for most alleles — *as published (O'Donnell 2020,
+          PMID 32711842); not revalidated in this repository*
 
         **Key thresholds:**
         - **Strong binder:** IC50 < 50 nM (very likely presented)

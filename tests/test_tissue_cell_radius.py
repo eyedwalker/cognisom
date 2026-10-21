@@ -88,15 +88,38 @@ def shipped_store():
 
 # ── the default is unchanged, and the config radius is live ─────────────
 
-def test_a_default_configuration_still_gives_every_cell_five_microns():
+def test_a_default_configuration_gives_five_microns_to_all_but_the_evidenced():
+    """It used to give 5.0 to every archetype including the macrophage,
+    because nothing resolved the library outside the dashboard. The
+    engine resolves now, so the one archetype with a measured radius
+    gets it and everything else still falls back."""
     eng = _engine(_cfg())
-    assert {r for rs in _radii_by_type(eng).values() for r in rs} == {5.0}
-    assert eng._mechanics._config.bucket_size_um == MechanicsConfig().bucket_size_um
+    radii = {r for rs in _radii_by_type(eng).values() for r in rs}
+    assert radii == {5.0, MACROPHAGE_UM}
+
+    # And the neighbour bucket grew to match. This assertion used to read
+    # `== MechanicsConfig().bucket_size_um`, i.e. the 15 um default, which
+    # held only because nothing outside the dashboard resolved the
+    # library. The engine's own comment says 15 um "covers 5 um cells and
+    # nothing above 6.5 um" and that below the contact range the search
+    # "falls back to the original 27-bucket stencil, misses included" --
+    # so every non-dashboard run was missing macrophage contacts.
+    assert eng._mechanics._config.bucket_size_um == pytest.approx(
+        2.0 * MACROPHAGE_UM + ADHESION_RANGE_UM)
+    assert eng._mechanics._config.bucket_size_um > \
+        MechanicsConfig().bucket_size_um
 
 
-def test_cell_radius_um_is_read():
-    eng = _engine(_cfg(cell_radius_um=6.0))
-    assert {r for rs in _radii_by_type(eng).values() for r in rs} == {6.0}
+def test_cell_radius_um_is_read_for_every_archetype_without_evidence():
+    """cell_radius_um is the fallback, not a global override: a measured
+    archetype keeps its measurement."""
+    cfg = _cfg(cell_radius_um=6.0)
+    eng = _engine(cfg)
+    by_type = _radii_by_type(eng)
+    names = list(cfg.initial_composition)
+    for index, radii in by_type.items():
+        expected = (MACROPHAGE_UM if names[index] == "macrophage" else 6.0)
+        assert radii == {expected}, names[index]
 
 
 # ── the library ─────────────────────────────────────────────────────────
@@ -242,3 +265,70 @@ def test_a_ghost_carries_its_real_radius():
         r for ca in eng.cell_arrays
         for r in eng._backend.to_numpy(ca.radii)[ca.n_real:ca.n_real + ca.n_ghost].tolist())
     assert ghost_radii == pytest.approx(sorted([5.0, MACROPHAGE_UM]))
+
+
+# ── every entry point, not just the dashboard ────────────────────────
+
+def test_a_config_built_from_json_still_gets_the_measured_radius():
+    """resolve_radii_from_library was called from the tissue-scale
+    dashboard page and nowhere else in the package. The container
+    entrypoint, tissue_runner.main, builds its config with from_json and
+    never resolved -- so every non-dashboard run gave EVERY archetype the
+    5.0 um default, macrophage included, whose measured radius is 10.6.
+
+    The engine constructor is the one place every entry point passes
+    through, so it resolves there.
+    """
+    import contextlib
+    import io
+
+    from cognisom.core.tissue_config import TissueScaleConfig
+    from cognisom.core.tissue_engine import TissueSimulationEngine
+
+    config = TissueScaleConfig.from_json(
+        TissueScaleConfig.small_test().to_json())
+    assert config.radius_for("macrophage") == pytest.approx(5.0), (
+        "from_json already resolves; this test no longer proves anything")
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        TissueSimulationEngine(config)
+
+    assert config.radius_for("macrophage") == pytest.approx(10.6)
+    assert "PMID:9400735" in config.archetype_radius_source["macrophage"]
+
+
+def test_every_archetype_records_why_it_has_the_radius_it_has():
+    """A run that silently used defaults for nine of ten archetypes is
+    indistinguishable from one that resolved them. Each must say."""
+    import contextlib
+    import io
+
+    from cognisom.core.tissue_config import TissueScaleConfig
+    from cognisom.core.tissue_engine import TissueSimulationEngine
+
+    config = TissueScaleConfig.from_json(
+        TissueScaleConfig.small_test().to_json())
+    with contextlib.redirect_stdout(io.StringIO()):
+        TissueSimulationEngine(config)
+
+    for archetype in config.initial_composition:
+        assert config.archetype_radius_source.get(archetype), (
+            f"{archetype} has a radius and no record of where it came from")
+
+
+def test_resolving_twice_does_not_change_the_answer():
+    """The dashboard still calls it explicitly; that must stay harmless."""
+    import contextlib
+    import io
+
+    from cognisom.core.tissue_config import TissueScaleConfig
+    from cognisom.core.tissue_engine import TissueSimulationEngine
+
+    config = TissueScaleConfig.from_json(
+        TissueScaleConfig.small_test().to_json())
+    with contextlib.redirect_stdout(io.StringIO()):
+        TissueSimulationEngine(config)
+    first = dict(config.archetype_radius_um)
+
+    config.resolve_radii_from_library()
+    assert dict(config.archetype_radius_um) == first

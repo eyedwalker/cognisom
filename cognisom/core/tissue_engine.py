@@ -74,6 +74,20 @@ class TissueSimulationEngine:
 
     def __init__(self, config: TissueScaleConfig):
         self._config = config
+        # Resolved HERE rather than at the one call site that used to do
+        # it. resolve_radii_from_library was called from the tissue-scale
+        # dashboard page and nowhere else, so every other entry point --
+        # tissue_runner.main, which is what the container runs, and every
+        # script building a config from_json or from a preset -- gave
+        # EVERY archetype the 5.0 um default, macrophage included, whose
+        # measured radius is 10.6. This constructor is the one place all
+        # of them pass through. It is idempotent (an archetype already in
+        # archetype_radius_um is left alone and marked "config") and it
+        # fails soft when no library is reachable.
+        try:
+            config.resolve_radii_from_library()
+        except Exception:                                  # pragma: no cover
+            log.debug("radii not resolved from the library", exc_info=True)
         self._step_count: int = 0
         self._sim_time: float = 0.0
         self._wall_start: float = 0.0

@@ -225,7 +225,20 @@ with tab_board:
             consensus_colors = {"unanimous": "🟢", "majority": "🟡", "split": "🔴"}
             st.metric("Consensus", f"{consensus_colors.get(decision.consensus_level, '')} {decision.consensus_level.title()}")
         with col3:
-            st.metric("Confidence", f"{decision.confidence:.0%}")
+            # Not the same construction as the treatment simulator's
+            # score, and not a probability either: board._compute_
+            # confidence starts from each agent's hardcoded prior (0.70,
+            # 0.65, 0.70), adds 0.10 when the board is unanimous,
+            # subtracts 0.15 when split, and adds a tenth of the gap to
+            # the runner-up. It measures how much the three agents
+            # agreed, from a prior nothing fitted.
+            st.metric(
+                "Board Agreement", f"{decision.confidence:.0%}",
+                help=("How much the three agents agreed, starting from a "
+                      "fixed per-agent prior. Not a probability that the "
+                      "recommendation is correct, and not fitted to any "
+                      "outcome data."),
+            )
         with col4:
             st.metric("Evidence Items", len(decision.evidence_chain))
 
