@@ -747,9 +747,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -776,7 +776,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -785,7 +785,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -798,9 +798,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -827,7 +827,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -836,7 +836,58 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.444
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
+   "name": "Exhausted CD8+ T cell",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
+     "unit": "dimensionless",
+     "value": 0.002
+    },
+    "microvillus_density_per_um2": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human peripheral blood T cells, live and unfixed; variable-angle TIRF with 3D surface reconstruction",
+     "provenance": "measured",
+     "rationale": "3 +/- 0.5 per um^2. Independently the midpoint of the 2-4 range from SEM morphometry across lymphocyte sources two decades earlier (PMID 15130947) -- two labs, two unrelated methods, the same number. Measured on LIVE cells, so it escapes the critical-point-drying artefact; the same paper's own SEM gives 4.5, which is the size of that artefact.",
+     "source": "Jung Y et al., PNAS 2016, Fig. S2 legend",
+     "unit": "1/um^2",
+     "value": 3.0
+    },
+    "microvillus_diameter_um": {
+     "citation": "PMID:27647916",
+     "conditions": "Resting primary human T cells; SEM. Effector T cells measured 'comparable' in the same paper",
+     "provenance": "measured",
+     "rationale": "Midpoint of a measured 70-100 nm range; the measurement is the range. The 150 nm figure in circulation traces to a review and could not be confirmed in any primary source.",
+     "source": "Jung Y et al., PNAS 2016",
+     "unit": "um",
+     "value": 0.085
+    },
+    "microvillus_length_um": {
+     "citation": "PMID:15130947",
+     "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
+     "provenance": "measured",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
+     "source": "Majstoravich S et al., Blood 2004",
+     "unit": "um",
+     "value": 0.35
+    },
+    "nuclear_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -851,7 +902,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 29% for this cell, so the true fraction is between 0.0202 and 0.0260. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
      "unit": "dimensionless",
      "value": 0.026
@@ -869,13 +920,28 @@
   },
   {
    "entity_type": "cell_type",
+   "name": "Monocyte",
+   "parameters": {
+    "granule_volume_fraction": {
+     "citation": "PMID:6775712",
+     "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
+     "provenance": "measured",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 29% for this cell, so the true fraction is between 0.0202 and 0.0260. Not corrected here because the Appendix states a maximum rather than a point estimate.",
+     "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
+     "unit": "dimensionless",
+     "value": 0.026
+    }
+   }
+  },
+  {
+   "entity_type": "cell_type",
    "name": "NK cell",
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -920,7 +986,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -929,7 +995,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -942,9 +1008,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -971,7 +1037,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -980,7 +1046,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2693,9 +2759,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -2722,7 +2788,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -2731,7 +2797,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2744,9 +2810,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -2773,7 +2839,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -2782,7 +2848,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2795,9 +2861,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -2824,7 +2890,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -2833,7 +2899,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2846,9 +2912,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -2902,7 +2968,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -2920,7 +2986,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2933,9 +2999,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -2962,7 +3028,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -2971,7 +3037,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -2984,9 +3050,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3013,7 +3079,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3022,7 +3088,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3037,7 +3103,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood eosinophil; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 19% for this cell, so the true fraction is between 0.1933 and 0.2300. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115197)",
      "unit": "dimensionless",
      "value": 0.23
@@ -3050,9 +3116,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3079,7 +3145,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3088,7 +3154,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3101,9 +3167,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3130,7 +3196,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3139,7 +3205,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3152,9 +3218,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3181,7 +3247,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3190,7 +3256,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3203,9 +3269,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3232,7 +3298,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3241,7 +3307,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3256,7 +3322,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 29% for this cell, so the true fraction is between 0.0202 and 0.0260. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
      "unit": "dimensionless",
      "value": 0.026
@@ -3280,7 +3346,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood monocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 29% for this cell, so the true fraction is between 0.0202 and 0.0260. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
      "unit": "dimensionless",
      "value": 0.026
@@ -3293,9 +3359,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3322,7 +3388,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3331,7 +3397,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3344,9 +3410,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3399,7 +3465,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3417,7 +3483,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3430,9 +3496,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3477,7 +3543,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3486,7 +3552,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3499,9 +3565,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3528,7 +3594,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3537,7 +3603,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3552,7 +3618,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood neutrophil; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 28% for this cell, so the true fraction is between 0.1203 and 0.1540. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115195)",
      "unit": "dimensionless",
      "value": 0.154
@@ -3591,9 +3657,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3620,7 +3686,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3629,7 +3695,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
@@ -3642,9 +3708,9 @@
    "parameters": {
     "granule_volume_fraction": {
      "citation": "PMID:6775712",
-     "conditions": "Human peripheral blood lymphocyte",
+     "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The floor of the 77-fold spread in this table; an eosinophil measured the same way is 23.0%.",
+     "rationale": "One table, one method, one paper, which is what makes the 77-fold spread across these cells a comparison rather than four unrelated numbers. Table 2 as printed, which is an OVERESTIMATE: the paper's Appendix puts the bias from finite section thickness at up to 44% for this cell, so the true fraction is between 0.0014 and 0.0020. Not corrected here because the Appendix states a maximum rather than a point estimate.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.002
@@ -3671,7 +3737,7 @@
      "citation": "PMID:15130947",
      "conditions": "Circulating mammalian lymphocytes; SEM morphometry",
      "provenance": "measured",
-     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number.",
+     "rationale": "A MEDIAN of a strongly right-skewed distribution, not a mean. Lengths run 'from 0.1 um to several micrometers' (PMID 27647916, verbatim), so a constant-length coat has the wrong shape and not merely the wrong number. Confirmed from an unrelated direction by PMID 6775712, read 2026-10-20: TEM morphometry puts 'the height of the membrane foldings at 305 mosmole' at 'about 0.35 um', and checks it by arithmetic -- a 6.72 um smooth-sphere diameter plus twice the folding height gives 7.42 um, which is what light microscopy measures at the outer edge. Two methods 24 years apart, one measuring villus length and the other folding height, agree to two figures.",
      "source": "Majstoravich S et al., Blood 2004",
      "unit": "um",
      "value": 0.35
@@ -3680,7 +3746,7 @@
      "citation": "PMID:6775712",
      "conditions": "Human peripheral blood lymphocyte; stereology on electron micrographs",
      "provenance": "measured",
-     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell.",
+     "rationale": "The record reads 'nucleus 44.4%: granules 0.2%: mitochondria 3.8%: cytoplasm 51.6%'. Petrzilka (PMID 308396) agrees independently at 0.458, from 47.5 um^3 of nucleus in a 103.8 um^3 cell. A RADIUS is the cube root of this; using the fraction as a radius gives a nucleus at 8.8% of the cell. The same Appendix that discounts the granule fractions clears this one: the section-thickness error is 'negligible, because the section thickness is small in comparison to nuclear dimensions'. Checked against the paper's own Table 1, where an eosinophil nucleus of 37 um^3 in a 206 um^3 cell is 18.0% against Table 2's 17.9%.",
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444

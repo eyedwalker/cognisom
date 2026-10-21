@@ -332,6 +332,26 @@
   ]
  },
  {
+  "referenced_as": "AMACR",
+  "entity_name": "Alpha-methylacyl-CoA racemase (AMACR/P504S)",
+  "gene": "AMACR",
+  "accession": "Q9UHK6",
+  "uniprot_name": "Alpha-methylacyl-CoA racemase",
+  "entity_type": "protein",
+  "compartments": [
+   "cytoplasm"
+  ],
+  "length": 382,
+  "synonyms": [
+   "AMACR",
+   "P504S",
+   "racemase"
+  ],
+  "description": "Peroxisomal/mitochondrial racemase in branched-chain fatty acid beta-oxidation, and the positive diagnostic marker of prostatic adenocarcinoma: overexpressed in roughly 80% of cases and used with the LOSS of basal p63 and CK5 to separate carcinoma from a benign mimic. It is cytoplasmic, so a marker list that renders it on the membrane says the wrong thing about the one stain a pathologist reads for this diagnosis.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
+ },
+ {
   "referenced_as": "ACTA2+ / alpha-SMA+",
   "entity_name": "Alpha-smooth muscle actin (ACTA2)",
   "gene": "ACTA2",
@@ -458,6 +478,27 @@
   "compartments": [
    "cell_membrane"
   ]
+ },
+ {
+  "referenced_as": "CNN1",
+  "entity_name": "Calponin-1 (CNN1)",
+  "gene": "CNN1",
+  "accession": "P51911",
+  "uniprot_name": "Calponin-1",
+  "entity_type": "protein",
+  "compartments": [
+   "cytoplasm"
+  ],
+  "length": 297,
+  "synonyms": [
+   "CNN1",
+   "calponin",
+   "calponin-1",
+   "basic calponin"
+  ],
+  "description": "Actin-binding regulator of smooth muscle contraction and one of the three markers that identify a differentiated smooth muscle cell. Its loss is part of the reactive-stroma switch in prostate cancer.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
  },
  {
   "referenced_as": "CHGA+",
@@ -620,6 +661,25 @@
   "compartments": [
    "cytoplasm"
   ]
+ },
+ {
+  "referenced_as": "DES",
+  "entity_name": "Desmin (DES)",
+  "gene": "DES",
+  "accession": "P17661",
+  "uniprot_name": "Desmin",
+  "entity_type": "protein",
+  "compartments": [
+   "cytoplasm"
+  ],
+  "length": 470,
+  "synonyms": [
+   "DES",
+   "desmin"
+  ],
+  "description": "The muscle intermediate filament, cytoplasmic and structural. With MYH11 and calponin it says a stromal cell is smooth muscle rather than a fibroblast, which is the distinction the prostate stroma turns on.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
  },
  {
   "referenced_as": "CD203c",
@@ -842,6 +902,27 @@
   ]
  },
  {
+  "referenced_as": "MYH11",
+  "entity_name": "Myosin-11 (MYH11)",
+  "gene": "MYH11",
+  "accession": "P35749",
+  "uniprot_name": "Myosin-11",
+  "entity_type": "protein",
+  "compartments": [
+   "cytoplasm"
+  ],
+  "length": 1972,
+  "synonyms": [
+   "MYH11",
+   "myosin-11",
+   "SMMHC",
+   "smooth muscle myosin heavy chain"
+  ],
+  "description": "Smooth muscle myosin heavy chain, the contractile motor itself and the most specific marker of a differentiated smooth muscle cell. At 1972 residues it is also, by a wide margin, the largest protein in this library.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
+ },
+ {
   "referenced_as": "NSE+",
   "entity_name": "Neuron-specific enolase (ENO2)",
   "gene": "ENO2",
@@ -930,6 +1011,25 @@
   "compartments": [
    "granule"
   ]
+ },
+ {
+  "referenced_as": "TOX",
+  "entity_name": "TOX",
+  "gene": "TOX",
+  "accession": "O94900",
+  "uniprot_name": "Thymocyte selection-associated high mobility group box protein TOX",
+  "entity_type": "protein",
+  "compartments": [
+   "nucleus"
+  ],
+  "length": 526,
+  "synonyms": [
+   "TOX",
+   "TOX1"
+  ],
+  "description": "The HMG-box transcription factor that drives and maintains T-cell exhaustion: it is required for the exhausted state and its deletion restores effector function. NUCLEAR, like every other lineage factor here, which is the compartment a marker list cannot express on its own.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
  },
  {
   "referenced_as": "SOX2+",
@@ -1108,6 +1208,26 @@
   "compartments": [
    "cell_membrane"
   ]
+ },
+ {
+  "referenced_as": "CCR2",
+  "entity_name": "CCR2 (CD192)",
+  "gene": "CCR2",
+  "accession": "P41597",
+  "uniprot_name": "C-C chemokine receptor type 2",
+  "entity_type": "receptor",
+  "compartments": [
+   "cell_membrane"
+  ],
+  "length": 374,
+  "synonyms": [
+   "CCR2",
+   "CD192",
+   "CC-CKR-2"
+  ],
+  "description": "The receptor for CCL2/MCP-1 and the axis that recruits monocytes out of blood into a tumour. Blocking it is an actively trialled way to starve a tumour of macrophages, so the pair matters to any treatment simulation: CCL2 is already an entity here and its receptor was not.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
  },
  {
   "referenced_as": "CCR4",
@@ -1425,6 +1545,26 @@
   "compartments": [
    "cell_membrane"
   ]
+ },
+ {
+  "referenced_as": "CD39",
+  "entity_name": "Ectonucleoside triphosphate diphosphohydrolase 1 (CD39/ENTPD1)",
+  "gene": "ENTPD1",
+  "accession": "P49961",
+  "uniprot_name": "Ectonucleoside triphosphate diphosphohydrolase 1",
+  "entity_type": "receptor",
+  "compartments": [
+   "cell_membrane"
+  ],
+  "length": 510,
+  "synonyms": [
+   "CD39",
+   "ENTPD1",
+   "NTPDase 1"
+  ],
+  "description": "Hydrolyses extracellular ATP to AMP, the first step of the adenosine brake on T-cell killing, and with CD73 the pair that makes a tumour microenvironment immunosuppressive. On a CD8 T cell it marks tumour-reactive and terminally exhausted cells, which is why it is in the exhausted T cell's marker list.",
+  "verified_twice": false,
+  "uniprot_verified": "2026-10-21: gene symbol and length read back from UniProt"
  },
  {
   "referenced_as": "CD193",

@@ -129,8 +129,31 @@ def test_a_placeholder_radius_is_refused_and_a_missing_row_says_so(shipped_store
     assert "luminal_secretory" not in cfg.archetype_radius_um
     assert cfg.archetype_radius_source["luminal_secretory"] == (
         "Luminal epithelial cell: placeholder: not evidence")
-    assert cfg.archetype_radius_source["smooth_muscle"] == "no library row"
-    assert cfg.archetype_radius_source["cancer_epithelial"] == "no library row"
+    # smooth_muscle and cancer_epithelial used to report "no library
+    # row" here, and that was the real state: ARCHETYPE_ENTITY mapped
+    # eight of DEFAULT_COMPOSITION's ten, so a fifth of every simulated
+    # tissue -- the malignant compartment among it -- had no entity at
+    # all. Both are mapped now, so against this planted store they
+    # report the row they looked for and did not find, which is the more
+    # useful message of the two.
+    for archetype, row in (("smooth_muscle", "Prostatic smooth muscle cell"),
+                           ("cancer_epithelial", "Prostatic adenocarcinoma cell")):
+        assert cfg.archetype_radius_source[archetype] == (
+            f"{row}: no cell_type named {row!r}")
+
+
+def test_an_archetype_with_no_mapping_still_says_so(shipped_store):
+    """The other half of the message, which must survive every
+    archetype in the shipped composition being mapped: a composition can
+    name something ARCHETYPE_ENTITY has never heard of, and that has to
+    read differently from a row that was looked up and missing."""
+    composition = dict(_cfg().initial_composition)
+    composition["an_archetype_nobody_mapped"] = 0.0
+    cfg = _cfg(initial_composition=composition).resolve_radii_from_library(
+        SimulationParameterResolver(shipped_store))
+    assert cfg.archetype_radius_source["an_archetype_nobody_mapped"] == (
+        "no library row")
+    assert "an_archetype_nobody_mapped" not in cfg.archetype_radius_um
 
 
 def test_a_curated_radius_on_any_mapped_archetype_is_used(shipped_store):

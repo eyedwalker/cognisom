@@ -95,6 +95,14 @@ ARCHETYPE_ENTITY: Dict[str, Tuple[str, str]] = {
     "macrophage": ("Macrophage", "cell_type"),
     "t_cell": ("CD8+ Effector T cell", "immune_cell"),
     "nk_cell": ("NK cell", "immune_cell"),
+    # These two were absent, and between them they are a FIFTH of the
+    # default composition. cancer_epithelial is the malignant
+    # compartment -- what displays the neoantigen, what gets killed,
+    # what downregulates MHC-I -- and it had no entity, so every cancer
+    # cell in every run was the flat cell_radius_um fallback with
+    # nothing behind it to curate or cite.
+    "cancer_epithelial": ("Prostatic adenocarcinoma cell", "cell_type"),
+    "smooth_muscle": ("Prostatic smooth muscle cell", "cell_type"),
 }
 
 

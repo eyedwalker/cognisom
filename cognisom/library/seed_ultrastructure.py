@@ -230,6 +230,11 @@ LYMPHOCYTE_NAMES = (
     "CD8+ Effector T cell", "Regulatory T cell", "Regulatory T cell (Treg)",
     "T follicular helper (Tfh)", "Gamma-delta T cell", "Naive B cell",
     "Memory B cell", "ILC1", "ILC2", "ILC3", "NK cell", "NKT cell",
+    # Still a lymphocyte: the nucleus, the microvilli and the resting
+    # granule fraction all apply. Deliberately NOT in CYTOTOXIC_NAMES --
+    # losing the lytic load is what exhaustion IS, so giving it the full
+    # 63 granules would contradict the state the entity exists to model.
+    "Exhausted CD8+ T cell",
 )
 CYTOTOXIC_NAMES = ("NK cell", "NKT cell", "CD8+ Effector T cell")
 EOSINOPHIL_NAMES = ("Eosinophil",)

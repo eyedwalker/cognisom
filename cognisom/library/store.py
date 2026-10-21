@@ -194,6 +194,24 @@ class EntityStore:
                     log.warning("Marker molecule seed failed "
                                 "(non-fatal): %s", e)
 
+                # The two tissue archetypes that had no entity.
+                # DEFAULT_COMPOSITION declares ten and ARCHETYPE_ENTITY
+                # mapped eight, so a fifth of every simulated tissue --
+                # smooth_muscle and cancer_epithelial, the malignant
+                # compartment among them -- fell back to a 5 um sphere
+                # with nothing to curate or cite.
+                try:
+                    from .seed_malignant_compartment import (
+                        seed as seed_malignant, seed_aliases)
+                    added, notes = seed_malignant(self)
+                    log.info("Tissue archetypes: %d added, %d aliases",
+                             added, seed_aliases(self))
+                    for note in notes:
+                        log.debug("  %s", note)
+                except Exception as e:
+                    log.warning("Malignant compartment seed failed "
+                                "(non-fatal): %s", e)
+
                 # Enrich with visualization/physics defaults
                 try:
                     from .enrichment import EntityEnricher

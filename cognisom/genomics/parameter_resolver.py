@@ -387,6 +387,51 @@ class SimulationParameterResolver:
 
     # ── Cell Type Parameters ────────────────────────────────────────
 
+    #: Name form -> entity name, built once from the library's own
+    #: synonyms. None until first use.
+    _CELL_NAME_INDEX = None
+
+    def _canonical_cell_name(self, cell_name: str) -> str:
+        """The library's name for this cell, however the caller spelled it.
+
+        ``find_entity_by_name`` matches exactly, and the callers do not
+        spell things the way the library does. Measured against the four
+        vocabularies this repository emits -- spatial_transcriptomics,
+        cell_state_classifier, the spatial dashboard page and
+        cellular_module -- 19 of 19 distinct labels resolved to nothing,
+        and six of those failed on CASE ALONE: ``Macrophage`` answered
+        and ``macrophage`` did not, while cell_state_classifier
+        lowercases every label before it looks one up.
+
+        So the lookup goes through the same synonym index the rest of
+        the library resolves references with, which already handles case,
+        punctuation and declared aliases, and which drops any form two
+        entities would claim rather than guessing between them.
+
+        An unrecognised name is returned unchanged, so the caller still
+        gets the warning and the empty dict rather than a silent
+        substitution.
+        """
+        if type(self)._CELL_NAME_INDEX is None:
+            try:
+                from cognisom.library.seed_synonyms import resolve_index
+                index = resolve_index(self.store)
+            except Exception:                             # pragma: no cover
+                index = {}
+            cells = {
+                row[0] for row in self.store._conn.execute(
+                    "SELECT name FROM entities WHERE entity_type IN "
+                    "('cell_type', 'immune_cell')")
+            }
+            type(self)._CELL_NAME_INDEX = {
+                form: name for form, name in index.items() if name in cells
+            }
+        index = type(self)._CELL_NAME_INDEX or {}
+        probe = str(cell_name).strip()
+        return (index.get(probe.lower())
+                or index.get(probe.lower().replace("_", " "))
+                or probe)
+
     def get_cell_type_params(self, cell_name: str) -> Dict[str, Any]:
         """Get simulation parameters for a cell type.
 
@@ -400,6 +445,7 @@ class SimulationParameterResolver:
         # a cell that cannot kill anything. Prefer the row that actually
         # carries cytotoxic parameters, and record both which row answered
         # and that the name was ambiguous.
+        cell_name = self._canonical_cell_name(cell_name)
         as_immune = self.store.find_entity_by_name(cell_name, "immune_cell")
         as_cell = self.store.find_entity_by_name(cell_name, "cell_type")
         cytotoxic = as_immune is not None and any(
