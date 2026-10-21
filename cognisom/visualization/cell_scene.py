@@ -123,7 +123,9 @@ class CellScene:
                  else "sphere (no builder for this type)")
         bits = [shape.replace("_", " ")]
         if self.scale_um:
-            bits.append(f"~{self.scale_um:g} um")
+            sourced = self.sources.get("scale_um", "").startswith("radius_um")
+            bits.append(f"{'' if sourced else '~'}{self.scale_um:g} um"
+                        + ("" if sourced else " (est)"))
         measured = sum(1 for v in self.sources.values() if v == "library")
         if measured:
             bits.append(f"{measured} measured")
@@ -143,6 +145,36 @@ def _entity_field(entity, name, default=None):
     return default if value in (None, "") else value
 
 
+def resolved_scale_um(entity) -> Tuple[float, str]:
+    """The diameter to draw at, and where it came from.
+
+    An entity can carry TWO sizes. ``radius_um`` is a parameter and
+    travels with a provenance grade and a citation; ``scale_um`` is a
+    top-level field with neither. They are free to disagree and they do:
+    every leukocyte sourced from PMID 2272970 had a ``scale_um`` between
+    1.16x and 1.85x its measured diameter, because ``scale_um`` was
+    2 x radius while the radius was a placeholder and nobody updated it
+    when a real radius arrived.
+
+    So a MEASURED radius wins. It is the number that carries evidence,
+    and preferring the other one would mean sourcing a cell's size from
+    a paper and then drawing it at the guess.
+    """
+    from cognisom.library.parameters import Provenance, get_parameter
+
+    try:
+        radius = get_parameter(entity, "radius_um")
+    except Exception:                       # a non-entity, in a test
+        radius = None
+    if radius is not None and radius.value > 0 and \
+            radius.provenance is not Provenance.PLACEHOLDER:
+        where = radius.citation or radius.provenance.value
+        return float(radius.value) * 2.0, f"radius_um {where}"
+
+    scale = float(_entity_field(entity, "scale_um", 10.0) or 10.0)
+    return scale, "scale_um (no provenance)"
+
+
 def scene_for(entity, *, grid: int = CARD_GRID,
               compartments: Optional[Dict[str, str]] = None,
               max_detail: int = cd.DRAW_CAP) -> CellScene:
@@ -155,10 +187,11 @@ def scene_for(entity, *, grid: int = CARD_GRID,
     """
     name = getattr(entity, "name", "") or ""
     mesh_type = _entity_field(entity, "mesh_type", "") or ""
-    scale_um = float(_entity_field(entity, "scale_um", 10.0) or 10.0)
+    scale_um, scale_source = resolved_scale_um(entity)
 
     scene = CellScene(entity_name=name, mesh_type=mesh_type,
                       scale_um=scale_um, from_library=has_builder(mesh_type))
+    scene.sources["scale_um"] = scale_source
 
     # The proportions the entity itself records, read BEFORE the mesh is
     # built because they change the mesh. library_detail fetched these
@@ -201,7 +234,10 @@ def scene_for(entity, *, grid: int = CARD_GRID,
     profile = cp.profile_for(name, mesh_type, markers, scale_um=scale_um,
                              library=library, compartments=compartments)
     scene.profile = profile
-    scene.sources = dict(profile.sources)
+    # update, not replace: a wholesale assignment here dropped the
+    # scale_um provenance set above, so a sourced diameter was
+    # captioned as an estimate.
+    scene.sources.update(profile.sources)
 
     body = next((s for s in scene.surfaces if s.name == "body"), None)
     if body is None:

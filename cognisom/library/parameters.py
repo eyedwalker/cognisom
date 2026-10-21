@@ -1566,6 +1566,14 @@ PARAMETER_ALIASES: Tuple[ParameterAlias, ...] = (
         substrate="DEVD peptide",
     ),
     ParameterAlias(
+        # Named so that nobody can reach for it as a protein Km. A
+        # fluorogenic tetrapeptide reports on the active site; it is not
+        # procaspase-3 or BID, and the two need not agree.
+        "km_ietd_um", "km_um", 1.0,
+        "Km for the Ac-IETD-AFC peptide substrate, in micromolar",
+        substrate="Ac-IETD-AFC peptide",
+    ),
+    ParameterAlias(
         "km_collagen_iv_um", "km_um", 1.0,
         "Km for collagen IV, in micromolar",
         substrate="collagen IV",

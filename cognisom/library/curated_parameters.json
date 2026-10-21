@@ -1017,6 +1017,15 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115196)",
      "unit": "dimensionless",
      "value": 0.026
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Unactivated human peripheral blood monocytes, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 8.13 um, individual cells 6.96-9.09 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 8.79 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
+     "provenance": "measured",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 8.127 um diameter -> 4.063 um radius. The paper's own text rounds this to '8.13', which is how the transcription here was checked.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
+     "unit": "um",
+     "value": 4.063
     }
    }
   },
@@ -3507,6 +3516,15 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Unactivated human peripheral blood lymphocytes, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 6.05 um, individual cells 4.92-7.25 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 7.02 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
+     "provenance": "measured",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 6.050 um diameter -> 3.025 um radius. The paper's own text rounds this to '6.05', which is how the transcription here was checked.\nThis is a BULK resting lymphocyte: the fraction was 98-99% pure after elutriation and was not sorted into T and B, so the number describes a small resting lymphocyte and is applied only to entities that are one. The differentiated effector subsets keep their placeholders.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
+     "unit": "um",
+     "value": 3.025
     }
    }
   },
@@ -3558,6 +3576,15 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Unactivated human peripheral blood lymphocytes, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 6.05 um, individual cells 4.92-7.25 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 7.02 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
+     "provenance": "measured",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 6.050 um diameter -> 3.025 um radius. The paper's own text rounds this to '6.05', which is how the transcription here was checked.\nThis is a BULK resting lymphocyte: the fraction was 98-99% pure after elutriation and was not sorted into T and B, so the number describes a small resting lymphocyte and is applied only to entities that are one. The differentiated effector subsets keep their placeholders.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
+     "unit": "um",
+     "value": 3.025
     }
    }
   },
@@ -3867,6 +3894,15 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Unactivated human peripheral blood lymphocytes, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 6.05 um, individual cells 4.92-7.25 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 7.02 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
+     "provenance": "measured",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 6.050 um diameter -> 3.025 um radius. The paper's own text rounds this to '6.05', which is how the transcription here was checked.\nThis is a BULK resting lymphocyte: the fraction was 98-99% pure after elutriation and was not sorted into T and B, so the number describes a small resting lymphocyte and is applied only to entities that are one. The differentiated effector subsets keep their placeholders.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
+     "unit": "um",
+     "value": 3.025
     }
    }
   },
@@ -4073,6 +4109,15 @@
      "source": "Schmid-Schonbein GW et al., Table 2 (BNID 115194)",
      "unit": "dimensionless",
      "value": 0.444
+    },
+    "radius_um": {
+     "citation": "PMID:2272970",
+     "conditions": "Unactivated human peripheral blood lymphocytes, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 6.05 um, individual cells 4.92-7.25 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 7.02 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
+     "provenance": "measured",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 6.050 um diameter -> 3.025 um radius. The paper's own text rounds this to '6.05', which is how the transcription here was checked.\nThis is a BULK resting lymphocyte: the fraction was 98-99% pure after elutriation and was not sorted into T and B, so the number describes a small resting lymphocyte and is applied only to entities that are one. The differentiated effector subsets keep their placeholders.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
+     "unit": "um",
+     "value": 3.025
     }
    }
   },
@@ -4108,12 +4153,12 @@
     },
     "radius_um": {
      "citation": "PMID:2272970",
-     "conditions": "Human Homo sapiens; BioNumbers quantity: Diameter of neutrophil; range 7.3-9.7 Table - link \u00b5m; method: P.768 right column bottom paragraph: \"The measurement of the size of isolated and purified leukocytes was done by two independent methods. The first method of l; diameter 8.4 um x0.5; cells in suspension (Coulter, cross-checked by flow at 8.3 um). The seeded scale_um=13 is a blood-smear diameter of a flattened cell and stays as the rendering size; this is the volume-exclusion radius, giving 310 fL against measured 300-320 fL",
+     "conditions": "Unactivated human peripheral blood neutrophils, isolated by plasma-Percoll and counterflow elutriation, measured in suspension at 22 C. Flow cytometry (axial pulse extinction, calibrated against 5/10/15 um latex beads): mean of three donors 8.33 um, individual cells 7.04-10.25 um, 11,000-70,000 cells per donor. The same donors by Coulter counter read 8.40 um; the flow figure is used because the authors lead with it and name a bias in the other ('overestimation of cell volume due to plasma trapping in the surface folds'). RUFFLE-INCLUSIVE: this is the functional diameter including membrane folds, which is larger than the ruffle-excluded morphometry in PMID:6775712 that this library uses for granule volume fractions.",
      "provenance": "measured",
-     "rationale": "Value represents mean of coulter counter measurements of 11,000-70,000 cells from three donors. Mean neutrophil diameter measured from same samples by flow cytometer is 8.3\u00b5m, range 7.14-10.25\u00b5m. See table link for diameter of monocytes and lymphocytes. See BNID 100508, 104669",
-     "source": "BioNumbers BNID:100510 (Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. Retention of leukocytes in capillaries: role of ce)",
+     "rationale": "Table 1, flow cytometry column, mean of three donors: 8.333 um diameter -> 4.167 um radius. The paper's own text rounds this to '8.33', which is how the transcription here was checked.\nThis replaces a stored 4.2 um that was already graded MEASURED against this same PMID before the paper was read. 4.2 is the COULTER mean (8.40 um diameter), not the flow mean the authors lead with, and nothing recorded which of the two it was.",
+     "source": "Downey GP, Doherty DE, Schwab B 3rd, Elson EL, Henson PM, Worthen GS. J Appl Physiol 1990;69(5):1767-1778, Table 1",
      "unit": "um",
-     "value": 4.2
+     "value": 4.167
     }
    }
   },
@@ -4821,12 +4866,30 @@
    "parameters": {
     "kcat_per_s": {
      "citation": "PMID:15209560",
-     "conditions": "substrate: acetyl-IETD-7-amido-4-fluoromethylcoumarin; Homo sapiens, wild-type; IETD is caspase-8's preferred motif, not DEVD",
-     "provenance": "derived",
-     "rationale": "median of 4 BRENDA measurements across 1 papers, spanning 0.65 to 1.25 1/s. The citation names the paper contributing most records (4 of 4); a single record would have been an arbitrary pick from that spread",
-     "source": "BRENDA EC 3.4.22.61 (CC BY 4.0), 4 records across 1 papers",
+     "conditions": "Cleaved caspase-8 homodimer, active-site titrated, in 20 mM Tris / 100 mM NaCl pH 7.4 at 37 C -- the paper's LOW-SALT buffer. Substrate Ac-IETD-AFC at 100 uM. kcat 0.65 +/- 0.1 s^-1.",
+     "provenance": "measured",
+     "rationale": "Table 1, the row measured under near-physiological salt. It had been 0.88, graded DERIVED, as 'the median of 4 BRENDA measurements across 1 papers, spanning 0.65 to 1.25'. Reading the table shows those four are not four measurements of one thing:\n  0.65  cleaved caspase-8 homodimer, low salt      <- this one\n  1.25  the SAME enzyme in 0.7 M sodium citrate\n  0.98  caspase-8/FLIP-L HETERODIMER, 0.7 M citrate\n  0.78  the same heterodimer with FLIP-L D297A\nThree different molecular species, and three of the four in a kosmotrope. Sodium citrate at 0.7 M is not a cellular condition: the paper uses it as a tool to force dimerization -- 'capable of salting out proteins from solution, creating local areas of high protein concentration' -- and says it improved Km and kcat 'probably due to stabilization of the active site'. Taking the median across them averages a homodimer with a heterodimer and physiological salt with a laboratory device.",
+     "source": "Boatright KM et al., Biochem J 2004;382:651-657, Table 1",
      "unit": "1/s",
-     "value": 0.88
+     "value": 0.65
+    },
+    "km_ietd_um": {
+     "citation": "PMID:15209560",
+     "conditions": "Cleaved caspase-8 homodimer, active-site titrated, in 20 mM Tris / 100 mM NaCl pH 7.4 at 37 C -- the paper's LOW-SALT buffer. Substrate Ac-IETD-AFC at 100 uM. Km 55.2 +/- 2.0 uM.",
+     "provenance": "measured",
+     "rationale": "55.2 +/- 2.0 uM on Ac-IETD-AFC, the same row as the kcat so the pair describes one enzyme under one condition. In 0.7 M sodium citrate the same enzyme reads 20.6 uM, which is the size of the kosmotrope's effect on Km alone.\nStored under the substrate-named alias, not as a bare km_um: Ac-IETD-AFC is a fluorogenic TETRAPEPTIDE. It reports on the active site, and it is not BID or procaspase-3. A Km for a real protein substrate is a different measurement and this one must not stand in for it.",
+     "source": "Boatright KM et al., Biochem J 2004;382:651-657, Table 1",
+     "unit": "uM",
+     "value": 55.2
+    },
+    "km_um": {
+     "citation": "PMID:15209560",
+     "conditions": "Cleaved caspase-8 homodimer, active-site titrated, in 20 mM Tris / 100 mM NaCl pH 7.4 at 37 C -- the paper's LOW-SALT buffer. Substrate Ac-IETD-AFC at 100 uM. Km 55.2 +/- 2.0 uM.",
+     "provenance": "measured",
+     "rationale": "55.2 +/- 2.0 uM on Ac-IETD-AFC, the same row as the kcat so the pair describes one enzyme under one condition. In 0.7 M sodium citrate the same enzyme reads 20.6 uM, which is the size of the kosmotrope's effect on Km alone.",
+     "source": "Boatright KM et al., Biochem J 2004;382:651-657, Table 1",
+     "unit": "uM",
+     "value": 55.2
     },
     "molecular_extent_nm": {
      "citation": "AlphaFoldDB:Q14790",
@@ -8498,10 +8561,10 @@
    "parameters": {
     "replication_cycle_hours": {
      "citation": "PMID:16840338",
-     "conditions": "Influenza; BioNumbers quantity: Latent phase of influenza A; latent phase, infection to virion release, from a model fitted to human infection data, x1",
+     "conditions": "Six serosusceptible adults inoculated intranasally with 10^4.2 TCID50 of cloned wild-type A/Hong Kong/123/77 (H1N1); daily nasal wash titres fitted with a target-cell-limited model carrying an eclipse phase. Geometric mean of six patient-specific fits; 95% CI 4.6-7.9 h. UPPER respiratory tract -- the authors note natural infection also involves the lower tract, where the kinetics may differ.",
      "provenance": "measured",
-     "rationale": "The delay model suggests that influenza virus is produced by an infected cell for a period of about 5 h, that it takes about 6 h between infection of target cells and virion release, and that infected cells have an average life span of about 12 h (Table 3).",
-     "source": "BioNumbers BNID:101619 (Baccam P, Beauchemin C, Macken CA, Hayden FG, Perelson AS. Kinetics of influenza A virus infection in humans. J Virol. 2)",
+     "rationale": "1/k in Table 3: the time from a cell being infected to that cell releasing its first virion, the eclipse phase. Confirmed on reading the paper, which states it in words -- 'it takes about 6 h between infection of target cells and virion release'.\nTwo neighbouring quantities in the same table are NOT this one, and a reader reaching for 'the replication cycle' could take either by mistake: 1/delta = 4.6 h is how long a cell goes on PRODUCING virus once it starts, and <t> = 11.4 h is the whole lifetime of an infected cell, eclipse plus production. The paper itself rounds that last one to 'about 12 h'.\nThe free-virion half-life from the same fit is 3.2 h (CI 1.9-5.3) and R0 is 22 (CI 10-46); neither is stored and both could be.",
+     "source": "Baccam P et al., J Virol 2006;80(15):7590-7599, Table 3",
      "unit": "h",
      "value": 6.0
     }

@@ -144,7 +144,14 @@ def test_a_curated_radius_takes_precedence_over_the_alias(sized_entities):
     """The alias exists to stop a stated size reading as absent, not to
     outvote evidence. Once a radius is curated, the alias must step aside --
     otherwise the neutrophil would keep its 6.5 um smear radius over a
-    measured 4.2."""
+    measured one.
+
+    The measured value is read from the library rather than pinned here.
+    This test pinned 4.2 and 4.2 turned out to be the Coulter column of
+    PMID 2272970, stored before the paper was read; pinning it a second
+    time would make this test the reason the correction could not land.
+    PMID 2272970 is what asserts the number, in
+    test_values_read_from_their_papers.py."""
     curated = [(e, get_parameter(e, "radius_um")) for e in sized_entities]
     curated = [(e, pv) for e, pv in curated
                if pv is not None and pv.provenance is not Provenance.PLACEHOLDER]
@@ -154,5 +161,9 @@ def test_a_curated_radius_takes_precedence_over_the_alias(sized_entities):
         assert pv.citation, f"{entity.name} has an uncited non-placeholder radius"
     neutrophil = {e.name: pv for e, pv in curated}.get("Neutrophil")
     if neutrophil is not None:
-        assert neutrophil.value == pytest.approx(4.2), (
+        # The smear figure is what the alias would supply if it won.
+        assert neutrophil.value != pytest.approx(6.5), (
             "the alias overrode the curated neutrophil radius")
+        assert 3.5 < neutrophil.value < 5.0, (
+            f"a neutrophil radius of {neutrophil.value} um is not a "
+            "measured blood neutrophil by any method")
