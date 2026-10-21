@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Sequence
 
 from .models import (
     BioEntity,
@@ -943,6 +943,106 @@ class EntityEnricher:
         "Inflamed endothelial cell": {"usd_prim_type": "BioEndothelialCell", "mesh_type": "flat_activated_adhesion", "scale_um": 22.0, "color_rgb": [0.9, 0.5, 0.5]},
     }
 
+    def _applicable_defaults(self, entity, etype: str) -> Dict[str, float]:
+        """The type-level defaults that actually apply to this entity.
+
+        These were written wholesale -- ``entity.physics_params =
+        dict(physics)`` -- which bypassed both checks ``set_parameter``
+        makes, so a default landed on entities the parameter is not
+        declared for and on entities the spec explicitly calls
+        inapplicable.
+
+        What that produced: **28 cells carrying kill_probability 0.3**,
+        a plasma cell and a Treg with the same per-contact kill chance
+        as a CD8 effector, and three ENDOTHELIAL rows carrying one at
+        all -- kill_probability is declared for immune_cell only, and
+        those three are cell_type. ``models.py`` already says of these
+        fields that "for the non-cytotoxic types that is not a missing
+        value, it is a wrong one", and the seeded data never honoured
+        it.
+
+        It also produced the exact drift the single-writer rule exists
+        to stop: ``assess()`` reported kill_probability NOT APPLICABLE
+        for a plasma cell while 0.3 sat in its physics_params. The
+        stored number and the curation report disagreeing is what
+        ``set_parameter``'s guard refuses, and this path went around it.
+
+        So the same two checks are applied here. A default with no spec
+        is kept -- plenty of these have none and are legitimate
+        type-level starting points.
+        """
+        from .parameters import PARAMETER_SPECS
+
+        out: Dict[str, float] = {}
+        for name, value in self._PHYSICS_DEFAULTS.get(etype, {}).items():
+            spec = PARAMETER_SPECS.get(name)
+            if spec is not None:
+                if entity.entity_type not in spec.applies_to:
+                    continue
+                if spec.inapplicable_to(entity) is not None:
+                    continue
+            out[name] = value
+        return out
+
+    #: What strip_inapplicable_parameters acts on unless told otherwise.
+    #:
+    #: Scoped deliberately. Run over every spec it also removes
+    #: ``half_life_hours`` from 17 gene rows -- correct by the letter of
+    #: the spec, which declares that parameter for cytokine, ligand,
+    #: protein and drug -- and the AR row's value is what the mRNA
+    #: degradation rate is read from, with a live test depending on it.
+    #: Whether a GENE has a half-life, and whether an mRNA half-life and
+    #: a protein half-life belong under one name, is a real question and
+    #: the same shape as the Km-alias problem this library has already
+    #: been bitten by. It deserves deciding, not settling as a side
+    #: effect of a cytotoxicity fix.
+    #:
+    #: Same for ``division_time_hours`` on post-mitotic neutrophils and
+    #: eosinophils: probably right, not investigated here.
+    _STRIP_BY_DEFAULT = ("kill_probability", "detection_radius_um",
+                         "exhaustion_rate", "kill_radius_um")
+
+    def strip_inapplicable_parameters(
+        self, names: Optional[Sequence[str]] = None,
+    ) -> List[str]:
+        """Remove stored values the spec says cannot apply.
+
+        For a database that already has them. ``names`` defaults to
+        :data:`_STRIP_BY_DEFAULT`; pass an explicit list to widen it,
+        having first decided that each one SHOULD be removed. Returns
+        one line per removal, because a silent deletion of stored data
+        is not something a caller should have to take on trust.
+        """
+        from .parameters import PARAMETER_SPECS
+
+        wanted = set(names if names is not None else self._STRIP_BY_DEFAULT)
+        removed: List[str] = []
+        entities, _ = self.store.search(limit=10000)
+        for entity in entities:
+            params = getattr(entity, "physics_params", None) or {}
+            drop = []
+            for name in list(params):
+                if name.startswith("_") or name not in wanted:
+                    continue
+                spec = PARAMETER_SPECS.get(name)
+                if spec is None:
+                    continue
+                if entity.entity_type not in spec.applies_to:
+                    drop.append((name, f"not declared for "
+                                       f"{entity.entity_type.value}"))
+                elif spec.inapplicable_to(entity) is not None:
+                    drop.append((name, spec.inapplicable_to(entity)))
+            if not drop:
+                continue
+            for name, why in drop:
+                params.pop(name, None)
+                sidecar = params.get("_provenance")
+                if isinstance(sidecar, dict):
+                    sidecar.pop(name, None)
+                removed.append(f"{entity.name}: {name} ({why})")
+            self.store.update_entity(entity, changed_by="enrichment:strip")
+        return removed
+
     def enrich_with_defaults(
         self, progress_callback: Optional[Callable] = None,
     ) -> EnrichmentReport:
@@ -973,7 +1073,7 @@ class EntityEnricher:
                     entity.scale_um = viz["scale_um"]
                     changed = True
 
-            physics = self._PHYSICS_DEFAULTS.get(etype, {})
+            physics = self._applicable_defaults(entity, etype)
             if physics and not entity.physics_params:
                 entity.physics_params = dict(physics)
                 changed = True

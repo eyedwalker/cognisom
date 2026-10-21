@@ -218,3 +218,145 @@ def conformer_prim_count(smiles: str, with_hydrogens: bool = True) -> Tuple[int,
     if mol is None:
         return (0, 0)
     return (mol.GetNumAtoms(), mol.GetNumBonds())
+
+
+# ── backfill ─────────────────────────────────────────────────────────
+
+#: Entity types a small-molecule structure can belong to.
+STRUCTURED_TYPES = ("drug", "metabolite")
+
+
+def _disagrees_with_record(entity, found: Dict) -> str:
+    """Why a fetched structure contradicts the entity's own record, or "".
+
+    Compared against what the LIBRARY already says, which is a different
+    question from ``validate_structure``'s -- that one checks a
+    structure against the formula PubChem returned with it, and both can
+    be internally consistent while describing different species.
+    """
+    recorded_formula = (getattr(entity, "molecular_formula", "") or "").strip()
+    fetched_formula = (found.get("molecular_formula") or "").strip()
+    if recorded_formula and fetched_formula and \
+            recorded_formula != fetched_formula:
+        return (f"formula {fetched_formula} from PubChem, record says "
+                f"{recorded_formula}")
+    try:
+        recorded_mw = float(getattr(entity, "molecular_weight", 0) or 0)
+        fetched_mw = float(found.get("molecular_weight") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if recorded_mw and fetched_mw and abs(recorded_mw - fetched_mw) > 1.0:
+        return (f"MW {fetched_mw:.2f} from PubChem, record says "
+                f"{recorded_mw:.2f}")
+    return ""
+
+
+def backfill_structures(store, *, dry_run: bool = False,
+                        limit: Optional[int] = None,
+                        client: Any = None) -> Dict[str, Any]:
+    """Fill every empty ``smiles`` this library has a structure for.
+
+    This did not exist, and that is why it matters. The SMILES in the
+    shipped database were written by a one-off pass that left no code
+    behind, the database is gitignored, and so the structures lived on
+    one machine and nowhere else. Deleting the file lost them, and
+    nothing in the repository could put them back -- the library would
+    have rebuilt itself clean, silently, with 0 molecules where it had
+    had 24, and the molecular USD export would have raised "no library
+    entities carry a SMILES" with no clue why.
+
+    A sourcing pass that cannot be re-run is not a source. This one is
+    re-runnable, refuses biologics before it queries (a name search for
+    "Interferon alfa-2b" confidently returns a 746 Da compound
+    containing Cl3I2Na), and cross-checks every structure against its
+    own recorded formula and weight before storing it.
+
+    Returns a summary: filled, skipped-as-biologic, not-found,
+    failed-verification, and already-present.
+    """
+    summary: Dict[str, Any] = {
+        "filled": [], "biologic": [], "not_found": [],
+        "failed_check": [], "conflicts": [], "already": 0,
+    }
+    entities, _ = store.search(limit=10000)
+    todo = [e for e in entities
+            if e.entity_type.value in STRUCTURED_TYPES]
+    if limit is not None:
+        todo = todo[:limit]
+
+    for entity in todo:
+        if (getattr(entity, "smiles", "") or "").strip():
+            summary["already"] += 1
+            continue
+        name = entity.name
+        if is_biologic(name):
+            summary["biologic"].append(name)
+            continue
+        found = resolve_small_molecule(name, client=client)
+        if found is not None:
+            conflict = _disagrees_with_record(entity, found)
+            if conflict:
+                # The structure verified against PubChem's own formula
+                # and weight and still contradicts what this library
+                # records for the same name. Storing it would silently
+                # change which SPECIES the entity means.
+                #
+                # It is not a lookup failure. For lactate, pyruvate and
+                # citrate PubChem's name search returns the conjugate
+                # BASE -- C3H5O3- for lactate -- while the library
+                # records the neutral acid, C3H6O3. Both are right about
+                # their own molecule and they are different molecules;
+                # at physiological pH the anion is the one a simulation
+                # means, which makes this a decision about the record
+                # rather than a bad fetch.
+                summary["conflicts"].append(f"{name}: {conflict}")
+                continue
+        if found is None:
+            # Separating these two matters: a miss is a gap in PubChem's
+            # naming, a failed check is a structure that disagreed with
+            # its own formula, and they need different work.
+            summary["not_found"].append(name)
+            continue
+        if dry_run:
+            summary["filled"].append(name)
+            continue
+        entity.smiles = found["smiles"]
+        extra = getattr(entity, "_extra_properties", None)
+        if isinstance(extra, dict):
+            extra.setdefault("pubchem_cid", found.get("pubchem_cid"))
+            extra.setdefault("inchikey", found.get("inchikey"))
+            extra.setdefault("structure_source", "pubchem")
+        store.update_entity(entity, changed_by="structures.backfill")
+        summary["filled"].append(name)
+    return summary
+
+
+def main(argv=None) -> int:                                 # pragma: no cover
+    """``python -m cognisom.library.structures`` -- fill the structures."""
+    import argparse
+    import contextlib
+    import io
+
+    parser = argparse.ArgumentParser(description=backfill_structures.__doc__)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--limit", type=int, default=None)
+    args = parser.parse_args(argv)
+
+    from .store import EntityStore
+    with contextlib.redirect_stdout(io.StringIO()):
+        store = EntityStore()
+    out = backfill_structures(store, dry_run=args.dry_run, limit=args.limit)
+    print(f"already had a structure : {out['already']}")
+    print(f"filled                  : {len(out['filled'])}")
+    print(f"refused as a biologic   : {len(out['biologic'])}")
+    print(f"no PubChem match        : {len(out['not_found'])}")
+    for name in out["not_found"]:
+        print(f"    {name}")
+    print(f"conflicts with record   : {len(out['conflicts'])}")
+    for line in out["conflicts"]:
+        print(f"    {line}")
+    return 0
+
+
+if __name__ == "__main__":                                  # pragma: no cover
+    raise SystemExit(main())

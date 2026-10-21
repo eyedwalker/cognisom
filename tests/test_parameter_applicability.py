@@ -255,16 +255,41 @@ def test_required_for_entity_narrows_where_required_for_cannot(immune_rows):
 
 # ── the read path is deliberately untouched ──────────────────────────────
 
-def test_the_read_path_still_returns_the_stored_number(immune_rows):
-    """parameter_resolver breaks a name collision on `is not None`.
+def test_the_tie_break_survives_the_value_being_removed(immune_rows):
+    """This used to assert that a plasma cell still STORES 0.3, on the
+    grounds that parameter_resolver breaks the NK name collision on
+    ``is not None`` and removing values would take the tie-break with
+    it.
 
-    Suppressing reads is a separate change; if it happens here it takes the
-    NK-cell tie-break with it.
+    The concern was reasonable and it turns out not to be what happens.
+    The tie-break compares the two rows named "NK cell" -- an
+    immune_cell and a cell_type -- and asks which carries cytotoxic
+    fields. The plasma cell is not one of them. Removing the value from
+    rows the spec already calls inapplicable left the NK immune_cell row
+    holding its kill_probability and the NK cell_type row without one,
+    so the tie-break discriminates on a real difference instead of a
+    condition that was true of all 28 cells.
+
+    So the plasma cell now stores nothing, which is what assess() has
+    reported all along -- the stored number and the report agreeing is
+    the thing the single-writer rule exists to produce.
     """
     plasma = {e.name: e for e in immune_rows}["Plasma cell"]
+    assert get_parameter(plasma, "kill_probability") is None
+    assert "kill_probability" in assess(plasma).not_applicable
 
-    pv = get_parameter(plasma, "kill_probability")
-    assert pv is not None and pv.value == 0.3
+    # and the tie-break it was protecting
+    import contextlib
+    import io
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        from cognisom.genomics.parameter_resolver import (
+            SimulationParameterResolver)
+        from cognisom.library.store import EntityStore
+        params = SimulationParameterResolver(
+            EntityStore()).get_cell_type_params("NK cell")
+    assert params["_entity_type"] == "immune_cell"
+    assert params.get("kill_probability") == 0.3
 
 
 def test_no_immune_parameter_is_carried_without_a_spec(immune_rows):

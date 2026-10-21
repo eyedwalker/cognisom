@@ -177,9 +177,16 @@ EFFECTORS: Tuple[Effector, ...] = (
 
 def build(effector: Effector):
     """One effector as a library entity, before sourcing."""
-    from .models import BioEntity, EntityType
+    # A Protein and not a bare BioEntity. BioEntity.to_dict() does not
+    # serialise an ad-hoc ``.properties`` dict, so the verified UniProt
+    # names set below reached the database only when the optional
+    # network sourcing ran -- and the automatic seed calls this with
+    # source=False. A library built from scratch therefore had every
+    # effector's uniprot_recommended_name empty, which is the field that
+    # records the accession was checked.
+    from .models import EntityType, Protein
 
-    entity = BioEntity(name=effector.name, entity_type=EntityType.PROTEIN)
+    entity = Protein(name=effector.name, entity_type=EntityType.PROTEIN)
     entity.display_name = effector.name
     entity.description = effector.description
     entity.synonyms = list(effector.synonyms)
@@ -187,11 +194,10 @@ def build(effector: Effector):
     entity.compartments = list(effector.compartments)
     entity.source = "curated"
     entity.source_url = f"https://www.uniprot.org/uniprotkb/{effector.accession}"
-    entity.properties = {
-        "uniprot_id": effector.accession,
-        "gene_symbol": effector.gene,
-        "uniprot_recommended_name": effector.uniprot_name,
-    }
+    # Typed fields, so they survive to_dict() without the network pass.
+    entity.uniprot_id = effector.accession
+    entity.gene_symbol = effector.gene
+    entity.uniprot_recommended_name = effector.uniprot_name
     entity.interacts_with = [
         {"target": target, "type": kind, "note": note}
         for target, kind, note in effector.interacts

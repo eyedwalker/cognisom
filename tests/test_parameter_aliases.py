@@ -102,8 +102,22 @@ def test_the_radii_land_in_the_textbook_range(sized_entities):
 
 
 def test_a_conversion_does_not_become_evidence(sized_entities):
-    """Dividing by two does not tell you where the number came from."""
-    pv = get_parameter(sized_entities[0], "radius_um")
+    """Dividing by two does not tell you where the number came from.
+
+    Pick an entity whose radius IS a conversion rather than indexing
+    into the list. It used to take ``sized_entities[0]``, which held
+    while the library's row order held and broke the moment entities
+    were added -- position 0 became Macrophage M1, whose radius is
+    genuinely MEASURED (PMID:9400735), so the test failed on a value
+    that was right.
+    """
+    pv = None
+    for entity in sized_entities:
+        candidate = get_parameter(entity, "radius_um")
+        if candidate is not None and "scale_um" in (candidate.rationale or ""):
+            pv = candidate
+            break
+    assert pv is not None, "no entity derives a radius from scale_um any more"
 
     assert pv.provenance is Provenance.PLACEHOLDER
     assert not pv.is_simulation_grade, (
