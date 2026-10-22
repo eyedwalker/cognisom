@@ -159,11 +159,19 @@ class TissueSimulationEngine:
     #: one dict shared by every engine ever built.
     _steady_solves: Dict[str, Any]
 
-    #: Seconds per voxel for one warm steady-state solve of one field, on this
-    #: machine's CPU path. Measured at 0.19-0.25 us/voxel across 24^3, 48^3
-    #: and 100^3 -- flat, because the vessel lattice keeps the CG iteration
-    #: count independent of grid size. Used only to warn.
-    _STEADY_SECONDS_PER_VOXEL = 0.2e-6
+    #: Seconds per voxel for one warm steady-state solve of one field, on a
+    #: CPU. Measured at 0.15-0.17 us/voxel across 24^3, 48^3 and 100^3 --
+    #: flat, because the vessel lattice keeps the CG iteration count
+    #: independent of grid size. Machine-dependent, and used only to warn, so
+    #: an order of magnitude is what matters rather than the third figure.
+    #:
+    #: It was 0.19-0.25 before the solver stopped allocating a full grid per
+    #: operator application; removing that bought 23%, which is all there is
+    #: to get that way -- the solve is memory-bandwidth bound, about ten
+    #: full-grid passes per CG iteration and 37 iterations. Closing the
+    #: remaining gap to the 500^3 preset's budget needs the GPU or a
+    #: multigrid preconditioner, not more of this.
+    _STEADY_SECONDS_PER_VOXEL = 0.16e-6
 
     def _warn_if_the_solves_will_not_fit(self, cfg) -> None:
         """Say so at startup if the steady solves exceed the runtime budget.

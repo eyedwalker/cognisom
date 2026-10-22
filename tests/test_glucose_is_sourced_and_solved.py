@@ -286,3 +286,46 @@ def test_a_longer_interval_actually_skips_solves():
 
     assert counts[1] > counts[4], counts
     assert counts[4] >= 1, "it must still solve at least once"
+
+
+def test_the_cost_constant_has_not_drifted_by_an_order_of_magnitude():
+    """The startup warning quotes a measured number, so it has to stay true.
+
+    A stale constant in a warning is the same class of error as a stale
+    comment: it reads as a measurement and is not one. The bound is
+    deliberately loose -- a factor of eight either way -- because this is
+    machine-dependent and a tight timing assertion in a test suite is a
+    flake, while an order of magnitude is what the warning actually turns on.
+    """
+    import time
+
+    import numpy as np
+
+    from cognisom.core.tissue_engine import TissueSimulationEngine
+    from cognisom.gpu.steady_diffusion import solve_steady_state
+
+    n = 48
+    vessels = np.zeros((n, n, n), bool)
+    vessels[2::6, 2::6, :] = True
+    up = np.full((n, n, n), (0.15 / 0.21) * 100 / 3600.0)
+    up[vessels] = 0.0
+
+    warm = solve_steady_state(
+        np.full((n,) * 3, 0.21), 2000.0, 10.0, uptake_k=up, uptake_km=1 / 760.,
+        uptake_ref=0.21, held=vessels, held_value=0.21).field
+
+    best = float("inf")
+    for _ in range(3):
+        start = time.perf_counter()
+        solve_steady_state(
+            warm, 2000.0, 10.0, uptake_k=up, uptake_km=1 / 760.,
+            uptake_ref=0.21, held=vessels, held_value=0.21)
+        best = min(best, time.perf_counter() - start)
+
+    measured = best / n ** 3
+    claimed = TissueSimulationEngine._STEADY_SECONDS_PER_VOXEL
+    assert claimed / 8 <= measured <= claimed * 8, (
+        f"measured {measured * 1e6:.3f} us/voxel against a claimed "
+        f"{claimed * 1e6:.3f}; the constant behind the runtime warning has "
+        "drifted"
+    )

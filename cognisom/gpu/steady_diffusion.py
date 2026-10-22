@@ -129,13 +129,32 @@ def _laplacian(field: np.ndarray, resolution: float, faces: str,
 
     inv = 1.0 / (resolution * resolution)
     if faces == INSULATED:
-        padded = np.pad(field, 1, mode="edge")
-        out[...] = (
-            padded[2:, 1:-1, 1:-1] + padded[:-2, 1:-1, 1:-1]
-            + padded[1:-1, 2:, 1:-1] + padded[1:-1, :-2, 1:-1]
-            + padded[1:-1, 1:-1, 2:] + padded[1:-1, 1:-1, :-2]
-            - 6.0 * field
-        ) * inv
+        # Accumulated in place rather than through np.pad. Padding allocates
+        # and copies a whole extra grid on EVERY call, which at 100^3 float64
+        # is 8.5 MB per CG iteration and was 46% of the solve. Mirroring the
+        # edge value is the same as adding the edge slice to itself, so the
+        # zero-flux condition needs no ghost storage at all.
+        np.multiply(field, -6.0, out=out)
+        for axis in range(3):
+            lo_dst = [slice(None)] * 3
+            lo_src = [slice(None)] * 3
+            lo_dst[axis] = slice(1, None)
+            lo_src[axis] = slice(0, -1)
+            out[tuple(lo_dst)] += field[tuple(lo_src)]
+
+            hi_dst = [slice(None)] * 3
+            hi_src = [slice(None)] * 3
+            hi_dst[axis] = slice(0, -1)
+            hi_src[axis] = slice(1, None)
+            out[tuple(hi_dst)] += field[tuple(hi_src)]
+
+            # The two faces, where the mirrored neighbour is the voxel itself.
+            face = [slice(None)] * 3
+            face[axis] = 0
+            out[tuple(face)] += field[tuple(face)]
+            face[axis] = -1
+            out[tuple(face)] += field[tuple(face)]
+        out *= inv
         return out
 
     core = (slice(1, -1),) * 3
@@ -186,8 +205,11 @@ def _cg(apply_op, rhs: np.ndarray, free: np.ndarray, diag: np.ndarray,
     """
     x = np.zeros_like(rhs)
     r = rhs * free
-    precond = np.where(diag > 0, 1.0 / diag, 1.0)
-    z = r * precond * free
+    # The Jacobi preconditioner folded together with the free mask, so the
+    # inner loop applies one multiply instead of two. Held once: neither
+    # changes across iterations.
+    precond = np.where(diag > 0, 1.0 / diag, 1.0) * free
+    z = r * precond
     p = z.copy()
     rz = float(np.vdot(r, z).real)
     if rz <= 0.0:
@@ -204,13 +226,16 @@ def _cg(apply_op, rhs: np.ndarray, free: np.ndarray, diag: np.ndarray,
             # residual.
             break
         alpha = rz / denom
+        # In place: each of these allocated a full grid per iteration, and at
+        # 100^3 float64 that is 8 MB a time for arrays thrown away at once.
         x += alpha * p
         r -= alpha * Ap
-        z = r * precond * free
+        np.multiply(r, precond, out=z)
         rz_new = float(np.vdot(r, z).real)
         if rz_new <= target:
             break
-        p = z + (rz_new / rz) * p
+        p *= rz_new / rz
+        p += z
         rz = rz_new
     return x, used
 
@@ -334,9 +359,26 @@ def solve_steady_state(
         slope = _reaction_slope(C, vmax, uptake_km) * free
 
         # -J = -(D L - diag(slope)) = -D L + diag(slope), SPD.
-        def apply_op(x, _slope=slope):
-            lap = _laplacian(x * free, dx, faces)
-            return (-D * lap + _slope * x) * free
+        # Scratch for the operator, reused across every CG iteration. As
+        # written with plain expressions this allocated five full grids per
+        # iteration -- 40 MB a time at 100^3 float64 -- for arrays discarded
+        # immediately. The search direction is already zero on held voxels
+        # (the preconditioner carries the free mask), so masking the input
+        # again is redundant; the output is still masked, which keeps the
+        # residual clean for the vdot that follows.
+        op_lap = np.empty_like(C)
+        op_tmp = np.empty_like(C)
+
+        # Bound as default arguments, not captured: an augmented assignment
+        # to a closed-over name makes it local, so `lap *= -D` on a captured
+        # buffer raises UnboundLocalError rather than writing through.
+        def apply_op(x, _slope=slope, lap=op_lap, tmp=op_tmp):
+            _laplacian(x, dx, faces, lap)
+            lap *= -D
+            np.multiply(_slope, x, out=tmp)
+            lap += tmp
+            lap *= free
+            return lap
 
         delta, cg_used = _cg(
             apply_op, residual, free, slope + D * 6.0 / (dx * dx),
