@@ -74,6 +74,7 @@ class TissueSimulationEngine:
 
     def __init__(self, config: TissueScaleConfig):
         self._config = config
+        self._steady_solves = {}
         # Resolved HERE rather than at the one call site that used to do
         # it. resolve_radii_from_library was called from the tissue-scale
         # dashboard page and nowhere else, so every other entry point --
@@ -150,6 +151,13 @@ class TissueSimulationEngine:
 
     #: Where the motility coefficient came from, so a run can say.
     _motility_source: str = "not resolved"
+
+    #: The last steady-state solve per field, as a SteadyResult. Carries the
+    #: Newton and CG counts, the depletion, and whether it converged, so a run
+    #: can report how well its fields are solved rather than only that a
+    #: solve was attempted. Set per instance in __init__: a dict here would be
+    #: one dict shared by every engine ever built.
+    _steady_solves: Dict[str, Any]
 
     def _resolve_motility_diffusion(self, cfg) -> float:
         """D for the tissue, from the library's migration speed.
@@ -451,12 +459,25 @@ class TissueSimulationEngine:
                         )
                 self._diffusion.set_uptake(uptake or None)
 
+                # Fields that relax far faster than one step are SOLVED,
+                # not stepped. Substepping them to where the split resolves
+                # the depletion would need ~7,000 substeps -- the same order
+                # as the explicit scheme's stability requirement -- for a
+                # transient nobody observes. See DiffusionFieldConfig.
+                steady = [n for n, fc in cfg.fields.items()
+                          if fc.steady_state and fc.diffusion_coeff > 0]
+                for name in steady:
+                    outcome = self._diffusion.solve_steady(
+                        name, cfg.resolution_um)
+                    self._steady_solves[name] = outcome
+
                 # Unconditionally stable, so substeps buy accuracy only: the
                 # per-voxel uptake split carries an error of order k*dt,
                 # measured 0.71% at one substep and 0.14% at five.
                 sub_dt = dt_seconds / cfg.diffusion_substeps
                 for _ in range(cfg.diffusion_substeps):
-                    self._diffusion.step_implicit(sub_dt, cfg.resolution_um)
+                    self._diffusion.step_implicit(
+                        sub_dt, cfg.resolution_um, exclude=steady)
             else:
                 diff_dt = dt / cfg.diffusion_substeps
                 for _ in range(cfg.diffusion_substeps):

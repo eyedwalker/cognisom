@@ -467,10 +467,86 @@ class MultiGPUDiffusionSolver:
             max(2, int(kdt / self._SPLIT_ERROR_LIMIT)),
         )
 
+    def solve_steady(
+        self,
+        name: str,
+        resolution: float = _DEFAULT_RESOLUTION_UM,
+        faces: str = "insulated",
+        tol: float = 1e-2,
+    ) -> Any:
+        """Solve one field for its steady state instead of advancing it.
+
+        For a field that relaxes far faster than one engine step -- oxygen
+        crosses the gap between capillaries in 1.8 s against a 180 s step --
+        the transient is not observable, and stepping only pays the
+        reaction-splitting error, which is 312x the depletion at the engine's
+        own step size. See :mod:`cognisom.gpu.steady_diffusion`.
+
+        Gathers to the global grid, solves, scatters back. The solve cannot be
+        done per partition: a partition edge is not a boundary of the problem,
+        and treating it as one would invent exactly the kind of artificial
+        supply the domain faces already invent. Gathering is affordable
+        because the solve is linear in voxel count -- the vessel lattice keeps
+        every voxel within a few cells of a Dirichlet point, so the CG
+        iteration count does not grow with the grid (measured 119, 133 and 136
+        at 24^3, 48^3 and 100^3, for 12 ms, 80 ms and 633 ms).
+
+        Returns the :class:`~cognisom.gpu.steady_diffusion.SteadyResult`,
+        whose ``converged`` flag and ``imbalance``/``depletion`` pair say
+        whether to believe the field.
+        """
+        from cognisom.gpu.steady_diffusion import solve_steady_state
+
+        if name not in self._fields:
+            raise ValueError(f"unknown field {name!r}")
+        D = self._diff_coeffs[name]
+        if D <= 0:
+            raise ValueError(
+                f"{name} has no diffusion coefficient, so it has no steady "
+                "state to solve for")
+
+        per_gpu = self._fields[name]
+        field = self._decomp.gather(
+            [self._mgpu.to_numpy(f) for f in per_gpu])
+
+        uptake: Any = 0.0
+        if self._uptake is not None and self._uptake.get(name):
+            arrays = self._uptake[name]
+            if all(a is not None for a in arrays):
+                uptake = self._decomp.gather(
+                    [self._mgpu.to_numpy(a).astype(np.float64)
+                     for a in arrays])
+
+        held = None
+        masks = self._vessels.get(name)
+        if masks and all(m is not None for m in masks):
+            held = self._decomp.gather(
+                [self._mgpu.to_numpy(m).astype(np.float64)
+                 for m in masks]) > 0.5
+
+        result = solve_steady_state(
+            field, D, resolution,
+            uptake_k=uptake,
+            uptake_km=self._uptake_km.get(name, 0.0),
+            uptake_ref=self._uptake_ref.get(name, 1.0),
+            held=held,
+            held_value=self._vessel_values.get(name),
+            faces=faces,
+            tol=tol,
+        )
+
+        target_dtype = self._mgpu.to_numpy(per_gpu[0]).dtype
+        solved = result.field.astype(target_dtype, copy=False)
+        for gpu_id, local in enumerate(self._decomp.scatter(solved)):
+            with self._device_scope(gpu_id):
+                per_gpu[gpu_id] = local
+        return result
+
     def step_implicit(
         self,
         dt_seconds: float,
         resolution: float = _DEFAULT_RESOLUTION_UM,
+        exclude: Optional[Any] = None,
     ) -> None:
         """Advance every field by ``dt_seconds`` with the ADI solver.
 
@@ -487,15 +563,24 @@ class MultiGPUDiffusionSolver:
         already parallel over every voxel line, so adding outer threads
         oversubscribes the machine rather than using it; :meth:`step` threads
         because single-threaded NumPy ufuncs cannot use more than one core.
+
+        ``exclude`` names fields to leave alone, for those the caller has
+        already handed to :meth:`solve_steady`.
         """
         from cognisom.gpu.implicit_diffusion import adi_step
 
         if dt_seconds < 0:
             raise ValueError(f"dt_seconds must be non-negative, got {dt_seconds}")
 
+        skip = frozenset(exclude or ())
         for name, device_fields in self._fields.items():
             D = self._diff_coeffs[name]
             if D <= 0:
+                continue
+            # A field already solved for its steady state this step must not
+            # then be walked through a transient: the step would move it off
+            # the answer by exactly the error the solve exists to avoid.
+            if name in skip:
                 continue
             self._ghost_ex.exchange_field_ghosts(device_fields)
             if self._uptake is not None:

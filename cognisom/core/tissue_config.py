@@ -59,6 +59,21 @@ class DiffusionFieldConfig:
     #: saturation gives.
     uptake_km: float = 0.0
 
+    #: Solve this field for its steady state each engine step instead of
+    #: advancing it by dt. Right whenever the field relaxes much faster than
+    #: the cells it feeds: oxygen crosses the 60 um gap between capillaries in
+    #: L^2/D = 1.8 s against a 180 s step, so it has settled a hundred times
+    #: over before the cells have aged once. The transient is not observable
+    #: and stepping only pays the reaction-splitting error, which at the
+    #: engine's own step over-states the depletion by 312x -- while leaving
+    #: every voxel inside 0.71% of arterial, which is why it reads as fine.
+    #:
+    #: Do NOT set this for a field whose own history matters. A chemokine
+    #: gradient that cells build up and follow over hours is a transient, and
+    #: replacing it with its steady state would delete the memory the
+    #: behaviour depends on.
+    steady_state: bool = False
+
     @staticmethod
     def oxygen() -> DiffusionFieldConfig:
         # q = 0.15 (the archetypes' highest oxygen_consumption), C_art = 0.21.
@@ -84,7 +99,8 @@ class DiffusionFieldConfig:
         return DiffusionFieldConfig(
             "oxygen", diffusion_coeff=2000.0, initial_value=0.21,
             uptake_per_cell_per_hour=0.15 / 0.21,
-            uptake_km=1.0 / 760.0)
+            uptake_km=1.0 / 760.0,
+            steady_state=True)
 
     @staticmethod
     def glucose() -> DiffusionFieldConfig:
