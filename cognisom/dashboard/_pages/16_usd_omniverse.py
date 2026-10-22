@@ -172,6 +172,18 @@ def _generate_usda_from_instances(instances, scene_size):
 # Helper: Static Three.js Viewer
 # ═══════════════════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════════════════
+# Helper: export through the real USD writer
+# ═══════════════════════════════════════════════════════════════════════
+
+try:
+    from cognisom.biousd.usd_writer import write_cells
+    from cognisom.biousd.scene_adapter import cells_from_instances
+    USD_WRITER_AVAILABLE = True
+except ImportError:          # pragma: no cover - pxr missing
+    USD_WRITER_AVAILABLE = False
+
+
 def _build_static_viewer(instances, scene_size):
     """Build a static Three.js 3D viewer for the scene."""
     cells_json = json.dumps(instances)
@@ -1025,19 +1037,64 @@ with tab5:
             export_name = st.text_input("Scene Name", value="cognisom_scene", key="exp_name")
             export_dir = st.text_input("Output Directory", value="exports/usd", key="exp_dir")
 
-            if st.button("Export as USDA", type="primary", use_container_width=True):
+            if USD_WRITER_AVAILABLE:
+                fmt = st.radio(
+                    "Format", [".usdc (binary)", ".usda (text)"],
+                    horizontal=True, key="exp_fmt",
+                    help="Binary is the same stage, about 15x smaller.")
+                cut = st.selectbox(
+                    "Cutaway", ["none", "section", "corner"], key="exp_cut",
+                    help="A dense scene occludes its own subject. A cut "
+                         "marks the instances in front of the lesion "
+                         "invisible, which costs an int array rather than "
+                         "a second export.")
+                keep_lesion = st.checkbox(
+                    "Keep every lesion cell", value=True, key="exp_keep",
+                    disabled=(cut == "none"),
+                    help="Cut only the stroma in the way. Off, the plane "
+                         "bisects the lesion too -- an anatomical section "
+                         "rather than a reveal.")
+            else:
+                fmt, cut, keep_lesion = ".usda (text)", "none", False
+                st.caption(
+                    "OpenUSD (`usd-core`) is not importable, so the export "
+                    "falls back to writing the stage as text: one prim per "
+                    "entity, no instancing and no cutaway.")
+
+            if st.button("Export Scene", type="primary", use_container_width=True):
                 try:
                     os.makedirs(export_dir, exist_ok=True)
-                    usda_path = os.path.join(export_dir, f"{export_name}.usda")
-                    usda = _generate_usda_from_instances(
-                        st.session_state.wb_scene_instances,
-                        scene_size,
-                    )
-                    with open(usda_path, "w") as f:
-                        f.write(usda)
+                    if USD_WRITER_AVAILABLE:
+                        suffix = ".usdc" if fmt.startswith(".usdc") else ".usda"
+                        usda_path = os.path.join(
+                            export_dir, f"{export_name}{suffix}")
+                        if os.path.exists(usda_path):
+                            os.remove(usda_path)   # CreateNew will not clobber
+                        result = write_cells(
+                            usda_path,
+                            cells_from_instances(
+                                st.session_state.wb_scene_instances),
+                            cutaway=cut,
+                            stroma_only=keep_lesion,
+                        )
+                        st.success(f"Exported {n_inst} entities to `{usda_path}`")
+                        st.caption(result.describe())
+                        if result.hidden:
+                            st.caption(
+                                f"{result.hidden:,} instances marked invisible "
+                                f"by the {cut} cut "
+                                f"({100 * result.hidden / max(1, result.cells):.0f}%).")
+                    else:
+                        usda_path = os.path.join(export_dir, f"{export_name}.usda")
+                        usda = _generate_usda_from_instances(
+                            st.session_state.wb_scene_instances,
+                            scene_size,
+                        )
+                        with open(usda_path, "w") as f:
+                            f.write(usda)
+                        st.success(f"Exported {n_inst} entities to `{usda_path}`")
 
                     st.session_state.usd_stage_path = usda_path
-                    st.success(f"Exported {n_inst} entities to `{usda_path}`")
                 except Exception as e:
                     st.error(f"Export error: {e}")
         else:
@@ -1048,24 +1105,33 @@ with tab5:
         # Show download if file exists
         stage_path = st.session_state.usd_stage_path
         if stage_path and os.path.exists(str(stage_path)):
-            with open(str(stage_path), 'r') as f:
+            # A .usdc is a binary crate file. Reading one in text mode
+            # raises UnicodeDecodeError on about the third byte, so the
+            # mode follows the suffix rather than being assumed.
+            is_text = str(stage_path).endswith(".usda")
+            with open(str(stage_path), "r" if is_text else "rb") as f:
                 usd_content = f.read()
 
             st.metric("File Size", f"{os.path.getsize(str(stage_path)):,} bytes")
 
             st.download_button(
-                label="Download .usda",
+                label=f"Download {os.path.splitext(str(stage_path))[1]}",
                 data=usd_content,
                 file_name=os.path.basename(str(stage_path)),
-                mime="text/plain",
+                mime="text/plain" if is_text else "application/octet-stream",
             )
 
-            with st.expander("View USD Source"):
-                preview_lines = usd_content.split('\n')[:60]
-                st.code('\n'.join(preview_lines), language="python")
-                remaining = len(usd_content.split('\n')) - 60
-                if remaining > 0:
-                    st.caption(f"... and {remaining} more lines")
+            if is_text:
+                with st.expander("View USD Source"):
+                    preview_lines = usd_content.split('\n')[:60]
+                    st.code('\n'.join(preview_lines), language="python")
+                    remaining = len(usd_content.split('\n')) - 60
+                    if remaining > 0:
+                        st.caption(f"... and {remaining} more lines")
+            else:
+                st.caption(
+                    "Binary crate -- open it in usdview, Omniverse or any "
+                    "OpenUSD reader. Export as .usda to read the source here.")
 
     with col_exp2:
         st.markdown("### USD Scene Hierarchy")
