@@ -12,6 +12,50 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 
+#: Oxygen at a vessel, as a fraction of an atmosphere. 11% O2 = 84 mmHg: the
+#: TOP of "physioxia", the range human organs actually sit in, measured across
+#: tissues as 11% down to 1% O2 by Carreau et al., J Cell Mol Med 2011;
+#: 15:1239-53, PMID 21251211. A capillary holds the tissue beside it at the
+#: top of that band and the tissue between vessels falls through it.
+#:
+#: This was 0.21 -- 21% O2, 160 mmHg -- which is inspired AIR, and above even
+#: alveolar gas. No capillary delivers it and no tissue sees it. Carreau's
+#: review exists largely to make that point: "current in vitro
+#: experimentations are usually performed in 19.95% O2, an artificial context
+#: as far as oxygen balance is concerned... most of the experiments performed
+#: in so-called normoxia might be dangerously misleading."
+#:
+#: The correction matters more than it looks. Absolute depletion is set by the
+#: demand and the geometry and does not care what the supply is called, so
+#: dividing the supply by ~2 doubles the depletion AS A FRACTION of it. That
+#: is what decides whether a cell is hypoxic.
+PHYSIOXIA_CEILING = 0.11
+
+#: The bottom of the same band, 1% O2 = 7.6 mmHg, which is also about where
+#: the radiobiological hypoxia line sits. Below this a cell is outside the
+#: range any healthy human tissue occupies.
+PHYSIOXIA_FLOOR = 0.01
+
+#: Zeroth-order oxygen consumption of ONE cell occupying one 10 um voxel, in
+#: field units per hour. From a Seahorse-typical 200 pmol/min per 1e6 cells
+#: (3.33e-18 mol/cell/s): a 10 um voxel holds 2.21e-16 mol of O2 at 160 mmHg,
+#: so one cell empties it in 66 s, and the rate is scale-free -- halving the
+#: supply halves the content too, leaving this number unchanged.
+#:
+#: It was 0.15/h, i.e. 76x lower. The published single-cell OCR range is about
+#: 1e-18 to 1e-16 mol/cell/s, so this is a central estimate and a factor of 3
+#: either way is still inside the literature.
+OXYGEN_Q_PER_HOUR = 11.41
+
+#: And for glucose, in mM per hour per cell per 10 um voxel. Derived rather
+#: than measured directly: BNID 102644 (Rathmell et al., J Immunol) gives 2-3
+#: nmol O2 per nmol glucose in T cells, so the same OCR implies 1.33e-18 mol
+#: glucose/cell/s, which empties a voxel's 5 mM in 3750 s. It was 0.2, i.e.
+#: 24x lower. See DiffusionFieldConfig.glucose for the BioNumbers record that
+#: was rejected in favour of this derivation.
+GLUCOSE_Q_MM_PER_HOUR = 4.80
+
+
 @dataclass
 class DiffusionFieldConfig:
     """Configuration for a single diffusion field."""
@@ -97,8 +141,9 @@ class DiffusionFieldConfig:
         # the only property the sink's behaviour depends on. Pinning the unit
         # down is worth doing, and would move this by less than 2x.
         return DiffusionFieldConfig(
-            "oxygen", diffusion_coeff=2000.0, initial_value=0.21,
-            uptake_per_cell_per_hour=0.15 / 0.21,
+            "oxygen", diffusion_coeff=2000.0,
+            initial_value=PHYSIOXIA_CEILING,
+            uptake_per_cell_per_hour=OXYGEN_Q_PER_HOUR / PHYSIOXIA_CEILING,
             uptake_km=1.0 / 760.0,
             steady_state=True)
 
@@ -147,7 +192,7 @@ class DiffusionFieldConfig:
         # where the directional error is large, and the guard said so.
         return DiffusionFieldConfig(
             "glucose", diffusion_coeff=600.0, initial_value=5.0,
-            uptake_per_cell_per_hour=0.2 / 5.0,
+            uptake_per_cell_per_hour=GLUCOSE_Q_MM_PER_HOUR / 5.0,
             steady_state=True)
 
     @staticmethod

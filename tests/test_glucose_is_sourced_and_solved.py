@@ -49,7 +49,11 @@ def test_glucose_stays_first_order_because_its_km_is_above_supply():
     # And oxygen is the opposite case, which is why the two differ.
     oxygen = DiffusionFieldConfig.oxygen()
     assert oxygen.uptake_km > 0
-    assert oxygen.initial_value / oxygen.uptake_km > 100
+    # 84x at the physioxia ceiling. It was >100 when the supply was set to
+    # inspired air; correcting the supply to a physiological level narrowed
+    # the gap without changing what matters, which is that the sink is flat
+    # across the range the tissue occupies and falls only at the bottom.
+    assert oxygen.initial_value / oxygen.uptake_km > 50
 
 
 def test_the_reasoning_is_recorded_with_its_source():
@@ -84,7 +88,7 @@ def test_a_low_temperature_km_would_have_changed_the_model():
     assert saturation(BRAHM_SELF_EXCHANGE_MM) < 0.5
 
 
-def test_the_consumption_rate_is_recorded_as_about_24x_low():
+def test_the_consumption_rate_now_matches_the_derivation():
     """Derived from the sourced OCR and a measured O2:glucose ratio.
 
     BNID 102644 (Rathmell et al., J Immunol) gives 2-3 nmol oxygen per nmol
@@ -92,9 +96,11 @@ def test_the_consumption_rate_is_recorded_as_about_24x_low():
     3.3e-18 mol O2/s consumes about 1.3e-18 mol glucose/s. In a 10 um voxel
     that is a few mM per hour against the 0.2 mM/h configured.
 
-    The rate is deliberately NOT changed -- calibration is a biology decision
-    -- but the arithmetic is checked here so the figure in the comment cannot
-    drift away from what it claims to be.
+    The rate WAS 0.2 mM/h, 24x below this, and was left alone while the
+    calibration was an open decision. It has since been set to the derived
+    value, so this test changed from recording a gap to checking that the
+    config and the derivation still agree -- which is the more useful job,
+    because the derivation lives in a comment and comments drift.
     """
     ocr_mol_per_cell_per_s = 200e-12 / 60 / 1e6      # 200 pmol/min/1e6 cells
     o2_per_glucose = 2.5                             # BNID 102644, midpoint
@@ -105,12 +111,12 @@ def test_the_consumption_rate_is_recorded_as_about_24x_low():
 
     glucose = DiffusionFieldConfig.glucose()
     configured = glucose.uptake_per_cell_per_hour * glucose.initial_value
-    assert configured == pytest.approx(0.2)
-    assert mM_per_hour / configured == pytest.approx(24, rel=0.15), (
-        f"derived {mM_per_hour:.2f} mM/h against configured {configured} -- "
-        f"a factor of {mM_per_hour / configured:.0f}, and the comment in "
-        "tissue_config says 24"
+    assert configured == pytest.approx(mM_per_hour, rel=0.02), (
+        f"derived {mM_per_hour:.2f} mM/h against configured {configured:.2f}; "
+        "the config no longer matches its own derivation"
     )
+    # And it is far above what it replaced, which is the calibration.
+    assert configured / 0.2 == pytest.approx(24, rel=0.15)
 
 
 def test_the_rejected_bionumber_is_inconsistent_with_the_oxygen_figure():

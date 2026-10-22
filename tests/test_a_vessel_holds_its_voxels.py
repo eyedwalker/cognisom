@@ -18,11 +18,16 @@ value through the method the engine actually calls.
 import numpy as np
 import pytest
 
-from cognisom.core.tissue_config import TissueScaleConfig
+from cognisom.core.tissue_config import (
+    DiffusionFieldConfig, TissueScaleConfig)
 from cognisom.core.tissue_engine import TissueSimulationEngine
 
 
-ARTERIAL = 0.21
+#: Read from the config, not pinned. A literal here is a second copy of a
+#: calibrated number: when the supply moved from 0.21 (inspired air) to the
+#: top of physioxia, this test reported all 384 vessel voxels as having
+#: "drifted" when every one of them was correctly held at the new value.
+ARTERIAL = DiffusionFieldConfig.oxygen().initial_value
 
 
 @pytest.fixture(scope="module")

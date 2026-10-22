@@ -196,8 +196,30 @@ def test_a_chemokine_carries_no_uptake():
 
 
 def test_oxygen_and_glucose_uptake_follow_the_q_over_arterial_convention():
-    """k = q_volumetric / C_arterial, as spatial_module argues it must be."""
-    cfg = TissueScaleConfig()
+    """k = q_volumetric / C_arterial, as spatial_module argues it must be.
 
-    assert cfg.fields["oxygen"].uptake_per_cell_per_hour == pytest.approx(0.15 / 0.21)
-    assert cfg.fields["glucose"].uptake_per_cell_per_hour == pytest.approx(0.2 / 5.0)
+    Checked against the named constants rather than against literals. The
+    literals were 0.15/0.21 and 0.2/5.0, and both numerators have since been
+    replaced by sourced values (76x and 24x up) while the supply moved from
+    inspired air to the top of physioxia. What this test is for is the
+    CONVENTION -- that the stored rate is a volumetric demand divided by the
+    supply it was measured against -- and that survives recalibration, which
+    a literal does not.
+    """
+    from cognisom.core.tissue_config import (
+        GLUCOSE_Q_MM_PER_HOUR, OXYGEN_Q_PER_HOUR)
+
+    cfg = TissueScaleConfig()
+    oxygen = cfg.fields["oxygen"]
+    glucose = cfg.fields["glucose"]
+
+    assert oxygen.uptake_per_cell_per_hour == pytest.approx(
+        OXYGEN_Q_PER_HOUR / oxygen.initial_value)
+    assert glucose.uptake_per_cell_per_hour == pytest.approx(
+        GLUCOSE_Q_MM_PER_HOUR / glucose.initial_value)
+
+    # The convention has a consequence worth pinning: the zeroth-order demand
+    # recovered at the supply level is the sourced q, whatever the supply is
+    # called.
+    assert oxygen.uptake_per_cell_per_hour * oxygen.initial_value == \
+        pytest.approx(OXYGEN_Q_PER_HOUR)

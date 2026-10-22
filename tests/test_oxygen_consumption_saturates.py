@@ -209,7 +209,7 @@ def test_oxygen_asks_for_saturation_and_glucose_does_not():
     o2 = DiffusionFieldConfig.oxygen()
     assert o2.uptake_km > 0
     assert o2.uptake_km == pytest.approx(1.0 / 760.0)
-    assert o2.initial_value / o2.uptake_km > 100, (
+    assert o2.initial_value / o2.uptake_km > 50, (
         "a km within two orders of the supply makes the sink first-order over "
         "the whole physiological range, which is what this replaces"
     )
