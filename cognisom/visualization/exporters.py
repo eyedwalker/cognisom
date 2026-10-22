@@ -691,6 +691,8 @@ class SceneExporter:
         instancer_threshold: Optional[int] = None,
         radius: Optional[float] = None,
         add_camera: bool = True,
+        cutaway: str = "none",
+        stroma_only: bool = False,
     ) -> str:
         """Export cells as a real USD file using OpenUSD (pxr).
 
@@ -790,6 +792,9 @@ class SceneExporter:
             SceneExporter._usd_point_instanced_cells(
                 stage, positions, colors, states, radii, material,
                 mesh_types=[cell_mesh_type(c) for c in cells],
+                cell_types=[str(_cell_field(c, "cell_type", "normal") or "normal")
+                            for c in cells],
+                cutaway=cutaway, stroma_only=stroma_only,
             )
         else:
             SceneExporter._usd_individual_cells(
@@ -974,7 +979,8 @@ class SceneExporter:
 
     @staticmethod
     def _usd_point_instanced_cells(stage, positions, colors, states, radii,
-                                   material, mesh_types=None):
+                                   material, mesh_types=None, cell_types=None,
+                                   cutaway="none", stroma_only=False):
         """One PointInstancer for the whole population.
 
         The prototype used to be a single `UsdGeom.Sphere` of radius 1,
@@ -1036,6 +1042,42 @@ class SceneExporter:
                           UsdGeom.Tokens.varying).Set(
             Vt.IntArray.FromNumpy(np.array(
                 [CELL_STATE_CODES.get(s, 0) for s in states], dtype="int32")))
+
+        # A dense population renders as a solid brick: 500,000 cells come
+        # back in 0.8 s and the frame shows nothing but its own surface.
+        # Speed was never the constraint here, occlusion is, and
+        # `cutaway` already worked this out -- of 20,000 cells, 15,200
+        # stroma hide the 2,378 that carry the biology. It has been
+        # sitting unwired to this path.
+        #
+        # invisibleIds is the PointInstancer's own mechanism, so a cut
+        # costs an int array rather than a second export. Only the
+        # direction to the camera matters to the cut plane, so it is
+        # taken from USD_CAMERA_DIRECTION rather than threading the
+        # fitted camera position back out of _usd_camera_and_lights.
+        #
+        # The two knobs answer different questions. `section` alone is an
+        # anatomical slice: it cuts the lesion at the same rate as the
+        # stroma (measured 50.7% against 50.0%) and you read the cut
+        # face. `stroma_only` is a reveal, keeping every lesion cell
+        # whichever side of the plane it sits on -- which is the view
+        # this platform usually wants, because the lesion is the subject
+        # and the stroma is what is in the way.
+        if cutaway and cutaway != "none" and cell_types is not None:
+            from cognisom.visualization.cutaway import (
+                hidden_instance_ids, lesion_pivot)
+
+            direction = np.asarray(SceneExporter.USD_CAMERA_DIRECTION,
+                                   dtype=float)
+            direction = direction / np.linalg.norm(direction)
+            pivot = lesion_pivot(positions, cell_types)
+            hidden = hidden_instance_ids(
+                positions, cell_types,
+                camera_position=pivot + direction * 1.0e4, mode=cutaway,
+                stroma_only=stroma_only)
+            if hidden:
+                instancer.CreateInvisibleIdsAttr().Set(
+                    Vt.Int64Array([int(i) for i in hidden]))
 
         if instancer:
             lo = (positions - radii[:, None]).min(axis=0)
