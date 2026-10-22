@@ -519,6 +519,13 @@ class TissueSimulationEngine:
                 )
                 self._mechanics.integrate(self._cell_arrays, forces, mech_dt)
 
+        # ── 4b. Metabolism ───────────────────────────────────────
+        # After the fields are sampled and before division and death read
+        # atp and damage, so a cell is judged on this step's substrate
+        # levels rather than the previous step's.
+        if cfg.enable_ode:
+            self._step_metabolism(dt)
+
         # ── 5. Cell cycle (division / death) ─────────────────────
         if cfg.enable_cell_cycle:
             self._step_cell_cycle(dt)
@@ -709,6 +716,56 @@ class TissueSimulationEngine:
             full_state = self._backend.to_numpy(ca.state)
             full_state[:n_real] = state
             ca.state = self._backend.to_device(full_state, gpu_id)
+
+    #: Rate at which a cell that cannot pay its maintenance ATP accumulates
+    #: an apoptotic signal, per hour. With the death threshold at 5.0 this is
+    #: about two hours of total metabolic failure. NOT sourced -- it is a
+    #: plausible time for an ATP-starved cell and nothing more, and it is the
+    #: one number in this path that is not either stoichiometry or a measured
+    #: substrate level.
+    _APOPTOSIS_RATE_PER_HOUR = 2.5
+
+    def _step_metabolism(self, dt: float) -> None:
+        """Turn local oxygen and glucose into ATP, lactate and a death signal.
+
+        Both ``atp`` and ``lactate`` had no writer: ATP was set to 1.0 at
+        initialisation and read by the division gate forever after, and
+        lactate was never touched, so there was no metabolism and no Warburg
+        effect on a platform built to study one.
+
+        The stoichiometry comes from ``cognisom.gpu.fba_solver``, which was
+        already in the repo and used by nothing. ``core.metabolism`` solves it
+        once per substrate level on a grid and interpolates, because the
+        linear program depends on a cell only through its local oxygen and
+        glucose -- solving it per cell would be a million linear programs per
+        step.
+
+        Two death routes, with different meanings, both feeding the existing
+        test in :meth:`_step_cell_cycle`. ``damage`` accumulates under
+        prolonged hypoxia, which is sublethal stress. ``apoptotic_signal``
+        accumulates when the flux problem is INFEASIBLE, which with a lower
+        bound on maintenance means precisely "this cell cannot pay its upkeep
+        at these substrate levels" -- a stronger and better-defined condition
+        than a threshold on oxygen.
+        """
+        from cognisom.core import metabolism
+
+        for gpu_id, ca in enumerate(self._cell_arrays):
+            n_real = ca.n_real
+            if n_real == 0:
+                continue
+            state = self._backend.to_numpy(ca.state[:n_real])
+
+            atp, lactate, feasible = metabolism.evaluate(
+                state[:, 0], state[:, 1])
+            state[:, 2] = atp
+            state[:, 3] = lactate
+            starving = ~feasible
+            state[starving, 9] += dt * self._APOPTOSIS_RATE_PER_HOUR
+
+            full = self._backend.to_numpy(ca.state)
+            full[:n_real] = state
+            ca.state = self._backend.to_device(full, gpu_id)
 
     def _step_cell_cycle(self, dt: float) -> None:
         """Process cell division and death.

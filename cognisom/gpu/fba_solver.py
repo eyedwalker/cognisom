@@ -85,34 +85,39 @@ def prostate_cancer_model() -> MetabolicModel:
       4: O2
       5: CO2
     """
-    n_met, n_rxn = 6, 8
+    n_met, n_rxn = 7, 10
 
     S = np.zeros((n_met, n_rxn), dtype=np.float64)
 
     # glucose_uptake: -> glucose
     S[0, 0] = 1.0
 
-    # glycolysis: glucose -> 2 pyruvate + 2 ATP
+    # glycolysis: glucose -> 2 pyruvate + 2 ATP + 2 NADH
     S[0, 1] = -1.0   # consumes glucose
     S[1, 1] = 2.0    # produces pyruvate
     S[3, 1] = 2.0    # produces ATP
+    S[6, 1] = 2.0    # produces NADH -- and this is the whole story below
 
-    # lactate_production: pyruvate -> lactate
+    # lactate_production: pyruvate + NADH -> lactate
     S[1, 2] = -1.0   # consumes pyruvate
     S[2, 2] = 1.0    # produces lactate
+    S[6, 2] = -1.0   # CONSUMES NADH, which is why fermentation exists: it
+                     # regenerates NAD+ so glycolysis can keep running when
+                     # there is no oxygen to reoxidise NADH.
 
-    # TCA_cycle: pyruvate + O2 -> CO2 + ATP
+    # TCA_cycle: pyruvate -> 3 CO2 + 4 NADH + 1 ATP
     S[1, 3] = -1.0   # consumes pyruvate
-    S[4, 3] = -3.0   # consumes O2
     S[5, 3] = 3.0    # produces CO2
-    S[3, 3] = 15.0   # produces ATP
+    S[6, 3] = 4.0    # produces NADH (3 NADH + 1 FADH2, lumped)
+    S[3, 3] = 1.0    # substrate-level phosphorylation only (the GTP step)
+
+    # oxidative_phosph: NADH + 0.5 O2 -> 2.5 ATP
+    S[6, 5] = -1.0   # consumes NADH
+    S[4, 5] = -0.5   # consumes O2
+    S[3, 5] = 2.5    # produces ATP
 
     # oxygen_consumption: -> O2
     S[4, 4] = 1.0
-
-    # oxidative_phosph: O2 -> ATP
-    S[4, 5] = -1.0
-    S[3, 5] = 2.5
 
     # atp_maintenance: ATP ->
     S[3, 6] = -1.0
@@ -120,8 +125,52 @@ def prostate_cancer_model() -> MetabolicModel:
     # biomass: ATP -> growth
     S[3, 7] = -10.0
 
-    lb = np.array([0, 0, 0, 0, 0, 0, 1.0, 0], dtype=np.float64)
-    ub = np.array([10, 10, 20, 10, 15, 15, 5.0, 2], dtype=np.float64)
+    # lactate_export: lactate ->
+    S[2, 8] = -1.0
+
+    # co2_export: CO2 ->
+    S[5, 9] = -1.0
+
+    # Lactate and CO2 need somewhere to GO. Without these two exchanges the
+    # steady-state constraint S*v = 0 forces both producing reactions to
+    # zero: no lactate export means no lactate production, which leaves
+    # pyruvate and NADH from glycolysis with no sink, which forces glycolysis
+    # itself to zero, and no CO2 export likewise forces the TCA cycle to
+    # zero. Every carbon route is then shut and the only reaction that can
+    # make ATP is one with no byproduct at all.
+    #
+    # Which is exactly what the previous model had: an oxidative_phosph
+    # reaction turning O2 straight into ATP. It was not merely unphysical, it
+    # was load-bearing -- the single feasible ATP route, kept feasible by
+    # producing nothing that needed disposing of. Correcting the
+    # stoichiometry without adding these exchanges makes the whole model
+    # infeasible, which is how the omission surfaced.
+
+    # Yields, as a check on the numbers above. Aerobic, per glucose:
+    # 2 ATP + 2 NADH from glycolysis, then 2 pyruvate through TCA for 2 ATP
+    # and 8 NADH, then 10 NADH through oxphos for 25 ATP and 5 O2 -- 29 ATP
+    # per glucose against a textbook 30-32, and 5 O2 against 6. Anaerobic,
+    # per glucose: 2 ATP and 2 lactate, which is exact.
+    #
+    # The previous version of this model had TCA consume O2 directly for
+    # 15 ATP AND a separate oxidative_phosph reaction turning O2 into ATP
+    # with no carbon source at all. A cell with oxygen and zero glucose
+    # therefore grew at the maximum rate, and since oxygen alone sufficed for
+    # ATP, glycolysis and the TCA cycle went unused whenever oxygen was
+    # present -- so lactate production was always zero and the model could
+    # not express the Warburg effect it exists to study. Routing the
+    # oxidative yield through NADH is what couples the two pathways: without
+    # oxygen the only NADH sink is lactate, which caps glycolysis at 2 ATP
+    # per glucose and forces fermentation.
+
+    # Capacities. These are NOT sourced -- they are the magnitudes this model
+    # shipped with, kept so the change above can be judged on its own. The
+    # oxidative_phosph ceiling is raised because its flux is now counted in
+    # NADH rather than in O2: ten NADH per glucose means the reaction runs an
+    # order of magnitude faster than the uptake it serves.
+    lb = np.array([0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0], dtype=np.float64)
+    ub = np.array([10, 10, 20, 20, 15, 120, 5.0, 2, 20, 60],
+                  dtype=np.float64)
 
     # Objective: maximize biomass (reaction 7)
     objective = np.zeros(n_rxn, dtype=np.float64)
@@ -129,11 +178,12 @@ def prostate_cancer_model() -> MetabolicModel:
 
     return MetabolicModel(
         S=S, lb=lb, ub=ub, objective=objective,
-        metabolite_names=["glucose", "pyruvate", "lactate", "ATP", "O2", "CO2"],
+        metabolite_names=["glucose", "pyruvate", "lactate", "ATP", "O2",
+                          "CO2", "NADH"],
         reaction_names=[
             "glucose_uptake", "glycolysis", "lactate_production",
             "TCA_cycle", "oxygen_consumption", "oxidative_phosph",
-            "atp_maintenance", "biomass",
+            "atp_maintenance", "biomass", "lactate_export", "co2_export",
         ],
     )
 
@@ -158,8 +208,14 @@ class FBASolver:
             log.info("FBA solver using CPU (SciPy)")
 
     def solve_single(self, cell_lb: Optional[np.ndarray] = None,
-                     cell_ub: Optional[np.ndarray] = None) -> Dict[str, float]:
-        """Solve FBA for a single cell. Returns flux dict."""
+                     cell_ub: Optional[np.ndarray] = None
+                     ) -> Optional[Dict[str, float]]:
+        """Solve FBA for a single cell.
+
+        Returns a flux dict, or None when the constraints cannot be satisfied
+        -- see :meth:`_solve_cpu_single` for why None rather than a plausible
+        vector.
+        """
         lb = cell_lb if cell_lb is not None else self.model.lb
         ub = cell_ub if cell_ub is not None else self.model.ub
 
@@ -167,12 +223,15 @@ class FBASolver:
             fluxes = self._solve_gpu_single(lb, ub)
         else:
             fluxes = self._solve_cpu_single(lb, ub)
+        if fluxes is None:
+            return None
 
         return {name: float(v) for name, v in zip(self.model.reaction_names, fluxes)}
 
     def solve_batch(self, n_cells: int,
                     lb_matrix: Optional[np.ndarray] = None,
-                    ub_matrix: Optional[np.ndarray] = None) -> np.ndarray:
+                    ub_matrix: Optional[np.ndarray] = None
+                    ) -> Tuple[np.ndarray, np.ndarray]:
         """Solve FBA for a batch of cells.
 
         Args:
@@ -181,7 +240,9 @@ class FBASolver:
             ub_matrix: (n_cells, n_rxn) upper bounds per cell, or None for default
 
         Returns:
-            (n_cells, n_rxn) flux matrix
+            ``(fluxes, feasible)``: an (n_cells, n_rxn) flux matrix, and a
+            boolean mask of the cells whose constraints could be met. Rows
+            where ``feasible`` is False are zero and mean nothing.
         """
         if lb_matrix is None:
             lb_matrix = np.tile(self.model.lb, (n_cells, 1))
@@ -189,9 +250,12 @@ class FBASolver:
             ub_matrix = np.tile(self.model.ub, (n_cells, 1))
 
         if self.use_gpu:
-            return self._solve_gpu_batch(lb_matrix, ub_matrix)
-        else:
-            return self._solve_cpu_batch(lb_matrix, ub_matrix)
+            fluxes = self._solve_gpu_batch(lb_matrix, ub_matrix)
+            # The GPU path is a least-squares relaxation and has no notion of
+            # infeasibility, so it cannot report one. Saying so is better
+            # than implying every cell is fine.
+            return fluxes, np.ones(len(lb_matrix), dtype=bool)
+        return self._solve_cpu_batch(lb_matrix, ub_matrix)
 
     # ── GPU path ──────────────────────────────────────────────────────
 
@@ -249,13 +313,28 @@ class FBASolver:
 
     # ── CPU path ──────────────────────────────────────────────────────
 
-    def _solve_cpu_single(self, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
-        """CPU: exact LP via scipy.optimize.linprog."""
+    def _solve_cpu_single(self, lb: np.ndarray, ub: np.ndarray
+                          ) -> Optional[np.ndarray]:
+        """CPU: exact LP via scipy.optimize.linprog, or None if infeasible.
+
+        None means the cell cannot satisfy its own constraints -- with
+        ``atp_maintenance`` carrying a lower bound, that is exactly the
+        statement "this cell cannot pay its maintenance cost at these
+        substrate levels", which is the most consequential thing this model
+        can say about a cell in a hypoxic core.
+
+        It used to return ``(lb + ub) / 2`` instead. That vector does not
+        satisfy S*v = 0, so it is not a flux distribution at all, and it is
+        not recognisable as a failure either: with oxygen and glucose both
+        clamped to zero the midpoint reported a growing cell excreting
+        lactate. A caller cannot distinguish a fabricated answer from a real
+        one, so there is no safe way to return one.
+        """
         try:
             from scipy.optimize import linprog
-        except ImportError:
-            log.warning("scipy not available, using midpoint heuristic")
-            return (lb + ub) / 2.0
+        except ImportError:                                # pragma: no cover
+            log.warning("scipy not available; FBA cannot be solved")
+            return None
 
         # linprog minimizes, so negate objective for maximization
         result = linprog(
@@ -267,14 +346,24 @@ class FBASolver:
         )
         if result.success:
             return result.x
-        else:
-            log.warning("FBA LP failed: %s, using midpoint", result.message)
-            return (lb + ub) / 2.0
+        log.debug("FBA infeasible: %s", result.message)
+        return None
 
-    def _solve_cpu_batch(self, lb_matrix: np.ndarray, ub_matrix: np.ndarray) -> np.ndarray:
-        """CPU: solve each cell sequentially."""
+    def _solve_cpu_batch(self, lb_matrix: np.ndarray, ub_matrix: np.ndarray
+                         ) -> Tuple[np.ndarray, np.ndarray]:
+        """CPU: solve each cell sequentially; also report feasibility.
+
+        One LP per cell in a Python loop, which is why nothing in the tissue
+        path calls this directly: at the configured million cells it would be
+        a million LPs per step. ``cognisom.core.metabolism`` solves the model
+        once per substrate level on a small grid and interpolates instead.
+        """
         n_cells = lb_matrix.shape[0]
         results = np.zeros((n_cells, self.model.n_reactions))
+        feasible = np.zeros(n_cells, dtype=bool)
         for i in range(n_cells):
-            results[i] = self._solve_cpu_single(lb_matrix[i], ub_matrix[i])
-        return results
+            fluxes = self._solve_cpu_single(lb_matrix[i], ub_matrix[i])
+            if fluxes is not None:
+                results[i] = fluxes
+                feasible[i] = True
+        return results, feasible
