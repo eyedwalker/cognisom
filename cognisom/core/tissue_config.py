@@ -314,6 +314,13 @@ class TissueScaleConfig:
     #: that is not the dominant error -- but it IS an error the solve does not
     #: otherwise have, so it is opt-in and the engine reports the cost that
     #: would justify it.
+    #:
+    #: It is also the only lever available. A coarser field grid looks like the
+    #: obvious saving -- oxygen varies on a 60 um scale and is resolved at
+    #: 10 um -- and it is not one: a vessel is marked as whole voxels, so a
+    #: capillary is one voxel wide and coarsening the grid widens every
+    #: capillary and raises the vessel volume fraction as dx^2. See
+    #: tests/test_a_vessel_is_one_voxel_wide.py.
     steady_interval: int = 1
     budget_usd: float = 80.0           # Max spend per session
     disconnect_timeout_min: int = 10   # Auto-terminate if dashboard disconnects

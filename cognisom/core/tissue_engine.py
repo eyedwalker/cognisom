@@ -198,8 +198,10 @@ class TissueSimulationEngine:
             "(%.1f s per step on %s voxels), against max_runtime_hours of "
             "%.1f, so the run will be auto-terminated first. Raise "
             "steady_interval to about %d -- which leaves the field roughly "
-            "%d%% stale, measured -- or use a coarser field grid, or allow a "
-            "longer budget.",
+            "%d%% stale, measured -- or allow a longer budget. A coarser "
+            "field grid is NOT an option: a vessel is one voxel wide, so "
+            "coarsening widens every capillary and changes the supply "
+            "(tests/test_a_vessel_is_one_voxel_wide.py).",
             ", ".join(steady), hours, steps, per_step, f"{voxels:,}",
             budget, needed, needed,
         )
