@@ -144,7 +144,9 @@ def _colour_of(cell: Any) -> Tuple[float, float, float]:
     return TYPE_COLOUR.get(_token_of(cell), TYPE_COLOUR["normal"])
 
 
-def _author_prototypes(stage, mesh_types: Sequence[str], grid: int):
+def author_prototypes(stage, mesh_types: Sequence[str],
+                      grid: int = PROTOTYPE_GRID,
+                      root: str = PROTOTYPE_ROOT):
     """One Xform per mesh type, its parts meshed beneath it.
 
     Returns ``(paths, faces)``. A mesh type with no builder is skipped by
@@ -161,10 +163,10 @@ def _author_prototypes(stage, mesh_types: Sequence[str], grid: int):
         if fell_back:
             log.warning("no builder for %s; it will instance a fallback",
                         mesh_type)
-        xform = UsdGeom.Xform.Define(stage, f"{PROTOTYPE_ROOT}/{mesh_type}")
+        xform = UsdGeom.Xform.Define(stage, f"{root}/{mesh_type}")
         for part, (vertices, triangles) in parts.items():
             mesh = UsdGeom.Mesh.Define(
-                stage, f"{PROTOTYPE_ROOT}/{mesh_type}/{part}")
+                stage, f"{root}/{mesh_type}/{part}")
             mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(
                 np.ascontiguousarray(vertices, dtype="float32")))
             mesh.GetFaceVertexIndicesAttr().Set(Vt.IntArray.FromNumpy(
@@ -207,7 +209,7 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # population.
     types = sorted({_mesh_type_of(c) or "smooth_sphere" for c in cells})
     if geometry:
-        proto_paths, result.prototype_faces = _author_prototypes(
+        proto_paths, result.prototype_faces = author_prototypes(
             stage, types, grid)
     else:
         # A sphere prototype, declared rather than defaulted to.

@@ -8,6 +8,7 @@ PDB (protein/cell coordinates), glTF (3D meshes), and VTK
 visualization tools (PyMOL, Blender, ParaView).
 """
 
+import functools
 import json
 import struct
 import base64
@@ -169,6 +170,60 @@ def cell_state_name(cell) -> str:
         return "activated"
 
     return "alive"
+
+
+#: The exporter's cell_type vocabulary is not the library's. Five names
+#: overlap outright; these are the rest that have a real shape behind
+#: them. The remainder -- normal, dead, dividing, differentiated,
+#: progenitor -- are STATES wearing a type's clothing, and a state has no
+#: morphology, so they get a sphere and are counted as unresolved rather
+#: than drawn as whatever cell sorts first.
+CELL_TYPE_MESH_ALIASES = {
+    "cancer": "cancer_epithelial",
+    "stem": "cancer_epithelial",
+    "immune": "t_cell",
+}
+
+#: What an unresolved cell instances. Named so a reader of the stage can
+#: see which cells the library had no shape for.
+UNRESOLVED_PROTOTYPE = "unresolved_sphere"
+
+
+def cell_mesh_type(cell) -> Optional[str]:
+    """The library mesh_type for a cell, or ``None`` if it has no shape.
+
+    Goes through ``ARCHETYPE_ENTITY``, which is the same route
+    ``cell_scene`` takes to draw a library card, so a macrophage in a
+    population export and a macrophage on its card are one object.
+    """
+    raw = _cell_field(cell, "cell_type", None)
+    key = str(raw).lower() if raw is not None else ""
+    key = CELL_TYPE_MESH_ALIASES.get(key, key)
+    try:
+        from cognisom.core.tissue_config import ARCHETYPE_ENTITY
+        from cognisom.library.store import EntityStore
+    except Exception:                                    # pragma: no cover
+        return None
+    entry = ARCHETYPE_ENTITY.get(key)
+    if entry is None:
+        return None
+    name, _etype = entry
+    try:
+        entity = _mesh_type_store().find_entity_by_name(name)
+    except Exception:                                    # pragma: no cover
+        return None
+    return getattr(entity, "mesh_type", None) if entity is not None else None
+
+
+@functools.lru_cache(maxsize=1)
+def _mesh_type_store():
+    """One store, opened quietly; this runs once per cell otherwise."""
+    import contextlib
+    import io
+
+    from cognisom.library.store import EntityStore
+    with contextlib.redirect_stdout(io.StringIO()):
+        return EntityStore()
 
 
 def cell_display_color(cell):
@@ -733,7 +788,8 @@ class SceneExporter:
             UsdGeom.Scope.Define(stage, "/World/Cells")
         elif n >= threshold:
             SceneExporter._usd_point_instanced_cells(
-                stage, positions, colors, states, radii, material
+                stage, positions, colors, states, radii, material,
+                mesh_types=[cell_mesh_type(c) for c in cells],
             )
         else:
             SceneExporter._usd_individual_cells(
@@ -917,59 +973,70 @@ class SceneExporter:
             UsdShade.MaterialBindingAPI(sphere).Bind(material)
 
     @staticmethod
-    def _usd_point_instanced_cells(stage, positions, colors, states, radii, material):
+    def _usd_point_instanced_cells(stage, positions, colors, states, radii,
+                                   material, mesh_types=None):
         """One PointInstancer for the whole population.
 
-        Reuses `cognisom.omniverse.instancing.NestedInstancingManager`
-        rather than authoring a second instancer: it already builds the
-        prototype relationship and the bulk Vt arrays correctly.  The
-        per-instance colour goes through the primvar method added there.
+        The prototype used to be a single `UsdGeom.Sphere` of radius 1,
+        which made a 500,000-cell export half a million copies of a
+        sphere while the library held 32 real morphologies the library
+        card already drew.  `mesh_types` carries one library mesh_type
+        per cell, resolved through the same `ARCHETYPE_ENTITY` route
+        `cell_scene` takes, and each distinct one becomes a prototype.
+
+        A cell whose type resolves to no shape instances an explicitly
+        named sphere rather than borrowing another cell's morphology.
+        That matters: several of the exporter's "types" -- dead,
+        dividing, progenitor -- are states, and a state has no shape.
+
+        `NestedInstancingManager` is no longer used here.  It authors one
+        instancer per prototype, and the export's own tests read
+        `_instancers(stage)[0]`, so several prototypes have to share one
+        instancer with `protoIndices`.
         """
-        from pxr import UsdGeom, UsdShade, Gf, Sdf
-        from cognisom.omniverse.instancing import (
-            InstanceData, NestedInstancingManager, create_sphere_prototype,
-        )
+        from pxr import Gf, Sdf, UsdGeom, UsdShade, Vt
 
-        manager = NestedInstancingManager(stage)
-        # The manager's own default is 10,000; a tissue slab needs the
-        # instancer long before that.
-        manager.POINT_INSTANCER_THRESHOLD = 1
+        from cognisom.biousd.usd_writer import author_prototypes
 
-        manager.register_prototype(
-            "CellBody",
-            geometry_creator=lambda s, p: create_sphere_prototype(s, p, 1.0),
-            category="cell",
-        )
-        proto = stage.GetPrimAtPath("/Prototypes/CellBody")
-        UsdGeom.Sphere(proto).GetExtentAttr().Set([(-1, -1, -1), (1, 1, 1)])
-        UsdShade.MaterialBindingAPI.Apply(proto)
-        UsdShade.MaterialBindingAPI(proto).Bind(material)
+        n = len(positions)
+        names = list(mesh_types or [None] * n)
+        resolved = sorted({m for m in names if m})
+        order = resolved + [UNRESOLVED_PROTOTYPE]
+        index_of = {name: i for i, name in enumerate(order)}
 
-        instances = [
-            InstanceData(
-                prototype_name="CellBody",
-                position=(float(p[0]), float(p[1]), float(p[2])),
-                scale=(float(r), float(r), float(r)),
-            )
-            for p, r in zip(positions, radii)
-        ]
-        manager.create_instances_batch("CellBody", instances, parent_path="/World/Cells")
+        proto_paths, _faces = author_prototypes(stage, resolved)
+        fallback = UsdGeom.Sphere.Define(
+            stage, f"/Prototypes/{UNRESOLVED_PROTOTYPE}")
+        fallback.GetRadiusAttr().Set(1.0)
+        fallback.GetExtentAttr().Set([(-1, -1, -1), (1, 1, 1)])
+        proto_paths = list(proto_paths) + [fallback.GetPath()]
+        for path in proto_paths:
+            prim = stage.GetPrimAtPath(path)
+            UsdShade.MaterialBindingAPI.Apply(prim)
+            UsdShade.MaterialBindingAPI(prim).Bind(material)
 
-        # The manager always creates its own empty instance scope; drop it
-        # when nothing was put there, rather than ship a dangling prim.
-        leftover = stage.GetPrimAtPath(NestedInstancingManager.INSTANCES_PATH)
-        if leftover and not leftover.GetChildren():
-            stage.RemovePrim(leftover.GetPath())
+        instancer = UsdGeom.PointInstancer.Define(
+            stage, "/World/Cells/CellBody_Instancer")
+        instancer.GetPrototypesRel().SetTargets(proto_paths)
+        instancer.GetPositionsAttr().Set(
+            Vt.Vec3fArray.FromNumpy(np.asarray(positions, dtype="float32")))
+        instancer.GetProtoIndicesAttr().Set(Vt.IntArray.FromNumpy(np.array(
+            [index_of.get(m or UNRESOLVED_PROTOTYPE,
+                          index_of[UNRESOLVED_PROTOTYPE]) for m in names],
+            dtype="int32")))
+        scale = np.asarray(radii, dtype="float32")[:, None]
+        instancer.GetScalesAttr().Set(Vt.Vec3fArray.FromNumpy(
+            np.repeat(scale, 3, axis=1).astype("float32")))
 
-        manager.set_point_instancer_primvar("CellBody", "displayColor", colors)
-        manager.set_point_instancer_primvar(
-            "CellBody", "cognisom:cellState",
-            np.array([CELL_STATE_CODES.get(s, 0) for s in states], dtype=np.int32),
-        )
+        api = UsdGeom.PrimvarsAPI(instancer.GetPrim())
+        api.CreatePrimvar("displayColor", Sdf.ValueTypeNames.Color3fArray,
+                          UsdGeom.Tokens.varying).Set(
+            Vt.Vec3fArray.FromNumpy(np.asarray(colors, dtype="float32")))
+        api.CreatePrimvar("cognisom:cellState", Sdf.ValueTypeNames.IntArray,
+                          UsdGeom.Tokens.varying).Set(
+            Vt.IntArray.FromNumpy(np.array(
+                [CELL_STATE_CODES.get(s, 0) for s in states], dtype="int32")))
 
-        instancer = UsdGeom.PointInstancer(
-            stage.GetPrimAtPath("/World/Cells/CellBody_Instancer")
-        )
         if instancer:
             lo = (positions - radii[:, None]).min(axis=0)
             hi = (positions + radii[:, None]).max(axis=0)
