@@ -580,16 +580,33 @@ def _b_enveloped_pleomorphic(g, seed, p):
     return {1: body, 5: _sphere(g, r=0.26)}
 
 
+#: Length over width of a rhabdovirus virion. Rabies is ~180 nm long by
+#: ~75 nm across, and the library already carries the length -- its
+#: ``scale_um`` is 0.18. The shape was built at 1.25, so the one genuinely
+#: distinctive virion in this library was drawn barely longer than it was
+#: wide, and read as a lozenge rather than the bullet the family is named
+#: for. Found by rendering all sixty entities and looking at them.
+BULLET_ASPECT = 180.0 / 75.0
+
+
 def _b_bullet_shape(g, seed, p):
-    """Rhabdovirus: one rounded end, one flat."""
+    """Rhabdovirus: one rounded end, one flat, and markedly longer than wide."""
     z = g[..., 2]
-    # Rhabdovirus: a cylinder with one hemispherical end and one flat, the
-    # shape the family is named for. Cutting an ellipsoid at z > -0.62
-    # removed almost nothing -- its base was already at -0.70 -- so it
-    # rendered as a rounded capsule with no flat end at all.
-    body = (_capsule(g, (0, 0, -0.30), (0, 0, 0.34), 0.42)
-            & (z > -0.30))
-    core = (_capsule(g, (0, 0, -0.22), (0, 0, 0.26), 0.24) & (z > -0.22))
+    # A capsule from a to b with radius r spans (b + r) - a once the far end
+    # is cut flat at a, so aspect = (b - a + r) / 2r and the separation that
+    # gives a target aspect is (2*aspect - 1) * r. Solving rather than
+    # nudging the literals is what makes the number checkable: a test reads
+    # BULLET_ASPECT and measures the mask.
+    r = 0.30
+    span = (2.0 * BULLET_ASPECT - 1.0) * r
+    base = -(span + r) / 2.0                      # centred on z = 0
+    tip = base + span
+    body = _capsule(g, (0, 0, base), (0, 0, tip), r) & (z > base)
+    # The ribonucleoprotein core, inset proportionally from the envelope.
+    cr = r * 0.57
+    inset = span * 0.095
+    core = (_capsule(g, (0, 0, base + inset), (0, 0, tip - inset), cr)
+            & (z > base + inset))
     return {1: body, 5: core}
 
 

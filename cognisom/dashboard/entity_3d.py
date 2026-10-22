@@ -44,15 +44,45 @@ def render_entity_3d(entity, height: int = 250) -> bool:
     elif etype in ("cell_type", "immune_cell"):
         return _render_cell_3d(entity, height)
     elif etype == "virus":
-        return _render_virus_3d(entity, height)
+        return _library_shape_or(entity, height, _render_virus_3d)
     elif etype == "bacterium":
-        return _render_bacterium_3d(entity, height)
+        return _library_shape_or(entity, height, _render_bacterium_3d)
     elif etype == "antibody":
         return _render_antibody_3d(entity, height)
     elif etype in ("receptor", "complement", "prr", "adhesion_molecule", "cytokine"):
         return _render_protein_structure(entity, props, height)
     else:
         return _render_type_icon(entity, height)
+
+
+def _library_shape_or(entity, height: int, parametric) -> bool:
+    """Draw the shape the library names, or fall back and say so.
+
+    Cells have gone through the library since ``_render_cell_from_library``
+    was written. Viruses and bacteria did not, and went on being drawn by
+    the parametric renderers below -- which pick features by substring
+    matching the entity's NAME, the same defect that function was written
+    to replace.
+
+    What it cost, measured across the sixteen entities concerned: the
+    library distinguishes eight virus morphologies and the parametric path
+    collapsed them to one boolean, ``is_enveloped``, so rabies -- the only
+    bullet-shaped virion in the library -- was drawn as a spiked sphere.
+    For bacteria it read a ``shape`` property rather than ``mesh_type``,
+    collapsing six types to two: Clostridioides lost its spore, three
+    species lost their flagella, and Staphylococcus's cluster and
+    Streptococcus's chain both became a generic coccus.
+
+    The parametric renderers stay, because an entity whose ``mesh_type``
+    names no builder still has to be drawn by something. They are now the
+    declared fallback rather than the default path.
+    """
+    from cognisom.visualization.cell_scene import has_builder
+
+    if has_builder(getattr(entity, "mesh_type", None)):
+        if _render_cell_from_library(entity, height):
+            return True
+    return parametric(entity, height)
 
 
 def _render_protein_structure(entity, props: dict, height: int) -> bool:

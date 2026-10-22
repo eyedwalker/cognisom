@@ -31,6 +31,9 @@ the failure this project keeps finding.
 from __future__ import annotations
 
 import logging
+import colorsys
+import hashlib
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -175,6 +178,65 @@ def resolved_scale_um(entity) -> Tuple[float, str]:
     return scale, "scale_um (no provenance)"
 
 
+#: Glyphs drawn per membrane marker. A count, not a density -- see the
+#: note in :func:`scene_for`. Enough to read as a population at card size
+#: and few enough that three markers do not bury the cell.
+MARKER_GLYPHS = 90
+
+#: A marker glyph's radius as a fraction of the cell's diameter. Receptors
+#: are nanometres across and would be invisible at true scale, so this is
+#: openly a symbol; it is tied to the cell's size only so that a 30 um
+#: fibroblast and a 6 um B cell carry glyphs of the same apparent size.
+MARKER_GLYPH_FRACTION = 0.018
+
+
+def marker_radius_um(scale_um: float) -> float:
+    """Glyph radius for a cell of this diameter."""
+    return max(0.02, float(scale_um) * MARKER_GLYPH_FRACTION)
+
+
+def marker_key(marker: str) -> str:
+    """One molecule, one key, however the library spelled it.
+
+    The library stores the same marker several ways -- ``CD3`` and
+    ``CD3+``, ``CTLA4`` and ``CTLA-4+``, ``PD-1+`` -- because the records
+    came from different sources. Stripping only a trailing sign left
+    ``CTLA-4`` and ``CTLA4`` as different strings and therefore different
+    colours, which would have put one molecule in two colours on two cells
+    and made the picture lie about which markers they share.
+    """
+    return "".join(ch for ch in marker.upper() if ch.isalnum())
+
+
+def marker_colour(marker: str) -> Tuple[float, float, float]:
+    """The marker's colour, or a stable one derived from its name.
+
+    ``MARKER_COLORS`` covers fourteen of the markers that recur most. The
+    rest get a hue hashed from the name, which is arbitrary but CONSTANT:
+    CXCR3 is the same colour on every cell that carries it, which is the
+    property that lets a reader tell two lookalike cells apart at all.
+    """
+    known = cp.MARKER_COLORS.get(marker)
+    if known:
+        return tuple(known)
+    base = marker_key(marker)
+    for candidate, colour in cp.MARKER_COLORS.items():
+        if marker_key(candidate) == base:
+            return tuple(colour)
+    # Hue alone cannot carry this. The library has 45 distinct membrane
+    # markers; spread over one hue circle at fixed saturation they land a
+    # few degrees apart, and the first version put CCR5 and CCR6 at an RGB
+    # distance of 0.032 -- the single pair that has to separate a Th1 from
+    # a Th17. Saturation and value are the other two axes of the space and
+    # using all three multiplies the distinguishable set by about nine.
+    digest = hashlib.sha1(base.encode()).digest()
+    hue = int.from_bytes(digest[0:2], "big") / 65535.0
+    sat = (0.45, 0.70, 0.95)[digest[2] % 3]
+    val = (0.68, 0.84, 1.00)[digest[3] % 3]
+    r, g, b = colorsys.hsv_to_rgb(hue, sat, val)
+    return (round(r, 3), round(g, 3), round(b, 3))
+
+
 def scene_for(entity, *, grid: int = CARD_GRID,
               compartments: Optional[Dict[str, str]] = None,
               max_detail: int = cd.DRAW_CAP) -> CellScene:
@@ -256,6 +318,39 @@ def scene_for(entity, *, grid: int = CARD_GRID,
             DETAIL_COLORS.get("microvilli", (0.8, 0.86, 0.94)),
             actual=actual, drawn=drawn,
             length_um=profile.microvillus_length_um))
+
+    # Surface markers, which is what actually tells these cells apart.
+    #
+    # Nineteen library entities resolve to a smooth sphere and five
+    # distinct (scale, feature-count) combinations, so a Th1 and a Th17 and
+    # an exhausted CD8 were drawn identically. They are not identical in
+    # the library: all nineteen carry DISTINCT marker sets, none shared --
+    # Th1 is CXCR3 and T-bet, Th17 is CCR6 and RORgt, exhausted CD8 is PD-1
+    # and LAG-3. ``profile_for`` has partitioned those into membrane,
+    # nuclear and granule compartments since it was written, and nothing
+    # drew them. The data to tell the cells apart was already reaching this
+    # function and being discarded here.
+    #
+    # THE COUNT IS A GLYPH, NOT A MEASUREMENT, and that distinction is the
+    # whole reason this is safe to draw. Surface receptor copy numbers are
+    # real quantities, in the thousands to hundreds of thousands per cell,
+    # and this library has none of them -- the one abundance it does have,
+    # B2M from PaxDb, is five bulk samples broadcast across twenty cell
+    # types and implies CD4+ carries 2.79x the MHC-I of CD8+, which is
+    # spectral-counting noise. Inventing a density per marker per cell type
+    # would encode that same artefact as geometry. So every marker gets the
+    # same count and the COLOUR carries the identity. ``sources`` records
+    # it as a glyph so a caller cannot read density off the picture.
+    if profile.membrane_markers:
+        scene.sources["membrane_markers"] = "glyph:identity_not_density"
+        rng = np.random.default_rng(seed + 7)
+        for index, marker in enumerate(sorted(profile.membrane_markers)):
+            points, _normals = cd.sample_surface(
+                body.vertices, body.faces, MARKER_GLYPHS, rng)
+            scene.details.append(Detail(
+                marker, points, marker_radius_um(scale_um),
+                marker_colour(marker), actual=MARKER_GLYPHS,
+                drawn=MARKER_GLYPHS))
 
     # Granules come from one place or the other, never both.
     #
