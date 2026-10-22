@@ -106,15 +106,49 @@ class DiffusionFieldConfig:
     def glucose() -> DiffusionFieldConfig:
         # q = 0.2 (archetypes' glucose_consumption), C_art = 5.0.
         #
-        # No km: glucose keeps the first-order sink deliberately. Uptake is
-        # transporter-limited and GLUT1's Km is of the same order as blood
-        # glucose itself (a few mM against 5 mM here), not two orders below
-        # it, so the saturating and linear forms are not far apart over this
-        # field's range and nothing is gained by guessing which. The oxygen
-        # number is the one with a defensible gap between km and the supply.
+        # NO km, and that is now sourced rather than assumed. Brahm 1983
+        # (J Physiol 339:339-54, PMID 6887027) measured glucose transport in
+        # human erythrocytes at 38 C and found simple Michaelis-Menten
+        # kinetics with K1/2 = 6.7 mM for self-exchange and 8.2 mM for net
+        # efflux. Both sit ABOVE the 5 mM supply this field starts from, so
+        # the transporter is NOT saturated at physiological glucose and uptake
+        # varies with concentration across the whole range -- which is what a
+        # first-order sink says. Oxygen is the opposite case, km two orders
+        # BELOW supply, and is the one that needs the saturating form.
+        #
+        # The widely repeated "GLUT1 Km is about 1 mM, so transport runs at an
+        # essentially constant rate" is a low-temperature result. GLUT1 is
+        # kinetically asymmetric -- influx and efflux have different apparent
+        # affinities -- and the asymmetry collapses as temperature rises:
+        # Brahm found the maximal self-exchange flux and maximal net efflux
+        # IDENTICAL at 38 C, and about threefold apart at 10 C. Taking the
+        # 1 mM figure would have made this sink look saturated when at body
+        # temperature it is not.
+        #
+        # The RATE, by contrast, is about 24x too low, by the same kind of
+        # estimate that put oxygen 76-228x low. BNID 102644 (Rathmell et al.,
+        # J Immunol) measures 2-3 nmol oxygen per nmol glucose in T cells, so
+        # a cell respiring at a Seahorse-typical 3.3e-18 mol O2/s consumes
+        # about 1.3e-18 mol glucose/s, which in a 10 um voxel is 4.75 mM/h
+        # against the 0.2 mM/h configured here. Left as it is, because the
+        # calibration is a biology decision; the arithmetic is recorded so it
+        # is an informed one.
+        #
+        # Not used: BNID 110890 offers "typical glucose consumption 0.2
+        # pmol/hour/cell", which is 200 mM/h in a 10 um voxel -- 42x more than
+        # the oxygen figure permits at any O2:glucose ratio. Its reference is
+        # a paper on thermometry in single cells quoting the number from
+        # unnamed primary sources, so it is third-hand, and it is the higher
+        # of the two.
+        #
+        # steady_state: glucose crosses the 60 um intervessel gap in
+        # L^2/D = 6 s against a 180 s step, so like oxygen it is settled long
+        # before the cells have aged once. It also ran at D*dt/dx^2 = 216,
+        # where the directional error is large, and the guard said so.
         return DiffusionFieldConfig(
             "glucose", diffusion_coeff=600.0, initial_value=5.0,
-            uptake_per_cell_per_hour=0.2 / 5.0)
+            uptake_per_cell_per_hour=0.2 / 5.0,
+            steady_state=True)
 
     @staticmethod
     def cxcl12() -> DiffusionFieldConfig:
@@ -253,6 +287,22 @@ class TissueScaleConfig:
 
     # ── Safety (Lambda Labs) ───────────────────────────────────
     max_runtime_hours: float = 2.0     # Hard auto-terminate limit
+
+    #: Re-solve the steady fields every N steps instead of every step. 1 is
+    #: every step and is the default, because the alternative is a silent
+    #: approximation.
+    #:
+    #: It is a cheap one when it is wanted. The solve is instantaneous in
+    #: simulated time -- that is the point of it -- so what changes between
+    #: steps is only where the cells are, and they move about a micrometre
+    #: against a 10 um voxel. Measured on a 24^3 grid with an anoxic core, the
+    #: solved field moves 0.6-1.2% of its own depletion per step, so an
+    #: interval of N leaves the field roughly N percent stale. Against
+    #: consumption rates known to a factor of 24 (glucose) to 228 (oxygen)
+    #: that is not the dominant error -- but it IS an error the solve does not
+    #: otherwise have, so it is opt-in and the engine reports the cost that
+    #: would justify it.
+    steady_interval: int = 1
     budget_usd: float = 80.0           # Max spend per session
     disconnect_timeout_min: int = 10   # Auto-terminate if dashboard disconnects
 

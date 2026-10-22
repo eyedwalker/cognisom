@@ -111,11 +111,16 @@ def _reference(pin, up, insulated):
     return C.reshape(N, N, N)
 
 
-def _solve(vessels, up, faces, start=None):
+#: Tight enough that the inner linear solves stop being the limiting error,
+#: so the comparison below measures the METHOD and not the iteration count.
+EXACT_CG = 1e-12
+
+
+def _solve(vessels, up, faces, start=None, cg_tol=EXACT_CG):
     field = np.full((N, N, N), LEVEL) if start is None else start
     return solve_steady_state(
         field, D, DX, uptake_k=up, uptake_km=KM, uptake_ref=LEVEL,
-        held=vessels, held_value=LEVEL, faces=faces)
+        held=vessels, held_value=LEVEL, faces=faces, cg_tol=cg_tol)
 
 
 @pytest.mark.parametrize("scale", [1.0, 10.0, 100.0, 1000.0])
@@ -160,13 +165,14 @@ def test_the_faces_are_insulated_by_default_and_it_changes_the_answer():
         f"insulating the faces should deepen the depletion materially; got "
         f"{dep_ins:.3e} against {dep_art:.3e}"
     )
-    # And the default is the physical one.
-    default = _solve(vessels, up, INSULATED)
-    assert np.array_equal(
-        default.field,
-        solve_steady_state(
-            np.full((N, N, N), LEVEL), D, DX, uptake_k=up, uptake_km=KM,
-            uptake_ref=LEVEL, held=vessels, held_value=LEVEL).field)
+    # And the physical condition is the DEFAULT, which is a claim about the
+    # signature and so is checked there rather than by running two solves --
+    # comparing two runs would also compare whatever else their arguments
+    # differ in, which is how this assertion first went wrong.
+    import inspect
+
+    default = inspect.signature(solve_steady_state).parameters["faces"].default
+    assert default == INSULATED, default
 
 
 def test_capillaries_hold_exactly_and_nothing_goes_negative():
@@ -262,3 +268,39 @@ def test_a_mismatched_mask_is_refused_rather_than_broadcast():
     with pytest.raises(ValueError, match="does not match field shape"):
         solve_steady_state(np.full((N, N, N), LEVEL), D, DX,
                            held=np.zeros((4, 4, 4), bool))
+
+
+def test_the_shipped_tolerance_is_cheaper_and_still_accurate_enough():
+    """What the default inner tolerance trades, measured rather than asserted.
+
+    The exactness tests above drive the inner linear solves to 1e-12 so that
+    they measure the method. Production does not need that: Newton absorbs an
+    inexact step, so the shipped ``CG_TOLERANCE`` buys roughly half the
+    iterations for an error around 1e-5 of the depletion -- far inside the
+    uncertainty on the consumption rates feeding the field.
+
+    Both numbers are pinned because quoting the exact one while shipping the
+    loose one would be the same kind of overclaim as quoting a splitting error
+    against the field value when the depletion is what matters.
+    """
+    from cognisom.gpu.steady_diffusion import CG_TOLERANCE
+
+    vessels = _vessels()
+    up = _uptake(vessels, 100.0)
+    free = ~(vessels | _faces())
+
+    tight = _solve(vessels, up, INSULATED, cg_tol=EXACT_CG)
+    shipped = _solve(vessels, up, INSULATED, cg_tol=CG_TOLERANCE)
+
+    depletion = LEVEL - tight.field[free].min()
+    assert depletion > 0
+    error = np.abs(shipped.field[free] - tight.field[free]).max() / depletion
+    assert error < 1e-3, (
+        f"the shipped tolerance is {error:.2e} of the depletion from the "
+        "exact answer, which is more than it claims"
+    )
+    assert shipped.cg_steps < tight.cg_steps, (
+        f"and it should be cheaper: {shipped.cg_steps} against "
+        f"{tight.cg_steps} CG iterations"
+    )
+    assert CG_TOLERANCE > EXACT_CG

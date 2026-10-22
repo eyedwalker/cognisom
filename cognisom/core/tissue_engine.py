@@ -159,6 +159,51 @@ class TissueSimulationEngine:
     #: one dict shared by every engine ever built.
     _steady_solves: Dict[str, Any]
 
+    #: Seconds per voxel for one warm steady-state solve of one field, on this
+    #: machine's CPU path. Measured at 0.19-0.25 us/voxel across 24^3, 48^3
+    #: and 100^3 -- flat, because the vessel lattice keeps the CG iteration
+    #: count independent of grid size. Used only to warn.
+    _STEADY_SECONDS_PER_VOXEL = 0.2e-6
+
+    def _warn_if_the_solves_will_not_fit(self, cfg) -> None:
+        """Say so at startup if the steady solves exceed the runtime budget.
+
+        A correct field is worth little if the run is killed before it
+        finishes. Solving oxygen and glucose on the 500^3 ``full_tissue``
+        preset is about 47 s per step, roughly 32 h over a 2400-step run,
+        against a ``max_runtime_hours`` of 2 -- so the preset the headline
+        cell count comes from no longer fits, where the stepped path it
+        replaces did at about 1.25 h. That is the price of a field that is not
+        312x out on its own depletion, and the user should meet it at startup
+        rather than at the auto-terminate.
+        """
+        steady = [n for n, fc in cfg.fields.items()
+                  if fc.steady_state and fc.diffusion_coeff > 0]
+        if not steady:
+            return
+        voxels = 1
+        for dim in cfg.grid_shape:
+            voxels *= int(dim)
+        interval = max(1, int(getattr(cfg, "steady_interval", 1)))
+        per_step = (voxels * self._STEADY_SECONDS_PER_VOXEL
+                    * len(steady) / interval)
+        steps = int(cfg.duration / cfg.dt) if cfg.dt else 0
+        hours = per_step * steps / 3600.0
+        budget = float(getattr(cfg, "max_runtime_hours", 0.0) or 0.0)
+        if budget <= 0 or hours <= budget:
+            return
+        needed = int(-(-hours // budget)) * interval
+        log.warning(
+            "steady-state solves for %s will take about %.1f h over %d steps "
+            "(%.1f s per step on %s voxels), against max_runtime_hours of "
+            "%.1f, so the run will be auto-terminated first. Raise "
+            "steady_interval to about %d -- which leaves the field roughly "
+            "%d%% stale, measured -- or use a coarser field grid, or allow a "
+            "longer budget.",
+            ", ".join(steady), hours, steps, per_step, f"{voxels:,}",
+            budget, needed, needed,
+        )
+
     def _resolve_motility_diffusion(self, cfg) -> float:
         """D for the tissue, from the library's migration speed.
 
@@ -368,6 +413,7 @@ class TissueSimulationEngine:
                 diff_coeffs[name] = fc.diffusion_coeff
             self._diffusion.initialize_fields(global_fields, diff_coeffs)
             self._place_vessels(cfg)
+            self._warn_if_the_solves_will_not_fit(cfg)
             # A saturating sink where the field config asks for one. Set once:
             # the per-voxel rates are rebuilt every step, but what shape the
             # sink has is not a function of where the cells are.
@@ -466,10 +512,12 @@ class TissueSimulationEngine:
                 # transient nobody observes. See DiffusionFieldConfig.
                 steady = [n for n, fc in cfg.fields.items()
                           if fc.steady_state and fc.diffusion_coeff > 0]
-                for name in steady:
-                    outcome = self._diffusion.solve_steady(
-                        name, cfg.resolution_um)
-                    self._steady_solves[name] = outcome
+                interval = max(1, int(getattr(cfg, "steady_interval", 1)))
+                if self._step_count % interval == 0:
+                    for name in steady:
+                        outcome = self._diffusion.solve_steady(
+                            name, cfg.resolution_um)
+                        self._steady_solves[name] = outcome
 
                 # Unconditionally stable, so substeps buy accuracy only: the
                 # per-voxel uptake split carries an error of order k*dt,

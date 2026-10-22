@@ -63,6 +63,23 @@ import numpy as np
 
 #: Faces carry no flux: the block is a representative piece of a larger
 #: tissue, so its cut edges are symmetry planes and not sources.
+#: Relative residual reduction asked of the inner CG solve. Much looser than
+#: the outer Newton target, on purpose: Newton absorbs an inexact step, so
+#: solving each linear system to more precision than the nonlinear iteration
+#: needs is wasted. Measured on a 100^3 grid, the cost halves between 1e-6 and
+#: 1e-3 -- 136 CG iterations and 661 ms against 68 and 338 -- while the solved
+#: depletion agrees to about 1e-5 of itself. Below that it over-loosens: 1e-2
+#: saves no iterations and costs an extra Newton step.
+#:
+#: What this gives up is exactness, and the amount is worth stating. Driven to
+#: 1e-12 the solver reproduces an independently assembled sparse Newton solve
+#: to 2e-16, which is how the method is verified; at the default it agrees to
+#: around 1e-5 of the depletion, which is far inside the uncertainty on the
+#: consumption rates feeding it. The verification tests pass ``cg_tol``
+#: explicitly so that the exactness claim is tested at the setting it
+#: describes and the speed claim at the setting that ships.
+CG_TOLERANCE = 1e-3
+
 INSULATED = "insulated"
 #: Faces held at the boundary value, which is what ``adi_step`` does by never
 #: writing them. Kept so the two solvers can be compared on equal terms.
@@ -210,6 +227,7 @@ def solve_steady_state(
     held_value: Optional[float] = None,
     faces: str = INSULATED,
     tol: float = 1e-2,
+    cg_tol: float = CG_TOLERANCE,
     max_newton: int = 30,
     max_cg: Optional[int] = None,
 ) -> SteadyResult:
@@ -234,6 +252,8 @@ def solve_steady_state(
         faces: ``INSULATED`` (default, zero flux) or ``ARTERIAL``.
         tol: convergence target for the Newton correction, as a fraction of
             the DEPLETION rather than of the field. See the module docstring.
+        cg_tol: relative residual reduction for each inner linear solve; see
+            :data:`CG_TOLERANCE` for what the default trades away.
         max_newton: Newton steps before giving up.
         max_cg: CG iterations per Newton step. The default scales with the grid
             and is generous; the vessel lattice makes this system very well
@@ -318,8 +338,9 @@ def solve_steady_state(
             lap = _laplacian(x * free, dx, faces)
             return (-D * lap + _slope * x) * free
 
-        delta, cg_used = _cg(apply_op, residual, free, slope + D * 6.0 / (dx * dx),
-                             tol=1e-6, max_iter=max_cg)
+        delta, cg_used = _cg(
+            apply_op, residual, free, slope + D * 6.0 / (dx * dx),
+            tol=cg_tol, max_iter=max_cg)
         result.cg_steps += cg_used
         C += delta * free
         # The saturating sink is non-negative only while C is; Newton can
