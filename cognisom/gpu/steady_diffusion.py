@@ -169,6 +169,64 @@ def _laplacian(field: np.ndarray, resolution: float, faces: str,
     return out
 
 
+def krogh_exchange(length_per_volume: Any, radius_um: float,
+                   resolution_um: float, diffusion_coeff: float) -> Any:
+    """Exchange conductance for a sub-voxel vessel, in 1/s.
+
+    A vessel marked as whole voxels is exactly one voxel wide, so its physical
+    diameter is the grid resolution: halving the grid halves every capillary
+    and quarters the vessel volume fraction, and the answer moves with it
+    (see tests/test_a_vessel_is_one_voxel_wide.py). The radius has to enter
+    the model through something other than how many voxels the vessel fills.
+
+    Here it enters through the conductance. Inside a voxel the field around a
+    cylinder is the Krogh solution, radial and logarithmic, so the steady flux
+    per unit vessel length from a surface at radius r to a far field at radius
+    R is
+
+        Q = 2 pi D (C_blood - C) / ln(R / r)
+
+    Taking R as the voxel's own half-width -- the distance at which the
+    voxel-average concentration is representative -- and multiplying by the
+    vessel length per unit volume gives a conductance per unit volume:
+
+        beta = 2 pi D * lambda / ln(dx / (2 r))
+
+    which depends on the grid only logarithmically, where the whole-voxel
+    condition depended on it linearly. As r approaches dx/2 the logarithm
+    vanishes and beta diverges, which is the Dirichlet limit: a vessel that
+    fills its voxel is pinned, exactly as before.
+
+    Args:
+        length_per_volume: vessel length per unit volume, in 1/um^2. For a
+            square lattice of vessels spaced S apart this is 1/S^2 averaged
+            over the tissue, concentrated in the voxels the vessels pass
+            through.
+        radius_um: the vessel's PHYSICAL radius. A capillary is 2.5-4 um.
+        resolution_um: voxel edge.
+        diffusion_coeff: D, in um^2/s.
+
+    Returns:
+        Conductance in 1/s, matching the shape of ``length_per_volume``.
+    """
+    if radius_um <= 0:
+        raise ValueError(f"radius_um must be positive, got {radius_um}")
+    if resolution_um <= 0:
+        raise ValueError(
+            f"resolution_um must be positive, got {resolution_um}")
+    half = 0.5 * resolution_um
+    if radius_um >= half:
+        raise ValueError(
+            f"a vessel of radius {radius_um} um does not fit inside a "
+            f"{resolution_um} um voxel (half-width {half} um). At that size "
+            "the whole-voxel Dirichlet condition IS the right model -- pass "
+            "the mask as `held` instead"
+        )
+    return (2.0 * np.pi * diffusion_coeff
+            * np.asarray(length_per_volume, dtype=np.float64)
+            / np.log(half / radius_um))
+
+
 def _reaction(C: np.ndarray, vmax: Any, km: float) -> np.ndarray:
     """R(C), the per-voxel consumption."""
     if km <= 0.0:
@@ -250,6 +308,8 @@ def solve_steady_state(
     uptake_ref: float = 1.0,
     held: Optional[np.ndarray] = None,
     held_value: Optional[float] = None,
+    exchange: Any = 0.0,
+    exchange_value: float = 0.0,
     faces: str = INSULATED,
     tol: float = 1e-2,
     cg_tol: float = CG_TOLERANCE,
@@ -270,7 +330,18 @@ def solve_steady_state(
         uptake_km: half-saturation concentration. 0 gives a first-order sink,
             which cannot produce a Krogh profile at any rate and is kept only
             for fields that genuinely are first order.
-        held: boolean mask of Dirichlet voxels -- the capillaries.
+        held: boolean mask of Dirichlet voxels -- whole-voxel capillaries.
+            Marking a voxel makes the capillary exactly one voxel wide, which
+            ties the vessel's physical diameter to the grid resolution; see
+            ``exchange`` for the sub-voxel alternative.
+        exchange: per-voxel exchange conductance in 1/s, scalar or field,
+            adding a distributed source ``exchange * (exchange_value - C)``.
+            This is the sub-voxel vasculature: the vessel's radius enters
+            through the conductance rather than through how many voxels it
+            occupies, so refining the grid no longer thins the capillary.
+            See ``krogh_exchange``.
+        exchange_value: the concentration the exchange drives towards -- the
+            level the blood carries.
         held_value: the value to hold them at. Defaults to the starting field's
             value at those voxels, so a mask with the arterial level already
             written needs nothing further.
@@ -350,13 +421,30 @@ def solve_steady_state(
     if max_cg is None:
         max_cg = max(50, 4 * max(C.shape))
 
+    beta = np.asarray(exchange, dtype=np.float64)
+    if beta.ndim:
+        if beta.shape != C.shape:
+            raise ValueError(
+                f"exchange shape {beta.shape} does not match field shape "
+                f"{C.shape}")
+        if (beta < 0).any():
+            raise ValueError("exchange must be non-negative")
+        beta = beta * free      # a held voxel is already a boundary
+    elif float(beta) < 0:
+        raise ValueError("exchange must be non-negative")
+    blood = float(exchange_value)
+
     scratch = np.empty_like(C)
     result = SteadyResult(field=C)
 
     for step in range(1, max_newton + 1):
         residual = (D * _laplacian(C, dx, faces, scratch)
-                    - _reaction(C, vmax, uptake_km)) * free
-        slope = _reaction_slope(C, vmax, uptake_km) * free
+                    - _reaction(C, vmax, uptake_km)
+                    + beta * (blood - C)) * free
+        # d/dC of the terms moved to the left: R'(C) from the sink, and beta
+        # from the exchange. Both are non-negative, so both improve the
+        # conditioning of -J rather than threatening its definiteness.
+        slope = (_reaction_slope(C, vmax, uptake_km) + beta) * free
 
         # -J = -(D L - diag(slope)) = -D L + diag(slope), SPD.
         # Scratch for the operator, reused across every CG iteration. As
@@ -403,7 +491,8 @@ def solve_steady_state(
             break
 
     final = (D * _laplacian(C, dx, faces, scratch)
-             - _reaction(C, vmax, uptake_km)) * free
+             - _reaction(C, vmax, uptake_km)
+             + beta * (blood - C)) * free
     result.imbalance = float(np.abs(final).max())
     result.field = C
     return result
