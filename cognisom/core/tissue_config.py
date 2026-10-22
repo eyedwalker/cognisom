@@ -243,7 +243,37 @@ class DiffusionFieldConfig:
             "cxcl12", diffusion_coeff=100.0, initial_value=0.0)
 
 
-# Default prostate tissue cell type composition
+# Default prostate tissue cell type composition.
+#
+# These are estimates. They are ten round numbers summing to 1.00 and no
+# paper is behind any of them, which is worth saying plainly rather than
+# leaving to be discovered.
+#
+# DO NOT SOURCE THEM FROM A SINGLE-CELL ATLAS. That is the obvious move
+# -- CZ CELLxGENE carries 87,105 normal prostate cells, each with a Cell
+# Ontology term -- and it does not work, because scRNA-seq composition
+# is a property of the dissociation protocol as much as of the tissue.
+# Measured, after rolling those cells up through CL to these archetypes,
+# four datasets of NORMAL prostate report luminal anywhere from 7.3% to
+# 89.0% and basal from 11.0% to 76.2%. The worst disagreement between
+# this dict and the atlas is 2.5x; the disagreement among the atlas's
+# own datasets is 12x. Splitting by preparation shows it is not random:
+# smooth muscle is 3.7x higher in nuclei and T cells 3.1x higher in
+# whole cells, because matrix-embedded cells are lost on dissociation
+# and lymphocytes come free easily.
+#
+# cognisom/library/tissue_composition.py is that measurement, kept
+# runnable, with the two traps that nearly produced a confident wrong
+# correction: CL files luminal and basal prostate epithelium as siblings
+# with IDENTICAL ancestors, so a graph rollup cannot separate 45% of
+# this dict; and three defensible rollups of the same cells disagreed on
+# the DIRECTION of the error for fibroblast, smooth muscle and basal.
+#
+# What would source it is stereology on intact tissue (Bartsch, J Urol
+# 1979; Arenas, Int J Androl, 281 autopsy prostates) or spatial
+# transcriptomics. One conversion is needed and is not a detail: those
+# report VOLUME fractions and this is a NUMBER fraction, so a published
+# volume fraction read straight in would seed far too many large cells.
 DEFAULT_COMPOSITION: Dict[str, float] = {
     "luminal_secretory": 0.30,
     "basal": 0.15,
