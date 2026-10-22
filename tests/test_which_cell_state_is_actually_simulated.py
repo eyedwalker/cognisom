@@ -38,8 +38,15 @@ glucose and asks the FBA model in ``cognisom.gpu.fba_solver`` what is
 achievable there. ``damage`` always had one, and the no-writer check
 below missed it -- see ``test_a_dead_column_has_no_writer_anywhere``.
 
-The LIVE set below is UNCHANGED, and deliberately so. In this
-well-perfused default scenario the new columns are written and
+UPDATE, 2026-10-22. ``mhc1`` is live. It is computed from the
+archetype and the local oxygen, and it varies in the DEFAULT scenario
+because the archetypes differ -- a cancer cell presents less than its
+neighbours whether or not there is a gradient. Every number behind it
+is a labelled estimate; see
+``tests/test_mhc1_is_an_estimate_that_says_so.py``.
+
+``atp`` and ``lactate`` are written and still not in LIVE, deliberately.
+In this well-perfused default scenario they are written and
 constant: the ATP charge is 1.0 and lactate is 0 everywhere, because a
 cell with oxygen to spare respires and does not ferment. That is the
 physiology, not a dead column, and the honest way to show the coupling
@@ -67,7 +74,7 @@ COLUMNS = ["oxygen", "glucose", "atp", "lactate", "age", "phase", "mhc1",
 
 #: Columns that change over a run today. Raising this is the point of
 #: the work; lowering it silently is what the test exists to stop.
-LIVE = {"oxygen", "glucose", "age", "division_timer"}
+LIVE = {"oxygen", "glucose", "age", "division_timer", "mhc1"}
 
 
 @pytest.fixture(scope="module")
@@ -107,14 +114,20 @@ def test_exactly_the_recorded_columns_are_live(run_state):
         "If something was wired up, raise LIVE and say so in the docstring.")
 
 
-#: Columns nothing assigns. ``damage`` was in this list and should not have
+#: Columns nothing assigns. ``mhc1`` left this list on 2026-10-22, computed
+#: from the archetype and the local oxygen by ``core.antigen_presentation``
+#: -- entirely from LABELLED ESTIMATES, because the direction is sourced and
+#: no effect size was reachable. See
+#: tests/test_mhc1_is_an_estimate_that_says_so.py.
+#:
+#: ``damage`` was in this list and should not have
 #: been: it has been written since before this test existed, at
 #: ``state[hypoxic, damage_col] += dt * 0.5``. The old check was a regex for a
 #: literal ``[:, 8] =``, which a named column constant and an augmented
 #: assignment both slip past, so the test passed for the wrong reason -- the
 #: same way a grep for "set_parameter" once matched a docstring saying there
 #: was none. The check below walks the AST and resolves integer-valued names.
-UNWRITTEN = ["mhc1", "migration_speed", "phase"]
+UNWRITTEN = ["migration_speed", "phase"]
 
 
 def _column_writers(index: int):
@@ -182,7 +195,7 @@ def test_a_dead_column_has_no_writer_anywhere(name):
 
 
 @pytest.mark.parametrize("name", ["atp", "lactate", "apoptotic_signal",
-                                  "damage"])
+                                  "damage", "mhc1"])
 def test_a_column_claimed_live_really_is_assigned(name):
     """The other direction, so the AST check cannot pass by finding nothing."""
     assert _column_writers(COLUMNS.index(name)), (

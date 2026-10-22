@@ -806,7 +806,7 @@ class TissueSimulationEngine:
         at these substrate levels" -- a stronger and better-defined condition
         than a threshold on oxygen.
         """
-        from cognisom.core import metabolism
+        from cognisom.core import antigen_presentation, metabolism
 
         for gpu_id, ca in enumerate(self._cell_arrays):
             n_real = ca.n_real
@@ -820,6 +820,14 @@ class TissueSimulationEngine:
             state[:, 3] = lactate
             starving = ~feasible
             state[starving, 9] += dt * self._APOPTOSIS_RATE_PER_HOUR
+
+            # MHC-I, from the archetype baseline and the local oxygen. Every
+            # number behind this is an ESTIMATE and antigen_presentation.py
+            # says so at length -- it is here because the column had
+            # consumers and no producer, not because anyone measured it.
+            types = self._backend.to_numpy(ca.cell_types[:n_real])
+            state[:, 6] = antigen_presentation.surface_level(
+                state[:, 0], types)
 
             full = self._backend.to_numpy(ca.state)
             full[:n_real] = state

@@ -1,5 +1,8 @@
-"""MHC-I is displayed, exported and never computed, and the obvious data source
-cannot carry it.
+"""The obvious data source for MHC-I cannot carry it, and still cannot.
+
+WRITTEN 2026-10-22: the column is now filled by
+``core.antigen_presentation`` from labelled estimates. Everything below is
+still true and is why those numbers are estimates rather than measurements.
 
 ``mhc1`` is column 6 of the tissue cell-state array and nothing writes it. On a
 cancer immunology platform that is the variable the whole
@@ -150,11 +153,15 @@ def test_the_display_path_exists_and_is_fed_by_invented_numbers():
         "producer landed, this module's docstring is stale")
 
 
-def test_the_column_is_still_unwritten():
-    """Paired with the AST check in test_which_cell_state_is_actually_simulated.
+def test_the_column_is_now_written_from_estimates_not_from_b2m():
+    """It is filled, and NOT from the data this file argues against.
 
-    Stated here too, because that file's list is about the simulation and this
-    one is about why the simulation cannot fill it yet.
+    The column was written on 2026-10-22 from labelled estimates, under an
+    explicit instruction to accept one if no effect size could be sourced.
+    That does not retire anything above: the reason B2M cannot supply the
+    baselines is unchanged, and the reason a cancer-versus-normal measurement
+    is still missing is unchanged. What changed is that the gap is now filled
+    by something that announces itself as a guess instead of being left empty.
     """
     import importlib.util
     from pathlib import Path
@@ -168,5 +175,15 @@ def test_the_column_is_still_unwritten():
     spec.loader.exec_module(module)
     UNWRITTEN, _column_writers = module.UNWRITTEN, module._column_writers
 
-    assert "mhc1" in UNWRITTEN
-    assert not _column_writers(MHC1)
+    assert "mhc1" not in UNWRITTEN
+    writers = _column_writers(MHC1)
+    assert writers, "mhc1 should have a writer now"
+
+    # And the writer must not be reading B2M abundance.
+    from cognisom.core import antigen_presentation
+
+    source = (antigen_presentation.__doc__ or "")
+    assert "B2M" in source, (
+        "the module that fills the column has to carry the reason it does "
+        "not use the obvious data source")
+    assert any("B2M" in note for note in antigen_presentation.CAVEATS)
