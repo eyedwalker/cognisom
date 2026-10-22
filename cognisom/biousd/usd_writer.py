@@ -144,6 +144,63 @@ def _colour_of(cell: Any) -> Tuple[float, float, float]:
     return TYPE_COLOUR.get(_token_of(cell), TYPE_COLOUR["normal"])
 
 
+#: Surface properties for a cell. Cytoplasm is mostly water with
+#: protein in it, so it is neither matte nor a mirror: a moderate
+#: roughness with a little specular reads wet without reading metallic.
+#: UsdPreviewSurface has no subsurface scattering, which is the thing
+#: that would most improve this, so these are the knobs available rather
+#: than the ones wanted.
+CELL_ROUGHNESS = 0.38
+CELL_SPECULAR = 0.35
+
+
+def author_cell_material(stage, path: str = "/World/Looks/BioCell"):
+    """One UsdPreviewSurface for every cell, driven by primvars.
+
+    Without a bound material the stage renders under whatever default
+    surface the viewer supplies -- a flat lambert in usdrecord -- which
+    is neither reproducible across renderers nor anything like a cell.
+
+    Two primvar readers, and the second one is the trap. Binding a
+    material means ``displayOpacity`` STOPS GOVERNING: the material's
+    own ``opacity`` input does. So a translucent body silently turns
+    opaque the moment a material is bound, and the nucleus inside it
+    disappears again. The opacity reader is what keeps that from
+    happening, and its fallback is 1.0 so a part that authored none
+    stays solid.
+    """
+    from pxr import Gf, Sdf, UsdShade
+
+    material = UsdShade.Material.Define(stage, path)
+
+    colour = UsdShade.Shader.Define(stage, f"{path}/ColorReader")
+    colour.CreateIdAttr("UsdPrimvarReader_float3")
+    colour.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayColor")
+    colour.CreateInput("fallback", Sdf.ValueTypeNames.Float3).Set(
+        Gf.Vec3f(0.74, 0.80, 0.88))
+    colour.CreateOutput("result", Sdf.ValueTypeNames.Float3)
+
+    alpha = UsdShade.Shader.Define(stage, f"{path}/OpacityReader")
+    alpha.CreateIdAttr("UsdPrimvarReader_float")
+    alpha.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayOpacity")
+    alpha.CreateInput("fallback", Sdf.ValueTypeNames.Float).Set(1.0)
+    alpha.CreateOutput("result", Sdf.ValueTypeNames.Float)
+
+    shader = UsdShade.Shader.Define(stage, f"{path}/Surface")
+    shader.CreateIdAttr("UsdPreviewSurface")
+    shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f)\
+        .ConnectToSource(colour.ConnectableAPI(), "result")
+    shader.CreateInput("opacity", Sdf.ValueTypeNames.Float)\
+        .ConnectToSource(alpha.ConnectableAPI(), "result")
+    shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(CELL_ROUGHNESS)
+    shader.CreateInput("specular", Sdf.ValueTypeNames.Float).Set(CELL_SPECULAR)
+    shader.CreateInput("metallic", Sdf.ValueTypeNames.Float).Set(0.0)
+
+    material.CreateSurfaceOutput().ConnectToSource(
+        shader.ConnectableAPI(), "surface")
+    return material
+
+
 def author_prototypes(stage, mesh_types: Sequence[str],
                       grid: int = PROTOTYPE_GRID,
                       root: str = PROTOTYPE_ROOT,
@@ -220,7 +277,7 @@ def write_cells(path: str, cells: Sequence[Any], *,
     are read defensively because the engine's own cell objects and the
     schema's dataclass do not share a base class.
     """
-    from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, Vt
+    from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdShade, Vt
 
     cells = list(cells)
     stage = Usd.Stage.CreateNew(path)
@@ -237,6 +294,7 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # One prototype per distinct mesh type present, in a stable order so
     # that protoIndices mean the same thing across two writes of the same
     # population.
+    material = author_cell_material(stage)
     types = sorted({_mesh_type_of(c) or "smooth_sphere" for c in cells})
     if geometry:
         proto_paths, result.prototype_faces = author_prototypes(
@@ -247,6 +305,10 @@ def write_cells(path: str, cells: Sequence[Any], *,
         sphere.GetRadiusAttr().Set(0.5)
         proto_paths, types = [sphere.GetPath()], ["point"]
     result.prototypes = len(proto_paths)
+    for proto_path in proto_paths:
+        prim = stage.GetPrimAtPath(proto_path)
+        UsdShade.MaterialBindingAPI.Apply(prim)
+        UsdShade.MaterialBindingAPI(prim).Bind(material)
     index_of = {name: i for i, name in enumerate(types)}
 
     instancer = UsdGeom.PointInstancer.Define(stage, CELLS)

@@ -281,3 +281,50 @@ def test_part_colour_and_per_cell_colour_cannot_both_win(tmp_path):
         "instancer's per-cell colour over the whole population")
     explicit = colours_on_prototypes(True)
     assert explicit and all(c is not None for c in explicit)
+
+def test_a_material_is_bound_and_opacity_survives_it(written):
+    """Binding a material is where translucency quietly dies.
+
+    With no material the stage renders under whatever default surface the
+    viewer supplies -- a flat lambert in usdrecord -- which is neither
+    reproducible across renderers nor anything like a cell. Binding a
+    UsdPreviewSurface fixes that and breaks something else:
+    ``displayOpacity`` STOPS GOVERNING once a material is bound, because
+    the material's own ``opacity`` input does. A translucent body turns
+    opaque and the nucleus inside it disappears, with nothing raised.
+
+    So the material carries two primvar readers, not one, and this test
+    exists because the second is the easy one to leave out.
+    """
+    from pxr import UsdShade
+
+    _result, stage = written
+    material = UsdShade.Material(stage.GetPrimAtPath("/World/Looks/BioCell"))
+    assert material, "no cell material authored"
+
+    readers = {}
+    for prim in stage.Traverse():
+        shader = UsdShade.Shader(prim)
+        if not shader:
+            continue
+        if shader.GetIdAttr().Get() in ("UsdPrimvarReader_float3",
+                                        "UsdPrimvarReader_float"):
+            name = shader.GetInput("varname").Get()
+            readers[str(name)] = shader
+    assert "displayColor" in readers, sorted(readers)
+    assert "displayOpacity" in readers, (
+        "no opacity reader: the bound material overrides displayOpacity, "
+        "so every body is opaque and every nucleus is hidden")
+
+    surface = UsdShade.Shader(stage.GetPrimAtPath("/World/Looks/BioCell/Surface"))
+    assert surface.GetIdAttr().Get() == "UsdPreviewSurface"
+    for input_name in ("diffuseColor", "opacity"):
+        assert surface.GetInput(input_name).HasConnectedSource(), (
+            f"{input_name} is not driven by a primvar")
+
+    # and it reaches the geometry
+    instancer = stage.GetPrimAtPath(CELLS)
+    targets = UsdGeom.PointInstancer(instancer).GetPrototypesRel().GetTargets()
+    bound = UsdShade.MaterialBindingAPI(
+        stage.GetPrimAtPath(targets[0])).GetDirectBinding()
+    assert bound.GetMaterial(), "prototypes are not bound to the material"
