@@ -1051,10 +1051,10 @@ class SceneExporter:
         # sitting unwired to this path.
         #
         # invisibleIds is the PointInstancer's own mechanism, so a cut
-        # costs an int array rather than a second export. Only the
-        # direction to the camera matters to the cut plane, so it is
-        # taken from USD_CAMERA_DIRECTION rather than threading the
-        # fitted camera position back out of _usd_camera_and_lights.
+        # costs an int array rather than a second export. The cut plane
+        # needs only the direction to the camera, which is why this does
+        # not have to wait for _usd_camera_and_lights to fit an eye
+        # point further down.
         #
         # The two knobs answer different questions. `section` alone is an
         # anatomical slice: it cuts the lesion at the same rate as the
@@ -1065,16 +1065,11 @@ class SceneExporter:
         # and the stroma is what is in the way.
         if cutaway and cutaway != "none" and cell_types is not None:
             from cognisom.visualization.cutaway import (
-                hidden_instance_ids, lesion_pivot)
+                hidden_for_camera_direction)
 
-            direction = np.asarray(SceneExporter.USD_CAMERA_DIRECTION,
-                                   dtype=float)
-            direction = direction / np.linalg.norm(direction)
-            pivot = lesion_pivot(positions, cell_types)
-            hidden = hidden_instance_ids(
-                positions, cell_types,
-                camera_position=pivot + direction * 1.0e4, mode=cutaway,
-                stroma_only=stroma_only)
+            hidden = hidden_for_camera_direction(
+                positions, cell_types, SceneExporter.USD_CAMERA_DIRECTION,
+                mode=cutaway, stroma_only=stroma_only)
             if hidden:
                 instancer.CreateInvisibleIdsAttr().Set(
                     Vt.Int64Array([int(i) for i in hidden]))

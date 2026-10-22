@@ -78,6 +78,7 @@ def hidden_instance_ids(
     *,
     offset: float | str = 0.0,
     stroma_only: bool = False,
+    up: Sequence[float] = (0.0, 0.0, 1.0),
 ) -> list[int]:
     """Instance ids to hide for a cutaway view.
 
@@ -101,7 +102,17 @@ def hidden_instance_ids(
             an option because it is the honest choice when the question is
             "how big is the lesion" rather than "what is inside it".
         stroma_only: keep every non-stroma cell regardless of the plane. This
-            is NOT the default, and the docstring above says why.
+            is NOT the default, and the docstring above says why. Note that
+            it is a different knob from ``offset="near_face"`` and does not
+            share its problem: the plane still bisects, so the lesion's near
+            hemisphere is not left in front of its own centre. Measured on
+            the 20,000-cell scene, section alone took the lesion from 9.3%
+            to 23.4% of the lit frame and section with ``stroma_only`` took
+            it to 30.7%, without hiding a single lesion cell.
+        up: the stage's up axis. ``corner`` cuts a quadrant rather than a
+            half, so it needs to know which way is up; USD stages here are
+            written both Y-up and Z-up and a wrong guess silently cuts the
+            wrong quadrant.
 
     Returns:
         Instance ids, suitable for UsdGeomPointInstancer.GetInvisibleIdsAttr.
@@ -133,8 +144,8 @@ def hidden_instance_ids(
     if mode == "section":
         hide = depth > offset
     elif mode == "corner":
-        up = np.array([0.0, 0.0, 1.0])
-        hide = (depth > offset) & ((positions - pivot) @ up > 0.0)
+        up_v = np.asarray(up, dtype=float)
+        hide = (depth > offset) & ((positions - pivot) @ up_v > 0.0)
     else:
         raise ValueError(f"unknown cutaway mode {mode!r}")
 
@@ -144,6 +155,45 @@ def hidden_instance_ids(
         hide &= is_stroma
 
     return [int(i) for i in np.flatnonzero(hide)]
+
+
+def hidden_for_camera_direction(
+    positions: np.ndarray,
+    cell_types: Sequence[str],
+    direction: Sequence[float],
+    mode: str = "section",
+    *,
+    offset: float | str = 0.0,
+    stroma_only: bool = False,
+    up: Sequence[float] = (0.0, 0.0, 1.0),
+) -> list[int]:
+    """:func:`hidden_instance_ids` for a camera given as a direction.
+
+    Every exporter that wants a cut knows which way its camera faces long
+    before it knows where the camera ends up, because the eye point falls
+    out of a fit over the cells. :func:`hidden_instance_ids` only ever
+    uses the camera to form a unit view vector, so the distance cancels
+    and a point far along ``direction`` from the lesion is exactly as
+    good as the real one.
+
+    ``direction`` points *from the cells toward the camera*, matching
+    ``SceneExporter.USD_CAMERA_DIRECTION``. Passing it reversed is the
+    one mistake here that no test counting hidden ids can see -- the
+    count is identical, every occluder stays put, and the render looks
+    untouched -- so it is worth being sure of the sign.
+    """
+    positions = np.asarray(positions, dtype=float)
+    direction = np.asarray(direction, dtype=float)
+    norm = np.linalg.norm(direction)
+    if norm == 0.0:
+        return []
+    direction = direction / norm
+
+    pivot = lesion_pivot(positions, cell_types)
+    span = float(np.abs(positions - pivot).max()) if len(positions) else 1.0
+    camera = pivot + direction * (span + 1.0) * 1000.0
+    return hidden_instance_ids(positions, cell_types, camera, mode,
+                               offset=offset, stroma_only=stroma_only, up=up)
 
 
 def stroma_scales(

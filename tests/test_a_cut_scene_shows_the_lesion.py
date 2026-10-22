@@ -131,3 +131,118 @@ def test_the_cut_plane_faces_the_camera(tmp_path):
     direction /= np.linalg.norm(direction)
     assert (pos[~keep] @ direction).mean() > (pos[keep] @ direction).mean(), (
         "the cut removed the far half and left the occluders")
+
+
+# ── the Bio-USD writer, which is the path with a future ───────────────
+
+
+class _Cell:
+    """The duck `write_cells` reads: position, type, size."""
+
+    def __init__(self, position, cell_type):
+        self.position = tuple(float(v) for v in position)
+        self.cell_type = cell_type
+        self.scale_um = 12.0
+        self.volume = 1.0
+
+
+def _biousd_cells():
+    rng = np.random.default_rng(7)
+    return ([_Cell(p, "fibroblast") for p in rng.normal(0, 60, (N_STROMA, 3))]
+            + [_Cell(p, "cancer") for p in rng.normal(0, 18, (N_LESION, 3))])
+
+
+def _write(tmp_path, name, **kwargs):
+    from cognisom.biousd.usd_writer import write_cells
+    return write_cells(str(tmp_path / name), _biousd_cells(), **kwargs)
+
+
+def test_the_biousd_writer_hides_nothing_by_default(tmp_path):
+    assert _write(tmp_path, "a.usdc").hidden == 0
+
+
+def test_the_biousd_writer_cuts_and_says_how_much(tmp_path):
+    result = _write(tmp_path, "b.usdc", cutaway="section")
+    assert result.hidden > 0
+    assert result.hidden < result.cells
+
+
+def test_the_biousd_writer_keeps_the_lesion_whole(tmp_path):
+    """Only stroma may go, and enough of it to matter."""
+    from pxr import Usd, UsdGeom
+
+    path = str(tmp_path / "c.usdc")
+    result = _write(tmp_path, "c.usdc", cutaway="section", stroma_only=True)
+    stage = Usd.Stage.Open(path)
+    instancer = UsdGeom.PointInstancer(stage.GetPrimAtPath("/World/Cells"))
+    hidden = np.asarray(list(instancer.GetInvisibleIdsAttr().Get() or []),
+                        dtype=int)
+    assert int((hidden >= N_STROMA).sum()) == 0
+    assert result.hidden > 0.2 * N_STROMA
+
+
+def test_the_cut_follows_the_stage_up_axis(tmp_path):
+    """`corner` cuts a quadrant, so a wrong up axis cuts the wrong one.
+
+    Nothing about the resulting file looks wrong -- it is a valid stage
+    with a plausible number of hidden ids -- so this pins that the two
+    axes actually disagree and the parameter is therefore load-bearing.
+    """
+    y_up = _write(tmp_path, "y.usdc", cutaway="corner", up_axis="Y").hidden
+    z_up = _write(tmp_path, "z.usdc", cutaway="corner", up_axis="Z").hidden
+    assert y_up != z_up
+
+
+def test_the_camera_and_the_cut_read_the_same_direction(tmp_path):
+    """If these drift, the cut removes what the viewer could not see."""
+    from cognisom.biousd.usd_writer import CAMERA_DIRECTION
+    from pxr import Usd, UsdGeom, Gf
+
+    path = str(tmp_path / "d.usdc")
+    _write(tmp_path, "d.usdc", cutaway="section")
+    stage = Usd.Stage.Open(path)
+    cam = UsdGeom.Camera(stage.GetPrimAtPath("/World/Camera"))
+    eye = cam.ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation()
+
+    want = np.asarray(CAMERA_DIRECTION, dtype=float)
+    want /= np.linalg.norm(want)
+    got = np.asarray([eye[0], eye[1], eye[2]], dtype=float)
+    got /= np.linalg.norm(got)
+    assert float(want @ got) > 0.999
+
+
+def test_the_helper_does_not_care_how_far_away_the_camera_is(tmp_path):
+    """The reason an exporter may invent a camera point at all.
+
+    `hidden_instance_ids` normalises the view vector, so distance
+    cancels. If that ever stopped being true, every caller that passes a
+    direction instead of the fitted eye point would quietly cut at the
+    wrong depth.
+
+    It is not bit-identical, and asserting that it were would be wrong.
+    Normalising a vector scaled by 500 and one scaled by 5e7 rounds
+    differently in the last place, so a cell lying exactly on the plane
+    can fall either side. Measured here that is 3 cells in 2,000, every
+    one of them within 0.3 um of the plane -- against a cell radius of
+    6-8 um, so they straddle it and the choice is arbitrary. What must
+    hold is that nothing *away* from the plane moves.
+    """
+    from cognisom.visualization.cutaway import hidden_instance_ids, lesion_pivot
+
+    cells = _population()
+    pos = np.array([c["position"] for c in cells])
+    types = [c["cell_type"] for c in cells]
+    direction = np.asarray(SceneExporter.USD_CAMERA_DIRECTION, dtype=float)
+    direction /= np.linalg.norm(direction)
+
+    near = set(hidden_instance_ids(pos, types, direction * 500.0))
+    far = set(hidden_instance_ids(pos, types, direction * 5.0e7))
+
+    disputed = sorted(near ^ far)
+    assert len(disputed) < 0.01 * len(cells), f"{len(disputed)} cells moved"
+    depth = (pos - lesion_pivot(pos, types)) @ direction
+    smallest_radius = min(c["radius"] for c in cells)
+    for i in disputed:
+        assert abs(depth[i]) < smallest_radius, (
+            f"cell {i} is {abs(depth[i]):.2f} um from the plane and still "
+            f"changed side -- that is not a rounding tie")

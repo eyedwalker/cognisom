@@ -86,6 +86,8 @@ class WriteResult:
     prototype_faces: int = 0
     prims: int = 0
     bytes_written: int = 0
+    #: Instances marked invisible by a cutaway, if one was asked for.
+    hidden: int = 0
     #: Cells whose identity has no ontology term, by library name.
     unmapped: List[str] = field(default_factory=list)
     primvars: List[str] = field(default_factory=list)
@@ -265,11 +267,20 @@ def author_prototypes(stage, mesh_types: Sequence[str],
     return paths, faces
 
 
+#: Where the camera sits, as a direction from the cells. The cutaway
+#: plane is perpendicular to this, so the two must not drift apart: a
+#: cut aimed down a different axis than the camera removes material the
+#: viewer could not see and leaves what it could.
+CAMERA_DIRECTION = (1.7, 1.15, 2.0)
+
+
 def write_cells(path: str, cells: Sequence[Any], *,
                 grid: int = PROTOTYPE_GRID,
                 geometry: bool = True,
                 camera: bool = True,
-                up_axis: str = "Y") -> WriteResult:
+                up_axis: str = "Y",
+                cutaway: str = "none",
+                stroma_only: bool = False) -> WriteResult:
     """Author ``cells`` as one PointInstancer and return what it cost.
 
     ``cells`` may be :class:`~cognisom.biousd.schema.BioCell` instances or
@@ -381,13 +392,32 @@ def write_cells(path: str, cells: Sequence[Any], *,
             Vt.TokenArray(terms))
     result.unmapped = sorted(missing)
 
+    # A dense population occludes its own subject -- of 20,000 cells,
+    # 15,200 stroma hide the 2,378 that carry the biology. invisibleIds
+    # is the instancer's own mechanism, so the cut costs an int array
+    # rather than a second export, and it needs only the direction to
+    # the camera, not the eye point fitted below.
+    if cutaway and cutaway != "none":
+        from cognisom.visualization.cutaway import (
+            hidden_for_camera_direction)
+
+        up_vec = {"y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}.get(
+            up_axis.lower(), (0.0, 0.0, 1.0))
+        hidden = hidden_for_camera_direction(
+            positions, [_token_of(c) for c in cells], CAMERA_DIRECTION,
+            mode=cutaway, stroma_only=stroma_only, up=up_vec)
+        if hidden:
+            instancer.CreateInvisibleIdsAttr().Set(
+                Vt.Int64Array([int(i) for i in hidden]))
+            result.hidden = len(hidden)
+
     if camera:
         # Framed with a look-at, not Euler angles. A camera aimed by
         # rotation renders an EMPTY FRAME SUCCESSFULLY -- no error, no
         # warning, a valid PNG of nothing -- which is a long way to go
         # before noticing.
         half = float(np.abs(positions).max()) + float(diameters.max())
-        eye = Gf.Vec3d(half * 1.7, half * 1.15, half * 2.0)
+        eye = Gf.Vec3d(*(half * d for d in CAMERA_DIRECTION))
         look = Gf.Matrix4d(1).SetLookAt(eye, Gf.Vec3d(0, 0, 0),
                                         Gf.Vec3d(0, 1, 0))
         cam = UsdGeom.Camera.Define(stage, f"{WORLD}/Camera")
