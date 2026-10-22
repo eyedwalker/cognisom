@@ -207,7 +207,19 @@ class TissueScaleConfig:
     # ── Scale ──────────────────────────────────────────────────
     n_cells: int = 1_000_000
     grid_shape: Tuple[int, int, int] = (500, 500, 500)
-    resolution_um: float = 10.0       # um per voxel
+    #: um per voxel. A SECOND COPY of what grid_shape and tissue_size_um
+    #: already determine, kept because it is serialised, and checked in
+    #: __post_init__ because this repo has been bitten by exactly this shape
+    #: of duplication: scale_um was a second copy of a cell radius, it had no
+    #: provenance, and it broke only where a real radius had landed and
+    #: nobody updated the other copy.
+    #:
+    #: The failure here would be quieter and worse. Every length-dependent
+    #: quantity reads this one number -- the diffusion length, the vessel
+    #: spacing, the uptake binned per voxel, and the resolution handed to
+    #: steady_diffusion -- so a grid_shape changed without it leaves the
+    #: solver answering a well-posed question about the wrong tissue.
+    resolution_um: float = 10.0
     tissue_size_um: Tuple[float, float, float] = (5000.0, 5000.0, 5000.0)
 
     # ── Multi-GPU ──────────────────────────────────────────────
@@ -305,6 +317,37 @@ class TissueScaleConfig:
     steady_interval: int = 1
     budget_usd: float = 80.0           # Max spend per session
     disconnect_timeout_min: int = 10   # Auto-terminate if dashboard disconnects
+
+    def __post_init__(self) -> None:
+        """Refuse a geometry that disagrees with itself.
+
+        ``resolution_um`` must equal tissue_size_um / grid_shape on every
+        axis. It is not derived automatically because it is serialised and
+        read back by ``from_json``, so the two can drift; this makes the drift
+        loud instead of silent. The 1e-6 um tolerance allows for a float
+        round-trip through JSON and nothing else.
+        """
+        implied = [size / count
+                   for size, count in zip(self.tissue_size_um,
+                                          self.grid_shape)]
+        if any(abs(value - implied[0]) > 1e-6 for value in implied):
+            raise ValueError(
+                f"non-cubic voxels: tissue_size_um="
+                f"{tuple(self.tissue_size_um)} over grid_shape="
+                f"{tuple(self.grid_shape)} gives "
+                f"{[round(v, 6) for v in implied]} um per axis. The diffusion "
+                "stencil and every length in the engine assume one resolution "
+                "for all three axes."
+            )
+        if abs(implied[0] - self.resolution_um) > 1e-6:
+            raise ValueError(
+                f"resolution_um={self.resolution_um} disagrees with "
+                f"tissue_size_um={tuple(self.tissue_size_um)} over "
+                f"grid_shape={tuple(self.grid_shape)}, which implies "
+                f"{implied[0]:g} um per voxel. Every length in the simulation "
+                "reads resolution_um, so the two have to agree: set it to the "
+                "implied value, or change the grid or the tissue size."
+            )
 
     @property
     def total_steps(self) -> int:
