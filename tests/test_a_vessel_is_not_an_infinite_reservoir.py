@@ -12,15 +12,28 @@ muscle: carcinoma median 2.4 mmHg, muscle 30.0 mmHg, p < 0.0001, with tissue
 type the only significant predictor out of nine covariates. An internal
 control in the same patient is far harder to accommodate than one number.
 
-A constant-pO2 vessel cannot accommodate it at all, and the reason is a
-conservation argument rather than a calibration gap: reaching 2.4 mmHg by
-thinning the vasculature demands 137-149% oxygen extraction at EVERY
-consumption rate ever fitted against pimonidazole staining (M0 = 2.4-5.2
-mmHg/s over nine HNSCC xenografts, on perfused-vessel maps, with a
-Michaelis-Menten sink of this same form -- Wack et al., Med Phys
-2016;43(7):4113, PMID 27370131). Raising consumption cannot rescue it: it
-shrinks the spacing the target needs and raises the demand per vessel
-together, so the ratio hardly moves.
+A constant-pO2 vessel accommodates it only by stripping the blood nearly
+bare. Reaching 2.4 mmHg by thinning the vasculature needs about 77% of the
+oxygen flowing past to be extracted -- possible, but level with what
+maximally working muscle achieves (~80%) against 25-30% at rest, and here it
+would have to be sustained continuously rather than during exercise.
+
+The figure depends on the vessel's diameter, which in the whole-voxel model
+IS the grid spacing: 92% at a 10 um voxel, 77% at 6 um, 64% at 4 um. So it
+is quoted at dx = 2r, where the voxel vessel is exactly a real capillary.
+That sensitivity is the whole-voxel model's known weakness and the reason
+both the sub-voxel closure and this module exist.
+
+**That number was once 137%, and the difference was an error in this
+module's favour.** Vessels were held at 84 mmHg, the top of tissue
+physioxia, which is not a tension any capillary carries; Wack et al. (Med
+Phys 2016;43(7):4113, PMID 27370131) reset theirs to 40 mmHg while fitting
+the same Michaelis-Menten sink. At the corrected supply the tissue needs far
+less thinning to reach 2.4 mmHg -- 105 um of spacing rather than 235 -- and
+the demand on each vessel falls with it. So the claim this module was built
+on was partly an artefact of a category error, and what survives is the
+weaker and still sufficient one: a constant vessel reaches the measurement
+only at an extraction physiology rarely sustains.
 
 What resolves it is the term Krogh had and this model dropped. Blood
 depletes, so tissue beside the outlet of a capillary can be anoxic while
@@ -40,7 +53,8 @@ from cognisom.core.tissue_config import (
     OXYGEN_Q_PER_HOUR, DiffusionFieldConfig)
 from cognisom.gpu.steady_diffusion import INSULATED, solve_steady_state
 from cognisom.gpu.vessel_transport import (
-    ARTERIAL_PO2_MMHG, CAPILLARY_VELOCITY_UM_PER_S, HB_CAPACITY_FRACTIONS,
+    ARTERIAL_PO2_MMHG, CAPILLARY_RADIUS_UM, CAPILLARY_VELOCITY_UM_PER_S,
+    HB_CAPACITY_FRACTIONS,
     blood_content, capillary_flow_um3_per_s, march_blood, po2_from_content,
     saturation, solve_perfused_steady, vessel_outflux)
 
@@ -51,9 +65,18 @@ VMAX = OXYGEN_Q_PER_HOUR / 3600.0
 REF = OXYGEN.initial_value
 DX = 10.0
 
-#: PMID 11586096. The same instrument in the same 59 men.
+#: PMID 11586096. The same instrument in the same 59 patients, 11,944
+#: readings. The muscle figure is PERIPROSTATIC MUSCLE, used because no part
+#: of the prostate could be assumed tumour-free -- it is NOT normal prostate.
 MOVSAS_MUSCLE_MMHG = 30.0
 MOVSAS_CARCINOMA_MMHG = 2.4
+
+#: Normal-APPEARING prostate, from Milosevic's 44 awake patients as reported
+#: in Movsas's discussion: tumour 3.9 against 5.2 mmHg in apparently normal
+#: prostate, p = 0.03. Healthy prostate is itself hypoxic by the 10 mmHg
+#: line, which is why calibrating "normal tissue" to muscle's 30 mmHg was
+#: calibrating the wrong organ.
+MILOSEVIC_NORMAL_PROSTATE_MMHG = 5.2
 
 #: PMID 1283896: no organ-confined prostate carcinoma exceeded 156
 #: microvessels/mm2. Mean spacing is 1000/sqrt(MVD) um.
@@ -146,45 +169,61 @@ def test_content_inverts_exactly():
 # the impossibility that forced this
 # --------------------------------------------------------------------------
 
-def test_a_constant_vessel_cannot_reach_the_measured_tension_legally():
-    """Thinning a Dirichlet vasculature to 2.4 mmHg overdraws the blood.
+def test_a_constant_vessel_reaches_it_only_by_stripping_the_blood():
+    """Thinning a Dirichlet vasculature to 2.4 mmHg nearly empties it.
 
-    This is the defect, stated as a test. Find the spacing at which a
-    constant-pO2 lattice reaches the measured carcinoma median, then ask
-    what fraction of the arterial oxygen content one capillary would have to
-    surrender to supply the tissue it serves. Above 1 the boundary condition
-    is inventing oxygen.
+    Find the spacing at which a constant-pO2 lattice reaches the measured
+    carcinoma median, then ask what fraction of the arterial oxygen content
+    one capillary must surrender to supply the tissue it serves. The bound
+    that matters is no longer 1 -- see the module docstring for why the
+    earlier 137% was inflated -- but physiological plausibility: resting
+    extraction is 25-30%, and even maximally working muscle stops near 80%.
+
+    Solved at dx = 2r so the one-voxel vessel is a real capillary rather than
+    whatever width the grid happens to have.
     """
+    dx = 2.0 * CAPILLARY_RADIUS_UM
     def median_mmhg(spacing_um):
-        n = max(3, int(round(spacing_um / DX)))
+        n = max(3, int(round(spacing_um / dx)))
         mask = np.zeros((n, n, 1), bool)
         mask[0, 0, 0] = True
         uptake = np.full((n, n, 1), VMAX / REF)
         uptake[mask] = 0.0
         solved = solve_steady_state(
-            np.full((n, n, 1), REF), OXYGEN.diffusion_coeff, DX,
+            np.full((n, n, 1), REF), OXYGEN.diffusion_coeff, dx,
             uptake_k=uptake, uptake_km=OXYGEN.uptake_km, uptake_ref=REF,
             held=mask, held_value=REF, faces=INSULATED)
         return float(np.median(solved.field[~mask])) * 760.0
 
-    lo, hi = 20.0, 2000.0
-    for _ in range(30):
-        mid = 0.5 * (lo + hi)
-        lo, hi = (mid, hi) if median_mmhg(mid) > MOVSAS_CARCINOMA_MMHG else (lo, mid)
-    spacing = 0.5 * (lo + hi)
-    assert median_mmhg(spacing) == pytest.approx(MOVSAS_CARCINOMA_MMHG, abs=0.5)
+    # Search the integer grid rather than bisecting on a continuous spacing.
+    # The unit cell is ``round(spacing / dx)`` voxels wide, so the median is a
+    # STEP function of spacing: a bisection converges on a discontinuity and
+    # returns whichever side it lands on, which here was 1.44 mmHg for a
+    # 2.4 mmHg target. Stepping n by one is the real resolution available.
+    spacing = None
+    for n in range(3, 200):
+        if median_mmhg(n * dx) <= MOVSAS_CARCINOMA_MMHG:
+            spacing = n * dx
+            break
+    assert spacing is not None, "no lattice on this grid reaches the target"
+    assert median_mmhg(spacing) <= MOVSAS_CARCINOMA_MMHG
+    assert median_mmhg(spacing - dx) > MOVSAS_CARCINOMA_MMHG, (
+        "one step denser should still be above the target, or the search "
+        "overshot")
 
     # Oxygen demanded by the tissue one millimetre of vessel serves, against
     # the oxygen a millimetre of capillary carries past it.
     demand = (spacing ** 2) * 1000.0 * VMAX                 # fraction um^3/s
     delivery = capillary_flow_um3_per_s() * float(blood_content(
         ARTERIAL_PO2_MMHG))
-    assert demand / delivery > 1.0, (
+    ratio = demand / delivery
+    assert 0.5 < ratio <= 1.0, (
         f"a constant vessel {spacing:.0f} um apart reaches "
-        f"{MOVSAS_CARCINOMA_MMHG} mmHg while extracting only "
-        f"{demand / delivery:.0%} -- if this ever passes, the oxygen budget "
-        "no longer forbids the old boundary condition and this module's "
-        "reason for existing needs rechecking")
+        f"{MOVSAS_CARCINOMA_MMHG} mmHg at {ratio:.0%} extraction. Below 0.5 "
+        "the constant-vessel model is physiologically comfortable and this "
+        "module's reason for existing needs rechecking; above 1.0 it is "
+        "inventing oxygen again, which would mean the supply tension has "
+        "drifted back off the sourced capillary value.")
 
 
 def test_extraction_is_measured_and_cannot_exceed_everything_available():
@@ -276,17 +315,17 @@ def test_the_solver_holds_each_vessel_voxel_at_its_own_level():
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("target,velocity", [
-    (MOVSAS_MUSCLE_MMHG, 162.0),
-    (MOVSAS_CARCINOMA_MMHG, 48.0),
+    (MOVSAS_MUSCLE_MMHG, 1518.8),
+    (MILOSEVIC_NORMAL_PROSTATE_MMHG, 247.8),
+    (MOVSAS_CARCINOMA_MMHG, 168.0),
 ])
 def test_both_measured_tensions_are_reachable_at_measured_vessel_density(
         target, velocity):
     """One consumption rate, one vessel density, two measured tensions.
 
     The geometry is held at the measured prostate value and the consumption
-    at the bottom of Wack's fitted range. Only perfusion differs, which is
-    what tumour vasculature actually differs in -- and the velocities land
-    at 32% and 10% of the textbook intravital 0.5 mm/s.
+    at the value two independent measurements force it to. Only perfusion
+    differs, which is what tumour vasculature actually differs in.
     """
     result, mask = _perfused(velocity)
     median = float(np.median(result.field[~mask])) * 760.0
@@ -302,8 +341,8 @@ def test_perfusion_is_what_moves_antigen_presentation():
     in direction against 592 TCGA tumours, and quantitatively inert. Across
     Movsas's two measured tissues it now moves more than twofold.
     """
-    muscle, muscle_mask = _perfused(162.0)
-    tumour, tumour_mask = _perfused(48.0)
+    muscle, muscle_mask = _perfused(1518.8)
+    tumour, tumour_mask = _perfused(168.0)
     healthy = float(hypoxic_factor(np.median(muscle.field[~muscle_mask])))
     hypoxic = float(hypoxic_factor(np.median(tumour.field[~tumour_mask])))
     assert healthy > 0.95, healthy
@@ -311,16 +350,27 @@ def test_perfusion_is_what_moves_antigen_presentation():
     assert healthy / hypoxic > 2.0, (healthy, hypoxic)
 
 
-def test_normal_perfusion_leaves_the_tissue_oxygenated():
-    """The sanity end: at textbook velocity nothing is hypoxic.
+def test_normal_perfusion_gives_a_venous_outlet_and_a_hypoxic_prostate():
+    """The sanity end, with a conclusion that surprised this module.
 
-    Blood should leave at a venous tension, not an arterial one, and the
-    extraction should be a modest fraction rather than the whole load.
+    Blood must leave at a venous tension rather than an arterial one, and
+    the extraction must be a physiological fraction rather than the whole
+    load. Both hold.
+
+    What does NOT hold is the assumption this test began with -- that
+    textbook flow leaves nothing hypoxic. At the measured prostate vessel
+    density and a consumption rate the oxygen budget forces, normal flow
+    still leaves a large share of tissue under 10 mmHg. That is not a bug:
+    Milosevic measured apparently normal prostate at 5.2 mmHg, so healthy
+    prostate IS hypoxic by that line, and a model that denied it would be
+    disagreeing with the measurement.
     """
     result, mask = _perfused(CAPILLARY_VELOCITY_UM_PER_S)
     outlet = float(result.blood_po2[0, 0, -1]) * 760.0
-    assert 30.0 < outlet < 70.0, outlet
-    assert result.max_extraction < 0.30, result.max_extraction
-    tissue = result.field[~mask] * 760.0
-    assert float((tissue < 10.0).mean()) == 0.0
+    assert 20.0 < outlet < 50.0, outlet
+    assert 0.20 < result.max_extraction < 0.80, result.max_extraction
     assert float(result.exhausted.max()) == 0.0
+    tissue = result.field[~mask] * 760.0
+    assert float(np.median(tissue)) > MILOSEVIC_NORMAL_PROSTATE_MMHG, (
+        "textbook flow should sit above the measured normal-prostate median, "
+        "not below it")

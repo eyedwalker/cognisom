@@ -36,6 +36,19 @@ PHYSIOXIA_CEILING = 0.11
 #: range any healthy human tissue occupies.
 PHYSIOXIA_FLOOR = 0.01
 
+#: Oxygen tension of the blood inside a capillary, 40 mmHg. SOURCED, and a
+#: different quantity from the two above: physioxia describes what a TISSUE
+#: sits at, and using the top of that band as the boundary condition at a
+#: vessel is a category error -- it put the blood 2.1x above anything a
+#: capillary carries. Wack et al. (Med Phys 2016;43(7):4113, PMID 27370131)
+#: reset their vessels to exactly this value and varied it over 30-50 mmHg
+#: (their Fig. 1) while fitting the same Michaelis-Menten sink used here.
+#: Their oxygen diffusion coefficient, 2e-9 m^2/s, is this module's 2000
+#: um^2/s to the digit, and their Michaelis-Menten constant P0 (0.5-4.8 mmHg,
+#: default 2.0) brackets the 1 mmHg below -- which also settles the unit
+#: question raised there, since their model is explicitly in mmHg.
+CAPILLARY_PO2 = 40.0 / 760.0
+
 #: Zeroth-order oxygen consumption of ONE cell occupying one 10 um voxel, in
 #: field units per hour. From a Seahorse-typical 200 pmol/min per 1e6 cells
 #: (3.33e-18 mol/cell/s): a 10 um voxel holds 2.21e-16 mol of O2 at 160 mmHg,
@@ -44,8 +57,35 @@ PHYSIOXIA_FLOOR = 0.01
 #:
 #: It was 0.15/h, i.e. 76x lower. The published single-cell OCR range is about
 #: 1e-18 to 1e-16 mol/cell/s, so this is a central estimate and a factor of 3
-#: either way is still inside the literature.
-OXYGEN_Q_PER_HOUR = 11.41
+#: either way is still inside the literature -- and it has since been pushed
+#: to the top of that allowance, from 11.41 (2.41 mmHg/s) to 37.9
+#: (8.0 mmHg/s), by two measurements that cannot both hold below it.
+#:
+#: The argument needs no geometry at all. At steady state every molecule the
+#: tissue burns arrived in blood, so
+#:
+#:     consumption = perfusion x blood oxygen content x extraction
+#:
+#: and vessel spacing, radius, arrangement and Krogh radius all cancel.
+#: Human prostate carcinoma sits at a median 2.4 mmHg (Movsas et al., Am J
+#: Clin Oncol 2001;24(5):458-61, PMID 11586096; 11,944 electrode readings in
+#: 59 patients, each their own muscle control) -- the blood arrives
+#: nearly stripped, so extraction is ~100%. Measured prostate perfusion is
+#: 0.07-0.55 mL/mL/min (PMID 30510847). Those two together imply a
+#: consumption of at least 6.1 mmHg/s, and solving the transport properly
+#: rather than by mass balance puts the figure at 8.0. Below that the two
+#: measurements are simply inconsistent.
+#:
+#: 8.0 mmHg/s is inside Gullino's in vivo range of 2.7-11.1 (Cancer Res
+#: 1967;27:1020-30) and above Wack's fitted 2.2-4.5 -- which is where Wack
+#: says the truth should lie, since their 2D geometry ignores out-of-plane
+#: vessels and so "might lead to an underestimation of tissue oxygenation",
+#: biasing the fitted rate downward.
+#:
+#: This is a calibration, not a prediction: it was chosen to close the
+#: budget. What makes it more than a free parameter is that two independent
+#: measurements forced it, and it landed inside a third.
+OXYGEN_Q_PER_HOUR = 37.9
 
 #: And for glucose, in mM per hour per cell per 10 um voxel. Derived rather
 #: than measured directly: BNID 102644 (Rathmell et al., J Immunol) gives 2-3
@@ -142,8 +182,8 @@ class DiffusionFieldConfig:
         # down is worth doing, and would move this by less than 2x.
         return DiffusionFieldConfig(
             "oxygen", diffusion_coeff=2000.0,
-            initial_value=PHYSIOXIA_CEILING,
-            uptake_per_cell_per_hour=OXYGEN_Q_PER_HOUR / PHYSIOXIA_CEILING,
+            initial_value=CAPILLARY_PO2,
+            uptake_per_cell_per_hour=OXYGEN_Q_PER_HOUR / CAPILLARY_PO2,
             uptake_km=1.0 / 760.0,
             steady_state=True)
 

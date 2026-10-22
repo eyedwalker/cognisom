@@ -29,18 +29,24 @@ binds first unless the vasculature is sparse.
 import numpy as np
 import pytest
 
+from cognisom.core.tissue_config import (
+    CAPILLARY_PO2, OXYGEN_Q_PER_HOUR, DiffusionFieldConfig,
+)
 from cognisom.gpu.steady_diffusion import (
     INSULATED, krogh_exchange, solve_steady_state,
 )
 
 #: A capillary. 2.5-4 um is the usual range.
 RADIUS_UM = 3.0
-D = 2000.0
-BLOOD = 0.11
-KM = 1.0 / 760.0
+#: All read from the config. Literals here are second copies of calibrated
+#: numbers, and they go stale silently: BLOOD was pinned at 0.11 -- the top of
+#: tissue physioxia -- which is not what a capillary carries.
+D = DiffusionFieldConfig.oxygen().diffusion_coeff
+BLOOD = CAPILLARY_PO2
+KM = DiffusionFieldConfig.oxygen().uptake_km
 #: Volumetric demand, concentration per second. NOT scaled by voxel volume --
 #: doing that changes the physical demand 8x per halving of dx.
-VMAX = 11.41 / 3600.0
+VMAX = OXYGEN_Q_PER_HOUR / 3600.0  # read from config: a literal here is a second copy
 
 
 def _lattice(dx, spacing_um, box_um):
@@ -117,7 +123,12 @@ def test_the_two_models_agree_where_they_describe_the_same_vessel():
     then diverge monotonically as dx/2r grows, which is precisely where the
     whole-voxel radius departs from the truth.
     """
-    spacing, box = 240.0, 480.0
+    # 120 um apart, not 240. At the corrected consumption rate the sparser
+    # lattice is fully anoxic -- BOTH models return a depletion equal to the
+    # whole supply, "agree" perfectly, and the comparison measures nothing.
+    # A degenerate test passes for the wrong reason, so the geometry has to
+    # keep a real gradient in it.
+    spacing, box = 120.0, 240.0
     gaps = {}
     for dx in (240 / 36, 8.0, 20.0, 40.0):
         whole = _depletion(dx, spacing, box, sub_voxel=False)
@@ -137,8 +148,12 @@ def test_the_two_models_agree_where_they_describe_the_same_vessel():
 
 
 def test_the_radius_survives_coarsening_better_than_the_voxel_does():
-    """Sparse vasculature, where a coarser grid is actually wanted."""
-    spacing, box = 240.0, 480.0
+    """Sparse vasculature, where a coarser grid is actually wanted.
+
+    Also 120 um rather than 240, and for the same reason as above: at the
+    corrected consumption rate 240 um leaves nothing to resolve.
+    """
+    spacing, box = 120.0, 240.0
     fine_w = _depletion(10.0, spacing, box, sub_voxel=False)
     fine_s = _depletion(10.0, spacing, box, sub_voxel=True)
 

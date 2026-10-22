@@ -49,11 +49,15 @@ def test_glucose_stays_first_order_because_its_km_is_above_supply():
     # And oxygen is the opposite case, which is why the two differ.
     oxygen = DiffusionFieldConfig.oxygen()
     assert oxygen.uptake_km > 0
-    # 84x at the physioxia ceiling. It was >100 when the supply was set to
-    # inspired air; correcting the supply to a physiological level narrowed
-    # the gap without changing what matters, which is that the sink is flat
-    # across the range the tissue occupies and falls only at the bottom.
-    assert oxygen.initial_value / oxygen.uptake_km > 50
+    # The thing that matters is that oxygen's sink is FLAT across the range
+    # the tissue occupies and falls only at the bottom. Assert that directly
+    # rather than through a ratio: the ratio is a proxy whose threshold has
+    # had to move every time the supply was corrected (>100 at inspired air,
+    # 84 at the physioxia ceiling, 40 at the sourced capillary tension) while
+    # the saturation it stands for barely moved at all.
+    saturation = oxygen.initial_value / (oxygen.uptake_km + oxygen.initial_value)
+    assert saturation > 0.95, saturation
+    assert oxygen.initial_value / oxygen.uptake_km > 20
 
 
 def test_the_reasoning_is_recorded_with_its_source():

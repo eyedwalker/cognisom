@@ -209,7 +209,17 @@ def test_oxygen_asks_for_saturation_and_glucose_does_not():
     o2 = DiffusionFieldConfig.oxygen()
     assert o2.uptake_km > 0
     assert o2.uptake_km == pytest.approx(1.0 / 760.0)
-    assert o2.initial_value / o2.uptake_km > 50, (
+    # Test the PROPERTY, not a proxy for it. This was a bare ratio > 50,
+    # which is a threshold calibrated against an 84 mmHg supply; when the
+    # supply moved to the sourced capillary 40 mmHg the ratio fell to 40 and
+    # the test failed although the sink is still 97.6% saturated at supply,
+    # which is the thing that actually matters.
+    saturation = o2.initial_value / (o2.uptake_km + o2.initial_value)
+    assert saturation > 0.95, (
+        f"the sink runs at {saturation:.1%} of maximum at the supply level; "
+        "below ~95% it is varying across the physiological range, which is "
+        "the first-order behaviour this replaces")
+    assert o2.initial_value / o2.uptake_km > 20, (
         "a km within two orders of the supply makes the sink first-order over "
         "the whole physiological range, which is what this replaces"
     )

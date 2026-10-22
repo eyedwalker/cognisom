@@ -8,18 +8,31 @@ draws 9% of the oxygen the blood carries past it, so an error in the other
 
 It stops being defensible exactly where this platform's central claim lives.
 Measured prostate carcinoma sits at a median 2.4 mmHg against 30.0 mmHg in
-the same patient's own muscle -- Movsas et al., Am J Clin Oncol
-2001;24(5):458-61, **PMID 11586096**, Eppendorf microelectrode, 59 men with
-localised disease, tissue type the only significant predictor (p < 0.0001).
-Reaching 2.4 mmHg by thinning a constant-pO2 vasculature demands 137-149%
-oxygen extraction, and it demands that at every consumption rate ever fitted
-against pimonidazole staining -- M0 = 2.4 to 5.2 mmHg/s over nine HNSCC
-xenografts, on maps of PERFUSED vessels, with a Michaelis-Menten sink of the
-same form used here: Wack et al., Med Phys 2016;43(7):4113, **PMID
-27370131**. Above 100% the boundary hands the tissue oxygen that no blood
-carried. Raising consumption does not rescue it, because that shrinks the
-spacing the target needs and raises the demand per vessel together; the
-extraction ratio barely moves.
+the same patient's own periprostatic muscle -- Movsas et al., Am J Clin Oncol
+2001;24(5):458-61, **PMID 11586096**, Eppendorf microelectrode, 11,944
+readings in 59 patients, tissue type the only significant predictor of nine
+covariates (p < 0.0001). Normal PROSTATE is a third value and much closer to
+the tumour: 5.2 mmHg, from Milosevic's 44 patients as reported in that
+paper's discussion. Healthy prostate is itself hypoxic by the 10 mmHg line.
+
+Reaching 2.4 mmHg by thinning a constant-pO2 vasculature requires about 77%
+of the oxygen flowing past each capillary to be extracted -- level with
+maximally working muscle, against 25-30% at rest, and sustained rather than
+transient.
+
+**That figure was once 137%, and the difference was an error in this
+module's favour.** Vessels were pinned at 84 mmHg, the top of tissue
+physioxia, which is not a tension any capillary carries; Wack et al. (Med
+Phys 2016;43(7):4113, **PMID 27370131**) reset theirs to 40 mmHg while
+fitting a Michaelis-Menten sink of this same form to pimonidazole staining
+on maps of PERFUSED vessels. At the corrected supply the tissue needs far
+less thinning -- 96 um of spacing rather than 235 -- so the demand on each
+vessel falls with it and the budget stops being impossible. The strong claim
+this module was built on was therefore partly an artefact of a category
+error. What survives is weaker and still sufficient: a constant vessel
+reaches the measurement only at an extraction physiology rarely sustains,
+and the figure swings from 64% to 92% with the assumed vessel diameter,
+which the whole-voxel model cannot set independently of its grid.
 
 So tissue oxygenation cannot be set by geometry alone, and the missing piece
 is the term Krogh had and this model dropped: **blood depletes as it flows**.
