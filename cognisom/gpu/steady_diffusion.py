@@ -307,7 +307,7 @@ def solve_steady_state(
     uptake_km: float = 0.0,
     uptake_ref: float = 1.0,
     held: Optional[np.ndarray] = None,
-    held_value: Optional[float] = None,
+    held_value: Any = None,
     exchange: Any = 0.0,
     exchange_value: float = 0.0,
     faces: str = INSULATED,
@@ -342,9 +342,11 @@ def solve_steady_state(
             See ``krogh_exchange``.
         exchange_value: the concentration the exchange drives towards -- the
             level the blood carries.
-        held_value: the value to hold them at. Defaults to the starting field's
-            value at those voxels, so a mask with the arterial level already
-            written needs nothing further.
+        held_value: the value to hold them at -- a scalar, or an array
+            shaped like the field to hold each voxel at its own level, which
+            is what a vessel whose blood depletes along its length needs.
+            Defaults to the starting field's value at those voxels, so a mask
+            with the arterial level already written needs nothing further.
         faces: ``INSULATED`` (default, zero flux) or ``ARTERIAL``.
         tol: convergence target for the Newton correction, as a fraction of
             the DEPLETION rather than of the field. See the module docstring.
@@ -397,7 +399,31 @@ def solve_steady_state(
     level = held_value
     if level is None:
         level = float(C[held_mask].max()) if held_mask.any() else float(C.max())
-    C[held_mask] = level
+    if np.ndim(level) == 0:
+        C[held_mask] = level
+    else:
+        # A per-voxel held value, so that a vessel can carry a different
+        # level at each point along its length. Blood gives up oxygen as it
+        # flows and arrives at the far end depleted; pinning every vessel
+        # voxel at the arterial level makes each one an infinite reservoir,
+        # which is why tissue could not go hypoxic at any realistic vessel
+        # density. See ``gpu.vessel_transport``. The scalar path above is
+        # unchanged, and ``max()`` on a varying array would silently pick
+        # the inlet and discard exactly the gradient being modelled.
+        level = np.asarray(level, dtype=np.float64)
+        if level.shape != C.shape:
+            raise ValueError(
+                f"a per-voxel held_value must be shaped like the field, "
+                f"got {level.shape} for a field of {C.shape}")
+        C[held_mask] = level[held_mask]
+
+    # Everything downstream re-pins the held voxels after each Newton step
+    # and measures the depletion against the level supplied. With a varying
+    # held value there is no single level, so keep the values themselves and
+    # take the inlet -- the highest -- as the reference the depletion is a
+    # fraction of.
+    pinned = C[held_mask].copy()
+    level = float(pinned.max()) if pinned.size else float(np.max(level))
 
     free = (~held_mask).astype(np.float64)
     n_free = float(free.sum())
@@ -477,7 +503,7 @@ def solve_steady_state(
         # overshoot below zero on the first step from a bad guess, and R(C)
         # is not defined there in any useful sense.
         np.clip(C, 0.0, None, out=C)
-        C[held_mask] = level
+        C[held_mask] = pinned
 
         depletion = max(level - float(C[free > 0].min()), 0.0)
         measure = float(np.abs(delta * free).max())
