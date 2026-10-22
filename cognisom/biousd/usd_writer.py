@@ -146,14 +146,21 @@ def _colour_of(cell: Any) -> Tuple[float, float, float]:
 
 def author_prototypes(stage, mesh_types: Sequence[str],
                       grid: int = PROTOTYPE_GRID,
-                      root: str = PROTOTYPE_ROOT):
+                      root: str = PROTOTYPE_ROOT,
+                      part_colours: bool = False):
     """One Xform per mesh type, its parts meshed beneath it.
 
     Returns ``(paths, faces)``. A mesh type with no builder is skipped by
     the caller rather than silently drawn as something else.
+
+    ``part_colours`` trades per-cell colour for per-organelle colour; see
+    the note at the author site. The default keeps both as far as USD
+    allows: the body is translucent so the nucleus reads through it, and
+    the instancer still tints each cell.
     """
     from pxr import Gf, UsdGeom, Vt
 
+    from cognisom.visualization import morphology_usd as mu
     from cognisom.visualization.morphology import build_parts
 
     paths, faces = [], 0
@@ -173,6 +180,29 @@ def author_prototypes(stage, mesh_types: Sequence[str],
                 np.ascontiguousarray(triangles.ravel(), dtype="int32")))
             mesh.GetFaceVertexCountsAttr().Set(Vt.IntArray.FromNumpy(
                 np.full(len(triangles), 3, dtype="int32")))
+            # The body is a shell you look through; the contents are not.
+            # Without this every prototype meshes a nucleus and granules
+            # nobody can see, because the body around them is opaque
+            # default white -- three parts authored, one ever visible.
+            opacity = mu.PART_OPACITY.get(part, 1.0)
+            if opacity < 1.0:
+                mesh.GetDisplayOpacityAttr().Set(Vt.FloatArray([opacity]))
+            # Colour is the one that has to be chosen rather than copied.
+            # A prototype carrying displayColor WINS OVER the instancer's
+            # per-instance primvar -- measured: two renders, one with a
+            # green per-instance colour and one without, came back pixel
+            # for pixel the same. So authoring part colours here silently
+            # disables colour-by-variable over the whole population, which
+            # is the capability the primvar path exists for.
+            #
+            # Default is therefore opacity without colour: the instancer
+            # tints each cell and the translucent body still shows the
+            # structure inside it, which is both. part_colours is for a
+            # detail view of a few cells, where anatomy matters more than
+            # telling one cell from the next.
+            if part_colours:
+                mesh.GetDisplayColorAttr().Set(Vt.Vec3fArray(
+                    [Gf.Vec3f(*mu.PART_COLORS.get(part, (0.74, 0.80, 0.88)))]))
             faces += len(triangles)
         paths.append(xform.GetPath())
     return paths, faces

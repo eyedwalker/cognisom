@@ -226,3 +226,58 @@ def test_the_whole_cellular_library_is_covered():
         f"{len(missing)} library cells have no ontology term: {missing}. "
         "Resolve by EXACT label match against OLS, or leave unmapped "
         "deliberately -- fuzzy search returns a wrong term for everything.")
+
+def test_the_body_is_translucent_so_the_nucleus_can_be_seen(written):
+    """Three parts meshed and one visible is three parts wasted.
+
+    Every prototype meshes a body, and most mesh a nucleus and granules
+    inside it. Without an opacity on the body those inner parts are
+    sealed in an opaque shell -- authored, instanced, shipped, and
+    invisible. The library card has drawn the body at 0.35 since it was
+    written; the export did not.
+    """
+    _result, stage = written
+    instancer = UsdGeom.PointInstancer(stage.GetPrimAtPath(CELLS))
+    bodies = translucent = 0
+    for target in instancer.GetPrototypesRel().GetTargets():
+        for prim in Usd.PrimRange(stage.GetPrimAtPath(target)):
+            if prim.GetName() != "body":
+                continue
+            bodies += 1
+            opacity = UsdGeom.Mesh(prim).GetDisplayOpacityAttr().Get()
+            if opacity and float(opacity[0]) < 1.0:
+                translucent += 1
+    assert bodies and translucent == bodies, (
+        f"{bodies - translucent} of {bodies} bodies are opaque")
+
+
+def test_part_colour_and_per_cell_colour_cannot_both_win(tmp_path):
+    """A measured USD behaviour, pinned because it is invisible.
+
+    A prototype carrying ``displayColor`` OVERRIDES the instancer's
+    per-instance primvar. Two renders of the same scene -- one with a
+    green per-instance colour authored, one without -- came back pixel
+    for pixel identical once the prototype had its own colours. So
+    authoring part colours silently disables colouring a population by
+    any simulation variable, which is what the primvar path is for.
+
+    The default therefore authors opacity without colour, which keeps
+    both as far as USD allows: the instancer tints each cell, and the
+    translucent body still shows the structure inside it.
+    """
+    from pxr import Usd as _Usd
+    from cognisom.biousd.usd_writer import author_prototypes
+
+    def colours_on_prototypes(part_colours):
+        stage = _Usd.Stage.CreateNew(
+            str(tmp_path / f"p{int(part_colours)}.usda"))
+        author_prototypes(stage, ["multilobed_granular"],
+                          part_colours=part_colours)
+        return [UsdGeom.Mesh(p).GetDisplayColorAttr().Get()
+                for p in stage.Traverse() if p.IsA(UsdGeom.Mesh)]
+
+    assert all(c is None for c in colours_on_prototypes(False)), (
+        "the default authors prototype colour, which suppresses the "
+        "instancer's per-cell colour over the whole population")
+    explicit = colours_on_prototypes(True)
+    assert explicit and all(c is not None for c in explicit)
