@@ -250,3 +250,28 @@ def test_a_cognisom_written_scene_conforms(tmp_path):
 
 def test_required_is_exactly_id_and_type():
     assert REQUIRED_PRIMVARS == ("bio:cell:id", "bio:cell:type")
+
+
+# ── the starter term map ────────────────────────────────────────────
+
+
+def test_every_starter_term_is_a_well_formed_curie():
+    from cognisom.biousd.standard import terms
+
+    for name, curie in {**terms.CELL_CURIE, **terms.TYPE_CURIE}.items():
+        assert biousd.is_curie(curie) and curie, (name, curie)
+    assert terms.coverage()[0] >= 40
+    assert "normal" not in terms.TYPE_CURIE, "normal is a state, not a lineage"
+
+
+def test_cognisoms_ontology_module_is_the_same_map():
+    """One home for the data; Cognisom re-exports it."""
+    from cognisom.biousd import ontology
+    from cognisom.biousd.standard import terms
+
+    assert ontology.CELL_CURIE is terms.CELL_CURIE
+    assert ontology.curie_for("Macrophage M1") == "CL:0000863"
+    assert ontology.curie_for("Macrophage M2") == "CL:0000890"
+    assert ontology.curie_for("Regulatory T cell") == ontology.curie_for(
+        "Regulatory T cell (Treg)")
+    assert ontology.curie_for("no such cell") is None

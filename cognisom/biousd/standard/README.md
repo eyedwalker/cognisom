@@ -35,6 +35,14 @@ age, viability, relative volume. Positions and diameters are in
 micrometres. [SPEC.md](SPEC.md) is the normative list and is generated from
 [`vocabulary.py`](vocabulary.py), so the code and the prose cannot drift.
 
+## Which term do I use?
+
+[`terms.py`](terms.py) is a starter map from 43 cell identities to Cell
+Ontology / NCI Thesaurus terms — every one resolved by exact label match,
+never fuzzy search, with the pitfalls that forced that rule written down.
+`curie_for("Macrophage M1")` is `CL:0000863`; `curie_for("Macrophage M2")`
+is `CL:0000890`; an identity it does not know returns `None`, not a guess.
+
 ## Write one, check one
 
 ```python

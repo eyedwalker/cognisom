@@ -30,4 +30,9 @@ classifiers = [
 biousd-validate = "biousd.validate:main"
 
 [tool.setuptools]
+# After extraction this directory IS the package: its files sit at the
+# repository root, so the `biousd` package is mapped to ".". A clone named
+# `biousd` therefore imports as `biousd` from its parent directory, and
+# `pip install .` installs it the same way.
 packages = ["biousd"]
+package-dir = { biousd = "." }
