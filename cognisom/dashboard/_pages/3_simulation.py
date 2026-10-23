@@ -157,11 +157,12 @@ if run_btn or st.session_state.get("sim_engine_ran"):
     st.subheader("Simulation Dynamics (Real Engine)")
 
     fig = make_subplots(
-        rows=3, cols=2,
+        rows=4, cols=2,
         subplot_titles=(
             "Cell Populations", "Immune System",
             "Oxygen & Metabolism", "Metastasis & Lymphatic",
             "Epigenetic Changes", "Event Accumulation",
+            "Tissue DHT (nM)", "PSA — per-cell AR model",
         ),
         vertical_spacing=0.08, horizontal_spacing=0.08,
     )
@@ -205,6 +206,17 @@ if run_btn or st.session_state.get("sim_engine_ran"):
     fig.add_trace(go.Scatter(x=time_arr, y=ts["silenced_genes"], name="Silenced Genes",
                              line=dict(color="#c0392b", width=2)), row=3, col=1)
 
+    # 7. Androgen: free testosterone at the wall sets tissue DHT per cell
+    # (Titus 13.7 nM eugonadal; castration leaves ~25%, Page/Nishiyama).
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["avg_dht_nM"], name="Tissue DHT",
+                             line=dict(color="#b9770e", width=2)), row=4, col=1)
+    fig.add_hline(y=13.7, line_dash="dash", line_color="#b9770e",
+                  annotation_text="Titus 2005, benign", row=4, col=1)
+    # 8. PSA from the per-cell AR pathway. With K_psa = 0.5 nM the
+    # induction is near-saturated, so castration moves it ~10%.
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["avg_psa"], name="PSA (model units)",
+                             line=dict(color="#6c3483", width=2)), row=4, col=2)
+
     # 6. Events accumulation
     div_arr = ts["total_divisions"]
     death_arr = ts["total_deaths"]
@@ -217,7 +229,7 @@ if run_btn or st.session_state.get("sim_engine_ran"):
                              line=dict(color="#f39c12", width=2)), row=3, col=2)
 
     fig.update_xaxes(title_text="Time (hours)", row=3)
-    fig.update_layout(height=900, showlegend=True,
+    fig.update_layout(height=1160, showlegend=True,
                       legend=dict(orientation="h", yanchor="bottom", y=-0.08))
     st.plotly_chart(fig, use_container_width=True)
 
