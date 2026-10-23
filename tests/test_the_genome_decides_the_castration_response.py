@@ -137,6 +137,7 @@ def p53_mutant():
     return _run("Androgen Deprivation", 72.0, {"cellular": {"ar_dependent_fraction": 0.0}})
 
 
+@pytest.mark.slow
 def test_the_responding_tumour_loses_cells_and_the_p53_mutant_does_not(responding, p53_mutant):
     r = responding.engine.modules["cellular"].get_state()
     m = p53_mutant.engine.modules["cellular"].get_state()
@@ -147,6 +148,7 @@ def test_the_responding_tumour_loses_cells_and_the_p53_mutant_does_not(respondin
     assert r["n_cancer"] < 100 and m["n_cancer"] < 100
 
 
+@pytest.mark.slow
 def test_the_clinic_s_number_is_the_tumour_total(responding):
     ts = responding.get_time_series()
     per_cell = ts["avg_psa"][-1] / ts["avg_psa"][0]

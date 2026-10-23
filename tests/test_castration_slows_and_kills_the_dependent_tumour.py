@@ -59,6 +59,7 @@ def _state(runner):
 # ── an intact run is untouched ─────────────────────────────────────
 
 
+@pytest.mark.slow
 def test_an_intact_run_divides_exactly_as_it_did_without_the_coupling():
     """Same seed, AR module on and off: identical counts. The dead band
     (AR_INTACT_ABOVE) is what makes this exact rather than close."""
@@ -69,6 +70,7 @@ def test_an_intact_run_divides_exactly_as_it_did_without_the_coupling():
     assert _state(with_ar)["androgen_withdrawal_deaths"] == 0
 
 
+@pytest.mark.slow
 def test_baseline_cancer_doubles_every_twelve_hours_for_four_days(baseline):
     s = _state(baseline)
     assert s["n_cancer"] == 10 * 2 ** 8 and s["n_normal"] == 80 * 2 ** 4
@@ -78,6 +80,7 @@ def test_baseline_cancer_doubles_every_twelve_hours_for_four_days(baseline):
 # ── castration: slower, deadlier for a third, normal cells spared ──
 
 
+@pytest.mark.slow
 def test_castration_slows_the_tumour_and_spares_normal_epithelium(baseline, castrate):
     b, c = _state(baseline), _state(castrate)
     assert c["n_cancer"] < 0.1 * b["n_cancer"], (c["n_cancer"], b["n_cancer"])
@@ -86,6 +89,7 @@ def test_castration_slows_the_tumour_and_spares_normal_epithelium(baseline, cast
     assert c["total_divisions"] < b["total_divisions"]
 
 
+@pytest.mark.slow
 def test_only_dependent_cells_die_of_withdrawal_and_only_under_withdrawal(baseline, castrate):
     assert _state(baseline)["androgen_withdrawal_deaths"] == 0
     withdrawn = [e for e in castrate.event_log
@@ -94,6 +98,7 @@ def test_only_dependent_cells_die_of_withdrawal_and_only_under_withdrawal(baseli
     assert all(e["data"]["cell_type"] == "cancer" for e in withdrawn)
 
 
+@pytest.mark.slow
 def test_the_response_unfolds_over_days_not_steps(castrate):
     """AR-DHT decays with a 20 h time constant: signalling leaves the
     dead band within two hours and reaches its castrate floor over days,

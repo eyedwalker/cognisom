@@ -86,6 +86,7 @@ def test_cutting_the_binding_rate_does_not_reduce_ar_signalling():
 # ── the lever that works ──────────────────────────────────────────
 
 
+@pytest.mark.slow
 def test_blocking_transcription_lowers_signalling_without_touching_the_complex():
     treated = _run("Baseline", 24.0, {"ar_signaling": {"ar_transcriptional_block": 0.9}})
     untreated = _run("Baseline", 24.0)
@@ -100,6 +101,7 @@ def test_blocking_transcription_lowers_signalling_without_touching_the_complex()
     assert sig_t == pytest.approx(0.1 * sig_u, rel=0.05)
 
 
+@pytest.mark.slow
 def test_the_drug_collapses_psa_where_castration_alone_cannot():
     """The clinically important difference. Castration leaves per-cell PSA
     at 0.908 of eugonadal, because the induction term is near-saturated
@@ -113,6 +115,7 @@ def test_the_drug_collapses_psa_where_castration_alone_cannot():
     assert psa_drug < 0.15, f"anti-androgen: {psa_drug:.3f}"
 
 
+@pytest.mark.slow
 def test_the_drug_stops_the_tumour_and_the_two_treatments_compose():
     """48 h, immune off. Untreated doubles four times to 160; the drug
     holds the tumour at its seed of 10 (12 h / 0.1 signalling = a 120 h
@@ -135,6 +138,7 @@ def test_the_drug_stops_the_tumour_and_the_two_treatments_compose():
     assert signalling(both) < 0.05
 
 
+@pytest.mark.slow
 def test_an_untreated_run_is_untouched_by_the_new_parameter():
     assert _run("Baseline", 24.0).engine.modules["ar_signaling"].transcriptional_block == 0.0
 

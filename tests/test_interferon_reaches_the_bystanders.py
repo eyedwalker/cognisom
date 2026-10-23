@@ -251,6 +251,7 @@ def test_the_mhc1_rise_reaches_the_t_cell_kill_rule():
     assert high > 3.0 * low, (low, high)
 
 
+@pytest.mark.slow
 def test_in_the_shipped_preset_the_rise_changes_no_outcome_and_why():
     """The honest other half. Measured over 8 h with 300 cancer cells:
     MHC-I rises 0.300 -> 0.380, and the kill count does not move, because
