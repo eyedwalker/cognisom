@@ -3,6 +3,11 @@
 # Scientific computing
 numpy>=1.24.0
 scipy>=1.10.0
+# Reads the hand-fetched papers that tests pin library values against
+# (library/literature.py). It was installed by hand in ./venv and missing
+# from every fresh environment, which failed 14 paper-reading tests in the
+# MHCflurry venv on 2026-10-23 and looked like a predictor problem.
+pypdf>=4.0
 
 # Visualization
 matplotlib>=3.7.0

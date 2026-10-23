@@ -161,6 +161,16 @@ class ARSignalingModule(SimulationModule):
     def psa_of(self, cell_id: int) -> Optional[float]:
         return self.species_of(cell_id, "PSA")
 
+    def signalling_fraction(self, cell_id: int) -> Optional[float]:
+        """The cell's AR-DHT complex as a fraction of the eugonadal
+        steady state, clamped to [0, 1]; None if the cell is not mapped.
+        This is the one number the cellular module reads."""
+        value = self.species_of(cell_id, "AR_DHT")
+        if value is None or self.eugonadal_state is None:
+            return None
+        ref = float(self.eugonadal_state[self._i["AR_DHT"]])
+        return float(min(1.0, max(0.0, value / ref))) if ref > 0 else None
+
     # ── stepping ──────────────────────────────────────────────────
 
     def _dht_of_live_cells(self) -> np.ndarray:

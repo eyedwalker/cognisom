@@ -489,6 +489,7 @@ class EngineRunner:
             morphogen.set_cellular_module(cellular)
         if ar_signaling and cellular:
             ar_signaling.set_cellular_module(cellular)
+            cellular.set_ar_module(ar_signaling)
         if mechanics and cellular:
             mechanics.set_cellular_module(cellular)
             if spatial:

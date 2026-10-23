@@ -84,6 +84,15 @@ TISSUE_DHT_REFERENCE_NM = 13.7
 #: cleaner design; Nishiyama's 0.25 is the check. A vessel-fed field
 #: alone predicts 0.06 and is therefore wrong by itself -- measured.
 DHT_INTRACRINE_FRACTION = 0.20
+#: AR signalling at or above this fraction of eugonadal counts as intact:
+#: no division slowing, no withdrawal hazard, and no random draw. The
+#: eugonadal complex sits a few tenths of a percent under its bound in a
+#: running population (daughters inherit a parent that was still
+#: settling), and without a dead band that drift would stretch every
+#: division time by 0.5% and roll a die per dependent cell per step in a
+#: run where nothing was withdrawn.
+AR_INTACT_ABOVE = 0.95
+
 #: Relaxation time of tissue DHT toward its supply-set level, hours. Not
 #: measured: tissue levels are reported weeks after castration, which
 #: bounds it above and no closer. ESTIMATE; it moves transients only.
@@ -112,6 +121,15 @@ class CellState:
     # intracrine term (see DHT_INTRACRINE_FRACTION).
     testosterone_nM: Optional[float] = None
     dht_nM: float = TISSUE_DHT_REFERENCE_NM
+    # Whether this cancer cell dies when androgen signalling is withdrawn.
+    # Westin 1995 (PMID 7778676; 18 patients, biopsies the day before and
+    # 7 days after castration): proliferation fell in 15 tumours, but the
+    # apoptotic index rose in only 6 -- the WHO grade 1-2, p53/Bcl-2/
+    # c-myc-negative ones. A third, then; here a deterministic third of
+    # the cancer cells (cell_id % 3 == 0), inherited clonally, so no random
+    # draw moves the pinned runs. The split is per tumour in the paper
+    # and per cell here: ESTIMATE.
+    ar_dependent: bool = False
 
     # Cancer properties
     mhc1_expression: float = 1.0
@@ -182,6 +200,17 @@ class CellularModule(SimulationModule):
         # Parameters
         self.division_time_normal = self.config.get('division_time_normal', 24.0)  # hours
         self.division_time_cancer = self.config.get('division_time_cancer', 12.0)  # hours
+        # Androgen withdrawal, read from the AR module when linked. The
+        # proliferation gate applies to every cancer cell (15 of 18 tumours
+        # in Westin 1995 slowed by day 7); the apoptosis hazard applies to
+        # the ar_dependent subset. Both magnitudes are ESTIMATES: the
+        # paper's full text is a scanned PDF and its abstract gives
+        # directions and counts, not rates. Normal epithelium is left
+        # alone -- Page 2006 (PMID 16882745) found benign proliferation and
+        # apoptosis unchanged 28 days into castration.
+        self.ar_dependent_fraction = float(self.config.get('ar_dependent_fraction', 1.0 / 3.0))
+        self.androgen_withdrawal_death_per_hour = float(
+            self.config.get('androgen_withdrawal_death_per_hour', 0.01))   # ESTIMATE, /h at full withdrawal
         # Where the initial cells start in their cycle: 'asynchronous' (the
         # default) staggers them over the steady-state age distribution;
         # 'synchronous' starts every cell at age 0, as before -- for tests
@@ -262,6 +291,8 @@ class CellularModule(SimulationModule):
         # neoantigen peptide generation (set via set_molecular_module).
         self.molecular_module = None
         self.circadian_module = None
+        self.ar_module = None
+        self.androgen_withdrawal_deaths = 0
 
         # Statistics
         self.total_divisions = 0
@@ -432,6 +463,8 @@ class CellularModule(SimulationModule):
         if cell_type == 'cancer' and self.cancer_baseline_ecm > 0.0:
             cell.local_ecm_density = float(self.cancer_baseline_ecm)
 
+        if cell.cell_type == 'cancer' and self.ar_dependent_fraction > 0:
+            cell.ar_dependent = (cell_id % max(1, round(1.0 / self.ar_dependent_fraction))) == 0
         self.cells[cell_id] = cell
         return cell_id
 
@@ -464,6 +497,7 @@ class CellularModule(SimulationModule):
         """Update all cells"""
         cells_to_divide = []
         cells_to_die = []
+        cells_to_die_withdrawn = []
         
         for cell_id, cell in list(self.cells.items()):
             if not cell.alive:
@@ -495,6 +529,13 @@ class CellularModule(SimulationModule):
             division_time = (self.division_time_cancer if cell.cell_type == 'cancer' 
                            else self.division_time_normal)
             
+            # Androgen withdrawal slows a cancer cell's cycle in proportion
+            # to its lost AR signalling: a cell at a quarter of eugonadal
+            # signalling takes four times as long to divide. Proportional
+            # is the ESTIMATE; the direction is Westin 1995.
+            signalling = self._ar_signalling(cell_id) if cell.cell_type == 'cancer' else None
+            if signalling is not None and signalling < AR_INTACT_ABOVE:
+                division_time = division_time / max(signalling, 0.05)
             if cell.age >= division_time and self._division_permitted(cell_id):
                 cells_to_divide.append(cell_id)
             
@@ -509,6 +550,16 @@ class CellularModule(SimulationModule):
                 elif np.random.random() < -np.expm1(
                         -HYPOXIC_CANCER_DEATH_PER_HOUR * dt):
                     cells_to_die.append(cell_id)
+            # The AR-dependent third dies at a rate that grows with the
+            # signalling it has lost. No draw at all while signalling is
+            # intact, so an intact run's random stream is untouched.
+            if (cell.cell_type == 'cancer' and cell.ar_dependent
+                    and cell_id not in cells_to_die):
+                s = self._ar_signalling(cell_id)
+                if s is not None and s < AR_INTACT_ABOVE:
+                    hazard = self.androgen_withdrawal_death_per_hour * (1.0 - s)
+                    if np.random.random() < -np.expm1(-hazard * dt):
+                        cells_to_die_withdrawn.append(cell_id)
         
         # Process divisions
         for cell_id in cells_to_divide:
@@ -517,6 +568,9 @@ class CellularModule(SimulationModule):
         # Process deaths
         for cell_id in cells_to_die:
             self._kill_cell(cell_id, cause='hypoxia')
+        for cell_id in cells_to_die_withdrawn:
+            self.androgen_withdrawal_deaths += 1
+            self._kill_cell(cell_id, cause='androgen_withdrawal')
     
     def _update_metabolism(self, cell: CellState, dt: float):
         """Update cell metabolism"""
@@ -627,6 +681,7 @@ class CellularModule(SimulationModule):
         # of 25%, lifted by the cells born in its last few hours.
         daughter.dht_nM = parent.dht_nM
         daughter.testosterone_nM = parent.testosterone_nM
+        daughter.ar_dependent = parent.ar_dependent
         daughter.mutations = parent.mutations.copy()
         daughter.mhc1_expression = parent.mhc1_expression
         # Oxygen and glucose are concentrations, so both cells carry the
@@ -758,6 +813,8 @@ class CellularModule(SimulationModule):
             'total_divisions': self.total_divisions,
             'total_deaths': self.total_deaths,
             'total_departed': self.total_departed,
+            'androgen_withdrawal_deaths': self.androgen_withdrawal_deaths,
+            'n_ar_dependent': sum(1 for c in alive_cells if c.cell_type == 'cancer' and c.ar_dependent),
             'total_transformations': self.total_transformations,
             'avg_oxygen': np.mean([c.oxygen for c in alive_cells]) if alive_cells else 0,
             'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0,
@@ -788,6 +845,19 @@ class CellularModule(SimulationModule):
         Unlinked, division is as before: age alone decides.
         """
         self.circadian_module = circadian_module
+
+    def set_ar_module(self, ar_module):
+        """Link the AR signalling module: a cancer cell's division time and,
+        for the ar_dependent subset, its death hazard follow its AR-DHT
+        complex relative to the eugonadal state. Unlinked, androgen is
+        invisible to cell fate, as before."""
+        self.ar_module = ar_module
+
+    def _ar_signalling(self, cell_id: int):
+        ar = self.ar_module
+        if ar is None:
+            return None
+        return ar.signalling_fraction(cell_id)
 
     def _division_permitted(self, cell_id: int) -> bool:
         clock = self.circadian_module
