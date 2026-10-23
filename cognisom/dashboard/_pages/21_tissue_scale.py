@@ -161,6 +161,56 @@ with tab_config:
             )
 
     st.markdown("---")
+    st.markdown("**Blood Perfusion**")
+    # The oxygen a tissue sees is set by how fast its blood is replaced,
+    # not by how many vessels it has. Calibrated against Eppendorf
+    # electrode measurements in 59 patients (Movsas, PMID 11586096):
+    # periprostatic muscle 30.0 mmHg, prostate carcinoma 2.4 mmHg.
+    PERFUSION_PRESETS = {
+        "Textbook capillary (500 um/s)": 500.0,
+        "Periprostatic muscle, 30 mmHg (162 um/s)": 162.0,
+        "Normal-appearing prostate, ~5 mmHg (60 um/s)": 60.0,
+        "Prostate carcinoma, 2.4 mmHg (~55 um/s)": 55.0,
+        "Constant vessels -- no depletion (old model)": None,
+        "Custom": "custom",
+    }
+    pcol1, pcol2 = st.columns([2, 1])
+    with pcol1:
+        perfusion_choice = st.selectbox(
+            "Capillary blood speed", list(PERFUSION_PRESETS),
+            index=1, key="perfusion_preset",
+            help="Blood gives up oxygen as it flows, so the tissue at the "
+                 "far end of a capillary sees less than the tissue at the "
+                 "inlet. Slower blood is more spent. 'Constant vessels' "
+                 "holds every vessel at 40 mmHg along its whole length, "
+                 "which cannot reproduce a hypoxic tumour at any vessel "
+                 "spacing.")
+    with pcol2:
+        if PERFUSION_PRESETS[perfusion_choice] == "custom":
+            capillary_velocity = st.number_input(
+                "um/s", min_value=5.0, max_value=2000.0, value=100.0,
+                step=5.0, key="perfusion_custom")
+        else:
+            capillary_velocity = PERFUSION_PRESETS[perfusion_choice]
+    # Consumption is per cell occupying a voxel, so a sparsely seeded
+    # grid barely consumes and no perfusion will make it hypoxic:
+    # measured, 3,000 cells in a 24x24x100 grid left the carcinoma
+    # perfusion at a median of 42.6 mmHg against the 2.4 it is
+    # calibrated to. Tissue is about 0.7 cells per 10 um voxel.
+    packing = n_cells / float(grid_size ** 3)
+    if packing < 0.3:
+        st.warning(
+            f"{n_cells:,} cells on a {grid_size}^3 grid is "
+            f"{packing:.0%} of a voxel per cell; tissue is about 70%. "
+            "At this density the cells barely consume oxygen and the "
+            "field will stay near the vessel tension whatever the "
+            "perfusion. For an oxygen question, seed about "
+            f"{int(0.7 * grid_size ** 3):,} cells.")
+    else:
+        st.caption(f"Packing: {packing:.0%} of a voxel per cell "
+                   "(tissue is about 70%).")
+
+    st.markdown("---")
     st.markdown("**Execution Mode**")
     exec_mode = st.radio(
         "Run on",
@@ -209,6 +259,7 @@ with tab_config:
                 enable_cell_cycle=enable_cell_cycle,
                 enable_immune=enable_immune,
                 snapshot_interval_steps=snapshot_interval,
+                capillary_velocity_um_per_s=capillary_velocity,
                 seed=int(seed),
                 execution_mode="local" if exec_mode == "Local CPU (free)" else "remote",
                 max_runtime_hours=max_runtime if exec_mode != "Local CPU (free)" else 24.0,

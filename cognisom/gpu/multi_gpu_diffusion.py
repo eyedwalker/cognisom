@@ -160,6 +160,13 @@ class MultiGPUDiffusionSolver:
         #: whole field together.
         self._vessels: Dict[str, List[Any]] = {}
         self._vessel_values: Dict[str, float] = {}
+        #: Per-partition arrays of the blood tension along each vessel,
+        #: written by solve_perfused. When present they take the place
+        #: of the scalar in _vessel_values at every re-pin, because a
+        #: scalar re-applied after each implicit step would put every
+        #: vessel voxel back to the inlet and erase the depletion the
+        #: perfused solve just computed.
+        self._vessel_profiles: Dict[str, List[Any]] = {}
         #: Thomas factorisations, keyed by (length, r, k*dt, dtype) inside
         #: adi_step. Shared across fields and partitions on purpose -- the key
         #: already distinguishes everything that changes the coefficients.
@@ -291,6 +298,19 @@ class MultiGPUDiffusionSolver:
                     f"not match field shape {tuple(want)}")
         self._vessels[name] = list(masks)
         self._vessel_values[name] = float(value)
+        self._vessel_profiles.pop(name, None)
+
+    def _vessel_level(self, name: str, gpu_id: int, xp: Any) -> Any:
+        """What a vessel voxel is held at on this partition.
+
+        The depleting profile if a perfused solve has produced one,
+        otherwise the constant the vessels were set with.
+        """
+        profiles = self._vessel_profiles.get(name)
+        if profiles is not None and gpu_id < len(profiles) \
+                and profiles[gpu_id] is not None:
+            return xp.asarray(profiles[gpu_id])
+        return self._vessel_values[name]
 
     def vessel_fraction(self, name: str) -> float:
         """Fraction of voxels held as vessel, for a run to report."""
@@ -542,6 +562,98 @@ class MultiGPUDiffusionSolver:
                 per_gpu[gpu_id] = local
         return result
 
+    def solve_perfused(
+        self,
+        name: str,
+        resolution: float = _DEFAULT_RESOLUTION_UM,
+        *,
+        flow_um3_per_s: float,
+        inlet_po2_mmhg: float,
+        axis: int = 2,
+        faces: str = "insulated",
+        tol: float = 1e-2,
+        max_outer: int = 200,
+    ) -> Any:
+        """Steady state with blood that runs down along each vessel.
+
+        :meth:`solve_steady` holds every vessel voxel at one tension --
+        an infinite reservoir, which is why the tissue could not go
+        hypoxic at any realistic vessel spacing. This gathers exactly as
+        that does and hands the global problem to
+        :func:`~cognisom.gpu.vessel_transport.solve_perfused_steady`,
+        which alternates the tissue solve with a march of the blood
+        along ``axis`` until the two agree. The march has to be global:
+        a vessel runs the length of the domain, and the partition split
+        lies along the longest axis, so a per-partition march would
+        start every partition's blood fresh at the inlet.
+
+        The blood tension it ends with is kept, per partition, and
+        becomes what the vessel voxels are re-pinned to on every
+        implicit step until the next solve. Returns the
+        :class:`~cognisom.gpu.vessel_transport.PerfusedResult`; its
+        ``extraction`` is an output, read from what the tissue drew, and
+        cannot quietly exceed one.
+        """
+        from cognisom.gpu.vessel_transport import solve_perfused_steady
+
+        if name not in self._fields:
+            raise ValueError(f"unknown field {name!r}")
+        D = self._diff_coeffs[name]
+        if D <= 0:
+            raise ValueError(
+                f"{name} has no diffusion coefficient, so it has no steady "
+                "state to solve for")
+        masks = self._vessels.get(name)
+        if not masks or any(m is None for m in masks):
+            raise ValueError(
+                f"{name} has no vessels; perfusion needs something to flow "
+                "through -- call set_vessels first")
+
+        per_gpu = self._fields[name]
+        field = self._decomp.gather(
+            [self._mgpu.to_numpy(f) for f in per_gpu])
+        uptake: Any = 0.0
+        if self._uptake is not None and self._uptake.get(name):
+            arrays = self._uptake[name]
+            if all(a is not None for a in arrays):
+                uptake = self._decomp.gather(
+                    [self._mgpu.to_numpy(a).astype(np.float64)
+                     for a in arrays])
+        held = self._decomp.gather(
+            [self._mgpu.to_numpy(m).astype(np.float64) for m in masks]) > 0.5
+
+        result = solve_perfused_steady(
+            field, D, resolution,
+            vessels=held,
+            uptake_k=uptake,
+            uptake_km=self._uptake_km.get(name, 0.0),
+            uptake_ref=self._uptake_ref.get(name, 1.0),
+            axis=axis,
+            inlet_po2_mmhg=inlet_po2_mmhg,
+            flow_um3_per_s=flow_um3_per_s,
+            faces=faces,
+            tol=tol,
+            # Near exhaustion the blood tension approaches the zero clamp
+            # asymptotically: measured on a 24x24x100 engine problem the
+            # carcinoma perfusion converged at iteration 62 and the muscle
+            # one at 28, so the solver's default of 60 cut the hypoxic
+            # case off two iterations short and reported it unconverged.
+            max_outer=max_outer,
+        )
+
+        target_dtype = self._mgpu.to_numpy(per_gpu[0]).dtype
+        solved = result.field.astype(target_dtype, copy=False)
+        profile = np.asarray(result.blood_po2).astype(target_dtype, copy=False)
+        profiles: List[Any] = []
+        for gpu_id, (local, local_profile) in enumerate(
+                zip(self._decomp.scatter(solved),
+                    self._decomp.scatter(profile))):
+            with self._device_scope(gpu_id):
+                per_gpu[gpu_id] = local
+                profiles.append(self._mgpu.to_device(local_profile, gpu_id))
+        self._vessel_profiles[name] = profiles
+        return result
+
     def step_implicit(
         self,
         dt_seconds: float,
@@ -614,7 +726,8 @@ class MultiGPUDiffusionSolver:
                             and masks[gpu_id] is not None:
                         xp = _xp_for(stepped)
                         stepped = xp.where(masks[gpu_id],
-                                           self._vessel_values[name], stepped)
+                                           self._vessel_level(name, gpu_id, xp),
+                                           stepped)
                     device_fields[gpu_id] = stepped
 
     def sample_at_positions(
@@ -828,7 +941,7 @@ class MultiGPUDiffusionSolver:
             if masks is not None and masks[gpu_id] is not None:
                 xp = _xp_for(field)
                 field = xp.where(masks[gpu_id],
-                                 self._vessel_values[name], field)
+                                 self._vessel_level(name, gpu_id, xp), field)
             device_fields[gpu_id] = field
 
     def _voxel_indices(

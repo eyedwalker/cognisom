@@ -437,6 +437,52 @@ class TissueScaleConfig:
     #: capillary and raises the vessel volume fraction as dx^2. See
     #: tests/test_a_vessel_is_one_voxel_wide.py.
     steady_interval: int = 1
+    #: Speed of blood in the capillaries, um/s -- or None, which is the
+    #: model as it stood: every vessel voxel held at CAPILLARY_PO2 along
+    #: its whole length, an infinite reservoir. That is defensible while
+    #: the vasculature is dense (at 60 um spacing the tissue draws 9% of
+    #: what flows past) and it is exactly wrong in the hypoxic regime
+    #: this platform exists to study: measured prostate carcinoma sits at
+    #: a median 2.4 mmHg (Movsas, PMID 11586096) and a constant vessel
+    #: reaches that only by extracting ~77% of its oxygen, sustained.
+    #:
+    #: Set, the blood depletes as it flows (gpu/vessel_transport), and
+    #: this becomes the controlling variable. Calibrated against Movsas
+    #: at measured 80 um spacing and a 1 mm capillary, with the inlet at
+    #: capillary_inlet_po2_mmhg:
+    #:
+    #:     500 um/s   textbook red-cell velocity   median 50 mmHg
+    #:     162 um/s   periprostatic MUSCLE          30.0 mmHg (measured 30.0)
+    #:      48 um/s   prostate CARCINOMA             2.4 mmHg (measured 2.4)
+    #:
+    #: Those are unit-cell figures. Run through this engine -- 60 um
+    #: spacing, 70% of voxels holding a cell, per-cell rather than
+    #: uniform uptake -- the muscle figure transfers exactly (30.5) and
+    #: the carcinoma one does not: 48 um/s is fully exhausted at 0.3
+    #: mmHg with 65% of the tissue under 10, 2.4 mmHg sits near 55 um/s,
+    #: and 60 um/s gives 6.9, close to Milosevic's 5.2 for normal-
+    #: appearing prostate. The exhausted end is steep, so take the
+    #: carcinoma value as "around 50" here, not 48.
+    #:
+    #: Two things the number depends on that are not in it. Consumption
+    #: is per cell occupying a voxel, so a grid seeded with few cells
+    #: barely consumes and no perfusion will make it hypoxic -- 3,000
+    #: cells in 24x24x100 left 48 um/s at a median of 42.6 mmHg. And
+    #: extraction scales with vessel length over velocity, so the
+    #: figures are for the calibration's 1 mm capillary.
+    #:
+    #: Read "velocity" as an effective perfusion: it lumps red-cell speed
+    #: with the fraction of vessels that flow at all, and the latter is
+    #: the likelier mechanism (tumour vessels that DO flow run at near
+    #: normal speed, PMID 10867458).
+    capillary_velocity_um_per_s: Optional[float] = None
+    #: Tension of blood entering a capillary, mmHg. Arterial, and the
+    #: value vessel_transport.ARTERIAL_PO2_MMHG carries; a test holds the
+    #: two equal so this is not a second copy that drifts. This is NOT
+    #: CAPILLARY_PO2 (40 mmHg): that is Wack's constant for a vessel
+    #: that does not deplete, and at the calibrated velocities the blood
+    #: here passes through 40 on its way down.
+    capillary_inlet_po2_mmhg: float = 95.0
     budget_usd: float = 80.0           # Max spend per session
     disconnect_timeout_min: int = 10   # Auto-terminate if dashboard disconnects
 
@@ -558,6 +604,9 @@ class TissueScaleConfig:
             "snapshot_interval_steps": self.snapshot_interval_steps,
             "max_viz_cells": self.max_viz_cells,
             "execution_mode": self.execution_mode,
+            "steady_interval": self.steady_interval,
+            "capillary_velocity_um_per_s": self.capillary_velocity_um_per_s,
+            "capillary_inlet_po2_mmhg": self.capillary_inlet_po2_mmhg,
             "seed": self.seed,
             "max_runtime_hours": self.max_runtime_hours,
             "budget_usd": self.budget_usd,
@@ -596,6 +645,10 @@ class TissueScaleConfig:
             snapshot_interval_steps=d.get("snapshot_interval_steps", 100),
             max_viz_cells=d.get("max_viz_cells", 100_000),
             execution_mode=d.get("execution_mode", "local"),
+            steady_interval=int(d.get("steady_interval", 1)),
+            capillary_velocity_um_per_s=d.get("capillary_velocity_um_per_s"),
+            capillary_inlet_po2_mmhg=float(
+                d.get("capillary_inlet_po2_mmhg", 95.0)),
             seed=int(d.get("seed", 0)),
             max_runtime_hours=d.get("max_runtime_hours", 2.0),
             budget_usd=d.get("budget_usd", 80.0),

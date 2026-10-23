@@ -75,6 +75,9 @@ class TissueSimulationEngine:
     def __init__(self, config: TissueScaleConfig):
         self._config = config
         self._steady_solves = {}
+        #: The last perfused oxygen solve, when the config asks for one:
+        #: how far the blood ran down, and whether the coupling converged.
+        self._perfusion = None
         # Resolved HERE rather than at the one call site that used to do
         # it. resolve_radii_from_library was called from the tissue-scale
         # dashboard page and nowhere else, so every other entry point --
@@ -277,6 +280,13 @@ class TissueSimulationEngine:
     #: hypoxic at all.
     VESSEL_SPACING_UM = 60.0
 
+    #: The axis vessels run along. _place_vessels lays the lattice along
+    #: it and the perfused solve marches blood along it; one constant so
+    #: the two cannot disagree -- a march down the wrong axis would read
+    #: a different vessel's tissue at every step and report nonsense
+    #: extraction with full confidence.
+    VESSEL_AXIS = 2
+
     def _place_vessels(self, cfg) -> None:
         """Hold a lattice of voxels at arterial concentration.
 
@@ -307,8 +317,29 @@ class TissueSimulationEngine:
         # a vessel plane on the boundary would pin a whole face and make
         # the gradient one-dimensional.
         offset = stride // 2
-        lattice[offset::stride, offset::stride, :] = True
+        index = [slice(offset, None, stride)] * 3
+        index[self.VESSEL_AXIS] = slice(None)
+        lattice[tuple(index)] = True
         self._vessel_fraction = float(lattice.mean())
+
+        # Consumption is per cell occupying a voxel, so the oxygen this
+        # tissue draws is set by how many cells were seeded, which the
+        # config treats as a free number. Every shipped preset seeds about
+        # 1% of a cell per voxel against ~70% in tissue -- an effective
+        # M0 of 0.08 mmHg/s against the calibrated 8.0 -- and measured on
+        # small_test the field sits at 40-49 mmHg with nothing below 10
+        # whatever the perfusion. A run at that density is not a tissue
+        # oxygen simulation, and it should say so before it starts.
+        voxels = float(np.prod(shape))
+        packing = cfg.n_cells / voxels if voxels else 0.0
+        if packing < 0.3:
+            log.warning(
+                "%s cells on a %s grid is %.1f%% of a cell per voxel; tissue "
+                "is about 70%%. Oxygen consumption scales with this, so the "
+                "field will stay near the vessel tension whatever the "
+                "perfusion. For an oxygen question seed about %s cells.",
+                f"{cfg.n_cells:,}", "x".join(str(n) for n in shape),
+                100.0 * packing, f"{int(0.7 * voxels):,}")
 
         for name, fc in cfg.fields.items():
             # Only the blood-borne fields. A chemokine is secreted by
@@ -525,8 +556,35 @@ class TissueSimulationEngine:
                 interval = max(1, int(getattr(cfg, "steady_interval", 1)))
                 if self._step_count % interval == 0:
                     for name in steady:
-                        outcome = self._diffusion.solve_steady(
-                            name, cfg.resolution_um)
+                        velocity = getattr(cfg, "capillary_velocity_um_per_s",
+                                           None)
+                        if name == "oxygen" and velocity:
+                            # Blood that runs down as it flows. Only
+                            # oxygen: it is the one field carried on
+                            # haemoglobin, with the 83x capacity that
+                            # makes depletion along a vessel the
+                            # controlling term; glucose has no carrier
+                            # and no such curve.
+                            from cognisom.gpu.vessel_transport import (
+                                capillary_flow_um3_per_s)
+                            outcome = self._diffusion.solve_perfused(
+                                name, cfg.resolution_um,
+                                flow_um3_per_s=capillary_flow_um3_per_s(
+                                    velocity_um_per_s=float(velocity)),
+                                inlet_po2_mmhg=float(
+                                    cfg.capillary_inlet_po2_mmhg),
+                                axis=self.VESSEL_AXIS)
+                            if self._perfusion is None:
+                                log.info("oxygen %s", outcome.describe())
+                            if not outcome.converged:
+                                log.warning(
+                                    "perfused oxygen solve did not converge "
+                                    "at step %d: %s", self._step_count,
+                                    outcome.describe())
+                            self._perfusion = outcome
+                        else:
+                            outcome = self._diffusion.solve_steady(
+                                name, cfg.resolution_um)
                         self._steady_solves[name] = outcome
 
                 # Unconditionally stable, so substeps buy accuracy only: the
