@@ -1,0 +1,466 @@
+{
+ "census_version": "2025-11-08",
+ "measured_on": "2026-10-23",
+ "unit": "median counts per 10,000 per cell, B2M+HLA-A+HLA-B+HLA-C, within one dataset",
+ "n_cells": 215280,
+ "n_datasets": 7,
+ "min_cells_per_type": 200,
+ "tables": {
+  "574e9f9e:normal": {
+   "dataset_id": "574e9f9e-f8b4-41ef-bf19-89a9964fd9c7",
+   "disease": "normal",
+   "rows": [
+    {
+     "cell_type": "prostate gland microvascular endothelial cell",
+     "term": "CL:2000059",
+     "n": 1547,
+     "mhc1": 119.27,
+     "b2m": 73.66,
+     "ar": 0.112,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "pericyte",
+     "term": "CL:0000669",
+     "n": 272,
+     "mhc1": 79.97,
+     "b2m": 48.95,
+     "ar": 0.245,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "secretory cell",
+     "term": "CL:0000151",
+     "n": 1620,
+     "mhc1": 76.65,
+     "b2m": 52.45,
+     "ar": 0.185,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "fibroblast of connective tissue of glandular part of prostate",
+     "term": "CL:1000305",
+     "n": 684,
+     "mhc1": 76.61,
+     "b2m": 45.4,
+     "ar": 0.44,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "luminal cell of prostate epithelium",
+     "term": "CL:0002340",
+     "n": 1347,
+     "mhc1": 74.26,
+     "b2m": 52.32,
+     "ar": 0.424,
+     "klk3": 39.07
+    },
+    {
+     "cell_type": "fibroblast of connective tissue of nonglandular part of prostate",
+     "term": "CL:1000304",
+     "n": 323,
+     "mhc1": 65.74,
+     "b2m": 39.19,
+     "ar": 0.372,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "smooth muscle cell of prostate",
+     "term": "CL:1000487",
+     "n": 212,
+     "mhc1": 51.64,
+     "b2m": 35.19,
+     "ar": 0.337,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "epithelial cell of urethra",
+     "term": "CL:1000296",
+     "n": 6582,
+     "mhc1": 39.74,
+     "b2m": 24.67,
+     "ar": 0.078,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "basal cell of prostate epithelium",
+     "term": "CL:0002341",
+     "n": 14075,
+     "mhc1": 32.22,
+     "b2m": 16.73,
+     "ar": 0.099,
+     "klk3": 0.0
+    }
+   ]
+  },
+  "574e9f9e:benign prostatic hyperplasia": {
+   "dataset_id": "574e9f9e-f8b4-41ef-bf19-89a9964fd9c7",
+   "disease": "benign prostatic hyperplasia",
+   "rows": [
+    {
+     "cell_type": "CD8-positive, alpha-beta thymocyte",
+     "term": "CL:0000811",
+     "n": 220,
+     "mhc1": 262.16,
+     "b2m": 155.24,
+     "ar": 0.07,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "natural killer cell",
+     "term": "CL:0000623",
+     "n": 203,
+     "mhc1": 242.42,
+     "b2m": 135.46,
+     "ar": 0.035,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "effector CD4-positive, alpha-beta T cell",
+     "term": "CL:0001044",
+     "n": 1035,
+     "mhc1": 219.84,
+     "b2m": 138.12,
+     "ar": 0.032,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "effector CD8-positive, alpha-beta T cell",
+     "term": "CL:0001050",
+     "n": 2885,
+     "mhc1": 218.9,
+     "b2m": 126.15,
+     "ar": 0.042,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "prostate gland microvascular endothelial cell",
+     "term": "CL:2000059",
+     "n": 9998,
+     "mhc1": 163.01,
+     "b2m": 97.99,
+     "ar": 0.149,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "CD4-positive, alpha-beta thymocyte",
+     "term": "CL:0000810",
+     "n": 1950,
+     "mhc1": 144.19,
+     "b2m": 86.46,
+     "ar": 0.053,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "non-classical monocyte",
+     "term": "CL:0000875",
+     "n": 249,
+     "mhc1": 135.28,
+     "b2m": 92.06,
+     "ar": 0.036,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "classical monocyte",
+     "term": "CL:0000860",
+     "n": 322,
+     "mhc1": 123.81,
+     "b2m": 79.29,
+     "ar": 0.025,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "B cell",
+     "term": "CL:0000236",
+     "n": 2694,
+     "mhc1": 115.89,
+     "b2m": 69.97,
+     "ar": 0.052,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "CD1c-positive myeloid dendritic cell",
+     "term": "CL:0002399",
+     "n": 3519,
+     "mhc1": 113.85,
+     "b2m": 77.24,
+     "ar": 0.029,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "dendritic cell",
+     "term": "CL:0000451",
+     "n": 2907,
+     "mhc1": 107.6,
+     "b2m": 72.94,
+     "ar": 0.042,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "pericyte",
+     "term": "CL:0000669",
+     "n": 1928,
+     "mhc1": 101.56,
+     "b2m": 64.39,
+     "ar": 0.455,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "granulocyte",
+     "term": "CL:0000094",
+     "n": 2331,
+     "mhc1": 97.35,
+     "b2m": 63.22,
+     "ar": 0.028,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "secretory cell",
+     "term": "CL:0000151",
+     "n": 2035,
+     "mhc1": 87.28,
+     "b2m": 56.48,
+     "ar": 0.137,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "smooth muscle cell of prostate",
+     "term": "CL:1000487",
+     "n": 1587,
+     "mhc1": 82.82,
+     "b2m": 54.57,
+     "ar": 0.366,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "fibroblast of connective tissue of nonglandular part of prostate",
+     "term": "CL:1000304",
+     "n": 3504,
+     "mhc1": 81.18,
+     "b2m": 51.05,
+     "ar": 0.996,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "fibroblast of connective tissue of glandular part of prostate",
+     "term": "CL:1000305",
+     "n": 869,
+     "mhc1": 79.23,
+     "b2m": 48.1,
+     "ar": 0.651,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "epithelial cell of urethra",
+     "term": "CL:1000296",
+     "n": 1085,
+     "mhc1": 75.1,
+     "b2m": 50.27,
+     "ar": 0.053,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "vascular associated smooth muscle cell",
+     "term": "CL:0000359",
+     "n": 1205,
+     "mhc1": 73.29,
+     "b2m": 49.39,
+     "ar": 0.201,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "luminal cell of prostate epithelium",
+     "term": "CL:0002340",
+     "n": 1479,
+     "mhc1": 64.43,
+     "b2m": 40.16,
+     "ar": 0.467,
+     "klk3": 20.23
+    },
+    {
+     "cell_type": "basal cell of prostate epithelium",
+     "term": "CL:0002341",
+     "n": 13904,
+     "mhc1": 49.79,
+     "b2m": 30.91,
+     "ar": 0.131,
+     "klk3": 0.0
+    }
+   ]
+  },
+  "881e0e6b:prostatic acinar adenocarcinoma": {
+   "dataset_id": "881e0e6b-a185-45f1-9b56-81606e91e7ff",
+   "disease": "prostatic acinar adenocarcinoma",
+   "rows": [
+    {
+     "cell_type": "regulatory T cell",
+     "term": "CL:0000815",
+     "n": 1162,
+     "mhc1": 184.84,
+     "b2m": 121.48,
+     "ar": 0.016,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "cytotoxic T cell",
+     "term": "CL:0000910",
+     "n": 7314,
+     "mhc1": 167.63,
+     "b2m": 105.37,
+     "ar": 0.023,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "T cell",
+     "term": "CL:0000084",
+     "n": 9587,
+     "mhc1": 158.27,
+     "b2m": 101.05,
+     "ar": 0.024,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "endothelial cell",
+     "term": "CL:0000115",
+     "n": 3469,
+     "mhc1": 139.37,
+     "b2m": 80.61,
+     "ar": 0.404,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "vein endothelial cell",
+     "term": "CL:0002543",
+     "n": 10649,
+     "mhc1": 115.3,
+     "b2m": 70.37,
+     "ar": 0.36,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "natural killer cell",
+     "term": "CL:0000623",
+     "n": 1012,
+     "mhc1": 113.09,
+     "b2m": 69.0,
+     "ar": 0.012,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "B cell",
+     "term": "CL:0000236",
+     "n": 706,
+     "mhc1": 110.77,
+     "b2m": 66.22,
+     "ar": 0.014,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "monocyte",
+     "term": "CL:0000576",
+     "n": 865,
+     "mhc1": 109.38,
+     "b2m": 66.72,
+     "ar": 0.012,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "macrophage",
+     "term": "CL:0000235",
+     "n": 1019,
+     "mhc1": 77.86,
+     "b2m": 50.0,
+     "ar": 0.033,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "myeloid cell",
+     "term": "CL:0000763",
+     "n": 795,
+     "mhc1": 77.47,
+     "b2m": 50.65,
+     "ar": 0.018,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "pericyte",
+     "term": "CL:0000669",
+     "n": 2573,
+     "mhc1": 63.14,
+     "b2m": 39.83,
+     "ar": 0.592,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "club-like cell of the urethral epithelium",
+     "term": "CL:4032000",
+     "n": 4966,
+     "mhc1": 57.93,
+     "b2m": 35.69,
+     "ar": 0.414,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "glial cell",
+     "term": "CL:0000125",
+     "n": 1064,
+     "mhc1": 56.62,
+     "b2m": 35.78,
+     "ar": 0.049,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "vascular associated smooth muscle cell",
+     "term": "CL:0000359",
+     "n": 4082,
+     "mhc1": 49.22,
+     "b2m": 33.96,
+     "ar": 0.298,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "epithelial cell of prostate",
+     "term": "CL:0002231",
+     "n": 3165,
+     "mhc1": 41.9,
+     "b2m": 25.16,
+     "ar": 0.574,
+     "klk3": 6.43
+    },
+    {
+     "cell_type": "fibroblast of connective tissue of prostate",
+     "term": "CL:1000299",
+     "n": 2552,
+     "mhc1": 34.49,
+     "b2m": 21.12,
+     "ar": 1.354,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "basal cell of prostate epithelium",
+     "term": "CL:0002341",
+     "n": 8220,
+     "mhc1": 28.75,
+     "b2m": 17.69,
+     "ar": 0.239,
+     "klk3": 0.0
+    },
+    {
+     "cell_type": "luminal cell of prostate epithelium",
+     "term": "CL:0002340",
+     "n": 4582,
+     "mhc1": 25.12,
+     "b2m": 16.91,
+     "ar": 1.116,
+     "klk3": 142.57
+    }
+   ]
+  }
+ },
+ "seconds": 47.5,
+ "tumour_vs_normal_luminal": {
+  "direct_cross_dataset": 0.338,
+  "t_cell_referenced": 0.509,
+  "note": "direct compares two datasets of the same assay and similar depth; referenced divides each luminal median by its own dataset's T-cell median"
+ }
+}

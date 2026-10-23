@@ -91,26 +91,44 @@ HYPOXIC_FLOOR = 0.373
 #: the values cell_renderer's demo data already used. Index 5 is
 #: cancer_epithelial and 6-8 are the immune archetypes.
 BASELINE: Dict[int, float] = {
-    0: 0.9,    # luminal_secretory
-    1: 0.9,    # basal
-    2: 0.9,    # fibroblast
-    3: 0.9,    # smooth_muscle
-    4: 0.9,    # endothelial
-    5: 0.3,    # cancer_epithelial -- downregulated, the evasion route
-    6: 1.0,    # t_cell
-    7: 1.0,    # macrophage
-    8: 1.0,    # nk_cell
-    9: 0.9,    # neuroendocrine
+    0: 0.9,    # luminal_secretory -- the anchor the others are ranked against
+    1: 0.4,    # basal: 0.43x luminal in the census (RNA), was 0.9
+    2: 0.9,    # fibroblast: 0.89-1.03x luminal
+    3: 0.65,   # smooth_muscle: 0.70x luminal, was 0.9
+    4: 0.9,    # endothelial: 1.61x luminal in RNA, which this scale cannot
+               # express above the immune anchor without re-anchoring; held
+    5: 0.3,    # cancer_epithelial -- downregulated, the evasion route; the
+               # census puts tumour luminal at 0.34-0.51x normal luminal
+    6: 1.0,    # t_cell: 3.4x luminal in RNA; the scale's top
+    7: 1.0,    # macrophage: 1.7-2.1x luminal in RNA (monocytes, DCs)
+    8: 1.0,    # nk_cell: 3.8x luminal
+    9: 0.9,    # neuroendocrine: fewer than 200 census cells; no evidence
 }
+
+#: Where the ORDER above comes from, 2026-10-23: CZ CELLxGENE census
+#: 2025-11-08, prostate gland, B2M+HLA-A/B/C per 10,000 counts per cell,
+#: medians per cell type WITHIN one dataset (depth and assay cancel); the
+#: numbers and the datasets are in library/evidence/census_prostate_mhc1.json
+#: and library/census_mhc1.py regenerates them. Normal prostate (dataset
+#: 574e9f9e): endothelial 1.61, fibroblast 1.03 / 0.89, luminal 1.00,
+#: smooth muscle 0.70, basal 0.43. Immune, same dataset: NK 3.76, effector
+#: CD8 T 3.40, monocytes 1.9-2.1, dendritic 1.7-1.8. Tumour luminal
+#: (dataset 881e0e6b, adenocarcinoma) against normal luminal: 0.34 directly
+#: across the two datasets, 0.51 when each is referenced to its own T cells.
+#: This is transcript, not surface protein, so it fixes the order and the
+#: tumour-vs-normal bracket and nothing else; the values stay a 0-1 scale
+#: anchored at luminal 0.9 / immune 1.0.
+CENSUS_EVIDENCE = "library/evidence/census_prostate_mhc1.json"
 
 #: What a caller is entitled to conclude from these numbers, and what not.
 CAVEATS: Tuple[str, ...] = (
     "the OXYGEN RESPONSE is measured -- Estephan et al., EMBO J 2025, "
     "doi 10.1038/s44318-024-00319-7, Fig 2C, HT29 at 24 h -- but digitised "
     "from the figure rather than read from the source table",
-    "the BASELINES are still estimates: that paper measures a tumour line "
-    "against its own normoxic level and says nothing about tumour versus "
-    "healthy",
+    "the BASELINES are a 0-1 scale whose ORDER is from the CELLxGENE census "
+    "(RNA, within one dataset; see CENSUS_EVIDENCE) and whose VALUES are "
+    "still estimates: the census says basal is 0.43x luminal and tumour "
+    "luminal 0.34-0.51x normal, and says nothing about surface protein",
     "the library's B2M abundance is NOT a usable source for the baselines: "
     "20 cell types are 5 bulk samples and the implied CD4/CD8 ratio is an "
     "artefact",
