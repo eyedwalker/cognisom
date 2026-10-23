@@ -316,12 +316,17 @@ def test_the_under_diffusion_warning_fires_once_per_field(caplog):
 
 def test_a_whole_nine_module_run_logs_no_spatial_warnings(runs, caplog):
     """720 -> 0. The oxygen and glucose fields are solved directly, so
-    there is no CFL condition to violate, and the cytokine field has
-    nothing to transport."""
+    there is no CFL condition to violate. The cytokine field used to be
+    idle -- driven by nobody -- and is now secreted by cancer cells; it
+    takes the steady state while they live and, once the immune
+    compartment has cleared them, decays as a mixed field. Neither path
+    can warn; the explicit one could, and did, at 21% of the transport."""
     state = runs["Baseline"].engine.modules["spatial"].get_state()
     assert state["fields"]["oxygen"]["solver"] == "steady_state"
     assert state["fields"]["glucose"]["solver"] == "steady_state"
-    assert state["fields"]["cytokine"]["solver"] == "idle"
+    assert state["fields"]["cytokine"]["solver"] in ("steady_state", "mixed"), \
+        state["fields"]["cytokine"]["solver"]
+    assert not [r for r in caplog.records if "UNDER-DIFFUSED" in r.getMessage()]
 
 
 # ── THREE: the hypoxia mechanism is not regressed ───────────────────
@@ -347,25 +352,25 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     #
     # Cancer: 22 survived while the chase step was frozen (x0.01 for x60);
     # 0 once chasing cells moved but every contact rolled its kill
-    # probability each step and killed within a step or two; 6 now that a
-    # contact has one outcome and lasts a measured time (a lethal NK
-    # contact averages 19 min, a T cell's 75, and a failed NK contact ties
-    # the cell up for 29), so some tumour cells divide before they are
-    # killed. Every death is still an immune kill.
-    assert len([c for c in alive if c.cell_type == "cancer"]) == 6
-    assert cells.total_deaths == 9
-    assert _deaths(runner, "immune_killed", "cancer") == 9
-    # 80 normal divisions -- each normal cell divides once, now at a time
-    # staggered over the day rather than all on the final step -- plus 5
-    # cancer divisions that come before the kill.
-    assert cells.total_divisions == 85
+    # probability each step and killed within a step or two; 6 once a
+    # contact had one outcome and lasted a measured time, so some tumour
+    # cells divided before they were killed; 0 again now that the
+    # immune patrol follows the chemokine the tumour secretes -- it
+    # finds the ten-cell cluster within two hours, before any of them
+    # has divided. Every death is still an immune kill.
+    assert len([c for c in alive if c.cell_type == "cancer"]) == 0
+    assert cells.total_deaths == 10
+    assert _deaths(runner, "immune_killed", "cancer") == 10
+    # 80 normal divisions -- each normal cell divides once, at a time
+    # staggered over the day. The 5 cancer divisions that used to come
+    # before the kill no longer happen.
+    assert cells.total_divisions == 80
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(423.5066, abs=0.01)
-    # The oxygen floor. One daughter sits near the edge of its capillary's
-    # reach, hypoxic but alive; no normal cell is near death.
+        pytest.approx(413.7078, abs=0.01)
+    # The oxygen floor: no normal cell is near death.
     assert min(c.oxygen for c in alive) > 0.02          # the death threshold
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0550, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0667, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -386,21 +391,25 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     alive = [c for c in cells.cells.values() if c.alive]
 
     # The mechanism: normal cells starve in this preset and in no other.
-    assert _deaths(runner, "hypoxia", "normal") == 60
+    # 60 while the immune compartment wandered; 58 now that it follows
+    # the chemokine, a two-cell shift in a stochastic run whose cause is
+    # the changed immune trajectory, not the vasculature.
+    assert _deaths(runner, "hypoxia", "normal") == 58
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
-    # Cancer cells starve here too when the immune compartment does not
-    # reach them first: 16 while the chase step was frozen, 0 while every
-    # contact killed within a step or two, 7 now that a kill takes a
-    # measured contact time and a failed one ties the effector up for
-    # another 29 min.
-    assert _deaths(runner, "hypoxia", "cancer") == 7
-    assert _deaths(runner, "immune_killed", "cancer") == 20
-    assert cells.total_deaths == 87
-    # The 24 h snapshot: the survivors are the 10 best-perfused normal
-    # cells, and 3 cancer cells the compartment never got to.
+    # Cancer cells used to starve here too when the immune compartment
+    # did not reach them first: 16 while the chase step was frozen, 0
+    # while every contact killed within a step or two, 7 once a kill
+    # took a measured contact time. 0 now: with the patrol biased up the
+    # tumour's own chemokine, every cancer cell is reached and killed
+    # before the capillary-poor corner starves it.
+    assert _deaths(runner, "hypoxia", "cancer") == 0
+    assert _deaths(runner, "immune_killed", "cancer") == 25
+    assert cells.total_deaths == 83
+    # The 24 h snapshot: the survivors are the best-perfused normal
+    # cells, and no cancer cell is left.
     assert vascular.hypoxic_regions == 0
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0734, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0599, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

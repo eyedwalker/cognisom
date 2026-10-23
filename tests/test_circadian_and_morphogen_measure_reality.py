@@ -157,23 +157,25 @@ def test_morphogen_tracks_the_living_population_not_the_seeded_one():
     )
 
 
-def test_fate_assignment_is_not_a_single_bucket():
-    """With positions frozen at birth, every cell got the same fate."""
+def test_the_secreted_field_is_driven_by_somebody():
+    """The module once assigned embryonic fates nothing consumed; now it
+    is the source side of a field. 'Driven by nobody' -- identically
+    zero, skipped as idle -- was the cytokine field's state before."""
     from cognisom.dashboard.engine_runner import EngineRunner
 
     with contextlib.redirect_stdout(io.StringIO()):
-        runner = EngineRunner(dt=0.05, duration=24.0, scenario="Baseline")
+        runner = EngineRunner(dt=0.05, duration=6.0, scenario="Baseline")
         runner.build()
         runner.run()
         morph = runner.engine.modules['morphogen']
+        spatial = runner.engine.modules['spatial']
 
-    distribution = morph.get_state()['fate_distribution']
-
-    assert sum(distribution.values()) > 0, "no fates were determined"
-    assert len(distribution) > 1, (
-        f"every cell landed in one fate bucket: {distribution} -- positions "
-        f"are probably not being refreshed from the cellular module"
-    )
+    # Over the run, from the snapshots: by 6 h the immune compartment
+    # has cleared Baseline's tumour, so nothing is secreting at the end.
+    assert max(h.n_secreting for h in runner.history) > 0, "no cell ever secreted"
+    assert max(h.chemokine_max for h in runner.history) > 0.0, "the field stayed zero"
+    assert spatial.fields['cytokine'].last_solver != 'idle'
+    assert morph.get_state()['decay_length_um'] is not None
 
 
 def test_gradients_are_not_a_no_op_update():

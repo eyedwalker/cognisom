@@ -27,15 +27,33 @@ from cognisom.core.event_bus import EventTypes
 _log = logging.getLogger(__name__)
 
 
+#: First-order decay of the chemokine field, 1/h, from a half-life of 30
+#: minutes. That figure is CXCL12's half-life in the BLOODSTREAM (review,
+#: PMC6582792: protease degradation, GAG binding, sequestration), and is
+#: the only measured persistence available; tissue-bound chemokine very
+#: likely persists longer, and CD26 -- the protease that clips it -- is
+#: lost on activated CAFs (PMC6639198). With D = 100 um^2/s the decay
+#: length sqrt(D/k) is 510 um, so across this 200 um tissue the gradient
+#: is shallow but present. Lengthening the half-life lengthens it.
+CHEMOKINE_HALF_LIFE_HOURS = 0.5
+CHEMOKINE_DECAY_PER_HOUR = float(np.log(2.0) / CHEMOKINE_HALF_LIFE_HOURS)
+
+
 class SpatialField:
     """3D diffusible field"""
     
     def __init__(self, name: str, grid_size: Tuple[int, int, int], 
-                 resolution: float, diffusion_coeff: float):
+                 resolution: float, diffusion_coeff: float,
+                 decay_rate: float = 0.0):
         self.name = name
         self.grid_size = grid_size
         self.resolution = resolution  # μm per voxel
         self.diffusion_coeff = diffusion_coeff  # μm²/s
+        # Uniform first-order decay, 1/h. A secreted signal that is
+        # never degraded accumulates without bound; this is what gives
+        # a chemokine a finite decay length and the steady state a
+        # non-singular operator even with no vessel and no uptake.
+        self.decay_rate = float(decay_rate)
         
         # Concentration field
         self.concentration = np.zeros(grid_size, dtype=np.float32)
@@ -210,6 +228,22 @@ class SpatialField:
                 self.last_solver = 'steady_state'
                 return
 
+        # Undriven, decaying, and too diffusive for the explicit path: a
+        # secreted field after its last source is gone. The explicit
+        # step would apply a fifth of the transport and warn; the steady
+        # state is zero, which throws the residual away. Between those,
+        # a field whose diffusion number says it crosses the domain
+        # within the step is well described as fully mixed, decaying by
+        # exp(-k dt). Mass is conserved up to the decay, which neither
+        # alternative manages.
+        if (not self.dirichlet and not self.sources and not self.uptake
+                and self.decay_rate > 0.0 and self._explicit_is_capped(dt)):
+            level = (float(self.concentration.mean())
+                     * float(np.exp(-self.decay_rate * dt)))
+            self.concentration.fill(np.float32(level))
+            self.last_solver = 'mixed'
+            return
+
         self.last_solver = 'explicit'
 
         # Sources and sinks act over the whole interval, once.
@@ -236,6 +270,8 @@ class SpatialField:
         for idx, rate in self.uptake:
             if self._is_valid_index(idx) and rate > 0.0:
                 self.concentration[idx] *= np.exp(-rate * dt)
+        if self.decay_rate > 0.0:
+            self.concentration *= np.float32(np.exp(-self.decay_rate * dt))
 
         if self.diffusion_coeff <= 0 or dt_seconds <= 0:
             np.maximum(self.concentration, 0, out=self.concentration)
@@ -382,9 +418,32 @@ class SpatialField:
           the physical answer and explicit integration is correct.
         """
         driven = bool(self.dirichlet) or bool(self.sources)
-        regular = bool(self.dirichlet) or bool(self.uptake)
-        return (driven and regular
-                and self.fourier_number(dt) >= self.QUASI_STEADY_FOURIER)
+        regular = (bool(self.dirichlet) or bool(self.uptake)
+                   or self.decay_rate > 0.0)
+        if not (driven and regular):
+            return False
+        if self.fourier_number(dt) >= self.QUASI_STEADY_FOURIER:
+            return True
+        # Not quasi-steady at the DOMAIN scale, but if the explicit path
+        # would hit its sub-step cap it applies only a fraction of the
+        # transport, and a steady state taken a little early is the
+        # smaller error by far. Measured on the cytokine field (D = 100
+        # um^2/s, 200 um box, 0.1 h): domain Fo = 0.9, just under the
+        # threshold, so it went explicit -- where the voxel-scale
+        # diffusion number of 360 needed 2,400 sub-steps against a cap
+        # of 512 and 21% of the transport was applied, with a warning
+        # every run. The warning's own text says a steady solve is the
+        # right method there. Now it is used.
+        return self._explicit_is_capped(dt)
+
+    def _explicit_is_capped(self, dt: float) -> bool:
+        """Would the explicit path need more sub-steps than it is allowed?"""
+        if self.diffusion_coeff <= 0.0 or dt <= 0.0:
+            return False
+        diffusion_number = (self.diffusion_coeff * dt * self.SECONDS_PER_HOUR
+                            / self.resolution ** 2)
+        max_stable = self.CFL_LIMIT_3D * self.CFL_SAFETY
+        return int(np.ceil(diffusion_number / max_stable)) > self.MAX_SUBSTEPS
 
     def _assemble_matrix(self):
         """Assemble the steady-state operator; return (A_csc, is_dirichlet).
@@ -437,6 +496,9 @@ class SpatialField:
         for idx, rate in self.uptake:
             if self._is_valid_index(idx):
                 k[ids[idx]] += rate
+        # Decay is uptake everywhere: it lands on the diagonal of every
+        # row, which is what makes a secreted field's operator regular.
+        k += self.decay_rate
 
         is_dir = np.zeros(n, dtype=bool)
         for idx, _value in self.dirichlet:
@@ -504,6 +566,7 @@ class SpatialField:
             tuple(sorted((int(i), int(j), int(kk), round(float(r), 12))
                          for (i, j, kk), r in self.uptake)),
             round(float(self.diffusion_coeff), 9),
+            round(float(self.decay_rate), 12),
             round(float(self.resolution), 9),
             tuple(self.grid_size),
         )
@@ -667,6 +730,9 @@ class SpatialModule(SimulationModule):
         # had fired 720 times describing the transport of nothing.
         self.cellular_module = None
         self.vascular_module = None
+        # field name -> callables returning [(position, rate), ...]; see
+        # register_secretion.
+        self._secretion_providers: Dict[str, list] = {}
 
         # Cell radius used to turn a per-cell demand into a volumetric
         # uptake density. 5.0 um is this project's own default --
@@ -688,7 +754,8 @@ class SpatialModule(SimulationModule):
         # Create fields
         self._create_field('oxygen', diffusion_coeff=2000.0)  # μm²/s
         self._create_field('glucose', diffusion_coeff=600.0)
-        self._create_field('cytokine', diffusion_coeff=100.0)
+        self._create_field('cytokine', diffusion_coeff=100.0,
+                           decay_rate=CHEMOKINE_DECAY_PER_HOUR)
         
         # Subscribe to events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
@@ -698,10 +765,25 @@ class SpatialModule(SimulationModule):
         print(f"    ✓ Resolution: {self.resolution} μm/voxel")
         print(f"    ✓ {len(self.fields)} fields created")
     
-    def _create_field(self, name: str, diffusion_coeff: float):
+    def _create_field(self, name: str, diffusion_coeff: float,
+                      decay_rate: float = 0.0):
         """Create diffusible field"""
-        field = SpatialField(name, self.grid_size, self.resolution, diffusion_coeff)
+        field = SpatialField(name, self.grid_size, self.resolution,
+                             diffusion_coeff, decay_rate=decay_rate)
         self.fields[name] = field
+
+    def register_secretion(self, field_name: str, provider) -> None:
+        """Let another module supply sources for ``field_name``.
+
+        ``provider()`` returns an iterable of ``(position, rate)`` for
+        the cells secreting right now. It is called inside
+        _sync_sources_sinks, AFTER the field's terms are cleared, so a
+        cell that has died or moved stops or moves with it. Registering
+        a source once with add_source cannot do that: the terms are
+        rebuilt every update, and a one-time entry would be wiped on
+        the first.
+        """
+        self._secretion_providers.setdefault(field_name, []).append(provider)
     
     #: Per-cell O2 demand in field units per hour, matched to
     #: CellularModule._update_metabolism, which hard-codes them (0.1 /h
@@ -729,11 +811,21 @@ class SpatialModule(SimulationModule):
         see SpatialField.clear_sources_sinks for why a set-based guard
         would be wrong for a population that moves and dies.
         """
-        if self.cellular_module is None and self.vascular_module is None:
+        if (self.cellular_module is None and self.vascular_module is None
+                and not self._secretion_providers):
             return
 
         for field in self.fields.values():
             field.clear_sources_sinks()
+        for field_name, providers in self._secretion_providers.items():
+            target = self.fields.get(field_name)
+            if target is None:
+                continue
+            for provider in providers:
+                for position, rate in provider():
+                    if rate > 0.0:
+                        target.add_source(np.asarray(position, dtype=float),
+                                          float(rate))
 
         oxygen = self.fields.get('oxygen')
         glucose = self.fields.get('glucose')

@@ -267,6 +267,18 @@ class ImmuneModule(SimulationModule):
         self.n_nk_cells = _or_default(self.config.get('n_nk_cells'), 10)
         self.n_macrophages = _or_default(self.config.get('n_macrophages'), 8)
         self.patrol_speed = self.config.get('patrol_speed', 5.0)  # μm/min
+        # Chemotaxis: the patrol's random direction is mixed with the
+        # unit gradient of a spatial field, weight `chemotaxis_bias`
+        # (0 = pure random walk, 1 = straight up the gradient). The SPEED
+        # is untouched -- it stays the sourced patrol speed -- so this
+        # adds no invented velocity; it only aims the one we have. The
+        # field is the secreted chemokine MorphogenModule supplies.
+        # 0.5 is an ESTIMATE of the chemotactic index; it is not a
+        # measured number and the module reports how often it acted.
+        self.chemotaxis_field = str(self.config.get('chemotaxis_field', 'cytokine'))
+        self.chemotaxis_bias = float(self.config.get('chemotaxis_bias', 0.5))
+        self.chemotaxis_steps = 0
+        self.spatial_module = None
 
         # Per-lineage patrol speed, um/min. patrol_speed above is the
         # speed of any lineage with nothing more specific. Precedence: an
@@ -616,6 +628,16 @@ class ImmuneModule(SimulationModule):
         self.immune_cells[cell_id] = cell
         return cell_id
     
+    def set_spatial_module(self, spatial_module):
+        """Link to the spatial module whose field patrol follows."""
+        self.spatial_module = spatial_module
+
+    def _chemotaxis_gradient_field(self):
+        if self.spatial_module is None or self.chemotaxis_bias <= 0.0:
+            return None
+        return (getattr(self.spatial_module, 'fields', None) or {}).get(
+            self.chemotaxis_field)
+
     def set_cellular_module(self, cellular_module):
         """Link to cellular module for target access"""
         self.cellular_module = cellular_module
@@ -1254,9 +1276,22 @@ class ImmuneModule(SimulationModule):
 
     def _patrol(self, immune_cell: ImmuneCell, dt: float):
         """Random patrol movement, ECM-attenuated."""
-        # Random walk
+        # Random walk, biased up the chemokine gradient where there is
+        # one. A biased random walk IS chemotaxis as leukocytes do it:
+        # the cell keeps its own motility and tilts it, which is why the
+        # bias mixes directions and leaves the speed alone.
         direction = np.random.randn(3)
         direction = direction / (np.linalg.norm(direction) + 1e-6)
+        field = self._chemotaxis_gradient_field()
+        if field is not None:
+            gradient = np.asarray(field.get_gradient_at(immune_cell.position),
+                                  dtype=float)
+            magnitude = float(np.linalg.norm(gradient))
+            if magnitude > 0.0:
+                w = self.chemotaxis_bias
+                direction = (1.0 - w) * direction + w * (gradient / magnitude)
+                direction = direction / (np.linalg.norm(direction) + 1e-6)
+                self.chemotaxis_steps += 1
 
         # ECM barrier (Upgrade 6): patrol speed scales down with the
         # local stromal density. A T cell wandering into a fibrotic

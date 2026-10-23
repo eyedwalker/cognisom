@@ -318,7 +318,7 @@ CIRCADIAN
                 stats += f"""
 MORPHOGEN
   Gradients: {state['morphogen']['n_gradients']}
-  Fates Determined: {state['morphogen']['total_fates_determined']}
+  Chemokine max: {state['morphogen'].get('field_max', 0.0):.3f} ({state['morphogen'].get('n_secreting', 0)} secreting)
 """
             
             self.stats_text.delete('1.0', tk.END)

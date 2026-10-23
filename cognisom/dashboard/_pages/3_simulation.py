@@ -64,7 +64,7 @@ mod_molecular = st.sidebar.checkbox("Molecular", value=True, help="Gene expressi
 mod_spatial = st.sidebar.checkbox("Spatial", value=True, help="3D diffusion fields")
 mod_epigenetic = st.sidebar.checkbox("Epigenetic", value=True, help="Methylation, gene silencing")
 mod_circadian = st.sidebar.checkbox("Circadian", value=True, help="24h oscillators")
-mod_morphogen = st.sidebar.checkbox("Morphogen", value=True, help="BMP/Wnt gradients, cell fate")
+mod_morphogen = st.sidebar.checkbox("Morphogen", value=True, help="Secreted chemokine gradient: tumour cells secrete, it diffuses and decays, immune cells patrol up it")
 
 modules_enabled = {
     "cellular": mod_cellular, "immune": mod_immune,

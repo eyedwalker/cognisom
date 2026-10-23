@@ -178,8 +178,9 @@ class SimulationSnapshot:
     master_phase: float = 0.0
     synchrony: float = 0.0
 
-    # Morphogen
-    total_fates_determined: int = 0
+    # Morphogen: the secreted chemokine field
+    chemokine_max: float = 0.0
+    n_secreting: int = 0
 
 
 @dataclass
@@ -433,6 +434,14 @@ class EngineRunner:
             # position, so without this it senses the gradient at the
             # birthplace for the whole run and never tracks a daughter.
             morphogen.set_cellular_module(cellular)
+        if morphogen and spatial:
+            # The secretion side of the chemokine field. Without this
+            # the cytokine field has no source -- it was 'driven by
+            # nobody', identically zero, skipped as idle every update.
+            morphogen.set_spatial_module(spatial)
+        if immune and spatial:
+            # The consumer: patrol biases its random walk up the field.
+            immune.set_spatial_module(spatial)
         if spatial and cellular:
             # SpatialModule was registered and enabled by default, so it
             # allocated three fields and diffused them 240 times per 24 h
@@ -615,7 +624,8 @@ class EngineRunner:
 
         # Morphogen
         ms = state.get("morphogen", {})
-        snap.total_fates_determined = ms.get("total_fates_determined", 0)
+        snap.chemokine_max = float(ms.get("field_max", 0.0))
+        snap.n_secreting = int(ms.get("n_secreting", 0))
 
         self.history.append(snap)
 
@@ -875,7 +885,7 @@ class EngineRunner:
             "total_metastases", "immune_in_vessels", "cancer_in_vessels",
             "avg_methylation", "silenced_genes",
             "master_phase", "synchrony",
-            "total_fates_determined",
+            "chemokine_max", "n_secreting",
         ]
         result = {k: [] for k in keys}
         for snap in self.history:
