@@ -94,9 +94,19 @@ class CircadianClock:
             return "night"
     
     def is_permissive_for_division(self) -> bool:
-        """Check if clock permits cell division"""
-        # Cell division gated to specific phases (late G1/S)
-        # Typically around ZT 6-12 (zeitgeber time)
+        """Whether this cell's clock currently permits division.
+
+        That the clock gates division is measured: in regenerating mouse
+        liver the circadian clockwork drives WEE1 expression and with it
+        the timing of mitosis (Matsuo et al., Science 2003, PMID
+        12934012). WHEN in the cycle it permits is not settled -- in
+        fibroblasts the two oscillators phase-lock 1:1 rather than one
+        gating the other (Feillet et al., PNAS 2014) -- and the ZT 6-12
+        window here is an ESTIMATE this module has carried since it was
+        written, a quarter of the cycle. Until a measured window replaces
+        it, read it as "division happens in one part of the day", which
+        is the part Matsuo established.
+        """
         return 6 <= self.phase < 12
 
 
@@ -137,6 +147,10 @@ class CircadianModule(SimulationModule):
         # Statistics
         self.total_peaks = 0
         self.total_troughs = 0
+        #: Division checks refused by the gate (one per cell per step
+        #: while it waits), so a deferred division of a few hours counts
+        #: many times; a measure of waiting, not of divisions.
+        self.divisions_deferred = 0
         
         # References
         self.cellular_module = None
@@ -254,14 +268,23 @@ class CircadianModule(SimulationModule):
             return 1.0 - 0.1 * clock.amplitude
     
     def can_divide(self, cell_id: int) -> bool:
-        """Check if cell can divide (circadian gating)"""
+        """Check if cell can divide (circadian gating).
+
+        Called by the cellular module for a cell that has reached its
+        division time. A refusal is counted: it is the one observable
+        that says the clock is doing something to the population rather
+        than only to its own phases.
+        """
         if not self.enable_gating:
             return True
         
         if cell_id not in self.cell_clocks:
             return True
         
-        return self.cell_clocks[cell_id].is_permissive_for_division()
+        permitted = self.cell_clocks[cell_id].is_permissive_for_division()
+        if not permitted:
+            self.divisions_deferred += 1
+        return permitted
     
     def get_state(self) -> Dict[str, Any]:
         """Return current circadian state"""
@@ -285,7 +308,8 @@ class CircadianModule(SimulationModule):
             'avg_phase': np.mean(phases) if phases else 0,
             'avg_amplitude': np.mean(amplitudes) if amplitudes else 0,
             'total_peaks': self.total_peaks,
-            'total_troughs': self.total_troughs
+            'total_troughs': self.total_troughs,
+            'divisions_deferred': self.divisions_deferred,
         }
     
     # Event handlers

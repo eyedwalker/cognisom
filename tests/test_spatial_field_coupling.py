@@ -345,7 +345,16 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     alive = [c for c in cells.cells.values() if c.alive]
     normal = [c for c in alive if c.cell_type != "cancer"]
 
-    assert len(normal) == 160
+    # What this test exists for: no normal cell dies of anything. The
+    # count used to be pinned at 160 = 80 seeded + 80 divisions; now that
+    # the circadian clock gates division (Matsuo 2003) only 35 of the 80
+    # fit inside a 24 h run -- the rest are past their division time and
+    # waiting for the next ZT 6-12 window, at 30-36 h -- so the count is
+    # the seeded cells plus whatever divided, and the survival claim is
+    # stated as what it always was.
+    assert len(normal) == 80 + cells.total_divisions
+    waiting = [c for c in normal if c.age >= cells.division_time_normal]
+    assert len(normal) == 115 and len(waiting) == 45
     assert _deaths(runner, "hypoxia", "normal") == 0
     # What this test exists for is above: normal-cell survival at 160, and
     # no normal cell dying of anything. The rest pins the run.
@@ -364,13 +373,16 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # 80 normal divisions -- each normal cell divides once, at a time
     # staggered over the day. The 5 cancer divisions that used to come
     # before the kill no longer happen.
-    assert cells.total_divisions == 80
+    # 35: each normal cell's timer fires once in the day, but only the
+    # 35 whose own clock was in its permissive window when it fired
+    # divided inside the run. 80 while the clock was unwired.
+    assert cells.total_divisions == 35
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(413.7078, abs=0.01)
+        pytest.approx(363.1047, abs=0.01)
     # The oxygen floor: no normal cell is near death.
     assert min(c.oxygen for c in alive) > 0.02          # the death threshold
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0667, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0619, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -394,7 +406,9 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # 60 while the immune compartment wandered; 58 now that it follows
     # the chemokine, a two-cell shift in a stochastic run whose cause is
     # the changed immune trajectory, not the vasculature.
-    assert _deaths(runner, "hypoxia", "normal") == 58
+    # 54 now that the clock gates division: fewer daughters are born
+    # into the capillary-poor corner to starve there.
+    assert _deaths(runner, "hypoxia", "normal") == 54
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
     # Cancer cells used to starve here too when the immune compartment
     # did not reach them first: 16 while the chase step was frozen, 0
@@ -403,13 +417,13 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # tumour's own chemokine, every cancer cell is reached and killed
     # before the capillary-poor corner starves it.
     assert _deaths(runner, "hypoxia", "cancer") == 0
-    assert _deaths(runner, "immune_killed", "cancer") == 25
-    assert cells.total_deaths == 83
+    assert _deaths(runner, "immune_killed", "cancer") == 21
+    assert cells.total_deaths == 75
     # The 24 h snapshot: the survivors are the best-perfused normal
     # cells, and no cancer cell is left.
     assert vascular.hypoxic_regions == 0
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0599, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0747, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

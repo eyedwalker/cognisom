@@ -429,6 +429,15 @@ class EngineRunner:
             lymphatic.set_cellular_module(cellular)
         if lymphatic and immune:
             lymphatic.set_immune_module(immune)
+        if cellular and circadian:
+            # The clock gates division (Matsuo 2003). Without this link
+            # the circadian module computed phases, counted peaks and
+            # troughs for the dashboard, and its three rhythmic outputs
+            # -- can_divide, the metabolic and immune modifiers -- had no
+            # caller anywhere. Only the division gate is wired: its
+            # mechanism is sourced. The two modifiers are unsourced
+            # magnitudes and stay documented hooks.
+            cellular.set_circadian_module(circadian)
         if morphogen and cellular:
             # MorphogenModule keeps only a copy of each cell's birth
             # position, so without this it senses the gradient at the

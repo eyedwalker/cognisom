@@ -234,6 +234,7 @@ class CellularModule(SimulationModule):
         # Linked molecular module supplies WT protein sequences for
         # neoantigen peptide generation (set via set_molecular_module).
         self.molecular_module = None
+        self.circadian_module = None
 
         # Statistics
         self.total_divisions = 0
@@ -465,7 +466,7 @@ class CellularModule(SimulationModule):
             division_time = (self.division_time_cancer if cell.cell_type == 'cancer' 
                            else self.division_time_normal)
             
-            if cell.age >= division_time:
+            if cell.age >= division_time and self._division_permitted(cell_id):
                 cells_to_divide.append(cell_id)
             
             # Check for death (hypoxia, starvation). A normal cell dies at
@@ -646,6 +647,23 @@ class CellularModule(SimulationModule):
         per-cell MHC-I display state.
         """
         self.molecular_module = molecular_module
+
+    def set_circadian_module(self, circadian_module):
+        """Link to the circadian module, which gates division.
+
+        The clock controls the timing of mitosis through WEE1 (Matsuo et
+        al., Science 2003, PMID 12934012). Linked, a cell that has reached
+        its division time waits for its own clock's permissive window;
+        its age keeps accruing, so the division is deferred, not lost.
+        Unlinked, division is as before: age alone decides.
+        """
+        self.circadian_module = circadian_module
+
+    def _division_permitted(self, cell_id: int) -> bool:
+        clock = self.circadian_module
+        if clock is None:
+            return True
+        return bool(clock.can_divide(cell_id))
 
     # Event handlers
     def on_exosome_uptaken(self, data):
