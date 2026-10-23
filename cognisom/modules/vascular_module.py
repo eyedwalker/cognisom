@@ -57,6 +57,15 @@ def krogh_weight(distance: float, r_cap: float, r_tissue: float) -> float:
                      _WEIGHT_CAP))
 
 
+#: Serum total testosterone of a eugonadal man, nM, and the free fraction
+#: (Vermeulen 1999, PMID 10523012). Population midpoints -- ESTIMATE.
+EUGONADAL_TOTAL_TESTOSTERONE_NM = 17.0
+FREE_TESTOSTERONE_FRACTION = 0.02
+#: The free level the capillary wall is held at in a eugonadal man, nM.
+#: Tissue DHT is referenced to THIS supply (see CellularModule).
+EUGONADAL_FREE_TESTOSTERONE_NM = EUGONADAL_TOTAL_TESTOSTERONE_NM * FREE_TESTOSTERONE_FRACTION
+
+
 @dataclass
 class Capillary:
     """Blood capillary"""
@@ -67,6 +76,7 @@ class Capillary:
     # Blood contents
     oxygen: float = 0.21  # 21% O2 (arterial)
     glucose: float = 5.0  # mM
+    testosterone: float = 0.0  # nM, FREE (unbound) plasma testosterone
     
     # Flow
     flow_rate: float = 0.5  # mm/s
@@ -187,6 +197,19 @@ class VascularModule(SimulationModule):
         self.n_capillaries = self.config.get('n_capillaries', 8)
         self.arterial_O2 = self.config.get('arterial_O2', 0.21)
         self.arterial_glucose = self.config.get('arterial_glucose', 5.0)
+        # Free plasma testosterone, the level the capillary wall is held
+        # at for the testosterone field: only the unbound steroid crosses
+        # it. Total testosterone in eugonadal men is ~10-35 nM and about
+        # 2% of it is free (Vermeulen 1999, PMID 10523012, the standard
+        # calculated-free-T method). 17 nM x 0.02 = 0.34 nM. Both are
+        # population midpoints, not a measurement of this patient:
+        # ESTIMATE. Medical castration takes serum T to ~6% of baseline
+        # (Page 2006, PMID 16882745: -94%); a preset models androgen
+        # deprivation by setting serum_total_testosterone_nM to that.
+        self.serum_total_testosterone_nM = float(
+            self.config.get('serum_total_testosterone_nM', EUGONADAL_TOTAL_TESTOSTERONE_NM))
+        self.free_testosterone_fraction = float(
+            self.config.get('free_testosterone_fraction', FREE_TESTOSTERONE_FRACTION))
         self.exchange_rate = self.config.get('exchange_rate', 1.0)
         
         # Network layout.
@@ -351,6 +374,7 @@ class VascularModule(SimulationModule):
         for capillary in self.capillaries.values():
             capillary.oxygen = self.arterial_O2
             capillary.glucose = self.arterial_glucose
+            capillary.testosterone = self.arterial_testosterone_nM
         
         # Exchange with cells: one pass over cells, each served by
         # its nearest capillary only -- see _exchange_with_tissue.
@@ -362,6 +386,11 @@ class VascularModule(SimulationModule):
 
         self._exchange_with_tissue(dt)
     
+    @property
+    def arterial_testosterone_nM(self) -> float:
+        """Free plasma testosterone at the capillary wall, nM."""
+        return self.serum_total_testosterone_nM * self.free_testosterone_fraction
+
     def _exchange_with_tissue(self, dt: float):
         """Deliver O2 and glucose to, and clear lactate from, every live
         cell, via the nearest capillary.

@@ -35,6 +35,15 @@ _log = logging.getLogger(__name__)
 #: lost on activated CAFs (PMC6639198). With D = 100 um^2/s the decay
 #: length sqrt(D/k) is 510 um, so across this 200 um tissue the gradient
 #: is shallow but present. Lengthening the half-life lengthens it.
+#: Testosterone (288 Da) in interstitium, um^2/s. No measured tissue value
+#: was found. Stokes-Einstein for a ~290 Da solute gives ~650 in water at
+#: 37 C (glucose, 180 Da, is 600 above and ~670 measured), and interstitial
+#: hindrance roughly halves that; 500 is the midpoint: ESTIMATE. The
+#: field's Thiele modulus is << 1 on the shipped grid either way, so the
+#: value moves nothing measurable here -- the field is flat at the wall
+#: level, which is itself a prediction: uniform intraprostatic free T.
+TESTOSTERONE_DIFFUSION_UM2_S = 500.0
+
 CHEMOKINE_HALF_LIFE_HOURS = 0.5
 CHEMOKINE_DECAY_PER_HOUR = float(np.log(2.0) / CHEMOKINE_HALF_LIFE_HOURS)
 
@@ -744,6 +753,7 @@ class SpatialModule(SimulationModule):
         # normalised by. Overridden from the vascular module when it is
         # linked, so the two cannot drift.
         self.arterial_O2 = float(self.config.get('arterial_O2', 0.21))
+        self.arterial_testosterone_nM = 0.0   # set from the vascular module
         self.arterial_glucose = float(
             self.config.get('arterial_glucose', 5.0))
     
@@ -756,6 +766,8 @@ class SpatialModule(SimulationModule):
         self._create_field('glucose', diffusion_coeff=600.0)
         self._create_field('cytokine', diffusion_coeff=100.0,
                            decay_rate=CHEMOKINE_DECAY_PER_HOUR)
+        self._create_field('testosterone',
+                           diffusion_coeff=TESTOSTERONE_DIFFUSION_UM2_S)
         
         # Subscribe to events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
@@ -800,7 +812,8 @@ class SpatialModule(SimulationModule):
         """Link the capillary network that supplies these fields."""
         self.vascular_module = vascular_module
         for name, attr in (('arterial_O2', 'arterial_O2'),
-                           ('arterial_glucose', 'arterial_glucose')):
+                           ('arterial_glucose', 'arterial_glucose'),
+                           ('arterial_testosterone_nM', 'arterial_testosterone_nM')):
             value = getattr(vascular_module, attr, None)
             if value is not None and float(value) > 0.0:
                 setattr(self, name, float(value))
@@ -829,6 +842,7 @@ class SpatialModule(SimulationModule):
 
         oxygen = self.fields.get('oxygen')
         glucose = self.fields.get('glucose')
+        testosterone = self.fields.get('testosterone')
 
         # Capillaries supply the interstitium: a Dirichlet voxel wherever
         # a vessel passes. Sampled at half-voxel spacing along the
@@ -847,6 +861,8 @@ class SpatialModule(SimulationModule):
                         oxygen.add_dirichlet(pos, float(cap.oxygen))
                     if glucose is not None:
                         glucose.add_dirichlet(pos, float(cap.glucose))
+                    if testosterone is not None and float(getattr(cap, 'testosterone', 0.0)) > 0.0:
+                        testosterone.add_dirichlet(pos, float(cap.testosterone))
 
         # Cells consume: first-order uptake, k = q_volumetric / C_arterial.
         # See SpatialField.add_uptake for the derivation and for why the
@@ -872,6 +888,22 @@ class SpatialModule(SimulationModule):
                     q = (glu_cancer if is_cancer else glu_normal) * frac
                     glucose.add_uptake(cell.position,
                                        q / self.arterial_glucose)
+                if testosterone is not None and self.arterial_testosterone_nM > 0:
+                    # The cell's draw on free T is what it turns into DHT:
+                    # the circulating share of the reference tissue DHT,
+                    # turned over once per relaxation time. Same secant
+                    # linearisation as oxygen (see add_uptake).
+                    # First-order for real, not a secant: 5a-reductase
+                    # sits far below saturation at 0.34 nM, so the rate
+                    # constant is the EUGONADAL draw over the EUGONADAL
+                    # level and does not change when the wall level does.
+                    # Dividing by the current wall level made a castrate
+                    # tissue consume 17x harder per nM, which is the
+                    # opposite of what a sub-saturated enzyme does.
+                    from cognisom.modules.vascular_module import EUGONADAL_FREE_TESTOSTERONE_NM
+                    q = self.T_UPTAKE_NM_PER_H * frac
+                    testosterone.add_uptake(cell.position,
+                                            q / EUGONADAL_FREE_TESTOSTERONE_NM)
 
     def update(self, dt: float):
         """Update spatial fields"""
@@ -887,7 +919,34 @@ class SpatialModule(SimulationModule):
                 field.update(self.time_since_update)
 
             self.time_since_update = 0.0
+            self._push_fields_to_cells()
     
+    #: field -> cell attribute, written for every live cell after every
+    #: solve. This is how a signal reaches a consumer: the cell reads its
+    #: own attribute, and never has to know a field exists.
+    FIELDS_TO_CELLS = (('testosterone', 'testosterone_nM'),)
+
+    #: Per-cell volumetric draw on free testosterone, nM/h: the share of the
+    #: reference tissue DHT that comes from the blood, turned over once per
+    #: relaxation time (CellularModule constants).
+    from cognisom.modules.cellular_module import (  # noqa: E402
+        DHT_INTRACRINE_FRACTION as _F, DHT_RELAXATION_H as _TAU,
+        TISSUE_DHT_REFERENCE_NM as _DHT)
+    T_UPTAKE_NM_PER_H = (1.0 - _F) * _DHT / _TAU
+    del _F, _TAU, _DHT
+
+    def _push_fields_to_cells(self):
+        if self.cellular_module is None:
+            return
+        cells = getattr(self.cellular_module, 'cells', {}) or {}
+        for field_name, attr in self.FIELDS_TO_CELLS:
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            for cell in cells.values():
+                if getattr(cell, 'alive', False):
+                    setattr(cell, attr, float(field.get_concentration_at(cell.position)))
+
     def get_concentration(self, field_name: str, position: np.ndarray) -> float:
         """Get concentration at position"""
         if field_name in self.fields:
@@ -953,7 +1012,8 @@ class SpatialModule(SimulationModule):
             alive = [c for c in cells.values()
                      if getattr(c, 'alive', False)]
             for field_name, key in (('oxygen', 'interstitial_O2'),
-                                    ('glucose', 'interstitial_glucose')):
+                                    ('glucose', 'interstitial_glucose'),
+                                    ('testosterone', 'interstitial_testosterone_nM')):
                 if field_name not in self.fields or not alive:
                     continue
                 values = [self.get_concentration(field_name, c.position)

@@ -70,6 +70,26 @@ def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
 HYPOXIC_CANCER_DEATH_PER_HOUR = 1.0
 
 
+#: Tissue DHT in androgen-stimulated benign prostate: 13.7 pmol/g, i.e.
+#: ~13.7 nM at tissue density 1 g/mL (Titus 2005, PMID 16000557; LC-MS/MS,
+#: 18 specimens, blood flow preserved to the moment of freezing).
+TISSUE_DHT_REFERENCE_NM = 13.7
+#: The fraction of tissue DHT that does NOT come from circulating
+#: testosterone. Medical castration in healthy men cut serum T by 94% and
+#: prostatic DHT by only 80% (Page 2006, PMID 16882745, n=13); in
+#: patients, tissue DHT stayed at ~25% of baseline after six months of
+#: castration + flutamide while serum DHT fell to 7.5% (Nishiyama 2004,
+#: PMID 15534082, n=30 paired). Adrenal precursors converted inside the
+#: gland are the source both papers name. 0.20 is Page's figure, the
+#: cleaner design; Nishiyama's 0.25 is the check. A vessel-fed field
+#: alone predicts 0.06 and is therefore wrong by itself -- measured.
+DHT_INTRACRINE_FRACTION = 0.20
+#: Relaxation time of tissue DHT toward its supply-set level, hours. Not
+#: measured: tissue levels are reported weeks after castration, which
+#: bounds it above and no closer. ESTIMATE; it moves transients only.
+DHT_RELAXATION_H = 2.0
+
+
 @dataclass
 class CellState:
     """State of a single cell"""
@@ -85,6 +105,13 @@ class CellState:
     glucose: float = 5.0
     atp: float = 1000.0
     lactate: float = 0.0
+    # Androgen. testosterone_nM is the FREE interstitial testosterone at
+    # the cell, written by SpatialModule from its field on every solve;
+    # None means no field is attached and tissue DHT holds its reference.
+    # dht_nM is tissue dihydrotestosterone, set by that supply plus the
+    # intracrine term (see DHT_INTRACRINE_FRACTION).
+    testosterone_nM: Optional[float] = None
+    dht_nM: float = TISSUE_DHT_REFERENCE_NM
 
     # Cancer properties
     mhc1_expression: float = 1.0
@@ -447,6 +474,7 @@ class CellularModule(SimulationModule):
 
             # Metabolism
             self._update_metabolism(cell, dt)
+            self._update_androgen(cell, dt)
 
             # ECM dynamics (Upgrade 6). Cancer cells continuously
             # remodel their local stroma; anti-fibrotic therapy
@@ -511,6 +539,26 @@ class CellularModule(SimulationModule):
         cell.lactate = max(0, cell.lactate)
         cell.atp = max(0, cell.atp)
     
+    def _update_androgen(self, cell: CellState, dt: float):
+        """Tissue DHT follows its two supplies.
+
+        The circulating supply is the free testosterone the field put at
+        this cell, referenced to the eugonadal wall level at which tissue
+        DHT is the Titus value; the intracrine supply does not move with
+        castration. Linear in testosterone between the two measured points
+        (eugonadal and castrate) -- the saturable 5a-reductase form waits
+        on a sourced Km, and with two anchor points a Km is not
+        identifiable anyway. First-order relaxation, so a step in serum
+        testosterone reaches the tissue over DHT_RELAXATION_H.
+        """
+        if cell.testosterone_nM is None:
+            return
+        from cognisom.modules.vascular_module import EUGONADAL_FREE_TESTOSTERONE_NM
+        supply = max(0.0, float(cell.testosterone_nM)) / EUGONADAL_FREE_TESTOSTERONE_NM
+        target = TISSUE_DHT_REFERENCE_NM * (
+            (1.0 - DHT_INTRACRINE_FRACTION) * supply + DHT_INTRACRINE_FRACTION)
+        cell.dht_nM += (target - cell.dht_nM) * (1.0 - np.exp(-dt / DHT_RELAXATION_H))
+
     def _divide_cell(self, cell_id: int):
         """Cell division"""
         if cell_id not in self.cells:
@@ -528,6 +576,12 @@ class CellularModule(SimulationModule):
         )
         
         daughter = self.cells[daughter_id]
+        # The daughter shares the parent's cytoplasm: it is born at the
+        # parent's tissue androgen state, not at the eugonadal reference.
+        # Without this a 24 h castrate run read 29% of baseline instead
+        # of 25%, lifted by the cells born in its last few hours.
+        daughter.dht_nM = parent.dht_nM
+        daughter.testosterone_nM = parent.testosterone_nM
         daughter.mutations = parent.mutations.copy()
         daughter.mhc1_expression = parent.mhc1_expression
         # Oxygen and glucose are concentrations, so both cells carry the
@@ -656,6 +710,7 @@ class CellularModule(SimulationModule):
             'total_transformations': self.total_transformations,
             'avg_oxygen': np.mean([c.oxygen for c in alive_cells]) if alive_cells else 0,
             'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0,
+            'avg_dht_nM': float(np.mean([c.dht_nM for c in alive_cells])) if alive_cells else 0.0,
             # Mutations whose peptides bound nothing on this patient's HLA
             # panel, with the best IC50 each reached and the scorer that
             # said so. Empty when every mutation presented something.

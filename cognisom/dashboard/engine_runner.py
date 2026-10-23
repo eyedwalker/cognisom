@@ -92,6 +92,16 @@ SCENARIOS = {
                       "ring_centre_um": (120.0, 120.0, 50.0),
                       "ring_inner_um": 10.0, "ring_outer_um": 60.0},
     },
+    "Androgen Deprivation": {
+        "desc": "Baseline tissue under castrate serum testosterone (6% of "
+                "eugonadal, Page 2006). Tissue DHT settles near 25% of "
+                "baseline, not 6%, because a fifth of it never came from "
+                "the blood.",
+        "cellular": {"n_normal_cells": 80, "n_cancer_cells": 10},
+        "immune": {"n_t_cells": 12, "n_nk_cells": 8, "n_macrophages": 6},
+        "vascular": {"n_capillaries": 8, "serum_total_testosterone_nM": 17.0 * 0.06},
+        "lymphatic": {"n_vessels": 4, "metastasis_probability": 0.001},
+    },
     # The only preset that seeds a tissue VOLUME.
     #
     # Every preset above seeds a RING: CellularModule._seed_ring puts
@@ -158,6 +168,7 @@ class SimulationSnapshot:
     total_transformations: int = 0
     avg_oxygen: float = 0.0
     avg_glucose: float = 0.0
+    avg_dht_nM: float = 0.0
 
     # Immune
     n_immune: int = 0
@@ -631,6 +642,7 @@ class EngineRunner:
         snap.total_deaths = cs.get("total_deaths", 0)
         snap.total_transformations = cs.get("total_transformations", 0)
         snap.avg_oxygen = cs.get("avg_oxygen", 0)
+        snap.avg_dht_nM = cs.get("avg_dht_nM", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
 
         # Immune
@@ -920,7 +932,7 @@ class EngineRunner:
             "time", "step",
             "n_cells", "n_cancer", "n_normal",
             "total_divisions", "total_deaths", "total_transformations",
-            "avg_oxygen", "avg_glucose",
+            "avg_oxygen", "avg_glucose", "avg_dht_nM",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",
             "avg_cell_O2", "avg_cell_glucose", "hypoxic_regions",
