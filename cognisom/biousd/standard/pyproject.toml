@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "biousd"
-version = "0.1.1"
+version = "0.1.2"
 description = "Biological cells on OpenUSD: a primvar convention any OpenUSD tool reads, with a Cell Ontology term per cell"
 readme = "README.md"
 license = { text = "Apache-2.0" }

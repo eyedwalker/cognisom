@@ -1,0 +1,23 @@
+{
+  "title": "Bio-USD: a convention for biological cells on OpenUSD",
+  "upload_type": "software",
+  "description": "A convention for carrying a population of biological cells in an OpenUSD stage as a PointInstancer with per-instance primvars, including a Cell Ontology / NCI Thesaurus term per cell for interoperability with single-cell atlases. Adds no prim types; any OpenUSD tool reads it. Includes a validator, example stages, and a converter from PhysiCell / MultiCellDS snapshots. Draft, seeking a second implementation.",
+  "creators": [
+    {
+      "name": "Walker, David",
+      "affiliation": "eyentelligence inc.",
+      "orcid": "0009-0008-3482-6181"
+    }
+  ],
+  "license": "Apache-2.0",
+  "keywords": [
+    "OpenUSD",
+    "Cell Ontology",
+    "multicellular simulation",
+    "visualization",
+    "digital twin",
+    "MultiCellDS",
+    "PhysiCell"
+  ],
+  "access_right": "open"
+}

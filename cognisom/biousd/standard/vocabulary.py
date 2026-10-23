@@ -33,7 +33,7 @@ from typing import Dict, Optional, Tuple
 
 #: Semantic version of the vocabulary. A stage records the version it
 #: was written to in its layer data as ``bio:version``.
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 #: One stage unit is one micrometre. Cell positions and diameters are
 #: in micrometres; this is what ``metersPerUnit`` must say.

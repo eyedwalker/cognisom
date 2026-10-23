@@ -1,4 +1,4 @@
-# Bio-USD 0.1.1 — specification
+# Bio-USD 0.1.2 — specification
 
 Bio-USD is a convention for carrying a population of biological cells in an OpenUSD stage. It adds no prim types: cells are instances of a `UsdGeom.PointInstancer`, and their biology is a set of `varying` primvars on that instancer, one value per instance. Any OpenUSD tool draws it unmodified; an ontology-aware tool can join it to other data through the Cell Ontology term each cell may carry.
 

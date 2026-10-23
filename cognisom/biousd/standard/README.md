@@ -1,7 +1,7 @@
 # Bio-USD
 
 **Biological cells on OpenUSD, as a convention anyone can write to.**
-Draft v0.1.1 · Apache 2.0 · [SPEC.md](SPEC.md)
+Draft v0.1.2 · Apache 2.0 · [SPEC.md](SPEC.md)
 
 A Bio-USD file is an ordinary OpenUSD stage. Cells are instances of a
 `PointInstancer`; what each cell *is* rides along as per-instance primvars.
@@ -14,7 +14,7 @@ annotate their 150 million cells with the same identifiers.
 ```
 #usda 1.0
 (
-    customLayerData = { string "bio:version" = "0.1.1" }
+    customLayerData = { string "bio:version" = "0.1.2" }
     metersPerUnit = 1e-06
     upAxis = "Y"
 )
@@ -60,7 +60,7 @@ print(table.n, table["bio:cell:ontologyTerm"])
 
 ```
 $ python -m biousd.validate scene.usdc
-scene.usdc: CONFORMS to Bio-USD 0.1.1 -- 1 population(s), 2 cells, 0 error(s), 0 warning(s)
+scene.usdc: CONFORMS to Bio-USD 0.1.2 -- 1 population(s), 2 cells, 0 error(s), 0 warning(s)
 ```
 
 The validator checks exactly what the spec says and nothing else; its exit
