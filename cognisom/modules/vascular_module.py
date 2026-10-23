@@ -210,6 +210,13 @@ class VascularModule(SimulationModule):
             self.config.get('serum_total_testosterone_nM', EUGONADAL_TOTAL_TESTOSTERONE_NM))
         self.free_testosterone_fraction = float(
             self.config.get('free_testosterone_fraction', FREE_TESTOSTERONE_FRACTION))
+        # Arterial lactate and tissue perfusion, for the lactate field's
+        # budget (see SpatialModule._lactate_vessel_level). Resting
+        # arterial lactate is 0.5-1.5 mM; 1.0 is the midpoint: ESTIMATE.
+        # Prostate perfusion is measured at 0.07-0.55 mL/mL/min (PMID
+        # 30510847); 0.15 is a low-normal value: ESTIMATE.
+        self.blood_lactate_mM = float(self.config.get('blood_lactate_mM', 1.0))
+        self.perfusion_ml_per_ml_min = float(self.config.get('perfusion_ml_per_ml_min', 0.15))
         self.exchange_rate = self.config.get('exchange_rate', 1.0)
         
         # Network layout.

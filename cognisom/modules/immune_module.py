@@ -84,6 +84,7 @@ from cognisom.engine.py.immune.macrophage_polarization import (
     DEFAULT_TAU_HOURS,
     NORMOXIC_OXYGEN,
     arginase_attenuation,
+    arginase_attenuation,
     cytokine_output,
     hypoxia_signal,
     initial_polarization,
@@ -92,6 +93,9 @@ from cognisom.engine.py.immune.macrophage_polarization import (
     polarization_label,
     polarization_step,
     polarization_target,
+)
+from cognisom.engine.py.immune.lactate import (  # noqa: E402
+    DEFAULT_LACTATE_MAX_SUPPRESSION, lactate_attenuation,
 )
 
 #: patrol_speed is quoted in um/min; the engine steps in hours.
@@ -279,6 +283,10 @@ class ImmuneModule(SimulationModule):
         self.chemotaxis_bias = float(self.config.get('chemotaxis_bias', 0.5))
         self.chemotaxis_steps = 0
         self.spatial_module = None
+        # Tumour lactic acid blunts T and NK killing (Fischer 2007, Brand
+        # 2016); read off the lactate field at the effector's position.
+        self.lactate_max_suppression = float(
+            self.config.get('lactate_max_suppression', DEFAULT_LACTATE_MAX_SUPPRESSION))
 
         # Per-lineage patrol speed, um/min. patrol_speed above is the
         # speed of any lineage with nothing more specific. Precedence: an
@@ -1489,17 +1497,29 @@ class ImmuneModule(SimulationModule):
                 self._local_m2_burden(immune_cell.position),
                 max_suppression=self.arginase_max_suppression,
             )
+            lactate_mult = self._lactate_attenuation_at(immune_cell)
             return (
-                outcome.kill_probability * sympathetic_mult * arginase_mult
+                outcome.kill_probability * sympathetic_mult * arginase_mult * lactate_mult
             )
 
         if immune_cell.cell_type == 'NK_cell':
-            return self._nk_kill_probability(immune_cell, target_cell)
+            return (self._nk_kill_probability(immune_cell, target_cell)
+                    * self._lactate_attenuation_at(immune_cell))
         if immune_cell.cell_type == 'macrophage':
             return self._macrophage_kill_probability(
                 target_cell, immune_cell,
             )
         return self.kill_probability
+
+    def _lactate_attenuation_at(self, immune_cell: ImmuneCell) -> float:
+        """Kill function retained at the effector's interstitial lactate;
+        exactly 1.0 without a lactate field or at normal tissue levels."""
+        fields = getattr(self.spatial_module, 'fields', None) or {}
+        field = fields.get('lactate')
+        if field is None or self.lactate_max_suppression <= 0.0:
+            return 1.0
+        return lactate_attenuation(field.get_concentration_at(immune_cell.position),
+                                   max_suppression=self.lactate_max_suppression)
 
     def _kill_target(self, immune_cell: ImmuneCell, target_cell):
         """Kill target cancer cell.

@@ -70,6 +70,14 @@ def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
 HYPOXIC_CANCER_DEATH_PER_HOUR = 1.0
 
 
+#: Lactate production, mM per hour on the cell's own volume: the rates
+#: _update_metabolism has always used for the intracellular pool, now
+#: named so the spatial field can source from the same numbers. 3:1
+#: cancer:normal is the module's own ratio. Both ESTIMATE -- see
+#: SpatialModule's lactate budget for what the field actually needs.
+LACTATE_PRODUCTION_CANCER_PER_H = 0.3
+LACTATE_PRODUCTION_NORMAL_PER_H = 0.1
+
 #: Tissue DHT in androgen-stimulated benign prostate: 13.7 pmol/g, i.e.
 #: ~13.7 nM at tissue density 1 g/mL (Titus 2005, PMID 16000557; LC-MS/MS,
 #: 18 specimens, blood flow preserved to the moment of freezing).
@@ -120,6 +128,9 @@ class CellState:
     # dht_nM is tissue dihydrotestosterone, set by that supply plus the
     # intracrine term (see DHT_INTRACRINE_FRACTION).
     testosterone_nM: Optional[float] = None
+    # Interstitial lactate at the cell, mM, from the spatial field (None =
+    # no field). `lactate` above is the cell's own pool.
+    lactate_mM: Optional[float] = None
     dht_nM: float = TISSUE_DHT_REFERENCE_NM
     # Whether this cancer cell dies when androgen signalling is withdrawn.
     # Westin 1995 (PMID 7778676; 18 patients, biopsies the day before and
@@ -578,13 +589,13 @@ class CellularModule(SimulationModule):
             # Warburg effect
             cell.glucose -= self.glucose_consumption_cancer * dt
             cell.oxygen -= 0.1 * dt
-            cell.lactate += 0.3 * dt
+            cell.lactate += LACTATE_PRODUCTION_CANCER_PER_H * dt
             cell.atp += 50 * dt  # Less efficient
         else:
             # Normal metabolism
             cell.glucose -= self.glucose_consumption_normal * dt
             cell.oxygen -= 0.15 * dt
-            cell.lactate += 0.1 * dt
+            cell.lactate += LACTATE_PRODUCTION_NORMAL_PER_H * dt
             cell.atp += 100 * dt  # More efficient
         
         # Clamp values

@@ -35,6 +35,12 @@ _log = logging.getLogger(__name__)
 #: lost on activated CAFs (PMC6639198). With D = 100 um^2/s the decay
 #: length sqrt(D/k) is 510 um, so across this 200 um tissue the gradient
 #: is shallow but present. Lengthening the half-life lengthens it.
+#: Lactate (90 Da) in interstitium, um^2/s. ~1,000 in water at 37 C by
+#: Stokes-Einstein; interstitial hindrance roughly halves it. ESTIMATE.
+#: It does not matter here, and that is the finding: see
+#: _lactate_vessel_level.
+LACTATE_DIFFUSION_UM2_S = 700.0
+
 #: Testosterone (288 Da) in interstitium, um^2/s. No measured tissue value
 #: was found. Stokes-Einstein for a ~290 Da solute gives ~650 in water at
 #: 37 C (glucose, 180 Da, is 600 above and ~670 measured), and interstitial
@@ -754,6 +760,15 @@ class SpatialModule(SimulationModule):
         # linked, so the two cannot drift.
         self.arterial_O2 = float(self.config.get('arterial_O2', 0.21))
         self.arterial_testosterone_nM = 0.0   # set from the vascular module
+        self.blood_lactate_mM = 1.0           # set from the vascular module
+        self.perfusion_ml_per_ml_min = 0.15   # set from the vascular module
+        self.lactate_budget: Dict[str, float] = {}
+        # Production the FIELD sources from, mM/h on the cell's volume.
+        # None = the cellular module's pool rates (0.3 / 0.1), which are
+        # ~300x below a glycolytic tumour's; a dense preset that wants
+        # Walenta's tissue lactate sets these to glycolytic values.
+        self.lactate_production_cancer_per_h = self.config.get('lactate_production_cancer_per_h')
+        self.lactate_production_normal_per_h = self.config.get('lactate_production_normal_per_h')
         self.arterial_glucose = float(
             self.config.get('arterial_glucose', 5.0))
     
@@ -768,6 +783,7 @@ class SpatialModule(SimulationModule):
                            decay_rate=CHEMOKINE_DECAY_PER_HOUR)
         self._create_field('testosterone',
                            diffusion_coeff=TESTOSTERONE_DIFFUSION_UM2_S)
+        self._create_field('lactate', diffusion_coeff=LACTATE_DIFFUSION_UM2_S)
         
         # Subscribe to events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
@@ -813,7 +829,9 @@ class SpatialModule(SimulationModule):
         self.vascular_module = vascular_module
         for name, attr in (('arterial_O2', 'arterial_O2'),
                            ('arterial_glucose', 'arterial_glucose'),
-                           ('arterial_testosterone_nM', 'arterial_testosterone_nM')):
+                           ('arterial_testosterone_nM', 'arterial_testosterone_nM'),
+                           ('blood_lactate_mM', 'blood_lactate_mM'),
+                           ('perfusion_ml_per_ml_min', 'perfusion_ml_per_ml_min')):
             value = getattr(vascular_module, attr, None)
             if value is not None and float(value) > 0.0:
                 setattr(self, name, float(value))
@@ -843,6 +861,8 @@ class SpatialModule(SimulationModule):
         oxygen = self.fields.get('oxygen')
         glucose = self.fields.get('glucose')
         testosterone = self.fields.get('testosterone')
+        lactate = self.fields.get('lactate')
+        lactate_vessel = self._lactate_vessel_level() if lactate is not None else 0.0
 
         # Capillaries supply the interstitium: a Dirichlet voxel wherever
         # a vessel passes. Sampled at half-voxel spacing along the
@@ -863,6 +883,8 @@ class SpatialModule(SimulationModule):
                         glucose.add_dirichlet(pos, float(cap.glucose))
                     if testosterone is not None and float(getattr(cap, 'testosterone', 0.0)) > 0.0:
                         testosterone.add_dirichlet(pos, float(cap.testosterone))
+                    if lactate is not None:
+                        lactate.add_dirichlet(pos, lactate_vessel)
 
         # Cells consume: first-order uptake, k = q_volumetric / C_arterial.
         # See SpatialField.add_uptake for the derivation and for why the
@@ -888,6 +910,9 @@ class SpatialModule(SimulationModule):
                     q = (glu_cancer if is_cancer else glu_normal) * frac
                     glucose.add_uptake(cell.position,
                                        q / self.arterial_glucose)
+                if lactate is not None:
+                    q_c, q_n = self._lactate_rates()
+                    lactate.add_source(cell.position, (q_c if is_cancer else q_n) * frac)
                 if testosterone is not None and self.arterial_testosterone_nM > 0:
                     # The cell's draw on free T is what it turns into DHT:
                     # the circulating share of the reference tissue DHT,
@@ -924,7 +949,7 @@ class SpatialModule(SimulationModule):
     #: field -> cell attribute, written for every live cell after every
     #: solve. This is how a signal reaches a consumer: the cell reads its
     #: own attribute, and never has to know a field exists.
-    FIELDS_TO_CELLS = (('testosterone', 'testosterone_nM'),)
+    FIELDS_TO_CELLS = (('testosterone', 'testosterone_nM'), ('lactate', 'lactate_mM'))
 
     #: Per-cell volumetric draw on free testosterone, nM/h: the share of the
     #: reference tissue DHT that comes from the blood, turned over once per
@@ -934,6 +959,71 @@ class SpatialModule(SimulationModule):
         TISSUE_DHT_REFERENCE_NM as _DHT)
     T_UPTAKE_NM_PER_H = (1.0 - _F) * _DHT / _TAU
     del _F, _TAU, _DHT
+
+    def _lactate_rates(self):
+        """(cancer, normal) lactate production, mM/h on the cell volume."""
+        from cognisom.modules.cellular_module import (
+            LACTATE_PRODUCTION_CANCER_PER_H, LACTATE_PRODUCTION_NORMAL_PER_H)
+        q_c = self.lactate_production_cancer_per_h
+        q_n = self.lactate_production_normal_per_h
+        return (float(q_c if q_c is not None else LACTATE_PRODUCTION_CANCER_PER_H),
+                float(q_n if q_n is not None else LACTATE_PRODUCTION_NORMAL_PER_H))
+
+    def _lactate_vessel_level(self) -> float:
+        """The lactate the blood carries past the cells, mM: a budget.
+
+        A Dirichlet wall at ARTERIAL lactate would be wrong by two orders
+        of magnitude, and the reason is worth having in one place. With
+        vessels 60-100 um apart, diffusion equilibrates a 200 um block in
+        ~15 s (L^2/D), so a diffusion-limited gradient of 9 mM needs
+        q R^2 / 4D = 9 -- a radius of about 1.6 mm at a glycolytic
+        tumour's production. Tumour lactate of 6-10 umol/g (Walenta 2000,
+        PMID 10706105) is not a diffusion gradient; it is what the BLOOD
+        has picked up, and that is set by perfusion, exactly as the
+        oxygen budget found consumption was. Fick's principle:
+
+            C_tissue = C_arterial + P / F
+
+        with P the volumetric production (mM per minute of tissue) and F
+        the perfusion (mL per mL per minute). The wall is held at that
+        level, uniform along the vessels (the blood enriches along a
+        capillary and this uses the mean), and the cell sources on top
+        add the small diffusive structure that is really there.
+
+        On the shipped presets, at ~1% of a cell per voxel, P/F is a few
+        hundredths of a millimolar: the field is flat at blood level and
+        the immune gate is inert, which is the correct answer for a
+        sparse, perfused block. A 70%-packed tumour at prostate perfusion
+        reaches Walenta's range only if the per-cell rate is a glycolytic
+        one (~100 mM/h on the cell's volume), not the 0.3/h the pool
+        model uses -- recorded in lactate_budget, not papered over.
+        """
+        cells = getattr(self.cellular_module, 'cells', None) or {}
+        q_cancer, q_normal = self._lactate_rates()
+        v_cell = (4.0 / 3.0) * np.pi * self.cell_radius_um ** 3
+        nx, ny, nz = self.grid_size
+        v_domain = float(nx * ny * nz) * self.resolution ** 3
+        production_mm_per_h = 0.0
+        n_alive = 0
+        for cell in cells.values():
+            if not getattr(cell, 'alive', False):
+                continue
+            n_alive += 1
+            q = q_cancer if getattr(cell, 'cell_type', '') == 'cancer' else q_normal
+            production_mm_per_h += q * v_cell
+        production_mm_per_h /= v_domain if v_domain > 0 else 1.0
+        p_per_min = production_mm_per_h / 60.0
+        f = max(float(self.perfusion_ml_per_ml_min), 1e-9)
+        level = float(self.blood_lactate_mM) + p_per_min / f
+        self.lactate_budget = {
+            'arterial_mM': float(self.blood_lactate_mM),
+            'production_mM_per_min': p_per_min,
+            'rate_cancer_mM_per_h': q_cancer,
+            'perfusion_ml_per_ml_min': f,
+            'vessel_mM': level,
+            'packing_fraction': (n_alive * v_cell / v_domain) if v_domain > 0 else 0.0,
+        }
+        return level
 
     def _push_fields_to_cells(self):
         if self.cellular_module is None:
@@ -996,6 +1086,7 @@ class SpatialModule(SimulationModule):
             }
 
         state = {
+            'lactate_budget': dict(self.lactate_budget),
             'grid_size': self.grid_size,
             'resolution': self.resolution,
             'n_fields': len(self.fields),
@@ -1013,7 +1104,8 @@ class SpatialModule(SimulationModule):
                      if getattr(c, 'alive', False)]
             for field_name, key in (('oxygen', 'interstitial_O2'),
                                     ('glucose', 'interstitial_glucose'),
-                                    ('testosterone', 'interstitial_testosterone_nM')):
+                                    ('testosterone', 'interstitial_testosterone_nM'),
+                                    ('lactate', 'interstitial_lactate_mM')):
                 if field_name not in self.fields or not alive:
                     continue
                 values = [self.get_concentration(field_name, c.position)
