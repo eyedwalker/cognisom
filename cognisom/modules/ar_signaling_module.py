@@ -253,9 +253,19 @@ class ARSignalingModule(SimulationModule):
                 col = self.Y[:, self._i[name]]
                 state[f'{name.lower()}_mean'] = float(col.mean())
             state['psa_min'] = float(self.Y[:, self._i["PSA"]].min())
+            # Totals, not means: serum PSA is what the whole gland secretes,
+            # so the clinical fall under castration shows up here as fewer
+            # cells as much as less PSA per cell. Split by the cell type the
+            # cellular module holds, because benign luminal cells make PSA
+            # too and a tumour's share is the number a clinic follows.
+            psa = self.Y[:, self._i["PSA"]]
+            state['psa_total'] = float(psa.sum())
+            cells = getattr(self.cellular_module, 'cells', None) or {}
+            cancer = np.array([getattr(cells.get(c), 'cell_type', '') == 'cancer' for c in self.ids])
+            state['psa_cancer_total'] = float(psa[cancer].sum()) if cancer.any() else 0.0
             state['psa_max'] = float(self.Y[:, self._i["PSA"]].max())
             state['psa_relative_to_eugonadal'] = (
                 state['psa_mean'] / state['eugonadal_psa'] if state['eugonadal_psa'] else 0.0)
         else:
-            state.update(psa_mean=0.0, ar_dht_mean=0.0, ar_mean=0.0)
+            state.update(psa_mean=0.0, ar_dht_mean=0.0, ar_mean=0.0, psa_total=0.0, psa_cancer_total=0.0)
         return state

@@ -42,6 +42,18 @@ from cognisom.library.store import EntityStore
 log = logging.getLogger(__name__)
 
 
+def variant_labels_from_profile(profile) -> List[str]:
+    """``GENE:CHANGE`` labels for a profile's protein-changing variants,
+    e.g. ``AR:T877A``; the ``p.`` prefix is dropped."""
+    labels: List[str] = []
+    for v in getattr(profile, "variants", None) or []:
+        gene = (getattr(v, "gene", "") or "").upper()
+        change = (getattr(v, "protein_change", "") or "").replace("p.", "")
+        if gene and change:
+            labels.append(f"{gene}:{change}")
+    return labels
+
+
 class ScenarioBuilder:
     """Build SimulationScenarios from enriched entities in EntityStore.
 
@@ -69,6 +81,7 @@ class ScenarioBuilder:
         initial_cell_counts: Optional[Dict[str, int]] = None,
         initial_field_values: Optional[Dict[str, float]] = None,
         auto_generate_params: bool = True,
+        variant_labels: Optional[List[str]] = None,
     ) -> SimulationScenario:
         """Build a SimulationScenario from entity names.
 
@@ -122,7 +135,11 @@ class ScenarioBuilder:
             initial_cell_counts=initial_cell_counts or {},
             initial_field_values=initial_field_values or {},
             source="scenario_builder",
-            tags=[scenario_type],
+            # A patient's variants ride along as tags -- "variant:AR:T877A" --
+            # so the parameter bridge can tell a receptor that an
+            # anti-androgen activates from one it blocks. Tags because the
+            # entity already persists them; no schema change.
+            tags=[scenario_type] + [f"variant:{v}" for v in (variant_labels or [])],
         )
 
         if not self._store.add_entity(scenario):

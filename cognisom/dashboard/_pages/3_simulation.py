@@ -214,8 +214,12 @@ if run_btn or st.session_state.get("sim_engine_ran"):
                   annotation_text="Titus 2005, benign", row=4, col=1)
     # 8. PSA from the per-cell AR pathway. With K_psa = 0.5 nM the
     # induction is near-saturated, so castration moves it ~10%.
-    fig.add_trace(go.Scatter(x=time_arr, y=ts["avg_psa"], name="PSA (model units)",
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["avg_psa"], name="PSA per cell",
                              line=dict(color="#6c3483", width=2)), row=4, col=2)
+    # The number a clinic follows is the tumour's total, which falls with
+    # the cell count as much as with the level per cell.
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["psa_cancer_total"], name="PSA, tumour total",
+                             line=dict(color="#c0392b", width=2, dash="dot")), row=4, col=2)
 
     # 6. Events accumulation
     div_arr = ts["total_divisions"]

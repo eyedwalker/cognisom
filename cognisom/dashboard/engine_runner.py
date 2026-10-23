@@ -171,6 +171,8 @@ class SimulationSnapshot:
     avg_glucose: float = 0.0
     avg_dht_nM: float = 0.0
     avg_psa: float = 0.0
+    psa_total: float = 0.0
+    psa_cancer_total: float = 0.0
 
     # Immune
     n_immune: int = 0
@@ -658,6 +660,8 @@ class EngineRunner:
         snap.avg_oxygen = cs.get("avg_oxygen", 0)
         snap.avg_dht_nM = cs.get("avg_dht_nM", 0.0)
         snap.avg_psa = state.get("ar_signaling", {}).get("psa_mean", 0.0)
+        snap.psa_total = state.get("ar_signaling", {}).get("psa_total", 0.0)
+        snap.psa_cancer_total = state.get("ar_signaling", {}).get("psa_cancer_total", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
 
         # Immune
@@ -947,7 +951,7 @@ class EngineRunner:
             "time", "step",
             "n_cells", "n_cancer", "n_normal",
             "total_divisions", "total_deaths", "total_transformations",
-            "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa",
+            "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa", "psa_total", "psa_cancer_total",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",
             "avg_cell_O2", "avg_cell_glucose", "hypoxic_regions",

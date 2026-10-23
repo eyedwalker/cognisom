@@ -315,6 +315,53 @@ GENE_SPECIFIC_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
 }
 
 
+# ── The genome decides the castration response ─────────────────────────
+#
+# Westin, Stattin, Damber and Bergh 1995 (Am J Pathol 146:1368, PMID
+# 7778676): 18 tumours biopsied before and seven days after castration.
+# The six whose apoptotic index rose were all negative for p53, Bcl-2 and
+# c-myc; every tumour in which it did not rise was positive for at least
+# one. So a tumour carrying any of these is one that slows under
+# castration but does not die of it. A TP53 mutation is read as p53
+# positivity (missense stabilises the protein IHC sees); BCL2 and MYC as
+# their over-expression -- approximations, labelled.
+CASTRATION_APOPTOSIS_BLOCKERS = frozenset({"TP53", "BCL2", "MYC"})
+
+# Receptor variants that turn a named anti-androgen into an AGONIST, so
+# the drug feeds the tumour instead of starving it. Keys are the variant
+# in both numberings in use; values are drug names, lower case.
+#   T877A (LNCaP; T878A in the current numbering): hydroxyflutamide,
+#   nilutamide and cyproterone acetate activate it; bicalutamide (ICI
+#   176334) does not -- Veldscholte et al. 1990 (PMID 2260966) and 1992
+#   (PMID 1540595).
+#   F876L (F877L): enzalutamide and ARN-509 (apalutamide) become
+#   agonists -- Joseph et al. 2013 (PMID 23779130).
+AR_AGONIST_ON_VARIANT: Dict[str, frozenset] = {
+    "T877A": frozenset({"flutamide", "hydroxyflutamide", "nilutamide",
+                        "cyproterone", "cyproterone acetate"}),
+    "F876L": frozenset({"enzalutamide", "apalutamide", "arn-509"}),
+}
+AR_AGONIST_ON_VARIANT["T878A"] = AR_AGONIST_ON_VARIANT["T877A"]
+AR_AGONIST_ON_VARIANT["F877L"] = AR_AGONIST_ON_VARIANT["F876L"]
+
+
+def anti_androgen_is_agonist(drug_name: str, variant_labels: List[str]) -> Optional[str]:
+    """The AR variant that makes ``drug_name`` an agonist, or None."""
+    name = (drug_name or "").strip().lower()
+    for label in variant_labels or []:
+        gene, _, change = label.partition(":")
+        if gene.upper() != "AR":
+            continue
+        if name in AR_AGONIST_ON_VARIANT.get(change.upper(), frozenset()):
+            return change.upper()
+    return None
+
+
+def variant_labels_of(scenario) -> List[str]:
+    return [t[len("variant:"):] for t in (getattr(scenario, "tags", None) or [])
+            if isinstance(t, str) and t.startswith("variant:")]
+
+
 # Runs at import: an unreachable lookup key is a silent no-op, which is
 # how the anti-androgen class went undetected.
 _assert_keys_reachable()
@@ -330,6 +377,9 @@ class ParameterBridge:
     and initial conditions into the flat config dicts that each simulation
     module expects.
     """
+
+    #: Why a drug was not applied as its class says, from the last resolve.
+    last_notes: List[str]
 
     def __init__(self, store: EntityStore):
         self._store = store
@@ -350,6 +400,8 @@ class ParameterBridge:
             Dict mapping module name → parameter dict.
             Ready to pass as ``overrides`` to EngineRunner.
         """
+        self.last_notes = []
+        variant_labels = variant_labels_of(scenario)
         layers: List[Dict[str, Dict[str, Any]]] = []
 
         # Layer 1: Baseline defaults
@@ -370,7 +422,7 @@ class ParameterBridge:
 
         # Layer 4: Drug-derived parameters
         if scenario.drug_ids:
-            drug_configs = self._map_drugs_to_params(scenario.drug_ids)
+            drug_configs = self._map_drugs_to_params(scenario.drug_ids, variant_labels)
             if drug_configs:
                 layers.append(drug_configs)
 
@@ -431,7 +483,7 @@ class ParameterBridge:
         return configs
 
     def _map_drugs_to_params(
-        self, drug_ids: List[str],
+        self, drug_ids: List[str], variant_labels: Optional[List[str]] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """Convert Drug entities to simulation parameters."""
         configs: Dict[str, Dict[str, Any]] = {}
@@ -446,6 +498,19 @@ class ParameterBridge:
             drug_class = normalize_lookup_key(entity.drug_class or "")
             mechanism = (entity.mechanism or "").lower()
 
+            # A receptor variant can turn this drug into an agonist; then
+            # neither the target mapping nor the class blockade may be
+            # applied, and the run should say so rather than quietly
+            # treating the patient. Checked before every strategy.
+            agonist_on = (anti_androgen_is_agonist(drug_name, variant_labels or [])
+                          if (drug_class == "anti_androgen" or "AR" in
+                              [str(x).upper() for x in (entity.targets or [])]) else None)
+            if agonist_on:
+                note = (f"{drug_name} is an AGONIST on this patient's AR {agonist_on}: "
+                        f"the anti-androgen blockade was not applied")
+                self.last_notes.append(note)
+                log.warning("ParameterBridge: %s", note)
+                continue
             # Strategy 1: Target-based mapping (highest specificity)
             for target in (entity.targets or []):
                 target_upper = target.upper()
@@ -512,6 +577,15 @@ class ParameterBridge:
         if suppressor_count >= 2:
             configs.setdefault("molecular", {}).setdefault("mutation_rate", 0.005)
 
+        # Whether castration can kill this tumour's cells (Westin 1995): a
+        # tumour carrying any of the blockers slows but does not die; one
+        # carrying none is the responding kind. Only when the scenario
+        # names genes at all -- a scenario without a genome keeps the
+        # population prior (a third) the cellular module defaults to.
+        if gene_ids:
+            blocked = any((self._store.get_entity(g).symbol or "").upper() in CASTRATION_APOPTOSIS_BLOCKERS
+                          for g in gene_ids if isinstance(self._store.get_entity(g), Gene))
+            configs.setdefault("cellular", {})["ar_dependent_fraction"] = 0.0 if blocked else 1.0
         # If AR pathway genes present, default to AR signaling ODE system
         if has_ar:
             configs.setdefault("ode", {}).setdefault("system", "ar_signaling")
