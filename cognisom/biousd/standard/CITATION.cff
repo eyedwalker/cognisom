@@ -6,7 +6,9 @@ date-released: 2026-10-23
 license: Apache-2.0
 type: software
 authors:
-  - name: "eyentelligence inc."
+  - family-names: Walker
+    given-names: David
+    affiliation: "eyentelligence inc."
 abstract: >-
   A convention for carrying a population of biological cells in an OpenUSD
   stage as a PointInstancer with per-instance primvars, including a Cell
