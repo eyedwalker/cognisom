@@ -27,6 +27,7 @@ from cognisom.modules import (
     MolecularModule, CellularModule, ImmuneModule,
     VascularModule, LymphaticModule, SpatialModule,
     EpigeneticModule, CircadianModule, MorphogenModule,
+    EpigeneticModule, CircadianModule, CellMechanicsModule,
     ODEModule, BNGLModule, HybridModule, SmoldynModule,
 )
 
@@ -263,6 +264,7 @@ class EngineRunner:
             "epigenetic": {},
             "circadian": {},
             "morphogen": {},
+            "cell_mechanics": {},
         }
         if overrides:
             for mod, params in overrides.items():
@@ -280,6 +282,10 @@ class EngineRunner:
             "epigenetic": True,
             "circadian": True,
             "morphogen": True,
+            # Opt-in: contact and adhesion between tissue cells, with
+            # stiffnesses nothing in the library backs. On by default
+            # it would move every cell in every preset on a guess.
+            "cell_mechanics": False,
         }
 
         # Collected data
@@ -355,6 +361,7 @@ class EngineRunner:
                 "epigenetic": EpigeneticModule,
                 "circadian": CircadianModule,
                 "morphogen": MorphogenModule,
+                "cell_mechanics": CellMechanicsModule,
                 # Solver modules. ParameterBridge.infer_enabled_modules
                 # turns these on and MODULE_PARAM_SCHEMA declares their
                 # parameters, but they were absent here, so every config
@@ -407,6 +414,7 @@ class EngineRunner:
         circadian = mods.get("circadian")
         morphogen = mods.get("morphogen")
         spatial = mods.get("spatial")
+        mechanics = mods.get("cell_mechanics")
 
         # The closed loop's first link, and the one that was missing.
         #
@@ -443,6 +451,10 @@ class EngineRunner:
             # position, so without this it senses the gradient at the
             # birthplace for the whole run and never tracks a daughter.
             morphogen.set_cellular_module(cellular)
+        if mechanics and cellular:
+            mechanics.set_cellular_module(cellular)
+            if spatial:
+                mechanics.set_spatial_module(spatial)
         if morphogen and spatial:
             # The secretion side of the chemokine field. Without this
             # the cytokine field has no source -- it was 'driven by
@@ -506,6 +518,8 @@ class EngineRunner:
                     circadian.add_cell(cell_id)
                 if morphogen:
                     morphogen.add_cell(cell_id, cell.position)
+                if mechanics:
+                    mechanics.add_cell(cell_id)
 
     def _subscribe_events(self):
         """Subscribe to key events for the dashboard event log."""

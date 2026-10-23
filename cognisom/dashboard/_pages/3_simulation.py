@@ -65,16 +65,17 @@ mod_spatial = st.sidebar.checkbox("Spatial", value=True, help="3D diffusion fiel
 mod_epigenetic = st.sidebar.checkbox("Epigenetic", value=True, help="Methylation, gene silencing")
 mod_circadian = st.sidebar.checkbox("Circadian", value=True, help="24h oscillators")
 mod_morphogen = st.sidebar.checkbox("Morphogen", value=True, help="Secreted chemokine gradient: tumour cells secrete, it diffuses and decays, immune cells patrol up it")
+mod_mechanics = st.sidebar.checkbox("Mechanics", value=False, help="Contact and adhesion between tissue cells (repulsion 100 pN/um, adhesion 10 pN/um -- placeholders, unsourced). Off by default; on, overlapping cells push apart.")
 
 modules_enabled = {
     "cellular": mod_cellular, "immune": mod_immune,
     "vascular": mod_vascular, "lymphatic": mod_lymphatic,
     "molecular": mod_molecular, "spatial": mod_spatial,
     "epigenetic": mod_epigenetic, "circadian": mod_circadian,
-    "morphogen": mod_morphogen,
+    "morphogen": mod_morphogen, "cell_mechanics": mod_mechanics,
 }
 n_enabled = sum(modules_enabled.values())
-st.sidebar.caption(f"{n_enabled} / 9 modules enabled")
+st.sidebar.caption(f"{n_enabled} / 10 modules enabled")
 
 # ── Run button ───────────────────────────────────────────────────────
 

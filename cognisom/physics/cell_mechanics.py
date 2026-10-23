@@ -154,6 +154,23 @@ if _WARP_AVAILABLE:
         # Add to forces
         forces[i] = forces[i] + f_chem
 
+    @wp.func
+    def _xorshift64(state: wp.uint64) -> wp.uint64:
+        state = state ^ (state << wp.uint64(13))
+        state = state ^ (state >> wp.uint64(7))
+        state = state ^ (state << wp.uint64(17))
+        return state
+
+    @wp.func
+    def _unit(state: wp.uint64) -> wp.float32:
+        return wp.float32(state & wp.uint64(0xFFFFFFFF)) / 4294967296.0
+
+    @wp.func
+    def _box_muller(u1: wp.float32, u2: wp.float32) -> wp.float32:
+        if u1 < 1e-15:
+            u1 = wp.float32(1e-15)
+        return wp.sqrt(-2.0 * wp.log(u1)) * wp.cos(6.283185307 * u2)
+
     @wp.kernel
     def add_brownian_force_kernel(
         forces: wp.array(dtype=wp.vec3),
@@ -174,32 +191,28 @@ if _WARP_AVAILABLE:
             return
 
         state = rng_state[i]
-
-        # Generate 3 uniform random numbers
-        def next_rand():
-            nonlocal state
-            state = state ^ (state << wp.uint64(13))
-            state = state ^ (state >> wp.uint64(7))
-            state = state ^ (state << wp.uint64(17))
-            return wp.float32(state & wp.uint64(0xFFFFFFFF)) / 4294967296.0
-
-        u1 = next_rand()
-        u2 = next_rand()
-        u3 = next_rand()
-        u4 = next_rand()
-        u5 = next_rand()
-        u6 = next_rand()
-
+        # Six uniforms from an xorshift64, the state threaded explicitly.
+        # This used to be a nested function with `nonlocal state`, which
+        # Warp's kernel compiler rejects -- and because Warp compiles a
+        # module as a whole, that one construct made EVERY kernel in this
+        # file unlaunchable, with Brownian forces on or off.
+        state = _xorshift64(state)
+        u1 = _unit(state)
+        state = _xorshift64(state)
+        u2 = _unit(state)
+        state = _xorshift64(state)
+        u3 = _unit(state)
+        state = _xorshift64(state)
+        u4 = _unit(state)
+        state = _xorshift64(state)
+        u5 = _unit(state)
+        state = _xorshift64(state)
+        u6 = _unit(state)
         # Box-Muller transform for 3 Gaussian random numbers
-        def box_muller(u1_: wp.float32, u2_: wp.float32) -> wp.float32:
-            if u1_ < 1e-15:
-                u1_ = wp.float32(1e-15)
-            return wp.sqrt(-2.0 * wp.log(u1_)) * wp.cos(6.283185307 * u2_)
-
         noise = wp.vec3(
-            box_muller(u1, u2),
-            box_muller(u3, u4),
-            box_muller(u5, u6),
+            _box_muller(u1, u2),
+            _box_muller(u3, u4),
+            _box_muller(u5, u6),
         )
 
         forces[i] = forces[i] + noise_strength * noise
@@ -282,6 +295,13 @@ class CellMechanics:
         self.n_cells = n_cells
         self.config = config or CellMechanicsConfig()
         self.backend = backend or get_warp_backend()
+        # Whether THIS instance steps on Warp. Starts as the backend's
+        # answer and flips to numpy, once, if a Warp launch raises -- a
+        # kernel that will not compile on the installed Warp must not
+        # take the simulation down with it; the numpy path is the same
+        # physics. Checked at every site that used to ask the backend.
+        self._use_warp = bool(self.backend.is_available)
+        self._warp_failed = None
 
         # State arrays
         self._positions: Optional[np.ndarray] = None
@@ -324,7 +344,7 @@ class CellMechanics:
             dtype=np.float32
         )
 
-        if self.backend.is_available:
+        if self._use_warp:
             self._initialize_warp()
         else:
             log.debug("CellMechanics initialized (NumPy fallback)")
@@ -370,10 +390,42 @@ class CellMechanics:
 
         log.debug(f"CellMechanics initialized on {self.backend.device}")
 
+    def _resize(self, n: int) -> None:
+        """Make every per-cell buffer ``n`` rows, keeping the leading rows.
+
+        The module allocates this solver once and then hands it whatever
+        population is alive on each sync. The setters used to replace
+        only their own array, so a 90-cell population on a 1000-row
+        solver launched the kernels at dim 1000 over a 90-row position
+        buffer: an out-of-bounds read, caught only when the integrator
+        tried to add (1000,3) forces to (90,3) positions. The numpy path
+        happened to tolerate the mismatch, so the silent fallback hid it.
+        """
+        if n == self.n_cells:
+            return
+
+        def fit(arr: np.ndarray, fill) -> np.ndarray:
+            out = np.full((n,) + arr.shape[1:], fill, dtype=arr.dtype)
+            k = min(n, len(arr))
+            out[:k] = arr[:k]
+            return out
+
+        self._positions = fit(self._positions, 0.0)
+        self._velocities = fit(self._velocities, 0.0)
+        self._forces = fit(self._forces, 0.0)
+        self._radii = fit(self._radii, 5.0)
+        self._cell_types = fit(self._cell_types, 0)
+        self._chemotaxis_strength = fit(
+            self._chemotaxis_strength, self.config.chemotaxis_strength)
+        self.n_cells = n
+        if self._use_warp:
+            self._initialize_warp()
+
     def set_positions(self, positions: np.ndarray):
         """Set cell positions."""
+        self._resize(len(positions))
         self._positions = positions.astype(np.float32)
-        if self.backend.is_available:
+        if self._use_warp:
             self._pos_wp = wp.array(
                 self._positions,
                 dtype=wp.vec3,
@@ -382,14 +434,15 @@ class CellMechanics:
 
     def get_positions(self) -> np.ndarray:
         """Get cell positions."""
-        if self.backend.is_available and self._pos_wp is not None:
+        if self._use_warp and self._pos_wp is not None:
             return self._pos_wp.numpy()
         return self._positions
 
     def set_velocities(self, velocities: np.ndarray):
         """Set cell velocities."""
+        self._resize(len(velocities))
         self._velocities = velocities.astype(np.float32)
-        if self.backend.is_available:
+        if self._use_warp:
             self._vel_wp = wp.array(
                 self._velocities,
                 dtype=wp.vec3,
@@ -398,14 +451,15 @@ class CellMechanics:
 
     def get_velocities(self) -> np.ndarray:
         """Get cell velocities."""
-        if self.backend.is_available and self._vel_wp is not None:
+        if self._use_warp and self._vel_wp is not None:
             return self._vel_wp.numpy()
         return self._velocities
 
     def set_radii(self, radii: np.ndarray):
         """Set cell radii."""
+        self._resize(len(radii))
         self._radii = radii.astype(np.float32)
-        if self.backend.is_available:
+        if self._use_warp:
             self._radii_wp = wp.array(
                 self._radii,
                 dtype=wp.float32,
@@ -414,8 +468,9 @@ class CellMechanics:
 
     def set_cell_types(self, types: np.ndarray):
         """Set cell types (for type-dependent adhesion)."""
+        self._resize(len(types))
         self._cell_types = types.astype(np.int32)
-        if self.backend.is_available:
+        if self._use_warp:
             self._types_wp = wp.array(
                 self._cell_types,
                 dtype=wp.int32,
@@ -424,8 +479,9 @@ class CellMechanics:
 
     def set_chemotaxis_strength(self, strength: np.ndarray):
         """Set per-cell chemotaxis sensitivity."""
+        self._resize(len(strength))
         self._chemotaxis_strength = strength.astype(np.float32)
-        if self.backend.is_available:
+        if self._use_warp:
             self._chem_wp = wp.array(
                 self._chemotaxis_strength,
                 dtype=wp.float32,
@@ -442,13 +498,32 @@ class CellMechanics:
             Time step (defaults to config.dt)
         """
         dt = dt or self.config.dt
-
-        if self.backend.is_available:
-            self._step_warp(dt)
+        if self._use_warp:
+            try:
+                self._step_warp(dt)
+            except Exception as exc:                 # noqa: BLE001
+                self._warp_failed = f"{type(exc).__name__}: {str(exc).splitlines()[-1][:160]}"
+                log.warning(
+                    "CellMechanics: Warp step failed (%s); this instance "
+                    "continues on numpy.", self._warp_failed)
+                self._sync_from_warp()
+                self._use_warp = False
+                self._step_numpy(dt)
         else:
             self._step_numpy(dt)
-
         self._time += dt
+
+    def _sync_from_warp(self) -> None:
+        """Pull the device arrays back into the numpy copies before a
+        fallback, so no step is lost."""
+        for name, wp_name in (("_positions", "_pos_wp"), ("_velocities", "_vel_wp"),
+                              ("_forces", "_forces_wp")):
+            arr = getattr(self, wp_name, None)
+            if arr is not None:
+                try:
+                    setattr(self, name, np.asarray(arr.numpy(), dtype=np.float32).copy())
+                except Exception:                    # noqa: BLE001
+                    pass
 
     def _step_warp(self, dt: float):
         """Warp-accelerated step."""
@@ -600,7 +675,7 @@ class CellMechanics:
 
     def get_forces(self) -> np.ndarray:
         """Get current forces on cells."""
-        if self.backend.is_available and self._forces_wp is not None:
+        if self._use_warp and self._forces_wp is not None:
             return self._forces_wp.numpy()
         return self._forces
 
@@ -611,7 +686,7 @@ class CellMechanics:
 
     def synchronize(self):
         """Wait for GPU operations to complete."""
-        if self.backend.is_available:
+        if self._use_warp:
             self.backend.synchronize()
 
     def seed_random(

@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from cognisom.core.event_bus import EventTypes
 from cognisom.core.module_base import SimulationModule
 from cognisom.physics.cell_mechanics import (
     CellMechanics,
@@ -48,18 +49,30 @@ class CellMechanicsModuleConfig:
     damping: float = 1.0            # Viscous damping
 
     # Chemotaxis
+    # Chemotaxis. Off, and not a stub: the cells this module moves are
+    # the cellular module's normal and cancer cells. The immune cells
+    # that chemotax live in immune_module and bias their own patrol up
+    # the chemokine gradient there, at their sourced speed.
     chemotaxis_field: str = ""      # Name of concentration field to follow
     chemotaxis_strength: float = 1.0
+    #: Radius of a tissue cell, um. The project's own default
+    #: (tissue_config.cell_radius_um), not a number invented here; the
+    #: cellular module's cells carry no volume to derive one from.
+    cell_radius_um: float = 5.0
 
     # Integration
     substeps_per_update: int = 10   # Physics substeps per simulation step
     overdamped: bool = True         # Use overdamped dynamics
 
     # Force types
+    # The stiffnesses above are UNSOURCED. k_repulsion 100 pN/um and
+    # k_adhesion 10 pN/um are placeholders of the right order; nothing
+    # in the library backs them, which is why the runner registers this
+    # module opt-in rather than on by default.
     enable_repulsion: bool = True
     enable_adhesion: bool = True
-    enable_chemotaxis: bool = True
-    enable_brownian: bool = True
+    enable_chemotaxis: bool = False
+    enable_brownian: bool = False
 
 
 class CellMechanicsModule(SimulationModule):
@@ -115,6 +128,8 @@ class CellMechanicsModule(SimulationModule):
         # Statistics
         self._total_collisions = 0
         self._total_adhesions = 0
+        self._total_displacement = 0.0
+        self._active_ids: List[int] = []
 
     def initialize(self):
         """Initialize the cell mechanics solver."""
@@ -140,16 +155,22 @@ class CellMechanicsModule(SimulationModule):
             force_types=force_types,
         )
 
-        # Start with capacity for 1000 cells (will grow as needed)
+        # Sized to whatever population is alive on each sync; the
+        # solver resizes its buffers together when the count changes.
         self._mechanics = CellMechanics(
-            n_cells=1000,
+            n_cells=1,
             config=physics_config,
         )
 
         # Subscribe to events
-        self.subscribe("CELL_CREATED", self._on_cell_created)
-        self.subscribe("CELL_DIED", self._on_cell_died)
-        self.subscribe("CELL_DIVIDED", self._on_cell_divided)
+        # Event names are the bus's lower-case tokens. This subscribed to
+        # "CELL_CREATED", "CELL_DIED" and "CELL_DIVIDED" -- the first does
+        # not exist on the bus at all and the other two are spelt
+        # 'cell_died' and 'cell_divided' -- so no handler ever fired.
+        # Cells present at build time are added by the runner through
+        # add_cell(); daughters arrive by CELL_DIVIDED.
+        self.subscribe(EventTypes.CELL_DIED, self._on_cell_died)
+        self.subscribe(EventTypes.CELL_DIVIDED, self._on_cell_divided)
 
         log.info("CellMechanicsModule initialized")
 
@@ -165,12 +186,12 @@ class CellMechanicsModule(SimulationModule):
         if not self.enabled or self._mechanics is None:
             return
 
-        n_active = len(self._cell_ids)
-        if n_active == 0:
+        if not self._cell_ids:
             return
-
         # Sync positions from cellular module
         self._sync_from_cellular()
+        if not self._active_ids:
+            return
 
         # Update chemotaxis from spatial fields
         if self.module_config.enable_chemotaxis and self._spatial_module:
@@ -189,40 +210,27 @@ class CellMechanicsModule(SimulationModule):
         """Sync cell positions from cellular module."""
         if self._cellular_module is None:
             return
-
-        # Get cell data from cellular module
-        cells = getattr(self._cellular_module, 'cells', [])
-
-        positions = []
-        radii = []
-        cell_types = []
-
+        # The cellular module keeps its cells in a dict keyed by id. This
+        # indexed it like a list, with a registry index that happened to
+        # equal the id only while no cell had died; and a position that is
+        # a numpy array fell through an isinstance(list, tuple) test into
+        # a dict .get() and raised on the first sync. Neither could show
+        # while nothing registered the module.
+        cells = getattr(self._cellular_module, 'cells', None) or {}
+        getter = cells.get if hasattr(cells, 'get') else (
+            lambda cid: cells[cid] if 0 <= cid < len(cells) else None)
+        self._active_ids = []
+        positions, radii, cell_types = [], [], []
         for cell_id in self._cell_ids:
-            idx = self._cell_id_to_index.get(cell_id)
-            if idx is None or idx >= len(cells):
+            cell = getter(cell_id)
+            if cell is None or not getattr(cell, 'alive', True):
                 continue
-
-            cell = cells[idx]
-
-            pos = getattr(cell, 'position', (0, 0, 0))
-            if isinstance(pos, (list, tuple)):
-                pos = list(pos)
-            else:
-                pos = [pos.get('x', 0), pos.get('y', 0), pos.get('z', 0)]
-
-            positions.append(pos)
-
-            # Get radius from volume (assuming spherical cells)
-            volume = getattr(cell, 'volume', 1.0)
-            radius = (3 * volume / (4 * np.pi)) ** (1/3) * 5  # Scale factor
-            radii.append(radius)
-
-            # Cell type for adhesion
+            positions.append(np.asarray(getattr(cell, 'position', (0, 0, 0)),
+                                        dtype=np.float32).reshape(3).tolist())
+            radii.append(float(self.module_config.cell_radius_um))
             ctype = getattr(cell, 'cell_type', 0)
-            if hasattr(ctype, 'value'):
-                ctype = hash(ctype.value) % 100
-            cell_types.append(int(ctype))
-
+            cell_types.append(abs(hash(str(getattr(ctype, 'value', ctype)))) % 100)
+            self._active_ids.append(cell_id)
         if positions:
             self._mechanics.set_positions(np.array(positions, dtype=np.float32))
             self._mechanics.set_radii(np.array(radii, dtype=np.float32))
@@ -232,20 +240,22 @@ class CellMechanicsModule(SimulationModule):
         """Sync updated positions back to cellular module."""
         if self._cellular_module is None:
             return
-
-        cells = getattr(self._cellular_module, 'cells', [])
+        cells = getattr(self._cellular_module, 'cells', None) or {}
+        getter = cells.get if hasattr(cells, 'get') else (
+            lambda cid: cells[cid] if 0 <= cid < len(cells) else None)
         positions = self._mechanics.get_positions()
-
-        for i, cell_id in enumerate(self._cell_ids):
-            idx = self._cell_id_to_index.get(cell_id)
-            if idx is None or idx >= len(cells):
+        moved = 0.0
+        for i, cell_id in enumerate(self._active_ids):
+            cell = getter(cell_id)
+            if cell is None or i >= len(positions):
                 continue
-
-            cell = cells[idx]
-            if i < len(positions):
-                pos = positions[i]
-                if hasattr(cell, 'position'):
-                    cell.position = (float(pos[0]), float(pos[1]), float(pos[2]))
+            new = np.asarray(positions[i], dtype=np.float32)
+            old = np.asarray(getattr(cell, 'position', new), dtype=np.float32)
+            moved += float(np.linalg.norm(new - old))
+            # Keep the cellular module's own type: it stores positions as
+            # float32 numpy arrays and reads them with array arithmetic.
+            cell.position = new.copy()
+        self._total_displacement += moved
 
     def _update_chemotaxis_gradient(self):
         """Update chemotaxis strength based on spatial gradients."""
@@ -257,16 +267,7 @@ class CellMechanicsModule(SimulationModule):
 
     def _on_cell_created(self, data: Dict):
         """Handle new cell creation."""
-        cell_id = data.get("cell_id", len(self._cell_ids))
-        position = data.get("position", (0, 0, 0))
-
-        # Add to registry
-        index = len(self._cell_ids)
-        self._cell_ids.append(cell_id)
-        self._cell_id_to_index[cell_id] = index
-
-        log.debug(f"Cell {cell_id} added to mechanics at index {index}")
-
+        self.add_cell(int(data.get("cell_id", len(self._cell_ids))))
     def _on_cell_died(self, data: Dict):
         """Handle cell death."""
         cell_id = data.get("cell_id")
@@ -277,13 +278,13 @@ class CellMechanicsModule(SimulationModule):
                 self._cell_ids.remove(cell_id)
 
     def _on_cell_divided(self, data: Dict):
-        """Handle cell division."""
-        parent_id = data.get("parent_id")
-        daughter_ids = data.get("daughter_ids", [])
-
-        for d_id in daughter_ids:
-            self._on_cell_created({"cell_id": d_id})
-
+        """Handle cell division. The cellular module's payload names ONE
+        daughter, as daughter_id."""
+        daughter = data.get("daughter_id")
+        if daughter is not None:
+            self.add_cell(int(daughter))
+        for d_id in data.get("daughter_ids", []) or []:
+            self.add_cell(int(d_id))
     def set_cellular_module(self, module):
         """Set reference to cellular module."""
         self._cellular_module = module
@@ -296,6 +297,10 @@ class CellMechanicsModule(SimulationModule):
         """Return current module state."""
         return {
             "n_cells": len(self._cell_ids),
+            "n_active": len(self._active_ids),
+            "total_displacement_um": self._total_displacement,
+            "backend": ("warp" if self._mechanics is not None and self._mechanics._use_warp
+                        else "numpy"),
             "total_collisions": self._total_collisions,
             "total_adhesions": self._total_adhesions,
             "physics_time": self._mechanics.time if self._mechanics else 0,
@@ -324,37 +329,14 @@ class CellMechanicsModule(SimulationModule):
             return self._mechanics.get_forces()
         return np.array([])
 
-    def add_cell(
-        self,
-        cell_id: int,
-        position: Tuple[float, float, float],
-        radius: float = 5.0,
-        cell_type: int = 0,
-    ):
-        """
-        Add a cell to the mechanics simulation.
-
-        Parameters
-        ----------
-        cell_id : int
-            Unique cell identifier
-        position : tuple
-            (x, y, z) position
-        radius : float
-            Cell radius
-        cell_type : int
-            Cell type for adhesion rules
-        """
-        index = len(self._cell_ids)
+    def add_cell(self, cell_id: int, position=None, radius=None, cell_type=None) -> None:
+        """Register a cell by id. Its position is read from the cellular
+        module at every update, never stored here; the other arguments
+        are accepted for callers that pass them and ignored."""
+        if cell_id in self._cell_id_to_index:
+            return
+        self._cell_id_to_index[cell_id] = len(self._cell_ids)
         self._cell_ids.append(cell_id)
-        self._cell_id_to_index[cell_id] = index
-
-        # Add to mechanics (resize if needed)
-        if self._mechanics and index < self._mechanics.n_cells:
-            positions = self._mechanics.get_positions()
-            if index < len(positions):
-                positions[index] = position
-                self._mechanics.set_positions(positions)
 
     def seed_cells(
         self,
