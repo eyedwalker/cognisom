@@ -44,12 +44,17 @@ def _run(scenario, hours, seed=11, **enabled):
 
 @pytest.fixture(scope="module")
 def baseline():
-    return _run("Baseline", 96.0)
+    # 72 h, not 96: at 96 the untreated arm reaches 2,560 cells and the
+    # batched AR solve made this fixture 106 s against the suite's 120 s
+    # per-test timeout -- it passed alone and timed out under full-suite
+    # load. 72 h keeps every claim below (640 against 41 cancer cells,
+    # two withdrawal deaths) at half the cost.
+    return _run("Baseline", 72.0)
 
 
 @pytest.fixture(scope="module")
 def castrate():
-    return _run("Androgen Deprivation", 96.0)
+    return _run("Androgen Deprivation", 72.0)
 
 
 def _state(runner):
@@ -71,9 +76,9 @@ def test_an_intact_run_divides_exactly_as_it_did_without_the_coupling():
 
 
 @pytest.mark.slow
-def test_baseline_cancer_doubles_every_twelve_hours_for_four_days(baseline):
+def test_baseline_cancer_doubles_every_twelve_hours_for_three_days(baseline):
     s = _state(baseline)
-    assert s["n_cancer"] == 10 * 2 ** 8 and s["n_normal"] == 80 * 2 ** 4
+    assert s["n_cancer"] == 10 * 2 ** 6 and s["n_normal"] == 80 * 2 ** 3
     assert s["androgen_withdrawal_deaths"] == 0
 
 
@@ -103,13 +108,13 @@ def test_the_response_unfolds_over_days_not_steps(castrate):
     """AR-DHT decays with a 20 h time constant: signalling leaves the
     dead band within two hours and reaches its castrate floor over days,
     so the tumour still doubles in its first day (4x would be untouched,
-    1x frozen) and grows less in its fourth than in its first."""
+    1x frozen) and grows less in its third than in its first."""
     ts = castrate.get_time_series()
     t = np.asarray(ts["time"]); n = np.asarray(ts["n_cancer"], float)
     day1 = n[np.searchsorted(t, 24.0)] / n[0]
-    day4 = n[-1] / n[np.searchsorted(t, 72.0)]
+    day3 = n[-1] / n[np.searchsorted(t, 48.0)]
     assert 1.5 < day1 < 4.0, f"day-1 growth {day1:.2f}x"
-    assert day4 < day1, "growth has slowed by the fourth day"
+    assert day3 < day1, "growth has slowed by the third day"
 
 
 # ── the dependent third ────────────────────────────────────────────

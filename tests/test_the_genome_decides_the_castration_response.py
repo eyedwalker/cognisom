@@ -137,6 +137,11 @@ def p53_mutant():
     return _run("Androgen Deprivation", 72.0, {"cellular": {"ar_dependent_fraction": 0.0}})
 
 
+# The module-scoped 72 h fixtures these request cost ~80 s against the
+# suite's 120 s per-test timeout, and fixture setup counts toward the
+# requesting test's budget. Explicit budget rather than a shorter run:
+# the 72 h separation is what the test is about.
+@pytest.mark.timeout(400)
 @pytest.mark.slow
 def test_the_responding_tumour_loses_cells_and_the_p53_mutant_does_not(responding, p53_mutant):
     r = responding.engine.modules["cellular"].get_state()
@@ -148,6 +153,11 @@ def test_the_responding_tumour_loses_cells_and_the_p53_mutant_does_not(respondin
     assert r["n_cancer"] < 100 and m["n_cancer"] < 100
 
 
+# The module-scoped 72 h fixtures these request cost ~80 s against the
+# suite's 120 s per-test timeout, and fixture setup counts toward the
+# requesting test's budget. Explicit budget rather than a shorter run:
+# the 72 h separation is what the test is about.
+@pytest.mark.timeout(400)
 @pytest.mark.slow
 def test_the_clinic_s_number_is_the_tumour_total(responding):
     ts = responding.get_time_series()

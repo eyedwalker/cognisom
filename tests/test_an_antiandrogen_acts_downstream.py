@@ -116,6 +116,7 @@ def test_the_drug_collapses_psa_where_castration_alone_cannot():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(400)   # three 48 h arms in one test
 def test_the_drug_stops_the_tumour_and_the_two_treatments_compose():
     """48 h, immune off. Untreated doubles four times to 160; the drug
     holds the tumour at its seed of 10 (12 h / 0.1 signalling = a 120 h
