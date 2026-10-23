@@ -84,7 +84,13 @@ SCENARIOS = {
         "cellular": {"n_normal_cells": 60, "n_cancer_cells": 25},
         "immune": {"n_t_cells": 8, "n_nk_cells": 5, "n_macrophages": 4},
         "vascular": {"n_capillaries": 6},
-        "lymphatic": {"n_vessels": 6, "metastasis_probability": 0.01},
+        # The ring is drawn through the tumour margin (the cluster sits
+        # ~20 um from (100,100,50) with a ~17 um radius); with the
+        # module's default 60-90 um ring the description above was false
+        # and no 24 h run produced a metastasis. The rate is an ESTIMATE.
+        "lymphatic": {"n_vessels": 6, "metastasis_probability": 0.01,
+                      "ring_centre_um": (120.0, 120.0, 50.0),
+                      "ring_inner_um": 10.0, "ring_outer_um": 60.0},
     },
     # The only preset that seeds a tissue VOLUME.
     #

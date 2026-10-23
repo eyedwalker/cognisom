@@ -377,12 +377,18 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # 35 whose own clock was in its permissive window when it fired
     # divided inside the run. 80 while the clock was unwired.
     assert cells.total_divisions == 35
+    # 363.5638 / 0.0710 (were 363.1047 / 0.0619): on 2026-10-23 the
+    # lymphatic module stopped rolling its dice at five sample points
+    # per vessel and rolls once per exposed cell, so the shared RNG
+    # stream shifts by a few draws and a different cell ends up at the
+    # oxygen floor. Nothing about oxygen changed; the cell counts above
+    # did not move.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(363.1047, abs=0.01)
+        pytest.approx(363.5638, abs=0.01)
     # The oxygen floor: no normal cell is near death.
     assert min(c.oxygen for c in alive) > 0.02          # the death threshold
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0619, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0710, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):

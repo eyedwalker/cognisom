@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 from cognisom.core.module_base import SimulationModule
@@ -48,6 +48,23 @@ class LymphaticVessel:
         """Get position along vessel (t: 0-1)"""
         return self.start + t * (self.end - self.start)
 
+    def distance_to(self, position: np.ndarray) -> float:
+        """Distance from a point to the vessel segment.
+
+        Collection used to test a cell against five sample points along
+        the vessel and roll the dice at each, so a cell near the middle
+        of a 30 um vessel was within 20 um of all five points and drew
+        five times a step: the configured per-hour rate was silently
+        multiplied by up to five, and by a number that changed with
+        vessel length. One distance, one draw.
+        """
+        seg = self.end - self.start
+        length_sq = float(seg @ seg)
+        if length_sq == 0.0:
+            return float(np.linalg.norm(position - self.start))
+        t = float(np.clip((position - self.start) @ seg / length_sq, 0.0, 1.0))
+        return float(np.linalg.norm(position - (self.start + t * seg)))
+
 
 class LymphaticModule(SimulationModule):
     """
@@ -63,9 +80,17 @@ class LymphaticModule(SimulationModule):
     - METASTASIS_OCCURRED: When cancer enters lymphatic
     - IMMUNE_RECRUITED: When immune cell traffics
     
-    Events Subscribed:
-    - IMMUNE_ACTIVATED: Track immune trafficking
-    - CELL_TRANSFORMED: Monitor for metastasis
+    Events Subscribed: none. It used to subscribe to IMMUNE_ACTIVATED and
+    CELL_TRANSFORMED with handlers that were ``pass``.
+
+    Rates (both ESTIMATE -- no source; per cell per hour, for a cell
+    within ``collection_radius`` of a vessel):
+    - ``metastasis_probability``: a cancer cell intravasates and LEAVES
+      the tissue. It used to be counted as a metastasis and left in
+      place, alive and dividing: double-counted.
+    - ``immune_trafficking_rate``: an activated immune cell egresses to
+      the draining node. The immune module has no return path, so this
+      is a one-way exit from the tissue.
     """
     
     def __init__(self, config: Dict = None):
@@ -80,6 +105,17 @@ class LymphaticModule(SimulationModule):
         self.drainage_rate = self.config.get('drainage_rate', 0.01)
         self.metastasis_probability = self.config.get('metastasis_probability', 0.001)
         self.immune_trafficking_rate = self.config.get('immune_trafficking_rate', 0.05)
+        # Where the vessels sit: a ring about ``centre`` from ``inner`` to
+        # ``outer`` radius, in um. The defaults put them at 60-90 um from
+        # (100, 100, 50) while every preset seeds its tumour about 20 um
+        # from that centre with a ~17 um radius -- so a 20 um collection
+        # radius reached 0-6 of 25 cancer cells, by seed, and the preset
+        # called "Metastasis Risk ... tumour near lymphatic vessels" could
+        # not show a metastasis in its 24 h. A preset that means it sets
+        # the ring through the tumour margin.
+        self.ring_centre = np.asarray(self.config.get('ring_centre_um', (100.0, 100.0, 50.0)), dtype=float)
+        self.ring_inner_um = float(self.config.get('ring_inner_um', 60.0))
+        self.ring_outer_um = float(self.config.get('ring_outer_um', 90.0))
         
         # Statistics
         self.total_fluid_drained = 0.0
@@ -96,30 +132,25 @@ class LymphaticModule(SimulationModule):
         
         # Create lymphatic vessels (fewer, larger than capillaries)
         # Positioned between capillaries
-        center = np.array([100.0, 100.0, 50.0])
-        
+        center = self.ring_centre
+        inner, outer = self.ring_inner_um, self.ring_outer_um
+
         for i in range(self.n_vessels):
             angle = 2 * np.pi * i / self.n_vessels + np.pi/4  # Offset from capillaries
-            
-            # Start mid-radius
+
             start = center + np.array([
-                60 * np.cos(angle),
-                60 * np.sin(angle),
+                inner * np.cos(angle),
+                inner * np.sin(angle),
                 np.random.uniform(-5, 5)
             ])
-            
-            # End at periphery
+
             end = center + np.array([
-                90 * np.cos(angle),
-                90 * np.sin(angle),
+                outer * np.cos(angle),
+                outer * np.sin(angle),
                 np.random.uniform(-5, 5)
             ])
             
             self.add_vessel(start, end)
-        
-        # Subscribe to events
-        self.subscribe(EventTypes.IMMUNE_ACTIVATED, self.on_immune_activated)
-        self.subscribe(EventTypes.CELL_TRANSFORMED, self.on_cell_transformed)
         
         print(f"    ✓ {self.n_vessels} lymphatic vessels")
         print(f"    ✓ Drainage and trafficking ready")
@@ -163,61 +194,59 @@ class LymphaticModule(SimulationModule):
     
     def _collect_immune_cells(self, dt: float):
         """Collect activated immune cells for trafficking"""
+        for immune_id, immune_cell in list(self.immune_module.immune_cells.items()):
+            if immune_cell.in_blood or not immune_cell.activated:
+                continue
+            vessel = self._nearest_vessel(immune_cell.position)
+            if vessel is None:
+                continue
+            # Activated immune cells egress to the draining node
+            if np.random.random() < self.immune_trafficking_rate * dt:
+                immune_cell.in_blood = True
+                vessel.immune_cells_collected += 1
+                self.total_immune_trafficked += 1
+
+                self.emit_event(EventTypes.IMMUNE_RECRUITED, {
+                    'immune_id': immune_id,
+                    'immune_type': immune_cell.cell_type,
+                    'vessel_id': vessel.vessel_id,
+                    'destination': 'lymph_node'
+                })
+
+    def _nearest_vessel(self, position) -> Optional[LymphaticVessel]:
+        """The vessel within collection radius of ``position``, nearest
+        first, or ``None``. A cell near two vessels is still one cell with
+        one chance to enter a lymphatic this step."""
+        best, best_d = None, None
         for vessel in self.vessels.values():
-            # Sample points along vessel
-            for t in np.linspace(0, 1, 5):
-                vessel_pos = vessel.get_position(t)
-                
-                # Find nearby activated immune cells
-                for immune_id, immune_cell in self.immune_module.immune_cells.items():
-                    if immune_cell.in_blood or not immune_cell.activated:
-                        continue
-                    
-                    distance = np.linalg.norm(immune_cell.position - vessel_pos)
-                    
-                    if distance < vessel.collection_radius:
-                        # Activated immune cells enter lymphatics
-                        if np.random.random() < self.immune_trafficking_rate * dt:
-                            immune_cell.in_blood = True
-                            vessel.immune_cells_collected += 1
-                            self.total_immune_trafficked += 1
-                            
-                            self.emit_event(EventTypes.IMMUNE_RECRUITED, {
-                                'immune_id': immune_id,
-                                'immune_type': immune_cell.cell_type,
-                                'vessel_id': vessel.vessel_id,
-                                'destination': 'lymph_node'
-                            })
+            d = vessel.distance_to(np.asarray(position, dtype=float))
+            if d < vessel.collection_radius and (best_d is None or d < best_d):
+                best, best_d = vessel, d
+        return best
     
     def _collect_cancer_cells(self, dt: float):
         """Collect cancer cells (metastasis pathway)"""
-        for vessel in self.vessels.values():
-            # Sample points along vessel
-            for t in np.linspace(0, 1, 5):
-                vessel_pos = vessel.get_position(t)
-                
-                # Find nearby cancer cells
-                for cell_id, cell in self.cellular_module.cells.items():
-                    if cell.cell_type != 'cancer' or not cell.alive:
-                        continue
-                    
-                    distance = np.linalg.norm(cell.position - vessel_pos)
-                    
-                    if distance < vessel.collection_radius:
-                        # Cancer cells can enter lymphatics (METASTASIS!)
-                        if np.random.random() < self.metastasis_probability * dt:
-                            vessel.cancer_cells_collected += 1
-                            self.total_metastases += 1
-                            
-                            self.emit_event(EventTypes.METASTASIS_OCCURRED, {
-                                'cell_id': cell_id,
-                                'vessel_id': vessel.vessel_id,
-                                'position': cell.position.tolist(),
-                                'mutations': cell.mutations,
-                                'destination': 'lymph_node'
-                            })
-                            
-                            print(f"⚠️  METASTASIS: Cancer cell {cell_id} entered lymphatic!")
+        for cell_id, cell in list(self.cellular_module.cells.items()):
+            if cell.cell_type != 'cancer' or not cell.alive:
+                continue
+            vessel = self._nearest_vessel(cell.position)
+            if vessel is None:
+                continue
+            # A cancer cell intravasates: it leaves the tissue
+            if np.random.random() < self.metastasis_probability * dt:
+                vessel.cancer_cells_collected += 1
+                self.total_metastases += 1
+
+                self.emit_event(EventTypes.METASTASIS_OCCURRED, {
+                    'cell_id': cell_id,
+                    'vessel_id': vessel.vessel_id,
+                    'position': cell.position.tolist(),
+                    'mutations': cell.mutations,
+                    'destination': 'lymph_node'
+                })
+                depart = getattr(self.cellular_module, 'depart_cell', None)
+                if depart is not None:
+                    depart(cell_id, destination='lymphatic')
     
     def get_state(self) -> Dict[str, Any]:
         """Return current lymphatic state"""
@@ -231,16 +260,6 @@ class LymphaticModule(SimulationModule):
             'cancer_in_vessels': sum(v.cancer_cells_collected for v in self.vessels.values())
         }
     
-    # Event handlers
-    def on_immune_activated(self, data):
-        """Handle immune activation - may traffic to lymph node"""
-        # Immune cells near lymphatics may enter
-        pass
-    
-    def on_cell_transformed(self, data):
-        """Handle cell transformation - monitor for metastasis"""
-        # Transformed cells near lymphatics are at risk
-        pass
 
 
 # Test

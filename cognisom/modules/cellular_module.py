@@ -239,6 +239,7 @@ class CellularModule(SimulationModule):
         # Statistics
         self.total_divisions = 0
         self.total_deaths = 0
+        self.total_departed = 0
         self.total_transformations = 0
         self.total_peptides_generated = 0
         self.total_peptides_presented = 0
@@ -551,6 +552,28 @@ class CellularModule(SimulationModule):
         
         self.total_divisions += 1
     
+    def depart_cell(self, cell_id: int, destination: str = 'lymphatic'):
+        """A living cell leaves the tissue -- intravasation into a
+        lymphatic or a vessel. It is not a death and is not counted as
+        one, but every module that tracks the cell must drop it, and
+        they all listen for CELL_DIED, so that is the event it rides on
+        with ``cause`` naming the exit. Nothing filters CELL_DIED by
+        cause; a listener that starts to must treat 'intravasation' as
+        a departure."""
+        if cell_id not in self.cells:
+            return
+        cell = self.cells[cell_id]
+        cell.alive = False
+        self.emit_event(EventTypes.CELL_DIED, {
+            'cell_id': cell_id,
+            'cell_type': cell.cell_type,
+            'cause': 'intravasation',
+            'destination': destination,
+            'position': cell.position.tolist()
+        })
+        self.total_departed += 1
+        self.remove_cell(cell_id)
+
     def _kill_cell(self, cell_id: int, cause: str = 'unknown'):
         """Cell death"""
         if cell_id not in self.cells:
@@ -629,6 +652,7 @@ class CellularModule(SimulationModule):
             'n_normal': len(normal_cells),
             'total_divisions': self.total_divisions,
             'total_deaths': self.total_deaths,
+            'total_departed': self.total_departed,
             'total_transformations': self.total_transformations,
             'avg_oxygen': np.mean([c.oxygen for c in alive_cells]) if alive_cells else 0,
             'avg_glucose': np.mean([c.glucose for c in alive_cells]) if alive_cells else 0,
