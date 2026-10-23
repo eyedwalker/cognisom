@@ -1,0 +1,10 @@
+Cognisom
+Copyright 2026 eyentelligence inc.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The Bio-USD convention and package (cognisom/biousd/standard, mirrored at
+https://github.com/eyedwalker/biousd) are under the same licence. OpenUSD
+itself is distributed under the Tomorrow Open Source Technology License,
+which is Apache 2.0 with a different trademark section; the two are
+compatible.

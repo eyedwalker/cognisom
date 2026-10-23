@@ -448,7 +448,7 @@ If you use cognisom in your research, please cite:
 ```
 
 ## License
-MIT License — Open science, open source
+Apache License 2.0 — Open science, open source (see LICENSE; the Bio-USD package carries the same licence)
 
 ## Contact
 - **Website**: https://eyentelligence.ai
