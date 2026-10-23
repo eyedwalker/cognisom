@@ -138,13 +138,21 @@ def test_daughter_is_killable_end_to_end():
     daughter.position = np.array([100, 100, 50], dtype=np.float32)
     t_cell.position = np.array([100, 100, 50], dtype=np.float32)
 
-    engine.run(duration=0.5)
-
-    kills = [
-        data for evt, data in engine.event_bus.event_log
-        if evt == EventTypes.CELL_KILLED_BY_TCELL
-    ]
-    assert kills, "the daughter was never killed by the T cell"
+    # A kill is now a contact with a sourced duration -- an exponential
+    # with a 60 min mean when lethal, 15 min when not -- and a per-contact
+    # probability, so a T cell may need several encounters. "Killable"
+    # means it happens; it does not mean within half an hour. Run in
+    # 2 h pieces until the event appears, up to a day.
+    kills = []
+    for _ in range(12):
+        engine.run(duration=2.0)
+        kills = [
+            data for evt, data in engine.event_bus.event_log
+            if evt == EventTypes.CELL_KILLED_BY_TCELL
+        ]
+        if kills:
+            break
+    assert kills, "the daughter was never killed by the T cell in 24 h"
     assert kills[0]['cell_id'] == daughter_id
     assert kills[0]['source_gene'] == 'KRAS'
 
