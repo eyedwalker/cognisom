@@ -1,0 +1,33 @@
+# The standalone package, for the extracted repository. Inside Cognisom
+# this directory is imported as `cognisom.biousd.standard` and this file
+# is not used; after `git subtree split --prefix=cognisom/biousd/standard`
+# and renaming the directory to `biousd`, it is the package.
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biousd"
+version = "0.1.0"
+description = "Biological cells on OpenUSD: a primvar convention any OpenUSD tool reads, with a Cell Ontology term per cell"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "usd-core>=24.0",
+]
+keywords = ["OpenUSD", "USD", "Cell Ontology", "cells", "visualization", "digital twin"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+[project.scripts]
+biousd-validate = "biousd.validate:main"
+
+[tool.setuptools]
+packages = ["biousd"]

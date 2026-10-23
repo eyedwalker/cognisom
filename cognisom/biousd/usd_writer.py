@@ -429,6 +429,12 @@ def write_cells(path: str, cells: Sequence[Any], *,
     UsdGeom.SetStageUpAxis(stage, getattr(UsdGeom.Tokens, up_axis.lower()))
     UsdGeom.SetStageMetersPerUnit(stage, METERS_PER_UNIT)
     stage.SetDefaultPrim(UsdGeom.Xform.Define(stage, WORLD).GetPrim())
+    # The vocabulary version this stage is written to, which the
+    # standard's validator requires; the vocabulary itself lives in
+    # cognisom/biousd/standard and a test holds the primvars authored
+    # below equal to it.
+    from cognisom.biousd.standard.vocabulary import VERSION as BIOUSD_VERSION
+    stage.GetRootLayer().customLayerData = {"bio:version": BIOUSD_VERSION}
     result = WriteResult(path=path, cells=len(cells))
 
     if not cells:

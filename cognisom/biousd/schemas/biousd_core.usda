@@ -83,8 +83,16 @@ class BioCell "BioCell" (
         customData = { float min = 0.0 }
     )
     float bio:cell:divisionTime = 24.0 (
-        doc = "Hours between cell divisions"
+        doc = """Hours between cell divisions. Not part of the Bio-USD
+        0.1 primvar vocabulary (standard/SPEC.md); kept on the prim
+        type for engines that carry it."""
         customData = { float min = 1.0 }
+    )
+    string bio:cell:ontologyTerm = "" (
+        doc = """Cell Ontology (CL) or NCI Thesaurus (NCIT) CURIE naming
+        the cell's identity, e.g. CL:0000625; empty when not asserted.
+        The attribute that joins a scene to CELLxGENE and the Human Cell
+        Atlas, which annotate with the same identifiers."""
     )
 }
 
