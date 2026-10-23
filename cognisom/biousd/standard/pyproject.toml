@@ -17,6 +17,11 @@ dependencies = [
     "numpy>=1.24",
     "usd-core>=24.0",
 ]
+
+[project.optional-dependencies]
+# Reading PhysiCell / MultiCellDS snapshots needs scipy for the MATLAB v4 matrices.
+physicell = ["scipy>=1.10"]
+
 keywords = ["OpenUSD", "USD", "Cell Ontology", "cells", "visualization", "digital twin"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -28,6 +33,7 @@ classifiers = [
 
 [project.scripts]
 biousd-validate = "biousd.validate:main"
+biousd-from-physicell = "biousd.physicell:main"
 
 [tool.setuptools]
 # After extraction this directory IS the package: its files sit at the

@@ -86,6 +86,26 @@ status is 0, 1 or 2, so it drops into CI.
   with real morphology authors its own prototypes at unit diameter and
   sets `protoIndices`. The instance scale is then the cell's diameter.
 
+## From PhysiCell
+
+A PhysiCell / MultiCellDS snapshot converts directly; the label table in
+the XML says which matrix row is which, and the cycle, phase and death
+codes come from PhysiCell's own constants source. Cell-type names are
+not in the output, so you supply them:
+
+```
+$ pip install biousd[physicell]
+$ biousd-from-physicell output00000001.xml output00000001.usdc --type 0=normal --type 1=cancer
+125 cells (118 alive) at t = 60.0 min -> output00000001.usdc; 94 phases mapped to their nearest token, 0 unknown
+```
+
+Verified on a PhysiCell 1.14.1 output. `bio:cell:age` is not asserted
+(PhysiCell records time in phase, not since division), `volume` is
+relative to the median living volume of the type, and composite phases
+(G0G1, G2M) and the phase-less `live` model map to their nearest token
+and are counted in the report. The microenvironment matrices are not
+read.
+
 ## Examples
 
 `examples/` holds three files written by the reference writer, with the

@@ -26,9 +26,14 @@ MathCancer.org/Contact.php; or a GitHub Discussion on
 github.com/MathCancer/PhysiCell. A Discussion is public and lets others
 weigh in; email is faster.
 
-**The ask:** would a PhysiCell `.mat`/MultiCellDS snapshot → Bio-USD
-exporter be worth a pull request from us, and is the per-cell vocabulary
-(id, type, ontology term, phase, age, alive, volume) the right first set?
+**The ask:** the exporter exists (`biousd-from-physicell`, verified on a
+PhysiCell 1.14.1 snapshot; the cycle/phase codes are read from
+`PhysiCell_constants.cpp`). Would a PR adding it to PhysiCell's tooling
+be welcome, and is the per-cell vocabulary (id, type, ontology term,
+phase, age, alive, volume) the right first set? One thing only they can
+answer: the output carries `cell_type` as an integer and the names live
+in the settings file — should the exporter read `PhysiCell_settings.xml`
+for them, or should the output carry the names?
 
 > Subject: A USD carrier for MultiCellDS snapshots — would PhysiCell read it?
 >
@@ -42,10 +47,14 @@ exporter be worth a pull request from us, and is the per-cell vocabulary
 >
 > It is deliberately not a rival to MultiCellDS: it says what cells are
 > and where, nothing about how they got there, and the ontology term is
-> meant to be the join between the two. The question we would value your
-> answer to: if we wrote a PhysiCell → Bio-USD exporter as a PR, would it
-> be welcome, and is this the right first vocabulary? A no is as useful as
-> a yes.
+> meant to be the join between the two. We have written the converter —
+> `biousd-from-physicell output00000001.xml out.usdc --type 1=cancer`
+> turns a 1.14.1 snapshot into a stage that opens in usdview — and would
+> offer it as a PR to PhysiCell's tooling if that is welcome. Two
+> questions we would value your answer to: is this the right first
+> vocabulary, and should the exporter read cell-type names from
+> `PhysiCell_settings.xml` or would you rather the output carried them?
+> A no is as useful as a yes.
 >
 > — David Walker, eyentelligence inc.
 
