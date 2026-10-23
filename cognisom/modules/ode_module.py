@@ -113,6 +113,11 @@ class ODEModule(SimulationModule):
         'system', 'n_cells', 'method', 'rtol', 'atol', 'heterogeneity',
     })
 
+    @staticmethod
+    def _library_ar_system():
+        from cognisom.genomics.reaction_builder import library_ar_system
+        return library_ar_system().to_ode_system()
+
     def _apply_parameter_overrides(self):
         """Override the system's rate constants from module config.
 
@@ -163,7 +168,13 @@ class ODEModule(SimulationModule):
 
         # Create ODE system
         if self.system_name == 'ar_signaling':
-            self.system = ODESystem.ar_signaling_pathway()
+            # The library-sourced pathway, the same one ARSignalingModule
+            # runs. This used to be ODESystem.ar_signaling_pathway(), a
+            # literal-parameter copy (k_bind 100 where the library's AR-DHT
+            # on-rate is 3.6; K_psa 10 where the library says 0.5): the
+            # engine carried two AR pathways and this module ran the
+            # unsourced one.
+            self.system = self._library_ar_system()
         else:
             self.system = ODESystem.gene_expression_2species()
 

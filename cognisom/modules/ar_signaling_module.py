@@ -90,12 +90,9 @@ class ARSignalingModule(SimulationModule):
     # ── setup ─────────────────────────────────────────────────────
 
     def initialize(self):
-        from cognisom.genomics.reaction_builder import ReactionNetworkBuilder
-        from cognisom.library.store import EntityStore
+        from cognisom.genomics.reaction_builder import library_ar_system
 
-        with contextlib.redirect_stdout(io.StringIO()):
-            store = EntityStore()
-            self.system = ReactionNetworkBuilder(store).build_ar_signaling()
+        self.system = library_ar_system()
         self.rhs = self.system.get_rhs_func()
         self.params = dict(self.system.parameters)
         self.species = list(self.system.species_names)

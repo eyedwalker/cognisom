@@ -125,7 +125,7 @@ def test_ode_module_applies_rate_override_to_the_system():
     from cognisom.gpu.ode_solver import ODESystem
     from cognisom.modules import ODEModule
 
-    default = ODESystem.ar_signaling_pathway().parameters["k_bind"]
+    default = ODEModule._library_ar_system().parameters["k_bind"]
     assert default != 10.0, "test needs an override distinct from default"
 
     mod = ODEModule({
@@ -142,7 +142,9 @@ def test_ode_module_leaves_unrelated_parameters_alone():
     from cognisom.gpu.ode_solver import ODESystem
     from cognisom.modules import ODEModule
 
-    reference = ODESystem.ar_signaling_pathway().parameters
+    # The reference is the pathway the module actually builds -- the
+    # library-sourced one -- so this asserts plumbing, not which copy.
+    reference = ODEModule._library_ar_system().parameters
     mod = ODEModule({
         "system": "ar_signaling", "n_cells": 4, "k_bind": 10.0,
     })

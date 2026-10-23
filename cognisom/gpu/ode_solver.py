@@ -294,7 +294,11 @@ class ODESystem:
     @staticmethod
     def ar_signaling_pathway() -> "ODESystem":
         """
-        Androgen receptor signaling pathway (prostate-specific).
+        Androgen receptor signaling pathway (prostate-specific) -- a
+        LITERAL-PARAMETER STAND-IN for the solver's own tests. The engine
+        runs the library-sourced pathway from
+        ``cognisom.genomics.reaction_builder.library_ar_system`` (entity
+        Kd, half-lives, PSA induction Km); these constants are not those.
 
         Species:
             0: AR_mRNA

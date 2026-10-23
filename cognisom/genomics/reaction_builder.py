@@ -181,6 +181,25 @@ class EntityODESystem:
         )
 
 
+def library_ar_system() -> "EntityODESystem":
+    """The AR/PSA pathway the engine runs, built from the entity library.
+
+    One builder for every caller -- ARSignalingModule, ODEModule -- so
+    the engine has one AR pathway. ``gpu.ode_solver.ODESystem.
+    ar_signaling_pathway`` is a literal-parameter stand-in kept for the
+    solver's own tests; it is not the pathway and its constants (k_bind
+    100, K_psa 10) are not the library's (3.6, 0.5).
+    """
+    import contextlib
+    import io
+
+    from cognisom.library.store import EntityStore
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        store = EntityStore()
+        return ReactionNetworkBuilder(store).build_ar_signaling()
+
+
 class ReactionNetworkBuilder:
     """Build ODE systems from entity library interactions.
 
