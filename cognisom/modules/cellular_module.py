@@ -101,6 +101,28 @@ DHT_INTRACRINE_FRACTION = 0.20
 #: run where nothing was withdrawn.
 AR_INTACT_ABOVE = 0.95
 
+#: IFN-gamma raises surface MHC-I on tumour cells by a mean 50% (five
+#: glioma lines, Naganuma 1998, PMID 9821108; same direction in prostate,
+#: Martini 2010, PMID 20304037, magnitude not given). The GAIN is from a
+#: non-prostate line and the SATURATION level has no source: ESTIMATES.
+MHC1_IFN_GAIN = 0.5
+#: Field level at which the gain is full. The field's units are arbitrary
+#: -- the secretion rate per effector is 1.0/h and nothing external fixes
+#: it -- so this number is what gives them meaning, and it is an internal
+#: CALIBRATION rather than a measurement: it is the level that three
+#: activated effectors at contact range produce in the shipped block
+#: (measured against the solver: one effector at 10 um gives 1.4e-4).
+#: Three within 30 um is exactly the saturation point of the neighbour-
+#: counting proxy this field replaces (DEFAULT_CYTOKINE_SATURATION_COUNT
+#: in macrophage_polarization), so the two agree where the proxy is
+#: defined and part company the way the physics says: with distance, and
+#: with the density of the cells consuming the signal.
+MHC1_IFN_SATURATION = 4.5e-4
+#: Relaxation time of surface MHC-I toward its IFN-set level, hours. The
+#: cited measurements are at 24-48 h; class I turns over in hours. The
+#: value is an ESTIMATE within that bracket.
+MHC1_RESPONSE_H = 6.0
+
 #: Relaxation time of tissue DHT toward its supply-set level, hours. Not
 #: measured: tissue levels are reported weeks after castration, which
 #: bounds it above and no closer. ESTIMATE; it moves transients only.
@@ -131,6 +153,9 @@ class CellState:
     # Interstitial lactate at the cell, mM, from the spatial field (None =
     # no field). `lactate` above is the cell's own pool.
     lactate_mM: Optional[float] = None
+    # Interstitial IFN-gamma at the cell, in [0, 1], from the spatial
+    # field (None = no field). Raises MHC-I toward mhc1_ceiling.
+    ifn_gamma_level: Optional[float] = None
     dht_nM: float = TISSUE_DHT_REFERENCE_NM
     # Whether this cancer cell dies when androgen signalling is withdrawn.
     # Westin 1995 (PMID 7778676; 18 patients, biopsies the day before and
@@ -144,6 +169,11 @@ class CellState:
 
     # Cancer properties
     mhc1_expression: float = 1.0
+    # Where mhc1_expression sits with no IFN-gamma around. Captured the
+    # first time the IFN-gamma response runs, so that a cell seeded or
+    # transformed at a downregulated level returns to THAT level when the
+    # signal goes, not to 1.0.
+    mhc1_baseline: Optional[float] = None
     mutations: List[str] = None
 
     # PD-L1 surface expression in [0, 1]. Two induction modes:
@@ -520,6 +550,7 @@ class CellularModule(SimulationModule):
             # Metabolism
             self._update_metabolism(cell, dt)
             self._update_androgen(cell, dt)
+            self._update_mhc1(cell, dt)
 
             # ECM dynamics (Upgrade 6). Cancer cells continuously
             # remodel their local stroma; anti-fibrotic therapy
@@ -604,6 +635,38 @@ class CellularModule(SimulationModule):
         cell.lactate = max(0, cell.lactate)
         cell.atp = max(0, cell.atp)
     
+    def _update_mhc1(self, cell: CellState, dt: float):
+        """Surface MHC-I follows the local IFN-gamma.
+
+        IFN-gamma raises class I on tumour cells: a mean +50% across five
+        malignant glioma lines (Naganuma et al., J Neurooncol 1998;39:227,
+        PMID 9821108), and the same direction in a prostate model, where
+        TRAMP-C2 cells are MHC-I-low until IFN-gamma treatment induces
+        antigen-processing components (Martini et al., Vaccine
+        2010;28:3548, PMID 20304037 -- direction only, no magnitude).
+
+        The GAIN is therefore 0.5 from a non-prostate line, and the
+        saturation point (the field level at which the gain is full) has
+        no source at all: both are ESTIMATES. What is not an estimate is
+        the shape -- the cell relaxes toward the target rather than
+        jumping, over MHC1_RESPONSE_H, because surface class I turns over
+        in hours and the measurements are at 24-48 h.
+
+        This is what the contact-only PD-L1 bump in the immune module
+        cannot do: a BYSTANDER tumour cell near an engagement is made
+        more visible, so the effect spreads over the signal's range
+        instead of touching only the cell being killed.
+        """
+        if cell.ifn_gamma_level is None:
+            return
+        if cell.mhc1_baseline is None:
+            cell.mhc1_baseline = float(cell.mhc1_expression)
+        drive = min(1.0, max(0.0, float(cell.ifn_gamma_level)
+                             / MHC1_IFN_SATURATION))
+        target = cell.mhc1_baseline * (1.0 + MHC1_IFN_GAIN * drive)
+        cell.mhc1_expression += (target - cell.mhc1_expression) * (
+            1.0 - np.exp(-dt / MHC1_RESPONSE_H))
+
     def _update_androgen(self, cell: CellState, dt: float):
         """Tissue DHT follows its two supplies.
 
@@ -695,6 +758,9 @@ class CellularModule(SimulationModule):
         daughter.ar_dependent = parent.ar_dependent
         daughter.mutations = parent.mutations.copy()
         daughter.mhc1_expression = parent.mhc1_expression
+        # ...and the level it returns to without IFN-gamma, or a daughter
+        # born into a signal would decay to 1.0 when it faded.
+        daughter.mhc1_baseline = parent.mhc1_baseline
         # Oxygen and glucose are concentrations, so both cells carry the
         # parent's. A daughter used to start at the CellState defaults --
         # arterial O2 and plasma glucose -- so one born in a hypoxic corner

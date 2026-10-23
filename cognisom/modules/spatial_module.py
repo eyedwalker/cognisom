@@ -41,6 +41,32 @@ _log = logging.getLogger(__name__)
 #: _lactate_vessel_level.
 LACTATE_DIFFUSION_UM2_S = 700.0
 
+#: IFN-gamma (a 34 kDa dimer) in interstitium, um^2/s. ESTIMATE from size:
+#: a protein of this mass moves at ~50-100 um^2/s in water and slower in
+#: tissue. What sets its RANGE is not this number but consumption --
+#: Oyler-Yaniv et al., Immunity 2017;46:609-20 (PMID 28389069) show
+#: cytokine propagation is a diffusion-CONSUMPTION mechanism whose length
+#: scale sqrt(D/k) shrinks as the consuming cell density rises. That is
+#: why the range is tens of micrometres and why it is tunable, and it is
+#: the reason this field is worth solving rather than counting neighbours.
+IFN_GAMMA_DIFFUSION_UM2_S = 50.0
+
+#: First-order consumption of IFN-gamma by one cell, 1/h, applied at the
+#: cell's voxel like every other uptake here. No measured per-cell rate
+#: was found, so this is an ESTIMATE -- but it is pinned to the one thing
+#: that IS measured: the signal's range in REAL tissue. The field obeys
+#: L = sqrt(D / k_eff) with k_eff the volume-averaged uptake, verified
+#: against the solver (see tests); at 200/h that gives
+#:
+#:     39% packed (near real tissue)   L = 48 um   -- Oyler-Yaniv's tens
+#:      1% packed (these presets)      L = 276 um  -- a broad field
+#:
+#: so the value reproduces the measured paracrine range at the density
+#: the measurement was made in, and the presets' sparse block gets a
+#: broad field as a CONSEQUENCE, stated rather than tuned away. A
+#: sourced per-cell uptake replaces this outright.
+IFN_GAMMA_UPTAKE_PER_H = 200.0
+
 #: Testosterone (288 Da) in interstitium, um^2/s. No measured tissue value
 #: was found. Stokes-Einstein for a ~290 Da solute gives ~650 in water at
 #: 37 C (glucose, 180 Da, is 600 above and ~670 measured), and interstitial
@@ -784,6 +810,8 @@ class SpatialModule(SimulationModule):
         self._create_field('testosterone',
                            diffusion_coeff=TESTOSTERONE_DIFFUSION_UM2_S)
         self._create_field('lactate', diffusion_coeff=LACTATE_DIFFUSION_UM2_S)
+        self._create_field('ifn_gamma',
+                           diffusion_coeff=IFN_GAMMA_DIFFUSION_UM2_S)
         
         # Subscribe to events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
@@ -863,6 +891,7 @@ class SpatialModule(SimulationModule):
         testosterone = self.fields.get('testosterone')
         lactate = self.fields.get('lactate')
         lactate_vessel = self._lactate_vessel_level() if lactate is not None else 0.0
+        ifn_gamma = self.fields.get('ifn_gamma')
 
         # Capillaries supply the interstitium: a Dirichlet voxel wherever
         # a vessel passes. Sampled at half-voxel spacing along the
@@ -913,6 +942,16 @@ class SpatialModule(SimulationModule):
                 if lactate is not None:
                     q_c, q_n = self._lactate_rates()
                     lactate.add_source(cell.position, (q_c if is_cancer else q_n) * frac)
+                if ifn_gamma is not None:
+                    # Every cell consumes IFN-gamma: receptor binding and
+                    # internalisation. This is the term that sets the
+                    # signal's range (Oyler-Yaniv 2017), so a tissue that
+                    # is denser has a shorter-ranged signal -- which is
+                    # the mechanism, not a side effect. Scaled by the
+                    # cell's share of its voxel, like every other uptake
+                    # here, so one cell in a big voxel consumes less of it.
+                    ifn_gamma.add_uptake(cell.position,
+                                         IFN_GAMMA_UPTAKE_PER_H * frac)
                 if testosterone is not None and self.arterial_testosterone_nM > 0:
                     # The cell's draw on free T is what it turns into DHT:
                     # the circulating share of the reference tissue DHT,
@@ -949,7 +988,9 @@ class SpatialModule(SimulationModule):
     #: field -> cell attribute, written for every live cell after every
     #: solve. This is how a signal reaches a consumer: the cell reads its
     #: own attribute, and never has to know a field exists.
-    FIELDS_TO_CELLS = (('testosterone', 'testosterone_nM'), ('lactate', 'lactate_mM'))
+    FIELDS_TO_CELLS = (('testosterone', 'testosterone_nM'),
+                       ('lactate', 'lactate_mM'),
+                       ('ifn_gamma', 'ifn_gamma_level'))
 
     #: Per-cell volumetric draw on free testosterone, nM/h: the share of the
     #: reference tissue DHT that comes from the blood, turned over once per
@@ -1105,7 +1146,8 @@ class SpatialModule(SimulationModule):
             for field_name, key in (('oxygen', 'interstitial_O2'),
                                     ('glucose', 'interstitial_glucose'),
                                     ('testosterone', 'interstitial_testosterone_nM'),
-                                    ('lactate', 'interstitial_lactate_mM')):
+                                    ('lactate', 'interstitial_lactate_mM'),
+                                    ('ifn_gamma', 'interstitial_ifn_gamma')):
                 if field_name not in self.fields or not alive:
                     continue
                 values = [self.get_concentration(field_name, c.position)

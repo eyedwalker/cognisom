@@ -287,6 +287,15 @@ class ImmuneModule(SimulationModule):
         # 2016); read off the lactate field at the effector's position.
         self.lactate_max_suppression = float(
             self.config.get('lactate_max_suppression', DEFAULT_LACTATE_MAX_SUPPRESSION))
+        # IFN-gamma secretion into the spatial field. Activated CD8 T
+        # cells and NK cells are the sources (Brand 2016 measures both
+        # arms by their IFN-gamma output); macrophages are not. The rate
+        # is per cell per hour in the field's own [0, 1] units and is an
+        # ESTIMATE: no per-cell secretion rate was sourced, and only the
+        # RATIO of secretion to consumption sets the field's shape.
+        self.ifn_gamma_secretion_per_h = float(
+            self.config.get('ifn_gamma_secretion_per_h', 1.0))
+        self.ifn_gamma_sources = 0
 
         # Per-lineage patrol speed, um/min. patrol_speed above is the
         # speed of any lineage with nothing more specific. Precedence: an
@@ -637,8 +646,33 @@ class ImmuneModule(SimulationModule):
         return cell_id
     
     def set_spatial_module(self, spatial_module):
-        """Link to the spatial module whose field patrol follows."""
+        """Link to the spatial module: patrol follows one of its fields,
+        and activated effectors become sources of another."""
         self.spatial_module = spatial_module
+        register = getattr(spatial_module, 'register_secretion', None)
+        if register is not None and self.ifn_gamma_secretion_per_h > 0.0:
+            register('ifn_gamma', self.ifn_gamma_sources_now)
+
+    def ifn_gamma_sources_now(self):
+        """``(position, rate)`` for every activated effector in tissue.
+
+        Called by the spatial module after it clears the field's terms,
+        so a cell that has disengaged or left stops secreting with no
+        bookkeeping here. Activated CD8 T cells and NK cells only --
+        Brand et al. 2016 (PMID 27641098) read both arms by their
+        IFN-gamma output; a resting cell contributes nothing, which
+        makes this exactly zero in a run where nothing is activated.
+        """
+        rate = self.ifn_gamma_secretion_per_h
+        sources = []
+        for cell in self.immune_cells.values():
+            if cell.in_blood or not cell.activated:
+                continue
+            if cell.cell_type not in ('T_cell', 'NK_cell'):
+                continue
+            sources.append((cell.position, rate))
+        self.ifn_gamma_sources = len(sources)
+        return sources
 
     def _chemotaxis_gradient_field(self):
         if self.spatial_module is None or self.chemotaxis_bias <= 0.0:
