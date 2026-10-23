@@ -144,6 +144,6 @@ track.
 ## Before sending
 
 1. ~~Flip the repository to public.~~ Done 2026-10-23.
-2. Add the Zenodo DOI to CITATION.cff (connect the repo on zenodo.org,
-   then create the v0.1.0 release — the tag already exists).
+2. ~~Add the Zenodo DOI to CITATION.cff.~~ Done 2026-10-23: concept DOI
+   10.5281/zenodo.23603569 (v0.1.2 is 10.5281/zenodo.23603570); the messages cite it.
 3. Verify the two unverified addresses.

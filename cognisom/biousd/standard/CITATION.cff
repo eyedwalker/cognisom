@@ -4,6 +4,14 @@ title: "Bio-USD: a convention for biological cells on OpenUSD"
 version: 0.1.2
 date-released: 2026-10-23
 license: Apache-2.0
+doi: 10.5281/zenodo.23603569
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23603569
+    description: "Concept DOI: resolves to the latest archived version."
+  - type: doi
+    value: 10.5281/zenodo.23603570
+    description: "Version DOI for 0.1.2."
 type: software
 authors:
   - family-names: Walker
