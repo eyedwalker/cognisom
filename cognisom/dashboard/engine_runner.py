@@ -298,6 +298,9 @@ class EngineRunner:
         self.history: List[SimulationSnapshot] = []
         self.cell_snapshots: List[CellSnapshot] = []
         self.event_log: List[dict] = []
+        #: Every event with the position it carried, for the scrubbable
+        #: USD export (visualization.run_usd.write_run). Attached in build().
+        self.recorder = None
 
         # Engine reference (populated on build)
         self.engine: Optional[SimulationEngine] = None
@@ -406,6 +409,13 @@ class EngineRunner:
 
         # Subscribe to events we want to capture
         self._subscribe_events()
+        from cognisom.visualization.interaction_recorder import InteractionRecorder
+        if self.recorder is not None:
+            try:
+                self.recorder.detach()
+            except Exception:                        # noqa: BLE001
+                pass
+        self.recorder = InteractionRecorder.for_engine(self.engine)
 
     def _link_modules(self):
         """Wire inter-module dependencies."""
@@ -572,6 +582,9 @@ class EngineRunner:
         self.history.clear()
         self.cell_snapshots.clear()
         self.event_log.clear()
+        if self.recorder is not None:
+            self.recorder.events.clear()
+            self.recorder.dropped = 0
         self._next_snapshot_time = None   # the frame clock restarts with the run
 
         # Record initial state

@@ -120,6 +120,7 @@ if run_btn or st.session_state.get("sim_engine_ran"):
         st.session_state["sim_dt"] = dt
         st.session_state["sim_modules"] = modules_enabled
         st.session_state["sim_engine_ran"] = True
+        st.session_state.pop("sim_usd_bytes", None)   # a new run, a new timeline
 
     # ── Retrieve cached data ─────────────────────────────────────
     ts = st.session_state["sim_ts"]
@@ -422,6 +423,33 @@ if run_btn or st.session_state.get("sim_engine_ran"):
         st.download_button("Download Time Series (CSV)", buf.getvalue(),
                            "sim_timeseries.csv", "text/csv",
                            use_container_width=True)
+
+    # The whole run as one scrubbable USD stage: every snapshot is a
+    # frame, every recorded event is drawn on the frame it happened.
+    runner_obj = st.session_state.get("sim_runner")
+    if runner_obj is not None and getattr(runner_obj, "cell_snapshots", None):
+        if st.button("Build USD timeline (.usdc)", use_container_width=True,
+                     help="Cells where they were on each frame; kills, divisions, "
+                          "deaths and recruitment on the frame they happened. "
+                          "Scrub time in usdview or Omniverse."):
+            import os
+            import tempfile
+            from cognisom.visualization.run_usd import write_run
+            with tempfile.TemporaryDirectory() as td:
+                out = os.path.join(td, "cognisom_run.usdc")
+                try:
+                    rep = write_run(out, runner_obj)
+                    with open(out, "rb") as fh:
+                        st.session_state["sim_usd_bytes"] = fh.read()
+                    st.session_state["sim_usd_report"] = rep.describe()
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"USD timeline not written: {exc}")
+        if st.session_state.get("sim_usd_bytes"):
+            st.caption(st.session_state.get("sim_usd_report", ""))
+            st.download_button("Download USD timeline (.usdc)",
+                               st.session_state["sim_usd_bytes"],
+                               "cognisom_run.usdc", "application/octet-stream",
+                               use_container_width=True)
 
 else:
     st.info(
