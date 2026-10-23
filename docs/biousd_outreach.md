@@ -9,8 +9,10 @@ What to attach, every time: the repository link, and
 `examples/minimal_200_cells.usda` — it is 23 KB, opens in a text editor,
 and shows the whole convention in the first thirty lines.
 
-Repository: https://github.com/eyedwalker/biousd (private until you flip
-it; flip it before sending — a private link is a dead link to them).
+Repository: https://github.com/eyedwalker/biousd — public as of 2026-10-23,
+Apache 2.0, with the PhysiCell exporter and three example files. Ready-to-
+paste copies of the three messages below are kept beside this file as the
+artifact page "Bio-USD outreach messages".
 
 ---
 
@@ -141,7 +143,7 @@ track.
 
 ## Before sending
 
-1. Flip the repository to public.
+1. ~~Flip the repository to public.~~ Done 2026-10-23.
 2. Add the Zenodo DOI to CITATION.cff (connect the repo on zenodo.org,
    then create the v0.1.0 release — the tag already exists).
 3. Verify the two unverified addresses.
