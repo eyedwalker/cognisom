@@ -47,6 +47,7 @@ from .epigenetic_module import EpigeneticModule
 from .circadian_module import CircadianModule
 from .morphogen_module import MorphogenModule
 from .cell_mechanics_module import CellMechanicsModule
+from .ar_signaling_module import ARSignalingModule
 
 # Solver modules. These were importable by path but not exported here, so
 # EngineRunner could not register them and everything ParameterBridge
@@ -194,6 +195,7 @@ _BUILTIN_MODULES = {
     "circadian": CircadianModule,
     "morphogen": MorphogenModule,
     "cell_mechanics": CellMechanicsModule,
+    "ar_signaling": ARSignalingModule,
 }
 
 
@@ -228,6 +230,7 @@ __all__ = [
     'CircadianModule',
     'MorphogenModule',
     'CellMechanicsModule',  # Phase A
+    'ARSignalingModule',
     # Registry API
     'module_registry',
     'register_module',

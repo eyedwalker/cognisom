@@ -28,6 +28,7 @@ from cognisom.modules import (
     VascularModule, LymphaticModule, SpatialModule,
     EpigeneticModule, CircadianModule, MorphogenModule,
     EpigeneticModule, CircadianModule, CellMechanicsModule,
+    ARSignalingModule,
     ODEModule, BNGLModule, HybridModule, SmoldynModule,
 )
 
@@ -169,6 +170,7 @@ class SimulationSnapshot:
     avg_oxygen: float = 0.0
     avg_glucose: float = 0.0
     avg_dht_nM: float = 0.0
+    avg_psa: float = 0.0
 
     # Immune
     n_immune: int = 0
@@ -282,6 +284,7 @@ class EngineRunner:
             "circadian": {},
             "morphogen": {},
             "cell_mechanics": {},
+            "ar_signaling": {},
         }
         if overrides:
             for mod, params in overrides.items():
@@ -303,6 +306,10 @@ class EngineRunner:
             # stiffnesses nothing in the library backs. On by default
             # it would move every cell in every preset on a guess.
             "cell_mechanics": False,
+            # The consumer of the testosterone signal: the library-sourced
+            # AR/PSA pathway in every cell at that cell's tissue DHT.
+            # ~2 ms per step for 100 cells, so on by default.
+            "ar_signaling": True,
         }
 
         # Collected data
@@ -382,6 +389,7 @@ class EngineRunner:
                 "circadian": CircadianModule,
                 "morphogen": MorphogenModule,
                 "cell_mechanics": CellMechanicsModule,
+                "ar_signaling": ARSignalingModule,
                 # Solver modules. ParameterBridge.infer_enabled_modules
                 # turns these on and MODULE_PARAM_SCHEMA declares their
                 # parameters, but they were absent here, so every config
@@ -442,6 +450,7 @@ class EngineRunner:
         morphogen = mods.get("morphogen")
         spatial = mods.get("spatial")
         mechanics = mods.get("cell_mechanics")
+        ar_signaling = mods.get("ar_signaling")
 
         # The closed loop's first link, and the one that was missing.
         #
@@ -478,6 +487,8 @@ class EngineRunner:
             # position, so without this it senses the gradient at the
             # birthplace for the whole run and never tracks a daughter.
             morphogen.set_cellular_module(cellular)
+        if ar_signaling and cellular:
+            ar_signaling.set_cellular_module(cellular)
         if mechanics and cellular:
             mechanics.set_cellular_module(cellular)
             if spatial:
@@ -547,6 +558,8 @@ class EngineRunner:
                     morphogen.add_cell(cell_id, cell.position)
                 if mechanics:
                     mechanics.add_cell(cell_id)
+                if ar_signaling:
+                    ar_signaling.add_cell(cell_id)
 
     def _subscribe_events(self):
         """Subscribe to key events for the dashboard event log."""
@@ -643,6 +656,7 @@ class EngineRunner:
         snap.total_transformations = cs.get("total_transformations", 0)
         snap.avg_oxygen = cs.get("avg_oxygen", 0)
         snap.avg_dht_nM = cs.get("avg_dht_nM", 0.0)
+        snap.avg_psa = state.get("ar_signaling", {}).get("psa_mean", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
 
         # Immune
@@ -932,7 +946,7 @@ class EngineRunner:
             "time", "step",
             "n_cells", "n_cancer", "n_normal",
             "total_divisions", "total_deaths", "total_transformations",
-            "avg_oxygen", "avg_glucose", "avg_dht_nM",
+            "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",
             "avg_cell_O2", "avg_cell_glucose", "hypoxic_regions",

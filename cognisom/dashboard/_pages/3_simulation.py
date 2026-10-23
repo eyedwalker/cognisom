@@ -66,16 +66,17 @@ mod_epigenetic = st.sidebar.checkbox("Epigenetic", value=True, help="Methylation
 mod_circadian = st.sidebar.checkbox("Circadian", value=True, help="24h oscillators")
 mod_morphogen = st.sidebar.checkbox("Morphogen", value=True, help="Secreted chemokine gradient: tumour cells secrete, it diffuses and decays, immune cells patrol up it")
 mod_mechanics = st.sidebar.checkbox("Mechanics", value=False, help="Contact and adhesion between tissue cells (repulsion 100 pN/um, adhesion 10 pN/um -- placeholders, unsourced). Off by default; on, overlapping cells push apart.")
+mod_ar = st.sidebar.checkbox("AR / PSA", value=True, help="The library-sourced androgen receptor pathway in every cell, driven by that cell's tissue DHT (from the testosterone field). PSA is the readout; with K_psa = 0.5 nM the induction is near-saturated, so castration moves it ~10%.")
 
 modules_enabled = {
     "cellular": mod_cellular, "immune": mod_immune,
     "vascular": mod_vascular, "lymphatic": mod_lymphatic,
     "molecular": mod_molecular, "spatial": mod_spatial,
     "epigenetic": mod_epigenetic, "circadian": mod_circadian,
-    "morphogen": mod_morphogen, "cell_mechanics": mod_mechanics,
+    "morphogen": mod_morphogen, "cell_mechanics": mod_mechanics, "ar_signaling": mod_ar,
 }
 n_enabled = sum(modules_enabled.values())
-st.sidebar.caption(f"{n_enabled} / 10 modules enabled")
+st.sidebar.caption(f"{n_enabled} / 11 modules enabled")
 
 # ── Run button ───────────────────────────────────────────────────────
 
