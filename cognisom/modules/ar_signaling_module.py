@@ -68,6 +68,32 @@ class ARSignalingModule(SimulationModule):
         self.rtol = float(self.config.get('rtol', 1e-6))
         self.atol = float(self.config.get('atol', 1e-9))
 
+        # Fraction of the AR-DHT complex's TRANSCRIPTIONAL activity an
+        # anti-androgen blocks, in [0, 1]. 0 = untreated.
+        #
+        # This exists because the obvious lever does not work. The drug
+        # class used to be mapped to a tenfold cut in k_bind, the AR-DHT
+        # association rate, and that is INERT: measured on this very
+        # system, cutting k_bind by 100x moves the steady-state complex
+        # from 19.9998 to 19.9790 nM and PSA not at all. The complex is
+        # SUPPLY-bound, not affinity-bound -- AR sits at ~4.3e4 nM, so
+        # every DHT molecule that arrives is captured whatever the
+        # affinity, and the complex settles at DHT_input/k_complex_deg.
+        # Lowering affinity only raises free DHT.
+        #
+        # The real mechanism is downstream and the library's own AR entry
+        # states it: enzalutamide "inhibits AR signaling at three levels
+        # -- competitively blocks androgen binding..., inhibits AR
+        # nuclear translocation..., and prevents AR binding to DNA",
+        # which is also what Tran et al. 2009 (Science 324:787, PMID
+        # 19359544) characterise for MDV3100: reduced nuclear
+        # translocation, impaired DNA binding at androgen response
+        # elements, and impaired coactivator recruitment. Two of those
+        # three are after the complex has formed, so the complex is the
+        # wrong place to intervene and its OUTPUT is the right one.
+        self.transcriptional_block = float(
+            self.config.get('ar_transcriptional_block', 0.0))
+
         self.system = None
         self.rhs = None
         self.params: Dict[str, float] = {}
@@ -162,14 +188,24 @@ class ARSignalingModule(SimulationModule):
         return self.species_of(cell_id, "PSA")
 
     def signalling_fraction(self, cell_id: int) -> Optional[float]:
-        """The cell's AR-DHT complex as a fraction of the eugonadal
-        steady state, clamped to [0, 1]; None if the cell is not mapped.
-        This is the one number the cellular module reads."""
+        """The cell's ACTIVE AR signalling as a fraction of the untreated
+        eugonadal steady state, clamped to [0, 1]; None if the cell is not
+        mapped. This is the one number the cellular module reads.
+
+        Two things reduce it, and they are different: less androgen
+        reaching the receptor (castration, which lowers the complex) and
+        an anti-androgen blocking what the complex does (which does not
+        lower the complex at all). A tumour under both is suppressed by
+        the product.
+        """
         value = self.species_of(cell_id, "AR_DHT")
         if value is None or self.eugonadal_state is None:
             return None
         ref = float(self.eugonadal_state[self._i["AR_DHT"]])
-        return float(min(1.0, max(0.0, value / ref))) if ref > 0 else None
+        if ref <= 0:
+            return None
+        active = (value / ref) * (1.0 - self.transcriptional_block)
+        return float(min(1.0, max(0.0, active)))
 
     # ── stepping ──────────────────────────────────────────────────
 
@@ -202,6 +238,14 @@ class ARSignalingModule(SimulationModule):
         k = len(self.species)
         params = dict(self.params)
         params['DHT_input'] = np.array([self.dht_input_for(v) for v in dht])
+        if self.transcriptional_block > 0.0:
+            # The drug acts on what the complex DOES, so it scales the
+            # transcription the complex drives, not the complex itself.
+            # self.params stays the pristine library system, and
+            # eugonadal_state stays the UNTREATED reference, so a treated
+            # cell reads below 1.0 against an untreated patient.
+            params['k_psa_tx'] = (self.params['k_psa_tx']
+                                  * (1.0 - self.transcriptional_block))
 
         def f(t, yf):
             return self.rhs(t, yf.reshape(n, k), params).ravel()

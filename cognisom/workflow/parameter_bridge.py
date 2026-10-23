@@ -146,8 +146,26 @@ BASELINE_DEFAULTS: Dict[str, Dict[str, Any]] = {
 
 DRUG_CLASS_PARAM_MAP: Dict[str, Dict[str, Dict[str, Any]]] = {
     "anti_androgen": {
-        "ode": {"system": "ar_signaling", "k_bind": 10.0},  # reduced from 100
-        "cellular": {"division_time_cancer": 18.0},  # slowed growth
+        # k_bind 10.0 (down from the factory 100) is kept for the legacy
+        # ODEModule path, and it is INERT there: the AR-DHT complex is
+        # supply-bound, not affinity-bound, so cutting the association
+        # rate even 100-fold moves the steady-state complex by 0.1% and
+        # PSA not at all (measured; see ARSignalingModule's note). It
+        # stays only because removing a parameter that reaches a system
+        # is a separate change from making the drug work.
+        "ode": {"system": "ar_signaling", "k_bind": 10.0},
+        # What actually blocks the drug's target: the transcriptional
+        # output of the complex, which is where two of enzalutamide's
+        # three mechanisms act (nuclear translocation and DNA binding --
+        # Tran 2009, PMID 19359544; the library's own AR entry says the
+        # same). 0.9 at therapeutic exposure is an ESTIMATE: the papers
+        # characterise the mechanism, not a fraction.
+        "ar_signaling": {"ar_transcriptional_block": 0.9},
+        # The scripted slowdown stays for a run with no AR module. With
+        # the module on, the slowdown is computed from AR signalling and
+        # this is the weaker of the two, so it does not double-count --
+        # measured in test_an_antiandrogen_acts_downstream.
+        "cellular": {"division_time_cancer": 18.0},
     },
     "chemotherapy": {
         "cellular": {"division_time_cancer": 24.0, "glucose_consumption_cancer": 0.8},
