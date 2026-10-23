@@ -138,3 +138,16 @@ def test_the_page_imports_the_adapter_rather_than_redefining_it():
     assert "from cognisom.biousd.scene_adapter import" in source
     assert "class _SceneCell" not in source
     assert "_CELL_TYPE_FOR_PROTOTYPE" not in source
+
+
+def test_the_page_passes_the_phase_2_controls_through():
+    """Peel, LOD, colour-by and the blank-frame warning reach the user.
+
+    They are keyword arguments on write_cells; a page that forgot one
+    would still export, just without it, and nothing would say so.
+    """
+    source = (__import__("pathlib").Path(__file__).resolve().parents[1]
+              / "cognisom" / "dashboard" / "_pages"
+              / "16_usd_omniverse.py").read_text()
+    for needle in ("occlusion=", "lod=lod", "colour_by=", "result.over_limit"):
+        assert needle in source, f"the Export tab does not wire {needle!r}"

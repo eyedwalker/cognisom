@@ -196,6 +196,92 @@ def hidden_for_camera_direction(
                                offset=offset, stroma_only=stroma_only, up=up)
 
 
+def occluded_instance_ids(
+    positions: np.ndarray,
+    diameters: np.ndarray | float,
+    direction: Sequence[float],
+    *,
+    keep: int = 2,
+    up: Sequence[float] = (0.0, 0.0, 1.0),
+    column: Optional[float] = None,
+    already_hidden: Optional[Iterable[int]] = None,
+) -> list[int]:
+    """Instances buried behind others along the view, to hide.
+
+    "Draw only what is potentially visible" is Mesoscale Explorer's
+    third optimisation, and it matters here for a reason the plan did
+    not state. Storm's render time is linear in visible instances x
+    faces (measured: grid 12, 100k cells 0.8 s, 400k cells 2.8 s), and
+    somewhere between ~463M and ~579M submitted triangles it stops
+    drawing altogether -- exit code 0, a valid PNG, every pixel blank.
+    500,000 cells at grid 12 is over that line; the same scene with a
+    section cut is under it. invisibleIds is honoured before
+    submission, so hiding what cannot be seen is the lever that keeps
+    a scene on the right side of the cliff.
+
+    This is a depth peel. The screen is tiled into columns `column`
+    wide (default: the median cell diameter), each cell lands in one,
+    and within a column only the `keep` nearest to the camera stay.
+    Everything deeper is behind at least `keep` cells and, in a packed
+    tissue, cannot be seen.
+
+    It is approximate in two honest ways. A cell straddles up to four
+    columns and is binned by its centre, so a cell can be kept in one
+    column while a neighbour it half-covers is dropped from the next;
+    `keep` = 2 absorbs that. And the body material is translucent, so
+    deeper cells do contribute a little -- measured on the 500k scene
+    the peel changes the frame by a few percent of pixels, which is the
+    price of staying under the cliff and is reported, not hidden.
+
+    `already_hidden` lets this run after a section cut, peeling only
+    among what the cut left; otherwise the cut's own removed front layer
+    would count as the occluders and nothing would be peeled.
+    """
+    positions = np.asarray(positions, dtype=float)
+    n = len(positions)
+    if n == 0 or keep < 1:
+        return []
+    direction = np.asarray(direction, dtype=float)
+    norm = np.linalg.norm(direction)
+    if norm == 0.0:
+        return []
+    forward = -direction / norm
+    up_v = np.asarray(up, dtype=float)
+    right = np.cross(forward, up_v)
+    if np.linalg.norm(right) < 1e-9:
+        right = np.cross(forward, np.array([0.0, 1.0, 0.0]))
+    right /= np.linalg.norm(right)
+    up_cam = np.cross(right, forward)
+
+    d = np.asarray(diameters, dtype=float)
+    if d.ndim == 0:
+        d = np.full(n, float(d))
+    if column is None:
+        column = float(np.median(d)) if n else 1.0
+    column = max(float(column), 1e-6)
+
+    visible = np.ones(n, dtype=bool)
+    if already_hidden is not None:
+        hidden_idx = np.fromiter((int(i) for i in already_hidden), dtype=int)
+        visible[hidden_idx] = False
+    idx = np.flatnonzero(visible)
+    if len(idx) == 0:
+        return []
+    rel = positions[idx]
+    a = np.floor(rel @ right / column).astype(np.int64)
+    b = np.floor(rel @ up_cam / column).astype(np.int64)
+    depth = rel @ (-forward)            # larger = nearer the camera
+    # One key per column; sort by column then by depth descending.
+    key = (a - a.min()) * (b.max() - b.min() + 1) + (b - b.min())
+    order = np.lexsort((-depth, key))
+    key_sorted = key[order]
+    # rank within column = position since the column's first entry
+    starts = np.r_[0, np.flatnonzero(np.diff(key_sorted)) + 1]
+    rank = np.arange(len(order)) - np.repeat(starts, np.diff(np.r_[starts, len(order)]))
+    hide = idx[order[rank >= keep]]
+    return [int(i) for i in np.sort(hide)]
+
+
 def stroma_scales(
     cell_types: Sequence[str],
     *,

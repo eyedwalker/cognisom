@@ -88,15 +88,56 @@ class WriteResult:
     bytes_written: int = 0
     #: Instances marked invisible by a cutaway, if one was asked for.
     hidden: int = 0
+    #: Instances the depth peel hid on top of the cut.
+    occluded: int = 0
+    #: Triangles actually submitted: each visible instance times the
+    #: faces of the prototype it points at. This is the number the
+    #: render cliff is measured in; `prototype_faces` is only what was
+    #: authored once.
+    submitted_faces: int = 0
+    #: grid -> instances pointed at that tier, when LOD is on.
+    lod_tiers: Dict[int, int] = field(default_factory=dict)
+    #: prototype path -> triangles it will submit. The render cliff is
+    #: per prototype, so this is the number to watch.
+    submitted_by_prototype: Dict[str, int] = field(default_factory=dict)
+    #: Prototypes whose submission is over STORM_DRAW_TRIANGLE_LIMIT;
+    #: the frame will almost certainly come back blank.
+    over_limit: List[str] = field(default_factory=list)
+    #: The attribute driving displayColor, if colour_by was honoured.
+    colour_by: Optional[str] = None
+    colour_range: Optional[Tuple[float, float]] = None
+    #: Why colour_by fell back to type colour, if it did.
+    colour_skipped: Optional[str] = None
     #: Cells whose identity has no ontology term, by library name.
     unmapped: List[str] = field(default_factory=list)
     primvars: List[str] = field(default_factory=list)
 
     def describe(self) -> str:
         size = self.bytes_written / 1048576
-        return (f"{self.cells:,} cells, {self.prototypes} prototypes "
+        text = (f"{self.cells:,} cells, {self.prototypes} prototypes "
                 f"({self.prototype_faces:,} faces), {self.prims} prims, "
                 f"{size:.2f} MB")
+        visible = self.cells - self.hidden - self.occluded
+        if self.hidden or self.occluded:
+            text += (f"; {visible:,} visible ({self.hidden:,} cut, "
+                     f"{self.occluded:,} peeled)")
+        if self.submitted_faces:
+            text += f"; {self.submitted_faces / 1e6:.0f}M triangles submitted"
+        if self.over_limit:
+            worst = max(self.submitted_by_prototype[k] for k in self.over_limit)
+            text += (f"; OVER THE RENDER LIMIT on {len(self.over_limit)} "
+                     f"prototype(s), largest {worst / 1e6:.0f}M -- "
+                     f"expect a blank frame")
+        if self.lod_tiers:
+            text += "; LOD " + ", ".join(
+                f"grid {g}: {n:,}" for g, n in sorted(self.lod_tiers.items(),
+                                                       reverse=True))
+        if self.colour_by:
+            lo, hi = self.colour_range or (float("nan"), float("nan"))
+            text += f"; coloured by {self.colour_by} [{lo:g}, {hi:g}]"
+        elif self.colour_skipped:
+            text += f"; colour-by skipped: {self.colour_skipped}"
+        return text
 
 
 def _mesh_type_of(cell: Any) -> Optional[str]:
@@ -136,6 +177,12 @@ TYPE_COLOUR: Dict[str, Tuple[float, float, float]] = {
     "stem": (0.55, 0.50, 0.72),
     "normal": (0.66, 0.70, 0.76),
 }
+
+
+#: Sequential ramp for colour-by: one hue, light to dark. Chosen so no
+#: step resembles a TYPE_COLOUR, which would read as a lineage.
+COLOUR_RAMP: Tuple[Tuple[float, float, float], Tuple[float, float, float]] = (
+    (0.93, 0.95, 0.98), (0.03, 0.19, 0.42))
 
 
 def _colour_of(cell: Any) -> Tuple[float, float, float]:
@@ -203,10 +250,51 @@ def author_cell_material(stage, path: str = "/World/Looks/BioCell"):
     return material
 
 
+def _normalise_to_unit_diameter(parts):
+    """Scale a built prototype so its body really is one unit across.
+
+    The instancer multiplies each prototype by the cell's `scale_um`
+    on the stated grounds that the prototype is authored at unit
+    diameter. It was not. Measured from the builders at scale_um=1.0:
+
+        smooth_sphere      grid 8   body 0.776    grid 16   body 0.881
+        irregular_ruffled  grid 8   body 0.596    grid 16   body 0.744-0.824
+
+    A marching-cubes surface sits inside the voxel boundary, and how
+    far inside depends on the grid. So a 12 um cell was drawn at 9.3 um
+    at grid 8 and 10.6 um at grid 16 -- every export 12-22% too small,
+    and a level-of-detail swap between grids shrank each cell by a
+    further 12%, which is what made LOD look wrong when it was the
+    prototypes that were.
+
+    The body is the reference because it is the cell; its other parts
+    scale with it so the nucleus keeps its proportion. The diameter is
+    the mean of the three axis extents, which is what a measured
+    diameter of an irregular cell is closest to -- its longest axis
+    would make a ruffled cell smaller than its scale_um says, and its
+    shortest would make it larger. The body is also centred, so the
+    instance position is the cell's centre rather than a corner of the
+    voxel grid it was built on.
+    """
+    body = parts.get("body")
+    if body is None:
+        return parts
+    vertices, _ = body
+    lo, hi = vertices.min(axis=0), vertices.max(axis=0)
+    extent = float(np.mean(hi - lo))
+    if extent <= 0.0:
+        return parts
+    centre = (lo + hi) / 2.0
+    factor = 1.0 / extent
+    return {part: ((np.asarray(v, dtype="float64") - centre) * factor, t)
+            for part, (v, t) in parts.items()}
+
+
 def author_prototypes(stage, mesh_types: Sequence[str],
                       grid: int = PROTOTYPE_GRID,
                       root: str = PROTOTYPE_ROOT,
-                      part_colours: bool = False):
+                      part_colours: bool = False,
+                      suffix: str = ""):
     """One Xform per mesh type, its parts meshed beneath it.
 
     Returns ``(paths, faces)``. A mesh type with no builder is skipped by
@@ -229,16 +317,28 @@ def author_prototypes(stage, mesh_types: Sequence[str],
         if fell_back:
             log.warning("no builder for %s; it will instance a fallback",
                         mesh_type)
-        xform = UsdGeom.Xform.Define(stage, f"{root}/{mesh_type}")
+        parts = _normalise_to_unit_diameter(parts)
+        xform = UsdGeom.Xform.Define(stage, f"{root}/{mesh_type}{suffix}")
         for part, (vertices, triangles) in parts.items():
             mesh = UsdGeom.Mesh.Define(
-                stage, f"{root}/{mesh_type}/{part}")
+                stage, f"{root}/{mesh_type}{suffix}/{part}")
             mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(
                 np.ascontiguousarray(vertices, dtype="float32")))
             mesh.GetFaceVertexIndicesAttr().Set(Vt.IntArray.FromNumpy(
                 np.ascontiguousarray(triangles.ravel(), dtype="int32")))
             mesh.GetFaceVertexCountsAttr().Set(Vt.IntArray.FromNumpy(
                 np.full(len(triangles), 3, dtype="int32")))
+            # No normals are authored, deliberately. A UsdGeom.Mesh
+            # defaults to catmullClark subdivision, under which Hydra
+            # discards authored normals and shades the limit surface
+            # smooth -- measured: a prototype rendered with and without
+            # a full set of vertex normals came back identical to the
+            # pixel. It is also why a grid-8 prototype has never looked
+            # faceted. The far tier's remaining frame difference is
+            # tessellation noise under seven translucent layers: a grid
+            # 16 prototype re-meshed with a different seed moves the
+            # frame as much as dropping to grid 8 does (32.5 vs 36.2
+            # mean |dRGB| on the same 500k scene).
             # The body is a shell you look through; the contents are not.
             # Without this every prototype meshes a nucleus and granules
             # nobody can see, because the body around them is opaque
@@ -273,6 +373,33 @@ def author_prototypes(stage, mesh_types: Sequence[str],
 #: viewer could not see and leaves what it could.
 CAMERA_DIRECTION = (1.7, 1.15, 2.0)
 
+#: The authored camera. USD's default horizontal aperture is 20.955 mm;
+#: with a 35 mm focal length that is a 33.4 degree field of view, and
+#: the LOD tiers project through exactly this lens.
+CAMERA_FOCAL_MM = 35.0
+CAMERA_APERTURE_MM = 20.955
+
+#: Projected cell width, in pixels at `lod_pixels` frame width, below
+#: which a cell drops a tier. Under 5 px a grid-8 sphere is a dot at
+#: any grid; under 12 px the ruffles of a grid-16 prototype are below
+#: the pixel and only its silhouette survives.
+LOD_PIXEL_TIERS = (5.0, 12.0)
+
+#: Triangles one prototype can submit before Storm draws nothing at all.
+#:
+#: Measured, not read anywhere: on this machine (Storm on Metal, USD
+#: 25.11) every scene whose largest single prototype submitted up to
+#: 639M triangles drew, and every scene at 690M or more came back as a
+#: valid PNG with alpha 0 in every pixel, exit code 0, no warning. The
+#: total across prototypes is NOT the axis -- 728M in total drew and
+#: 735M did not -- it is the largest single draw. A first estimate of
+#: 330M was wrong by two, from guessing a grid-16 prototype at ~1,500
+#: faces when it is 2,916 with its nucleus; the bracket here is from
+#: the writer's own exact count. It will differ on another machine; it
+#: exists so the export can say "this will be blank" instead of
+#: letting a user find out.
+STORM_DRAW_TRIANGLE_LIMIT = 640_000_000
+
 
 def write_cells(path: str, cells: Sequence[Any], *,
                 grid: int = PROTOTYPE_GRID,
@@ -280,7 +407,14 @@ def write_cells(path: str, cells: Sequence[Any], *,
                 camera: bool = True,
                 up_axis: str = "Y",
                 cutaway: str = "none",
-                stroma_only: bool = False) -> WriteResult:
+                stroma_only: bool = False,
+                occlusion: Optional[int] = None,
+                occlusion_column: float = 0.5,
+                lod: bool = False,
+                lod_pixels: float = 1000.0,
+                colour_by: Optional[str] = None,
+                colour_range: Optional[Tuple[float, float]] = None
+                ) -> WriteResult:
     """Author ``cells`` as one PointInstancer and return what it cost.
 
     ``cells`` may be :class:`~cognisom.biousd.schema.BioCell` instances or
@@ -307,38 +441,102 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # population.
     material = author_cell_material(stage)
     types = sorted({_mesh_type_of(c) or "smooth_sphere" for c in cells})
-    if geometry:
-        proto_paths, result.prototype_faces = author_prototypes(
-            stage, types, grid)
-    else:
-        # A sphere prototype, declared rather than defaulted to.
-        sphere = UsdGeom.Sphere.Define(stage, f"{PROTOTYPE_ROOT}/point")
-        sphere.GetRadiusAttr().Set(0.5)
-        proto_paths, types = [sphere.GetPath()], ["point"]
-    result.prototypes = len(proto_paths)
-    for proto_path in proto_paths:
-        prim = stage.GetPrimAtPath(proto_path)
-        UsdShade.MaterialBindingAPI.Apply(prim)
-        UsdShade.MaterialBindingAPI(prim).Bind(material)
-    index_of = {name: i for i, name in enumerate(types)}
-
-    instancer = UsdGeom.PointInstancer.Define(stage, CELLS)
-    instancer.GetPrototypesRel().SetTargets(proto_paths)
 
     positions = np.array([tuple(getattr(c, "position", (0.0, 0.0, 0.0)))
                           for c in cells], dtype="float32")
-    instancer.GetPositionsAttr().Set(Vt.Vec3fArray.FromNumpy(positions))
-    proto_indices = np.array(
-        [index_of.get(_mesh_type_of(c) or "smooth_sphere", 0)
-         if geometry else 0 for c in cells], dtype="int32")
-    instancer.GetProtoIndicesAttr().Set(Vt.IntArray.FromNumpy(proto_indices))
-
     # Volume is a multiplier on the prototype, which is authored at unit
     # diameter, so the instance scale IS the cell's size in micrometres.
     diameters = np.array([float(getattr(c, "scale_um", 0) or 10.0)
                           for c in cells], dtype="float32")
     volume = np.array([float(getattr(c, "volume", 1.0) or 1.0)
                        for c in cells], dtype="float32")
+    # The camera's eye point, needed before the prototypes because LOD
+    # tiers are assigned by distance from it.
+    half = float(np.abs(positions).max()) + float(diameters.max())
+    eye_np = half * np.asarray(CAMERA_DIRECTION, dtype=float)
+
+    mesh_of = [_mesh_type_of(c) or "smooth_sphere" for c in cells]
+    if geometry and lod:
+        # Level of detail without a second instancer. A PointInstancer
+        # can target any number of prototypes, so the far tier is just
+        # more prototypes -- the same mesh types built at a coarser grid
+        # -- and a cell picks its tier through protoIndices. One
+        # instancer, one invisibleIds, every primvar untouched.
+        #
+        # A tier is chosen by how many pixels a cell will cover, not
+        # by its distance. The first version used fractions of the eye
+        # distance and sent 158,000 cells to grid 8 in a frame where
+        # they were 7-9 px wide; 20% of pixels changed. In a 1 mm block
+        # seen from 1.5 mm nothing is far, and a rule has to know that.
+        #
+        # The frame width is not known at export time, so it is a
+        # parameter: `lod_pixels` is the width the tiers are tuned for,
+        # and a cell narrower than LOD_PIXEL_TIERS[0] px at that width
+        # takes grid 8, narrower than LOD_PIXEL_TIERS[1] takes a grid
+        # four coarser than asked, and the rest take `grid`. The grid
+        # ladder is 328 / 904 / 2,316 faces per two prototypes at
+        # 8 / 12 / 16, so the far tier costs a seventh of the near one.
+        tan_half = (CAMERA_APERTURE_MM / 2.0) / CAMERA_FOCAL_MM
+        dist = np.linalg.norm(positions - eye_np, axis=1)
+        px = lod_pixels * diameters / (np.maximum(dist, 1e-6) * 2.0 * tan_half)
+        tiers = [(LOD_PIXEL_TIERS[0], 8),
+                 (LOD_PIXEL_TIERS[1], max(8, grid - 4)),
+                 (float("inf"), grid)]
+        tier_of = np.searchsorted([t for t, _ in tiers[:-1]], px, side="right")
+        # Only the grids some cell actually lands in are authored. A
+        # composed scene whose every cell is over 12 px wide wants one
+        # tier, not three with two of them empty -- measured, that was
+        # nine prototypes and 14,644 faces authored for a scene that
+        # used three and 8,694.
+        used = {tiers[int(t)][1] for t in np.unique(tier_of)}
+        grids = []
+        for _, g in tiers:
+            if g in used and g not in grids:
+                grids.append(g)
+        proto_paths, index_of, result.prototype_faces = [], {}, 0
+        for g in grids:
+            paths_g, faces_g = author_prototypes(stage, types, g,
+                                                 suffix=f"_g{g}")
+            result.prototype_faces += faces_g
+            for name, path_g in zip(types, paths_g):
+                index_of[(name, g)] = len(proto_paths)
+                proto_paths.append(path_g)
+        tier_grid = np.array([grids.index(tiers[int(t)][1]) for t in tier_of])
+        proto_indices = np.array(
+            [index_of[(mesh_of[i], grids[tier_grid[i]])]
+             for i in range(len(cells))], dtype="int32")
+        for g in grids:
+            n = int(sum(1 for i in range(len(cells)) if grids[tier_grid[i]] == g))
+            result.lod_tiers[g] = n
+    elif geometry:
+        proto_paths, result.prototype_faces = author_prototypes(
+            stage, types, grid)
+        index_of = {name: i for i, name in enumerate(types)}
+        proto_indices = np.array([index_of[m] for m in mesh_of], dtype="int32")
+    else:
+        # A sphere prototype, declared rather than defaulted to.
+        sphere = UsdGeom.Sphere.Define(stage, f"{PROTOTYPE_ROOT}/point")
+        sphere.GetRadiusAttr().Set(0.5)
+        proto_paths, types = [sphere.GetPath()], ["point"]
+        proto_indices = np.zeros(len(cells), dtype="int32")
+    result.prototypes = len(proto_paths)
+    faces_of_proto = []
+    for proto_path in proto_paths:
+        prim = stage.GetPrimAtPath(proto_path)
+        UsdShade.MaterialBindingAPI.Apply(prim)
+        UsdShade.MaterialBindingAPI(prim).Bind(material)
+        n_faces = 0
+        for child in Usd.PrimRange(prim):
+            if child.IsA(UsdGeom.Mesh):
+                counts = UsdGeom.Mesh(child).GetFaceVertexCountsAttr().Get()
+                n_faces += len(counts) if counts else 0
+        faces_of_proto.append(n_faces)
+
+    instancer = UsdGeom.PointInstancer.Define(stage, CELLS)
+    instancer.GetPrototypesRel().SetTargets(proto_paths)
+    instancer.GetPositionsAttr().Set(Vt.Vec3fArray.FromNumpy(positions))
+    instancer.GetProtoIndicesAttr().Set(Vt.IntArray.FromNumpy(proto_indices))
+
     scales = (diameters * np.cbrt(np.clip(volume, 1e-6, None)))[:, None]
     instancer.GetScalesAttr().Set(
         Vt.Vec3fArray.FromNumpy(np.repeat(scales, 3, axis=1).astype("float32")))
@@ -377,6 +575,36 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # it every instance takes the default white material and a dense
     # population renders as an undifferentiated white mass.
     colours = np.array([_colour_of(c) for c in cells], dtype="float32")
+    if colour_by:
+        # Colour by a variable: one hue, light to dark, so that "more"
+        # reads as "darker" and nothing in the ramp looks like a type
+        # colour. The ramp is a real control rather than a flag because
+        # the primvar path is the point of the whole design -- the
+        # colour of 500,000 cells is one array, and which variable fills
+        # it is the question a user asks.
+        raw = [getattr(c, colour_by, None) for c in cells]
+        try:
+            values = np.array([float(getattr(v, "value", v)) for v in raw],
+                              dtype="float64")
+        except (TypeError, ValueError):
+            values = None
+        if values is None or not np.isfinite(values).all():
+            result.colour_skipped = (
+                f"{colour_by!r} is missing or non-numeric on some cells")
+        else:
+            lo, hi = colour_range or (float(values.min()), float(values.max()))
+            span = (hi - lo) if hi > lo else 1.0
+            t = np.clip((values - lo) / span, 0.0, 1.0)[:, None]
+            light = np.array(COLOUR_RAMP[0], dtype="float32")
+            dark = np.array(COLOUR_RAMP[1], dtype="float32")
+            colours = (light + (dark - light) * t).astype("float32")
+            result.colour_by, result.colour_range = colour_by, (lo, hi)
+            layer = stage.GetRootLayer()
+            data = dict(layer.customLayerData)
+            data.update({"bio:colourBy": colour_by,
+                         "bio:colourMin": float(lo),
+                         "bio:colourMax": float(hi)})
+            layer.customLayerData = data
     primvar("displayColor", Sdf.ValueTypeNames.Color3fArray,
             Vt.Vec3fArray.FromNumpy(colours))
 
@@ -397,32 +625,66 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # is the instancer's own mechanism, so the cut costs an int array
     # rather than a second export, and it needs only the direction to
     # the camera, not the eye point fitted below.
+    up_vec = {"y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}.get(
+        up_axis.lower(), (0.0, 0.0, 1.0))
+    hidden: List[int] = []
     if cutaway and cutaway != "none":
         from cognisom.visualization.cutaway import (
             hidden_for_camera_direction)
 
-        up_vec = {"y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}.get(
-            up_axis.lower(), (0.0, 0.0, 1.0))
-        hidden = hidden_for_camera_direction(
+        hidden = [int(i) for i in hidden_for_camera_direction(
             positions, [_token_of(c) for c in cells], CAMERA_DIRECTION,
-            mode=cutaway, stroma_only=stroma_only, up=up_vec)
-        if hidden:
-            instancer.CreateInvisibleIdsAttr().Set(
-                Vt.Int64Array([int(i) for i in hidden]))
-            result.hidden = len(hidden)
+            mode=cutaway, stroma_only=stroma_only, up=up_vec)]
+        result.hidden = len(hidden)
+
+    if occlusion:
+        # Depth peel: of the cells left after the cut, keep only the
+        # `occlusion` nearest the camera in each screen column. The
+        # body is 0.35 opaque, so 95% of what reaches the eye comes
+        # from the first ln(0.05)/ln(0.65) ~ 7 layers; 8 is the
+        # default. Measured on the 500k section: visible 279k -> 194k,
+        # the frame moved by a mean of 2.7/765 per pixel.
+        from cognisom.visualization.cutaway import occluded_instance_ids
+
+        peeled = occluded_instance_ids(
+            positions, diameters, CAMERA_DIRECTION, keep=int(occlusion),
+            up=up_vec, column=float(np.median(diameters)) * occlusion_column,
+            already_hidden=hidden)
+        result.occluded = len(peeled)
+        hidden = sorted(set(hidden) | set(peeled))
+
+    if hidden:
+        instancer.CreateInvisibleIdsAttr().Set(Vt.Int64Array(hidden))
+    visible = np.ones(len(cells), dtype=bool)
+    if hidden:
+        visible[np.asarray(hidden, dtype=int)] = False
+    faces_arr = np.asarray(faces_of_proto, dtype=np.int64)
+    result.submitted_faces = int(faces_arr[proto_indices[visible]].sum())
+    per_proto = np.bincount(proto_indices[visible], minlength=len(proto_paths))
+    for proto_path, count, n_faces in zip(proto_paths, per_proto, faces_of_proto):
+        submitted = int(count) * int(n_faces)
+        result.submitted_by_prototype[str(proto_path)] = submitted
+        if submitted > STORM_DRAW_TRIANGLE_LIMIT:
+            result.over_limit.append(str(proto_path))
+    if result.over_limit:
+        log.warning(
+            "%s: %d prototype(s) submit more than %dM triangles each; Storm "
+            "renders such a scene as a blank frame. Cut, peel, or lower the "
+            "grid.", path, len(result.over_limit),
+            STORM_DRAW_TRIANGLE_LIMIT // 1_000_000)
 
     if camera:
         # Framed with a look-at, not Euler angles. A camera aimed by
         # rotation renders an EMPTY FRAME SUCCESSFULLY -- no error, no
         # warning, a valid PNG of nothing -- which is a long way to go
         # before noticing.
-        half = float(np.abs(positions).max()) + float(diameters.max())
-        eye = Gf.Vec3d(*(half * d for d in CAMERA_DIRECTION))
+        eye = Gf.Vec3d(*(float(v) for v in eye_np))
         look = Gf.Matrix4d(1).SetLookAt(eye, Gf.Vec3d(0, 0, 0),
                                         Gf.Vec3d(0, 1, 0))
         cam = UsdGeom.Camera.Define(stage, f"{WORLD}/Camera")
         UsdGeom.Xformable(cam).AddTransformOp().Set(look.GetInverse())
-        cam.GetFocalLengthAttr().Set(35.0)
+        cam.GetFocalLengthAttr().Set(CAMERA_FOCAL_MM)
+        cam.GetHorizontalApertureAttr().Set(CAMERA_APERTURE_MM)
         cam.GetClippingRangeAttr().Set(Gf.Vec2f(1.0, half * 12.0))
 
     # Intensity matters more than it looks: a DistantLight at the 500 this

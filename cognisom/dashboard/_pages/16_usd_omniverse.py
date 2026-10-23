@@ -1054,8 +1054,32 @@ with tab5:
                     help="Cut only the stroma in the way. Off, the plane "
                          "bisects the lesion too -- an anatomical section "
                          "rather than a reveal.")
+                peel = st.checkbox(
+                    "Hide buried cells (depth peel)", value=True,
+                    key="exp_peel",
+                    help="Keep only the 8 cells nearest the camera in each "
+                         "half-cell-wide screen column; everything behind "
+                         "them cannot be seen. Measured on 500,000 cells: a "
+                         "third fewer triangles, and the frame moves by "
+                         "under one part in a thousand per pixel.")
+                lod = st.checkbox(
+                    "Level of detail by screen size", value=False,
+                    key="exp_lod",
+                    help="Cells narrower than 12 px get a coarser mesh and "
+                         "narrower than 5 px the coarsest, all on one "
+                         "instancer. Halves to quarters the triangles on a "
+                         "deep scene; the difference is the same as "
+                         "re-meshing.")
+                colour_by = st.selectbox(
+                    "Colour by", ["cell type", "size (scale_um)"],
+                    key="exp_colour",
+                    help="A composed scene carries no simulated variables "
+                         "yet, so size is the only number here. A run "
+                         "exported from the engine can colour by any "
+                         "per-cell field.")
             else:
                 fmt, cut, keep_lesion = ".usda (text)", "none", False
+                peel, lod, colour_by = False, False, "cell type"
                 st.caption(
                     "OpenUSD (`usd-core`) is not importable, so the export "
                     "falls back to writing the stage as text: one prim per "
@@ -1076,14 +1100,19 @@ with tab5:
                                 st.session_state.wb_scene_instances),
                             cutaway=cut,
                             stroma_only=keep_lesion,
+                            occlusion=8 if peel else None,
+                            lod=lod,
+                            colour_by=("scale_um" if colour_by.startswith("size")
+                                       else None),
                         )
                         st.success(f"Exported {n_inst} entities to `{usda_path}`")
                         st.caption(result.describe())
-                        if result.hidden:
-                            st.caption(
-                                f"{result.hidden:,} instances marked invisible "
-                                f"by the {cut} cut "
-                                f"({100 * result.hidden / max(1, result.cells):.0f}%).")
+                        if result.over_limit:
+                            st.error(
+                                "This scene submits more triangles on one "
+                                "prototype than the renderer can draw; the "
+                                "frame will come back blank. Enable the "
+                                "depth peel or level of detail, or cut.")
                     else:
                         usda_path = os.path.join(export_dir, f"{export_name}.usda")
                         usda = _generate_usda_from_instances(
