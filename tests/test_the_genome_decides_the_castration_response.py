@@ -163,6 +163,14 @@ def test_the_clinic_s_number_is_the_tumour_total(responding):
     ts = responding.get_time_series()
     per_cell = ts["avg_psa"][-1] / ts["avg_psa"][0]
     total = ts["psa_cancer_total"][-1] / ts["psa_cancer_total"][0]
-    assert per_cell > 0.85, "per cell, PSA barely moves (the saturated induction)"
-    assert total > 1.0, "the tumour still grew, so its total PSA rose -- slower than untreated"
+    # Per cell, PSA falls to about 0.30 -- it tracks the androgen through
+    # an induction term that is no longer saturated (K_psa sourced to the
+    # in-cell apparent Kd, PMID 26657626). This assertion used to read
+    # "> 0.85, PSA barely moves", which was the broken Km talking.
+    assert 0.2 < per_cell < 0.5, f"per cell {per_cell:.3f}"
+    # The tumour's total barely moves, and for a reason worth seeing: the
+    # cells that are left each make a third as much, and there are three
+    # times as many of them by 72 h. Two effects of the same treatment
+    # pulling opposite ways is exactly why the clinic follows the total.
+    assert 0.8 < total < 1.5, f"tumour total {total:.3f}"
     assert ts["psa_total"][-1] >= ts["psa_cancer_total"][-1], "benign cells make PSA too"
