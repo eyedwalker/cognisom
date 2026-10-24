@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 from .vcf_parser import Variant, VCFParser
 from .vep_annotator import VEPAnnotator
 from .variant_annotator import (
-    VariantAnnotator, PROSTATE_CANCER_DRIVERS, DEFAULT_EXOME_MB,
+    VariantAnnotator, ALL_CANCER_DRIVERS, DEFAULT_EXOME_MB,
 )
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLATyper
@@ -159,7 +159,15 @@ class PatientProfile:
         """Get detailed info about each cancer driver mutation."""
         details = []
         for v in self.cancer_driver_mutations:
-            gene_info = PROSTATE_CANCER_DRIVERS.get(v.gene, {})
+            # ALL_CANCER_DRIVERS, not the prostate panel. This read
+            # PROSTATE_CANCER_DRIVERS regardless of cancer_type, so for any
+            # other tissue the drivers it had already IDENTIFIED came back
+            # role="unknown" and full_name=<the symbol>. Measured on a
+            # breast profile: ERBB2, ESR1, GATA3 and CDH1 -- four canonical
+            # breast drivers, all present in the pan-cancer table -- were
+            # four of six unknowns, while TP53 and BRCA2 resolved only
+            # because prostate happens to share them.
+            gene_info = ALL_CANCER_DRIVERS.get(v.gene, {})
             details.append({
                 "gene": v.gene,
                 "mutation": v.protein_change or f"{v.ref}>{v.alt}",
