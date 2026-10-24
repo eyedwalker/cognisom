@@ -1009,6 +1009,71 @@ class CognisomSimExtension(omni.ext.IExt):
 
         if self._usd_scene_manager:
             self._usd_scene_manager.process_pending()
+            # Opening a stage REPLACES the one the RTX annotator was
+            # attached to, which invalidates its render product: capture
+            # then fails with
+            #   '/Render/PostProcess/SDGPipeline/Replicator_LdrColorSDhostPtr'
+            # and /frame.jpg quietly falls back to the PIL placeholder.
+            # The diapedesis and molecular paths already recreate the
+            # annotator after a rebuild; a stage load needs it for the
+            # same reason.
+            usd_status = self._usd_scene_manager.status()
+            load_count = usd_status.get("load_count", 0)
+            if not hasattr(self, "_usd_load_count"):
+                self._usd_load_count = 0
+            if load_count > self._usd_load_count:
+                self._usd_load_count = load_count
+                # The HydraTexture that FEEDS the capture is bound to a
+                # camera path, and headless setup binds it to
+                # /World/DiapedesisCam. Opening a stage replaces the
+                # scene, so that camera no longer exists and the texture
+                # renders nothing. Setting the VIEWPORT camera does not
+                # move the texture; its own camera_path has to be set.
+                # Remember it rather than applying it once: headless
+                # setup is async and may create the texture AFTER the
+                # first stage arrives, in which case a single attempt
+                # here runs against _hydra_texture is None and is lost.
+                self._usd_stage_camera = usd_status.get("camera")
+                carb.log_warn(
+                    "[cognisom.sim] Bio-USD stage opened — recreating annotator")
+                self._empty_frame_count = 0
+                self._orchestrator_kicked = False
+                self._recovering = False
+                asyncio.ensure_future(self._recreate_annotator_after_build())
+
+            # Keep the CAPTURE camera on the stage's own camera. The
+            # HydraTexture that feeds /frame.jpg is bound to a camera
+            # path -- headless setup binds it to /World/DiapedesisCam --
+            # and opening a stage deletes that prim, so the texture
+            # renders an empty scene. Setting the viewport camera does
+            # not move it. Re-checked each tick because the texture may
+            # be created after the stage was already open.
+            # Two capture paths exist and they need different calls. Under
+            # isaac-sim.streaming.sh a real VIEWPORT exists, the annotator
+            # attaches to its render product and _hydra_texture stays None;
+            # only the headless-no-viewport path builds a HydraTexture.
+            # Handling just the latter left the viewport pointed at Kit's
+            # default perspective camera, so /frame.jpg showed the default
+            # scene -- a grey vessel on white -- while the stage it had
+            # just loaded was never in shot.
+            desired = getattr(self, "_usd_stage_camera", None)
+            if desired and desired != getattr(self, "_camera_applied", None):
+                applied = False
+                if self._hydra_texture is not None:
+                    try:
+                        self._hydra_texture.camera_path = desired
+                        applied = True
+                        carb.log_warn(
+                            f"[cognisom.sim] HydraTexture camera -> {desired}")
+                    except Exception as exc:           # noqa: BLE001
+                        carb.log_warn(
+                            f"[cognisom.sim] HydraTexture camera failed: {exc}")
+                else:
+                    self._set_active_camera(desired)
+                    applied = True
+                if applied:
+                    self._camera_path = desired
+                    self._camera_applied = desired
 
         if self._molecular_manager:
             self._molecular_manager.process_pending()

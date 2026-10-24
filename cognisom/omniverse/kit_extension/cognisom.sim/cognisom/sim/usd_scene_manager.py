@@ -53,8 +53,8 @@ from typing import Any, Deque, Dict, Optional
 import carb
 import omni.usd
 
-from .stage_intake import (PREFERRED_CAMERA, hours_at_frame, read_stage_facts,
-                           safe_stage_name)
+from .stage_intake import (PREFERRED_CAMERA, boost_lights_for_rtx,
+                           hours_at_frame, read_stage_facts, safe_stage_name)
 
 #: Where uploaded stages land. Kept off ``/tmp`` by default on the box so
 #: a stage survives a tmpfs clean mid-session.
@@ -207,6 +207,15 @@ class UsdSceneManager:
             raise RuntimeError(f"open_stage({path}) produced no stage")
 
         facts = read_stage_facts(stage)
+        # write_run's dome light is authored at intensity 1.0, the value
+        # at which STORM renders the authored colours faithfully. RTX
+        # scales light physically, so the same stage arrives almost
+        # black -- every cell correctly silhouetted and unlit. Raised in
+        # the session layer, so the file on disk stays Storm-correct.
+        lit = boost_lights_for_rtx(stage)
+        if lit:
+            carb.log_warn(f"[cognisom.usd] raised {len(lit)} dome light(s) "
+                          f"for RTX: {', '.join(lit)}")
         self._apply_timeline(facts)
         self._select_camera(facts)
 

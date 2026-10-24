@@ -21,14 +21,15 @@ The two jobs:
 
 from __future__ import annotations
 
+import math
 import posixpath
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 try:
-    from pxr import UsdGeom
+    from pxr import Usd, UsdGeom, UsdLux
 except ImportError:                                   # pragma: no cover
-    UsdGeom = None                                    # type: ignore
+    Usd = UsdGeom = UsdLux = None                     # type: ignore
 
 #: Layer-data key ``visualization.run_usd.write_run`` stamps with the
 #: simulated time of every frame, so a viewer can report hours.
@@ -143,3 +144,138 @@ def hours_at_frame(frame_times: List[float], frame: float) -> Optional[float]:
     low = int(frame)
     frac = frame - low
     return float(frame_times[low] * (1.0 - frac) + frame_times[low + 1] * frac)
+
+
+#: Dome-light intensity RTX needs to expose a scene the way Storm does
+#: at 1.0. Storm's intensity is ad hoc; RTX's is physically scaled, so
+#: one authored number cannot serve both renderers.
+RTX_DOME_INTENSITY = 1000.0
+#: Below this, a dome light was tuned for Storm and will render near
+#: black under RTX.
+STORM_DOME_CEILING = 50.0
+
+
+def boost_lights_for_rtx(stage: Any,
+                         intensity: float = RTX_DOME_INTENSITY) -> List[str]:
+    """Raise Storm-tuned dome lights to an RTX-usable intensity.
+
+    ``write_run`` authors its dome light at intensity 1.0, which is the
+    value at which Storm renders the authored colours faithfully. RTX
+    scales light physically, so the same stage comes back almost black:
+    the geometry is all there, correctly silhouetted, and unlit.
+
+    The edit goes in the stage's SESSION layer, so the file on disk is
+    untouched and still renders correctly under Storm. A light that was
+    already authored bright is left alone.
+
+    Returns the paths it changed.
+    """
+    if UsdLux is None or Usd is None:
+        return []
+    changed: List[str] = []
+    with Usd.EditContext(stage, stage.GetSessionLayer()):
+        for prim in stage.Traverse():
+            if not prim.IsA(UsdLux.DomeLight):
+                continue
+            light = UsdLux.DomeLight(prim)
+            attr = light.GetIntensityAttr()
+            current = attr.Get()
+            if current is not None and float(current) >= STORM_DOME_CEILING:
+                continue                    # authored for a lit renderer
+            attr.Set(float(intensity))
+            changed.append(str(prim.GetPath()))
+    return changed
+
+
+#: The up vector ``author_event_camera`` builds its look-at from. The
+#: stage's own upAxis metadata says Y, but that camera is authored
+#: Z-up, and orbiting around the wrong up rolls the horizon.
+CAMERA_UP = (0.0, 0.0, 1.0)
+
+
+def stage_pivot(stage: Any, time_code: Optional[float] = None
+                ) -> Optional[Tuple[float, float, float]]:
+    """The centre of the cell populations, to orbit around.
+
+    Falls back to the whole of ``/World`` when there are no cells, and
+    to None when nothing on the stage has an extent.
+    """
+    if UsdGeom is None or Usd is None:
+        return None
+    when = (Usd.TimeCode(float(time_code)) if time_code is not None
+            else Usd.TimeCode.EarliestTime())
+    cache = UsdGeom.BBoxCache(when, [UsdGeom.Tokens.default_,
+                                     UsdGeom.Tokens.render])
+    for path in ("/World/Cells", "/World"):
+        prim = stage.GetPrimAtPath(path)
+        if not prim.IsValid():
+            continue
+        try:
+            box = cache.ComputeWorldBound(prim)
+        except Exception:                             # noqa: BLE001
+            continue
+        if box.GetRange().IsEmpty():
+            continue
+        mid = box.ComputeCentroid()
+        return (float(mid[0]), float(mid[1]), float(mid[2]))
+    return None
+
+
+def orbit_camera(stage: Any, camera_path: str,
+                 pivot: Sequence[float],
+                 yaw_deg: float = 0.0, pitch_deg: float = 0.0,
+                 zoom: float = 1.0) -> Optional[Dict[str, Any]]:
+    """Orbit a camera around ``pivot`` and re-aim it there.
+
+    ``author_event_camera`` writes the camera as ONE transform op (a
+    matrix from ``SetLookAt``), not a translate plus a rotateXYZ. The
+    extension's existing orbit reads ``ops[0]``/``ops[1]`` and gives up
+    when there are fewer than two, which is why it silently does
+    nothing on a Bio-USD stage. This rebuilds the matrix instead.
+
+    ``zoom`` below 1 moves closer. Returns the new eye and distance.
+    """
+    if UsdGeom is None or Usd is None:
+        return None
+    from pxr import Gf
+
+    prim = stage.GetPrimAtPath(camera_path)
+    if not prim.IsValid():
+        return None
+    xf = UsdGeom.Xformable(prim)
+    ops = xf.GetOrderedXformOps()
+    if not ops:
+        return None
+
+    matrix = ops[0].Get()
+    if matrix is None:
+        return None
+    eye = matrix.ExtractTranslation()
+    target = Gf.Vec3d(float(pivot[0]), float(pivot[1]), float(pivot[2]))
+
+    offset = Gf.Vec3d(eye[0] - target[0], eye[1] - target[1], eye[2] - target[2])
+    dist = offset.GetLength()
+    if dist < 1e-9:
+        return None
+
+    # Spherical about the camera's own up axis (Z).
+    azimuth = math.atan2(offset[1], offset[0])
+    elevation = math.asin(max(-1.0, min(1.0, offset[2] / dist)))
+    azimuth += math.radians(float(yaw_deg))
+    elevation = max(math.radians(-89.0),
+                    min(math.radians(89.0),
+                        elevation + math.radians(float(pitch_deg))))
+    dist = max(1e-3, dist * max(0.01, float(zoom)))
+
+    new_eye = Gf.Vec3d(
+        target[0] + dist * math.cos(elevation) * math.cos(azimuth),
+        target[1] + dist * math.cos(elevation) * math.sin(azimuth),
+        target[2] + dist * math.sin(elevation))
+
+    view = Gf.Matrix4d(1.0)
+    view.SetLookAt(new_eye, target, Gf.Vec3d(*CAMERA_UP))
+    with Usd.EditContext(stage, stage.GetSessionLayer()):
+        UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(view.GetInverse())
+    return {"eye": (float(new_eye[0]), float(new_eye[1]), float(new_eye[2])),
+            "pivot": (float(target[0]), float(target[1]), float(target[2])),
+            "distance": float(dist)}
