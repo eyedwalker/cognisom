@@ -1,5 +1,20 @@
-"""The modules engine solves an oxygen field that nothing reads, and that
-could not make a cell hypoxic if something did.
+"""Two of SpatialModule's six fields are solved and read by nobody.
+
+                     solved   consumed by
+    oxygen             yes    -- nothing
+    glucose            yes    -- nothing
+    cytokine           yes    immune chemotaxis (gradient)
+    testosterone       yes    cell.testosterone_nM -> tissue DHT -> AR
+    lactate            yes    cell.lactate_mM -> the T/NK kill gate
+    ifn_gamma          yes    cell.ifn_gamma_level -> MHC-I, polarisation
+
+The two with no consumer are the two oldest. Both describe quantities
+the engine does model -- just by another route: cell.oxygen and
+cell.glucose are written by VascularModule._exchange_with_tissue over a
+Krogh distance and drained by CellularModule._update_metabolism.
+
+Below, the oxygen case in detail, because it also could not make a cell
+hypoxic if something did read it.
 
 This is a guard, not a fix. It states two measured facts so neither can
 be rediscovered as news, and so that a change which repairs either is
@@ -59,34 +74,49 @@ def _volumetric_mmhg_per_s(field_units_per_h: float) -> float:
 # ── one: nothing reads it ─────────────────────────────────────────
 
 
-def test_the_oxygen_field_is_not_pushed_to_any_cell():
+def test_neither_oxygen_nor_glucose_is_pushed_to_any_cell():
     pushed = {name for name, _ in SpatialModule.FIELDS_TO_CELLS}
-    assert "oxygen" not in pushed
+    assert "oxygen" not in pushed and "glucose" not in pushed
     assert pushed == {"testosterone", "lactate", "ifn_gamma"}, (
-        "if oxygen joins this list, the field has a consumer and this "
+        "if either joins this list, that field has a consumer and this "
         "guard should be rewritten, not deleted")
 
 
-def test_cell_oxygen_comes_from_the_vascular_path_not_the_field():
+def test_the_fields_that_do_have_consumers_still_have_them():
+    """The other side of the ledger, so this guard cannot be read as
+    'the spatial module does nothing'."""
+    from cognisom.modules.immune_module import ImmuneModule
+    module = ImmuneModule({"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0})
+    assert module.chemotaxis_field == "cytokine", "the chemokine field is read"
+    pushed = {name for name, _ in SpatialModule.FIELDS_TO_CELLS}
+    assert pushed == {"testosterone", "lactate", "ifn_gamma"}
+
+
+def test_cell_oxygen_and_glucose_come_from_the_vascular_path_not_the_fields():
     from cognisom.modules.vascular_module import VascularModule
     from cognisom.modules.cellular_module import CellularModule
 
     writes = inspect.getsource(VascularModule._exchange_with_tissue)
     assert "cell.oxygen +=" in writes, "the vascular module is the supplier"
+    assert "cell.glucose +=" in writes, "and of glucose, by the same route"
     drains = inspect.getsource(CellularModule._update_metabolism)
     assert "cell.oxygen -=" in drains, "the cellular module is the sink"
+    assert "cell.glucose -=" in drains
     # and neither consults a field
     for source in (writes, drains):
         assert "get_concentration" not in source
 
 
-def test_the_field_is_still_solved_and_reported_so_it_looks_alive():
+def test_both_are_still_solved_and_reported_so_they_look_alive():
     module = SpatialModule({})
     with redirect_stdout(io.StringIO()):
         module.initialize()
-    assert "oxygen" in module.fields
     state = module.get_state()
-    assert "oxygen" in state["fields"], "it is reported like any other field"
+    for name in ("oxygen", "glucose"):
+        assert name in module.fields
+        assert name in state["fields"], "reported like any other field"
+    assert "interstitial_O2_mean" not in state, (
+        "only reported once cells are attached -- see the module's get_state")
 
 
 # ── two: and it could not bite if it were read ────────────────────
