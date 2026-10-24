@@ -173,9 +173,10 @@ class GIABBenchmarkRunner:
     GPU_COST_PER_HOUR = 1.836
 
     def __init__(self, instance_id: str = None, region: str = "us-west-2"):
-        self.instance_id = instance_id or os.environ.get(
-            "GPU_INSTANCE_ID", "i-0ac9eb88c1b046163"
-        )
+        # The default comes from gpu_connector, which reads
+        # GPU_INSTANCE_ID itself. This had its own copy of a dead id.
+        from cognisom.infrastructure.gpu_connector import GPU_INSTANCE_ID
+        self.instance_id = instance_id or GPU_INSTANCE_ID
         self.region = region
         try:
             import boto3
