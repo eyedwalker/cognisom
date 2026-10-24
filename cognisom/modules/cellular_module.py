@@ -117,7 +117,13 @@ MHC1_IFN_GAIN = 0.5
 #: in macrophage_polarization), so the two agree where the proxy is
 #: defined and part company the way the physics says: with distance, and
 #: with the density of the cells consuming the signal.
-MHC1_IFN_SATURATION = 4.5e-4
+IFN_GAMMA_PROXY_SATURATION = 4.5e-4
+#: The MHC-I response uses that calibration; so does macrophage
+#: polarisation, through ImmuneModule._local_ifn_gamma. One number, so
+#: the field cannot mean one thing to one consumer and another to the
+#: next. (Kept under its old name too: it was published in a commit
+#: message and a memory note as MHC1_IFN_SATURATION.)
+MHC1_IFN_SATURATION = IFN_GAMMA_PROXY_SATURATION
 #: Relaxation time of surface MHC-I toward its IFN-set level, hours. The
 #: cited measurements are at 24-48 h; class I turns over in hours. The
 #: value is an ESTIMATE within that bracket.

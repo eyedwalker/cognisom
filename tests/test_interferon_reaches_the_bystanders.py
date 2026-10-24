@@ -290,6 +290,57 @@ def test_in_the_shipped_preset_the_rise_changes_no_outcome_and_why():
     assert killers_on["NK_cell"] > 0
 
 
+class _FlatField:
+    """A field at one level everywhere, for checking the conversion."""
+
+    def __init__(self, level):
+        self.level = level
+
+    def get_concentration_at(self, position):
+        return self.level
+
+
+class _SpatialWith:
+    def __init__(self, level):
+        self.fields = {"ifn_gamma": _FlatField(level)}
+
+
+def test_macrophage_polarisation_reads_the_field_when_there_is_one():
+    """One cytokine, one representation. The neighbour count stays as the
+    no-field fallback -- and gives exactly what it always gave -- but a
+    module with a spatial field reads the field, so the two cannot drift
+    apart."""
+    from cognisom.modules.cellular_module import IFN_GAMMA_PROXY_SATURATION
+    from cognisom.modules.immune_module import ImmuneModule
+
+    module = ImmuneModule({"n_t_cells": 3, "n_macrophages": 1, "n_nk_cells": 0})
+    with redirect_stdout(io.StringIO()):
+        module.initialize()
+    mac = next(c for c in module.immune_cells.values() if c.cell_type == "macrophage")
+    for cell in module.immune_cells.values():
+        cell.position = mac.position.copy()
+        if cell.cell_type == "T_cell":
+            cell.activated = True
+
+    # unattached: the count, unchanged -- three activated T cells is this
+    # proxy's saturation point
+    assert module._local_ifn_gamma(mac.position, mac.cell_id) == 1.0
+
+    # attached: the field, converted at the shared calibration
+    module.set_spatial_module(_SpatialWith(0.5 * IFN_GAMMA_PROXY_SATURATION))
+    assert module._local_ifn_gamma(mac.position, mac.cell_id) == pytest.approx(0.5)
+    module.set_spatial_module(_SpatialWith(IFN_GAMMA_PROXY_SATURATION))
+    assert module._local_ifn_gamma(mac.position, mac.cell_id) == pytest.approx(1.0), (
+        "the two representations agree where the proxy is defined")
+    module.set_spatial_module(_SpatialWith(0.0))
+    assert module._local_ifn_gamma(mac.position, mac.cell_id) == 0.0
+
+
+def test_the_calibration_is_one_number_for_both_consumers():
+    from cognisom.modules import cellular_module as cm
+    assert cm.MHC1_IFN_SATURATION is cm.IFN_GAMMA_PROXY_SATURATION
+
+
 def test_a_run_carries_the_field_to_every_cell():
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner

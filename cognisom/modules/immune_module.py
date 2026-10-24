@@ -1637,17 +1637,38 @@ class ImmuneModule(SimulationModule):
 
     def _local_ifn_gamma(self, position, exclude_id=None,
                          neighbours=None) -> float:
-        """Local IFN-gamma from activated T cells, in [0, 1].
+        """Local IFN-gamma at a position, in [0, 1].
 
-        Activated CD8 T cells are the IFN-gamma source. There is no
-        cytokine field and no diffusion solver here, and none is
-        claimed: the signal is counted from nearby cells on demand. The
-        30 um sampling radius is the measured effective range of
-        paracrine IFN-gamma / IL-2 signalling (Oyler-Yaniv A et al.,
-        Immunity 2017;46:609-20) rather than an arbitrary number.
+        Prefers the solved ``ifn_gamma`` field when a spatial module is
+        attached, and falls back to counting activated T cells within
+        the 30 um paracrine radius when one is not.
+
+        The fallback is what this method used to be, and it was honest
+        about itself: no field, no diffusion solver, and none claimed.
+        It is still the right answer with no spatial module, and every
+        test that exercises it unattached gets exactly the old numbers.
+        But once the field exists, keeping two representations of the
+        same cytokine means they can disagree -- so the field wins where
+        there is one, and the conversion is the SAME calibration the
+        MHC-I response uses (IFN_GAMMA_PROXY_SATURATION: the level three
+        activated effectors at contact produce, three within 30 um being
+        this proxy's own saturation point). The two therefore agree
+        where the proxy is defined.
+
+        Two things change when the field is used, and both are the
+        field being more right: the signal falls off with distance
+        rather than counting a 30 um ball, and NK cells contribute,
+        which the count never did -- Brand et al. 2016 (PMID 27641098)
+        read both T and NK arms by their IFN-gamma output.
+
         ``neighbours`` lets a caller that already has the neighbour list
-        reuse it instead of rescanning.
+        reuse it instead of rescanning; it is only used by the fallback.
         """
+        field = (getattr(self.spatial_module, 'fields', None) or {}).get('ifn_gamma')
+        if field is not None:
+            from cognisom.modules.cellular_module import IFN_GAMMA_PROXY_SATURATION
+            level = float(field.get_concentration_at(position))
+            return min(1.0, max(0.0, level / IFN_GAMMA_PROXY_SATURATION))
         if neighbours is None:
             neighbours = self._immune_neighbours(position, exclude_id)
         n = sum(
