@@ -181,6 +181,32 @@ class EntityODESystem:
         )
 
 
+#: Half-maximal activated-receptor concentration for AR-driven
+#: transcription, nM. This used to read the AR gene's
+#: ``dna_binding_kd_nm`` -- 0.5 nM, an in-vitro affinity for naked DNA --
+#: which put the induction term 97.6% saturated at the 13.7 nM the
+#: AR-DHT complex actually settles at, so PSA moved 1.46x across a 20x
+#: change in androgen.
+#:
+#: The quantity wanted is the receptor concentration at which androgen
+#: response elements are half occupied IN A CELL, against chromatin and
+#: with the pioneer factor present. Belikov, Berg & Wrange 2016 (Nucleic
+#: Acids Res 44:3045, PMID 26657626) measured exactly that: apparent Kd
+#: ~0.13 uM for AR at a composite androgen-responsive element carrying
+#: one FoxA1 site and one palindromic hormone-receptor site "known to
+#: bind one receptor homodimer", determined in vivo in Xenopus oocyte
+#: nuclei by dimethylsulphate footprinting, with FoxA1 -- the prostate
+#: AR pioneer factor -- strongly cooperative in the binding.
+#:
+#: Caveats, because this is a proxy and not a KLK3 measurement: it is a
+#: heterologous in-vivo system, not prostate epithelium; it is receptor
+#: occupancy rather than transcription rate, so using it as a Km assumes
+#: transcription follows occupancy; and the element is a model composite
+#: ARE rather than the KLK3 enhancer. It is nonetheless the right KIND
+#: of quantity measured in the right KIND of context, which the 0.5 nM
+#: was not.
+AR_ARE_APPARENT_KD_NM = 130.0
+
 def library_ar_system() -> "EntityODESystem":
     """The AR/PSA pathway the engine runs, built from the entity library.
 
@@ -272,7 +298,7 @@ class ReactionNetworkBuilder:
 
             # PSA dynamics
             "k_psa_tx": 2.0,
-            "K_psa": ar_pp.get("dna_binding_kd_nm", 10.0),  # PSA induction Km
+            "K_psa": AR_ARE_APPARENT_KD_NM,
             "k_psa_m_deg": 1.0,
             "k_psa_tl": 30.0,
             "k_psa_deg": 0.2,

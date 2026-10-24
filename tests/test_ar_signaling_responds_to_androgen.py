@@ -95,47 +95,47 @@ def test_psa_is_monotonic_in_the_androgen_supply(builder):
         f"PSA is not monotonic in androgen supply: {psa}")
 
 
-def test_the_psa_induction_term_is_saturated_at_physiological_androgen(builder):
-    """Records a live mis-scaling, so the cause is on file rather than rediscovered.
+def test_the_psa_induction_term_is_no_longer_saturated(builder):
+    """It was, until the Km was sourced. The cause is kept on file.
 
-    ``K_psa`` is read from the AR gene's ``dna_binding_kd_nm``, which is the
-    affinity of AR for the androgen response element on DNA. It is then used
-    as the half-maximal constant for PSA induction *by the AR-DHT complex*.
-    Those are different quantities, and the substitution is a category error
-    rather than a unit error, so no conversion factor repairs it.
+    ``K_psa`` used to read the AR gene's ``dna_binding_kd_nm`` -- 0.5 nM,
+    an in-vitro affinity for naked DNA -- and use it as the half-maximal
+    constant for PSA induction by the AR-DHT complex, which settles at
+    13.7 nM. The term ran at 40/41 of Vmax across the whole physiological
+    range, so PSA moved 1.46x over a 20x change in androgen and partial
+    suppression was unreachable. Full deprivation still worked, which is
+    why it went unnoticed.
 
-    The consequence is quantitative: AR_DHT settles at 20 nM against a Km of
-    0.5 nM, so the activation term runs at 40/41 of Vmax. The model is in
-    saturation across the whole physiological range, and the clinically
-    meaningful behaviour -- PSA falling progressively under partial androgen
-    suppression -- is unreachable. Full deprivation still works, which is why
-    this went unnoticed.
+    The quantity wanted is the receptor concentration at which androgen
+    response elements are half occupied in a cell. Belikov, Berg & Wrange
+    2016 (Nucleic Acids Res 44:3045, PMID 26657626) measured it in vivo:
+    apparent Kd ~0.13 uM at a composite ARE with FoxA1 present. At
+    130 nM the term sits near a tenth of Vmax and responds.
     """
     state, system = _steady_state(builder, 1.0)
     km = system.parameters["K_psa"]
     occupancy = state["AR_DHT"] / (km + state["AR_DHT"])
 
-    assert occupancy > 0.9, (
-        f"the induction term now runs at {occupancy:.1%} of Vmax rather than "
-        "in saturation. If the Km source was fixed, update this test and "
-        "re-enable the dose-response assertion below")
+    assert km == 130.0, "the sourced in-cell apparent Kd"
+    assert 0.05 < occupancy < 0.25, (
+        f"the induction term runs at {occupancy:.1%} of Vmax -- responsive, "
+        "not saturated")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "K_psa is sourced from the AR-DNA binding affinity (0.5 nM) but used as "
-    "the Km for PSA induction by the AR-DHT complex, which settles at 20 nM. "
-    "The induction term is therefore 97.6% saturated and PSA moves only "
-    "1.46x across a 20x change in androgen. Fixing it needs a defensible "
-    "half-maximal constant for AR-driven KLK3 transcription, which the "
-    "library does not currently hold."))
 def test_psa_responds_to_partial_androgen_blockade(builder):
-    """Partial suppression should move PSA substantially, not marginally."""
+    """Partial suppression should move PSA substantially, not marginally.
+
+    Was xfail(strict) from 2026-10-17 until the Km was sourced to the
+    in-cell apparent Kd: PSA moved 1.46x across this range and now moves
+    about 18x.
+    """
     psa_low = _steady_state(builder, 0.05)[0]["PSA"]
     psa_full = _steady_state(builder, 1.0)[0]["PSA"]
 
     assert psa_full > psa_low * 1.5, (
         f"PSA barely moves between 5% and full androgen ({psa_low:.4g} -> "
         f"{psa_full:.4g})")
+    assert psa_full > psa_low * 10, "and the response is now steep, not marginal"
 
 
 def test_the_androgen_receptor_complex_forms_at_all(builder):

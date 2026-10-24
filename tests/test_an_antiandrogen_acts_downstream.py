@@ -78,7 +78,12 @@ def test_cutting_the_binding_rate_does_not_reduce_ar_signalling():
     blocked = steady(k_bind=system.parameters["k_bind"] / 100.0)
     assert blocked["AR_DHT"] == pytest.approx(base["AR_DHT"], rel=2e-3), (
         "a 100-fold affinity cut barely moves the complex: it is supply-bound")
-    assert blocked["PSA"] == pytest.approx(base["PSA"], rel=1e-4)
+    # PSA moves 0.1% -- not nothing, because since the Km was sourced the
+    # induction term is no longer saturated, so the sliver of complex the
+    # affinity cut does remove is now visible. 0.1% against a drug that
+    # should abolish signalling is still "inert".
+    assert blocked["PSA"] == pytest.approx(base["PSA"], rel=2e-3)
+    assert abs(blocked["PSA"] / base["PSA"] - 1.0) < 0.01
     # and the reason: free DHT rises instead, by the same factor
     assert blocked["DHT"] > 50 * base["DHT"]
 
@@ -102,17 +107,24 @@ def test_blocking_transcription_lowers_signalling_without_touching_the_complex()
 
 
 @pytest.mark.slow
-def test_the_drug_collapses_psa_where_castration_alone_cannot():
-    """The clinically important difference. Castration leaves per-cell PSA
-    at 0.908 of eugonadal, because the induction term is near-saturated
-    at the androgen that remains. The drug acts on transcription itself,
-    so it bypasses that saturation and takes PSA to a tenth."""
+def test_the_drug_lowers_psa_further_than_castration_does():
+    """Both now lower PSA, and the drug lowers it more.
+
+    This test used to assert that castration CANNOT lower PSA -- true
+    only while K_psa came from an in-vitro naked-DNA affinity and left
+    the induction term saturated. With the Km sourced to the in-cell
+    apparent Kd (PMID 26657626) castration drops PSA to about 0.62 at
+    24 h, heading for 0.27 at steady state, which is what a 4x fall in
+    tissue androgen through an unsaturated term should give. The drug,
+    acting on transcription directly, reaches 0.11 at 24 h.
+    """
     castrate = _run("Androgen Deprivation", 24.0)
     drug = _run("Baseline", 24.0, {"ar_signaling": {"ar_transcriptional_block": 0.9}})
     psa_castrate = castrate.engine.modules["ar_signaling"].get_state()["psa_relative_to_eugonadal"]
     psa_drug = drug.engine.modules["ar_signaling"].get_state()["psa_relative_to_eugonadal"]
-    assert psa_castrate > 0.85, f"castration alone: {psa_castrate:.3f}"
-    assert psa_drug < 0.15, f"anti-androgen: {psa_drug:.3f}"
+    assert 0.4 < psa_castrate < 0.8, f"castration alone: {psa_castrate:.3f}"
+    assert psa_drug < 0.2, f"anti-androgen: {psa_drug:.3f}"
+    assert psa_drug < psa_castrate
 
 
 @pytest.mark.slow

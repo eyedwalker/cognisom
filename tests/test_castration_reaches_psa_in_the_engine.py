@@ -92,21 +92,25 @@ def test_it_is_cheap_enough_to_be_on_by_default(baseline):
 
 # ── castration reaches PSA, by the saturated amount ───────────────
 
+def test_castration_lowers_psa_through_an_unsaturated_term(baseline, castrate):
+    """Tissue DHT 13.7 -> 3.4 nM, and PSA follows it down.
 
-def test_castration_lowers_psa_but_only_by_the_saturated_amount(baseline, castrate):
-    """Tissue DHT 13.7 -> 3.4 nM moves the induction term 0.965 -> 0.872
-    (K_psa 0.5 nM), a 10% fall in steady PSA; at 24 h the complex (tau
-    20 h) has relaxed only part way, so PSA sits between. The clinic
-    sees >90%. That gap is the K_psa category error, now in the engine."""
+    Until the Km was sourced this test asserted the opposite -- that PSA
+    moved only ~10%, because K_psa came from an in-vitro naked-DNA
+    affinity (0.5 nM) and left the induction term 97.6% saturated. With
+    the in-cell apparent Kd (130 nM, PMID 26657626) the term is
+    responsive and PSA tracks the androgen.
+
+    A Hill-1 term cannot take PSA below the androgen ratio itself --
+    0.248 here -- for any Km, which is worth knowing: the clinic's >90%
+    fall needs the tumour to lose cells too, and that is modelled
+    separately.
+    """
     ar_b = baseline.engine.modules["ar_signaling"].get_state()
     ar_c = castrate.engine.modules["ar_signaling"].get_state()
     ratio = ar_c["psa_mean"] / ar_b["psa_mean"]
-    steady = castrate.engine.modules["ar_signaling"].steady_state(0.248 * cm.TISSUE_DHT_REFERENCE_NM)
-    steady_ratio = steady[castrate.engine.modules["ar_signaling"]._i["PSA"]] / ar_b["psa_mean"]
-    assert steady_ratio == pytest.approx(0.904, abs=0.01)
-    assert steady_ratio < ratio < 0.995, f"PSA ratio at 24 h {ratio:.3f}"
-    assert ratio > 0.5, "a >90% fall would mean K_psa had been fixed; update this test"
-
+    assert 0.35 < ratio < 0.75, f"PSA ratio at 24 h {ratio:.3f}"
+    assert ratio > 0.248, "and not below the androgen ratio -- Hill-1 cannot"
 
 def test_the_castrate_complex_is_falling_toward_its_new_bound(baseline, castrate):
     b = baseline.engine.modules["ar_signaling"].get_state()["ar_dht_mean"]
