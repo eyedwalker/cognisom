@@ -23,6 +23,7 @@ import omni.usd
 from .simulation_manager import SimulationManager
 from .diapedesis_manager import DiapedesisManager
 from .molecular_manager import MolecularManager
+from .usd_scene_manager import UsdSceneManager
 from .streaming_server import StreamingServer, _encode_jpeg
 
 
@@ -36,6 +37,7 @@ class CognisomSimExtension(omni.ext.IExt):
         self._simulation_manager = None
         self._diapedesis_manager = None
         self._molecular_manager = None
+        self._usd_scene_manager = None
         self._streaming_server = None
         self._menu_items = []
         self._update_sub = None
@@ -78,12 +80,17 @@ class CognisomSimExtension(omni.ext.IExt):
         self._simulation_manager = SimulationManager()
         self._diapedesis_manager = DiapedesisManager()
         self._molecular_manager = MolecularManager()
+        # Opens Bio-USD stages written by visualization.run_usd, so
+        # RTX can render what the engine simulated rather than only
+        # scenes this extension builds itself.
+        self._usd_scene_manager = UsdSceneManager()
 
         # Start HTTP server for simulation control + MJPEG streaming.
         # Port 8600 — Isaac Sim's streaming server already uses 8211.
         self._streaming_server = StreamingServer(
             self._diapedesis_manager,
             molecular_manager=self._molecular_manager,
+            usd_scene_manager=self._usd_scene_manager,
             port=8600)
         self._streaming_server.start()
 
@@ -131,6 +138,10 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._molecular_manager:
             self._molecular_manager.clear()
             self._molecular_manager = None
+
+        if self._usd_scene_manager:
+            self._usd_scene_manager.clear()
+            self._usd_scene_manager = None
 
         # Clean up HydraTexture
         if self._hydra_texture:
@@ -995,6 +1006,9 @@ class CognisomSimExtension(omni.ext.IExt):
         # Process any queued actions from HTTP threads (must run on main thread)
         if self._diapedesis_manager:
             self._diapedesis_manager.process_pending()
+
+        if self._usd_scene_manager:
+            self._usd_scene_manager.process_pending()
 
         if self._molecular_manager:
             self._molecular_manager.process_pending()

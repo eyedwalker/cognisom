@@ -19,11 +19,24 @@ Endpoints:
     POST /cognisom/molecular/compare      → Load WT vs mutant comparison
     POST /cognisom/molecular/mode         → Change visualization mode
     GET  /cognisom/molecular/status       → Molecular viz status
+    POST /cognisom/stage?name=&play=      → Upload a Bio-USD stage
+                                            (body = the stage bytes)
+                                            and open it in the viewport
+    POST /cognisom/stage/play|pause|stop  → Drive its timeline
+    POST /cognisom/stage/seek?frame=N     → Scrub to frame N
+    GET  /cognisom/stage/status           → What stage is open, which
+                                            frame, which simulated hour
+
+The /cognisom/stage endpoints are how a run written by
+``cognisom.visualization.run_usd.write_run`` reaches RTX. Every
+other scene here is built in process from JSON; a stage arrives
+whole. ``cognisom.omniverse.rtx_client`` is the repo-side client.
 
 Usage from extension.py::
 
     server = StreamingServer(diapedesis_manager,
                              molecular_manager=molecular_manager,
+                             usd_scene_manager=usd_scene_manager,
                              port=8211)
     server.start()           # Non-blocking, runs in daemon thread
     server.shutdown()        # Clean stop
@@ -454,6 +467,7 @@ class _StreamHandler(BaseHTTPRequestHandler):
     # Class-level references (set by StreamingServer)
     diapedesis_manager = None
     molecular_manager = None
+    usd_scene_manager = None
     viewport_capture = None
 
     def log_message(self, format, *args):
@@ -553,6 +567,14 @@ class _StreamHandler(BaseHTTPRequestHandler):
             # Serve a simple HTML viewer page
             self._serve_viewer_html()
 
+        elif path == "/cognisom/stage/status":
+            usd = self.usd_scene_manager
+            if usd:
+                self._send_json(usd.status())
+            else:
+                self._send_json(
+                    {"error": "usd scene manager not available"}, 503)
+
         elif path == "/cognisom/molecular/status":
             mol = self.molecular_manager
             if mol:
@@ -573,10 +595,12 @@ class _StreamHandler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
         mgr = self.diapedesis_manager
 
-        # Molecular endpoints don't require diapedesis manager
+        # Molecular and stage endpoints don't require the
+        # diapedesis manager -- they drive their own.
         is_molecular = path.startswith("/cognisom/molecular")
+        is_stage = path.startswith("/cognisom/stage")
 
-        if not mgr and not is_molecular:
+        if not mgr and not (is_molecular or is_stage):
             self._send_json({"error": "diapedesis manager not available"}, 503)
             return
 
@@ -741,6 +765,56 @@ class _StreamHandler(BaseHTTPRequestHandler):
             elif path == "/cognisom/camera/reset":
                 self._reset_camera()
                 self._send_json({"status": "camera reset"})
+
+            elif is_stage:
+                usd = self.usd_scene_manager
+                if not usd:
+                    self._send_json(
+                        {"error": "usd scene manager not available"}, 503)
+                    return
+
+                if path == "/cognisom/stage":
+                    # The body IS the stage. A write_run stage references
+                    # nothing external, so one upload is the whole scene.
+                    content_len = int(self.headers.get("Content-Length", 0))
+                    if not content_len:
+                        self._send_json(
+                            {"error": "expected the bytes of a USD stage "
+                                      "as the request body"}, 400)
+                        return
+                    body = self.rfile.read(content_len)
+                    name = (params.get("name", [None])[0]
+                            or self.headers.get("X-Cognisom-Stage-Name"))
+                    play = (params.get("play", ["0"])[0].lower()
+                            not in ("0", "", "false", "no"))
+                    stage_path = usd.save_upload(body, name)
+                    usd.request_open(stage_path, play=play)
+                    self._send_json({
+                        "message": "stage saved, open queued for the main thread",
+                        "path": stage_path,
+                        "bytes": len(body),
+                        "play_on_open": play,
+                    })
+
+                elif path == "/cognisom/stage/play":
+                    usd.play()
+                    self._send_json({"status": "playing"})
+
+                elif path == "/cognisom/stage/pause":
+                    usd.pause()
+                    self._send_json({"status": "paused"})
+
+                elif path == "/cognisom/stage/stop":
+                    usd.stop()
+                    self._send_json({"status": "stopped"})
+
+                elif path == "/cognisom/stage/seek":
+                    frame = float(params.get("frame", ["0"])[0])
+                    landed = usd.seek(frame)
+                    self._send_json({"status": "seeked", "frame": landed})
+
+                else:
+                    self._send_json({"error": "not found"}, 404)
 
             elif path == "/cognisom/scene/config":
                 content_len = int(self.headers.get("Content-Length", 0))
@@ -1149,7 +1223,7 @@ class StreamingServer:
     """HTTP server for Kit viewport streaming."""
 
     def __init__(self, diapedesis_manager, molecular_manager=None,
-                 port: int = 8211):
+                 usd_scene_manager=None, port: int = 8211):
         self._port = port
         self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
@@ -1161,6 +1235,7 @@ class StreamingServer:
         # Set class-level references for the handler
         _StreamHandler.diapedesis_manager = diapedesis_manager
         _StreamHandler.molecular_manager = molecular_manager
+        _StreamHandler.usd_scene_manager = usd_scene_manager
         _StreamHandler.viewport_capture = self._viewport_capture
 
     def start(self):

@@ -13,6 +13,10 @@ icon = "data/icon.png"
 [dependencies]
 # Required (always available)
 "omni.usd" = {}
+# UsdSceneManager drives this when a Bio-USD stage is opened. The
+# diapedesis path never needed it because it advances its own frame
+# counter; a stage carries a real USD timeline instead.
+"omni.timeline" = {}
 
 # Optional GUI deps (not available in headless streaming mode)
 "omni.kit.uiapp" = {optional = true}
