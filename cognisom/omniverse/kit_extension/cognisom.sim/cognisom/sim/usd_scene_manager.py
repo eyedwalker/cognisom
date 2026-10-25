@@ -54,7 +54,8 @@ import carb
 import omni.usd
 
 from .stage_intake import (PREFERRED_CAMERA, boost_lights_for_rtx,
-                           hours_at_frame, read_stage_facts, safe_stage_name)
+                           hours_at_frame, navigate_camera, read_stage_facts,
+                           reset_camera, safe_stage_name, stage_pivot)
 
 #: Where uploaded stages land. Kept off ``/tmp`` by default on the box so
 #: a stage survives a tmpfs clean mid-session.
@@ -86,6 +87,10 @@ class UsdSceneManager:
         # polled far more often than a frame changes.
         self._last_frame: float = 0.0
         self._last_playing: bool = False
+        # The point the camera turns about. Panning MOVES it, so it is
+        # state, not something recomputed per call.
+        self._pivot = None
+        self._view = None
         self._loaded_path: Optional[str] = None
         self._error: Optional[str] = None
         self._facts: Dict[str, Any] = {}
@@ -166,6 +171,10 @@ class UsdSceneManager:
             elif name == "seek" and self._facts:
                 timeline.set_current_time(
                     float(argument) / self._facts["fps"])
+            elif name == "camera":
+                self._navigate(argument)
+            elif name == "camera_reset":
+                self._reset_view()
         except Exception as exc:                      # noqa: BLE001
             carb.log_warn(f"[cognisom.usd] {name} failed: {exc}")
 
@@ -224,6 +233,8 @@ class UsdSceneManager:
         # before its timeline and camera were set, and would
         # screenshot the previous scene believing it was this one.
         self._facts = facts
+        self._pivot = None          # resolved lazily, on first move
+        self._view = None
         self._loaded_path = path
         self._loaded_at = time.time()
         self._load_count += 1
@@ -280,6 +291,57 @@ class UsdSceneManager:
         """Queue a stop and a rewind. Safe from any thread."""
         self._queue("stop")
 
+    # ── camera navigation (main thread) ───────────────────────────
+
+    def _stage_and_camera(self):
+        stage = omni.usd.get_context().get_stage()
+        camera = self._facts.get("camera")
+        if stage is None or not camera:
+            return None, None
+        return stage, camera
+
+    def _navigate(self, move: Dict[str, float]) -> None:
+        """Main thread only. Moves the camera the CAPTURE is bound to."""
+        stage, camera = self._stage_and_camera()
+        if stage is None:
+            return
+        if self._pivot is None:
+            self._pivot = stage_pivot(stage)
+        if self._pivot is None:
+            return
+        result = navigate_camera(stage, camera, self._pivot, **move)
+        if result:
+            self._pivot = result["pivot"]
+            self._view = result
+
+    def _reset_view(self) -> None:
+        stage, camera = self._stage_and_camera()
+        if stage is None:
+            return
+        reset_camera(stage, camera)
+        self._pivot = stage_pivot(stage)
+        self._view = None
+
+    def move_camera(self, *, yaw_deg: float = 0.0, pitch_deg: float = 0.0,
+                    zoom: float = 1.0, pan_right: float = 0.0,
+                    pan_up: float = 0.0) -> None:
+        """Queue a camera move. Safe from any thread.
+
+        The extension's own /cognisom/camera/orbit cannot do this: it
+        reads ops[0]/ops[1] expecting a translate and a rotateXYZ, and a
+        write_run camera is a single matrix op, so it returns having
+        done nothing at all.
+        """
+        self._queue("camera", {"yaw_deg": float(yaw_deg),
+                               "pitch_deg": float(pitch_deg),
+                               "zoom": float(zoom),
+                               "pan_right": float(pan_right),
+                               "pan_up": float(pan_up)})
+
+    def reset_view(self) -> None:
+        """Queue a return to the camera the FILE authored."""
+        self._queue("camera_reset")
+
     def seek(self, frame: float) -> float:
         """Queue a seek and return the frame it will land on.
 
@@ -329,6 +391,8 @@ class UsdSceneManager:
             "camera": facts.get("camera"),
             "bio_version": facts.get("bio_version"),
             "stage_dir": self._stage_dir,
+            "pivot": self._pivot,
+            "view": self._view,
         }
 
     def clear(self) -> None:

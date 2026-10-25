@@ -176,6 +176,35 @@ class RtxStageClient:
         return self._request("POST", "/cognisom/stage/seek",
                              params={"frame": frame})
 
+    # ── camera ────────────────────────────────────────────────────
+
+    def move_camera(self, *, yaw: float = 0.0, pitch: float = 0.0,
+                    zoom: float = 1.0, pan_right: float = 0.0,
+                    pan_up: float = 0.0) -> Dict[str, Any]:
+        """Orbit, zoom and pan the stage's own camera.
+
+        ``zoom`` below 1 moves closer. ``pan_right``/``pan_up`` are
+        fractions of half the visible frame, so they feel the same at
+        any zoom. The move is queued for Kit's main thread, so it has
+        not happened when this returns.
+        """
+        return self._request("POST", "/cognisom/stage/camera", params={
+            "yaw": yaw, "pitch": pitch, "zoom": zoom,
+            "pan_right": pan_right, "pan_up": pan_up})
+
+    def orbit(self, yaw: float = 0.0, pitch: float = 0.0) -> Dict[str, Any]:
+        return self.move_camera(yaw=yaw, pitch=pitch)
+
+    def zoom(self, factor: float) -> Dict[str, Any]:
+        return self.move_camera(zoom=factor)
+
+    def pan(self, right: float = 0.0, up: float = 0.0) -> Dict[str, Any]:
+        return self.move_camera(pan_right=right, pan_up=up)
+
+    def reset_view(self) -> Dict[str, Any]:
+        """Back to the camera the file authored, fitted to the run."""
+        return self._request("POST", "/cognisom/stage/camera/reset")
+
     def renderer(self) -> str:
         """``"rtx"`` once the box has produced a real RTX frame, else
         ``"pil"``.
@@ -264,6 +293,15 @@ def main(argv=None) -> int:                           # pragma: no cover - CLI
                         help="Kit server base URL (default: GPU_HOST/KIT_SERVER_URL)")
     parser.add_argument("--play", action="store_true", help="start the timeline on open")
     parser.add_argument("--seek", type=float, default=None, help="jump to this frame")
+    parser.add_argument("--yaw", type=float, default=0.0, help="orbit degrees")
+    parser.add_argument("--pitch", type=float, default=0.0, help="orbit degrees")
+    parser.add_argument("--zoom", type=float, default=1.0, help="<1 closer, >1 further")
+    parser.add_argument("--pan-right", type=float, default=0.0,
+                        help="fraction of half a frame")
+    parser.add_argument("--pan-up", type=float, default=0.0,
+                        help="fraction of half a frame")
+    parser.add_argument("--reset-view", action="store_true",
+                        help="back to the camera the file authored")
     parser.add_argument("--save", default=None, help="write the rendered frame here")
     parser.add_argument("--allow-placeholder", action="store_true",
                         help="save the frame even when the box is not "
@@ -283,6 +321,16 @@ def main(argv=None) -> int:                           # pragma: no cover - CLI
     print(load.summary())
     if args.seek is not None:
         print(f"seek -> {client.seek(args.seek)}")
+    if args.reset_view:
+        print(f"reset -> {client.reset_view()}")
+    if any((args.yaw, args.pitch, args.pan_right, args.pan_up)) or args.zoom != 1.0:
+        client.move_camera(yaw=args.yaw, pitch=args.pitch, zoom=args.zoom,
+                           pan_right=args.pan_right, pan_up=args.pan_up)
+        time.sleep(1.5)                 # the move runs on Kit's main thread
+        view = client.stage_status().get("view") or {}
+        if view:
+            print(f"camera -> distance {view['distance']:.0f}, "
+                  f"pivot {tuple(round(v) for v in view['pivot'])}")
     if args.save:
         try:
             jpeg = client.frame_jpeg(require_rtx=not args.allow_placeholder)

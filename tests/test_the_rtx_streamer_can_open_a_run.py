@@ -497,6 +497,116 @@ def test_the_box_reports_which_renderer_made_the_frame(box):
     assert box.client.kit_status()["renderer"] in ("rtx", "pil")
 
 
+# ── camera navigation ─────────────────────────────────────────────
+
+
+def _view(box):
+    return box.client.stage_status().get("view") or {}
+
+
+def test_the_camera_can_be_orbited_zoomed_and_panned(box, stage_path):
+    """The extension's own /cognisom/camera/orbit cannot move this
+    camera at all: it reads ops[0] and ops[1] expecting a translate and
+    a rotateXYZ, and a write_run camera is ONE matrix op, so it returns
+    having done nothing. This drives the matrix instead."""
+    box.client.render_stage(stage_path, timeout=20.0)
+    box.client.reset_view()
+    wait_for(lambda: not _view(box), what="the reset")
+
+    box.client.orbit(yaw=90)
+    wait_for(lambda: bool(_view(box)), what="the orbit")
+    home = _view(box)
+    assert home["distance"] > 0
+
+    # Orbiting alone must not change the distance or the pivot.
+    box.client.orbit(yaw=45, pitch=20)
+    wait_for(lambda: _view(box)["eye"] != home["eye"], what="a second orbit")
+    turned = _view(box)
+    assert turned["distance"] == pytest.approx(home["distance"], rel=1e-6)
+    assert turned["pivot"] == pytest.approx(home["pivot"], abs=1e-6)
+
+    # Zoom changes the distance and nothing else.
+    box.client.zoom(0.5)
+    wait_for(lambda: _view(box)["distance"] < turned["distance"] * 0.9,
+             what="the zoom")
+    closer = _view(box)
+    assert closer["distance"] == pytest.approx(turned["distance"] * 0.5, rel=1e-6)
+    assert closer["pivot"] == pytest.approx(turned["pivot"], abs=1e-6)
+
+    # Pan MOVES the pivot, which is why the manager keeps it as state.
+    box.client.pan(right=0.5, up=0.25)
+    wait_for(lambda: _view(box)["pivot"] != closer["pivot"], what="the pan")
+    panned = _view(box)
+    assert panned["distance"] == pytest.approx(closer["distance"], rel=1e-6)
+    assert panned["pivot"] != closer["pivot"]
+
+
+def test_a_pan_moves_the_view_by_a_fraction_of_the_FRAME_not_the_distance(
+        box, stage_path):
+    """Scaling a pan by the distance moved about three times the frame
+    at this focal length, which threw the tissue clean out of shot. The
+    unit is half the visible frame, so pan_up=1.0 moves half a frame."""
+    import math
+
+    box.client.render_stage(stage_path, timeout=20.0)
+    box.client.reset_view()
+    wait_for(lambda: not _view(box), what="the reset")
+    box.client.orbit(yaw=0)                      # establish a view
+    wait_for(lambda: bool(_view(box)), what="the first move")
+    before = _view(box)
+
+    box.client.pan(up=1.0)
+    wait_for(lambda: _view(box)["pivot"] != before["pivot"], what="the pan")
+    after = _view(box)
+
+    moved = math.dist(after["pivot"], before["pivot"])
+    # 35 mm lens, 16:9 of a 20.955 mm aperture -> tan(half fov) ~ 0.168
+    expected = before["distance"] * (20.955 / (16 / 9)) / (2 * 35.0)
+    assert moved == pytest.approx(expected, rel=0.02), (
+        f"a full pan moved {moved:.1f} where half a frame is {expected:.1f}")
+
+
+def test_reset_restores_the_camera_the_file_authored(box, stage_path):
+    """Navigation writes only to the session layer, so a reset drops
+    those opinions rather than recomputing a home position -- the
+    authored view was fitted to the run's own bounds."""
+    box.client.render_stage(stage_path, timeout=20.0)
+    box.client.move_camera(yaw=120, pitch=30, zoom=0.3, pan_right=0.8)
+    wait_for(lambda: bool(_view(box)), what="the move")
+    moved = _view(box)
+
+    box.client.reset_view()
+    wait_for(lambda: not _view(box), what="the reset")
+    assert box.client.stage_status()["view"] is None
+
+    # And the camera really is back: the next orbit starts from the
+    # authored distance, not the zoomed-in one.
+    box.client.orbit(yaw=1)
+    wait_for(lambda: bool(_view(box)), what="an orbit after reset")
+    assert _view(box)["distance"] > moved["distance"] * 2
+
+
+def test_a_camera_move_is_refused_when_no_stage_is_loaded(box):
+    """It queues happily and does nothing, rather than raising on the
+    HTTP thread -- but it must not pretend a view exists."""
+    box.client.stop()
+    assert box.client.move_camera(yaw=10)["status"] == "camera queued"
+
+
+def test_navigation_never_touches_the_file_on_disk(box, stage_path, tmp_path):
+    """Every camera edit goes to the session layer. The stage the box
+    saved must be byte-identical to the one that was uploaded."""
+    import hashlib
+
+    box.client.render_stage(stage_path, timeout=20.0)
+    box.client.move_camera(yaw=200, pitch=-40, zoom=0.2, pan_up=1.5)
+    wait_for(lambda: bool(_view(box)), what="the move")
+
+    original = hashlib.sha256(open(stage_path, "rb").read()).hexdigest()
+    saved = os.path.join(box.stage_dir, os.path.basename(stage_path))
+    assert hashlib.sha256(open(saved, "rb").read()).hexdigest() == original
+
+
 # ── refusals ──────────────────────────────────────────────────────
 
 
@@ -555,7 +665,8 @@ def test_no_method_the_http_thread_can_reach_calls_into_kit():
 
     main_thread_only = {
         "process_pending", "_run_command", "_refresh_cache", "_try_open",
-        "_open", "_apply_timeline", "_select_camera"}
+        "_open", "_apply_timeline", "_select_camera",
+        "_navigate", "_reset_view", "_stage_and_camera"}
 
     source = os.path.join(SIM_DIR, "usd_scene_manager.py")
     with open(source) as handle:

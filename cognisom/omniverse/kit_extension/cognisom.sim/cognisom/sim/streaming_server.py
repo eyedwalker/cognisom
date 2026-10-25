@@ -25,7 +25,17 @@ Endpoints:
     POST /cognisom/stage/play|pause|stop  → Drive its timeline
     POST /cognisom/stage/seek?frame=N     → Scrub to frame N
     GET  /cognisom/stage/status           → What stage is open, which
-                                            frame, which simulated hour
+                                            frame, which simulated hour,
+                                            and where the camera is
+    POST /cognisom/stage/camera           → Orbit/zoom/pan the stage's own
+         ?yaw=&pitch=&zoom=                 camera. zoom<1 is closer;
+         &pan_right=&pan_up=                pan is in half-frames.
+    POST /cognisom/stage/camera/reset     → Back to the authored camera
+
+NOTE /cognisom/camera/orbit is a DIFFERENT, older endpoint: it drives
+the diapedesis scene's camera, reads ops[0]/ops[1] expecting a translate
+plus a rotateXYZ, and so does nothing at all on a Bio-USD stage, whose
+camera is a single matrix op. Use /cognisom/stage/camera for stages.
 
 The /cognisom/stage endpoints are how a run written by
 ``cognisom.visualization.run_usd.write_run`` reaches RTX. Every
@@ -807,6 +817,24 @@ class _StreamHandler(BaseHTTPRequestHandler):
                 elif path == "/cognisom/stage/stop":
                     usd.stop()
                     self._send_json({"status": "stopped"})
+
+                elif path == "/cognisom/stage/camera":
+                    # Drives the stage's OWN camera -- the one the RTX
+                    # capture is bound to. /cognisom/camera/orbit is
+                    # hardwired to the diapedesis camera and does
+                    # nothing here.
+                    def _f(key, default):
+                        return float(params.get(key, [default])[0])
+                    usd.move_camera(yaw_deg=_f("yaw", "0"),
+                                    pitch_deg=_f("pitch", "0"),
+                                    zoom=_f("zoom", "1"),
+                                    pan_right=_f("pan_right", "0"),
+                                    pan_up=_f("pan_up", "0"))
+                    self._send_json({"status": "camera queued"})
+
+                elif path == "/cognisom/stage/camera/reset":
+                    usd.reset_view()
+                    self._send_json({"status": "camera reset queued"})
 
                 elif path == "/cognisom/stage/seek":
                     frame = float(params.get("frame", ["0"])[0])

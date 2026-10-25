@@ -221,19 +221,72 @@ def stage_pivot(stage: Any, time_code: Optional[float] = None
     return None
 
 
-def orbit_camera(stage: Any, camera_path: str,
-                 pivot: Sequence[float],
-                 yaw_deg: float = 0.0, pitch_deg: float = 0.0,
-                 zoom: float = 1.0) -> Optional[Dict[str, Any]]:
-    """Orbit a camera around ``pivot`` and re-aim it there.
+def _camera_basis(matrix: Any):
+    """Right and up vectors of a camera from its local-to-world matrix."""
+    from pxr import Gf
+    right = Gf.Vec3d(matrix[0][0], matrix[0][1], matrix[0][2]).GetNormalized()
+    up = Gf.Vec3d(matrix[1][0], matrix[1][1], matrix[1][2]).GetNormalized()
+    return right, up
+
+
+def _half_frame_tangent(camera: Any, default: float = 0.30) -> float:
+    """tan(half the vertical field of view), from the camera itself.
+
+    Multiplying by the distance gives half the visible frame height at
+    the subject, which is the natural unit for a pan: ``pan_up=1.0``
+    moves the view by half a frame.
+    """
+    from pxr import UsdGeom
+
+    cam = UsdGeom.Camera(camera)
+    focal = cam.GetFocalLengthAttr().Get()
+    aperture = cam.GetVerticalApertureAttr().Get()
+    if not focal or not aperture:
+        return default
+    return float(aperture) / (2.0 * float(focal))
+
+
+def _widen_clipping(camera: Any, distance: float) -> None:
+    """Keep the subject and the backdrop inside the frustum.
+
+    ``author_event_camera`` sets the range from the distance it framed
+    at, and the backdrop sits at twelve times that, parented to the
+    camera. Zooming moves the subject but not the backdrop, so the
+    range is only ever WIDENED here -- narrowing it would clip the
+    backdrop away and leave a transparent field.
+    """
+    from pxr import Gf, UsdGeom
+
+    attr = UsdGeom.Camera(camera).GetClippingRangeAttr()
+    current = attr.Get()
+    near, far = ((float(current[0]), float(current[1])) if current is not None
+                 else (distance * 0.01, distance * 13.0))
+    attr.Set(Gf.Vec2f(max(1e-4, min(near, distance * 0.005)),
+                      max(far, distance * 5.0)))
+
+
+def navigate_camera(stage: Any, camera_path: str,
+                    pivot: Sequence[float], *,
+                    yaw_deg: float = 0.0, pitch_deg: float = 0.0,
+                    zoom: float = 1.0,
+                    pan_right: float = 0.0, pan_up: float = 0.0
+                    ) -> Optional[Dict[str, Any]]:
+    """Orbit, zoom and pan a camera about ``pivot``.
 
     ``author_event_camera`` writes the camera as ONE transform op (a
     matrix from ``SetLookAt``), not a translate plus a rotateXYZ. The
-    extension's existing orbit reads ``ops[0]``/``ops[1]`` and gives up
-    when there are fewer than two, which is why it silently does
-    nothing on a Bio-USD stage. This rebuilds the matrix instead.
+    extension's own ``/cognisom/camera/orbit`` reads ``ops[0]`` and
+    ``ops[1]`` and gives up when there are fewer than two, which is why
+    it silently does nothing on a Bio-USD stage. This rebuilds the
+    matrix instead.
 
-    ``zoom`` below 1 moves closer. Returns the new eye and distance.
+    ``zoom`` below 1 moves closer. ``pan_right``/``pan_up`` are
+    fractions of the current distance, so panning feels the same at any
+    zoom, and they move the PIVOT -- the returned pivot is what a
+    caller must pass back on the next call.
+
+    Edits land in the stage's SESSION layer, leaving the file alone.
+    Returns the new eye, pivot and distance.
     """
     if UsdGeom is None or Usd is None:
         return None
@@ -242,26 +295,33 @@ def orbit_camera(stage: Any, camera_path: str,
     prim = stage.GetPrimAtPath(camera_path)
     if not prim.IsValid():
         return None
-    xf = UsdGeom.Xformable(prim)
-    ops = xf.GetOrderedXformOps()
+    ops = UsdGeom.Xformable(prim).GetOrderedXformOps()
     if not ops:
         return None
-
     matrix = ops[0].Get()
     if matrix is None:
         return None
+
     eye = matrix.ExtractTranslation()
     target = Gf.Vec3d(float(pivot[0]), float(pivot[1]), float(pivot[2]))
-
     offset = Gf.Vec3d(eye[0] - target[0], eye[1] - target[1], eye[2] - target[2])
     dist = offset.GetLength()
     if dist < 1e-9:
         return None
 
+    if pan_right or pan_up:
+        # Pan in units of the VISIBLE FRAME, not of the distance. A
+        # fraction of the distance is roughly three times the frame at
+        # this focal length, so panning by 0.3 threw the tissue clean
+        # out of shot.
+        right, up = _camera_basis(matrix)
+        reach = dist * _half_frame_tangent(prim)
+        target = target + right * (float(pan_right) * reach) \
+                        + up * (float(pan_up) * reach)
+
     # Spherical about the camera's own up axis (Z).
-    azimuth = math.atan2(offset[1], offset[0])
+    azimuth = math.atan2(offset[1], offset[0]) + math.radians(float(yaw_deg))
     elevation = math.asin(max(-1.0, min(1.0, offset[2] / dist)))
-    azimuth += math.radians(float(yaw_deg))
     elevation = max(math.radians(-89.0),
                     min(math.radians(89.0),
                         elevation + math.radians(float(pitch_deg))))
@@ -276,6 +336,29 @@ def orbit_camera(stage: Any, camera_path: str,
     view.SetLookAt(new_eye, target, Gf.Vec3d(*CAMERA_UP))
     with Usd.EditContext(stage, stage.GetSessionLayer()):
         UsdGeom.Xformable(prim).GetOrderedXformOps()[0].Set(view.GetInverse())
+        _widen_clipping(prim, dist)
     return {"eye": (float(new_eye[0]), float(new_eye[1]), float(new_eye[2])),
             "pivot": (float(target[0]), float(target[1]), float(target[2])),
             "distance": float(dist)}
+
+
+def reset_camera(stage: Any, camera_path: str) -> bool:
+    """Put the camera back to what the FILE says.
+
+    Navigation only ever writes to the session layer, so a reset is
+    simply dropping those opinions: the authored view underneath is the
+    one ``author_event_camera`` fitted to the run's own bounds, which is
+    a better home position than anything recomputed here.
+    """
+    if UsdGeom is None or Usd is None:
+        return False
+    prim = stage.GetPrimAtPath(camera_path)
+    if not prim.IsValid():
+        return False
+    ops = UsdGeom.Xformable(prim).GetOrderedXformOps()
+    if not ops:
+        return False
+    with Usd.EditContext(stage, stage.GetSessionLayer()):
+        ops[0].GetAttr().Clear()
+        UsdGeom.Camera(prim).GetClippingRangeAttr().Clear()
+    return True
