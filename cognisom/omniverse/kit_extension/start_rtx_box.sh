@@ -80,6 +80,12 @@ attempt() {
         echo "already running"; report "$INSTANCE"; return 0
     fi
     if [[ "$state" == "stopped" ]]; then
+        # Changing the type is a SIDE EFFECT on the user's instance, so
+        # remember what it was and put it back if nothing starts.
+        local original
+        original=$(aws ec2 describe-instances --instance-ids "$INSTANCE" \
+            --region "$REGION" \
+            --query 'Reservations[0].Instances[0].InstanceType' --output text 2>/dev/null)
         for t in $TYPES; do
             aws ec2 modify-instance-attribute --instance-id "$INSTANCE" \
                 --region "$REGION" --instance-type "{\"Value\": \"$t\"}" >/dev/null 2>&1
@@ -90,6 +96,12 @@ attempt() {
             fi
             echo "  no capacity to start as $t in its AZ"
         done
+        if [[ -n "$original" && "$original" != "None" ]]; then
+            aws ec2 modify-instance-attribute --instance-id "$INSTANCE" \
+                --region "$REGION" \
+                --instance-type "{\"Value\": \"$original\"}" >/dev/null 2>&1
+            echo "  (left $INSTANCE as $original, the type it had)"
+        fi
     elif [[ -n "$state" && "$state" != "None" ]]; then
         echo "existing instance is '$state'; not touching it"
     fi
