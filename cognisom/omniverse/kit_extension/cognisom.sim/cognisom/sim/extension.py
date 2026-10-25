@@ -1318,6 +1318,46 @@ class CognisomSimExtension(omni.ext.IExt):
         carb.log_warn("[cognisom.sim] Annotator recreated after "
                       "scene build")
 
+    # KNOWN DEFECT -- the RTX capture of a Bio-USD stage is STATIC.
+    #
+    # Opening a stage renders ONE correct RTX frame (right camera, right
+    # content, right lighting) and then /frame.jpg returns the same bytes
+    # forever: through timeline seeks, through camera moves, and while
+    # playing. The stage underneath is fine -- status reports the right
+    # simulated hour and the camera's distance and pivot change -- so
+    # this is the capture, not the scene.
+    #
+    # Measured on an L4 (2026-10-25), and the L40S run of 2026-10-24 shows
+    # it too: four stills saved at hours 0, 3, 6 and 12 were all exactly
+    # 117 KB, which a shrinking tumour cannot produce.
+    #
+    # Ruled out, each by a separate run:
+    #   - the annotator being empty. It returns a full (1080,1920,4)
+    #     uint8 buffer every frame; the PIXELS are identical.
+    #   - which render product feeds it: the viewport's, a standalone
+    #     one, and a forced HydraTexture all behave the same.
+    #   - stepping rep.orchestrator every frame to drive the render
+    #     product (no change, and step_async pauses the timeline).
+    #   - asking the viewport to draw via schedule_update/request_draw.
+    #   - the WebRTC livestream owning the render loop with no client
+    #     attached: --/app/livestream/enabled=false changes nothing.
+    #
+    # Next thing to try: a client actually attached to the livestream, or
+    # capture through omni.replicator's writer rather than reading an
+    # annotator from the update loop.
+
+    def _have_content(self) -> bool:
+        """Is there anything worth rendering yet?
+
+        Either the diapedesis scene was built, or a Bio-USD stage is
+        open. Recovery used to ask only the first question.
+        """
+        if (self._diapedesis_manager
+                and getattr(self._diapedesis_manager, "_scene_built", False)):
+            return True
+        return bool(self._usd_scene_manager
+                    and self._usd_scene_manager.status().get("loaded"))
+
     def _capture_rtx_frame(self):
         """Read RTX frame from replicator annotator and push to streaming buffer.
 
@@ -1364,11 +1404,14 @@ class CognisomSimExtension(omni.ext.IExt):
                 self._empty_frame_count += 1
                 # Recovery: kick orchestrator after scene is built but
                 # annotator still returns empty
+                # A stage load builds no diapedesis scene, so gating
+                # recovery on _scene_built meant neither path could ever
+                # fire for a Bio-USD stage: the annotator stayed empty
+                # and nothing tried to rescue it.
                 if (self._empty_frame_count == 200 and
                         not self._orchestrator_kicked and
                         not self._recovering and
-                        self._diapedesis_manager and
-                        self._diapedesis_manager._scene_built):
+                        self._have_content()):
                     carb.log_warn(
                         "[cognisom.sim] 200 empty frames post-build — "
                         "kicking orchestrator...")
@@ -1377,8 +1420,7 @@ class CognisomSimExtension(omni.ext.IExt):
                     asyncio.ensure_future(self._recovery_kick())
                 elif (self._empty_frame_count == 600 and
                         not self._recovering and
-                        self._diapedesis_manager and
-                        self._diapedesis_manager._scene_built):
+                        self._have_content()):
                     carb.log_warn(
                         "[cognisom.sim] 600 empty frames — "
                         "trying viewport RP swap...")
