@@ -1342,9 +1342,40 @@ class CognisomSimExtension(omni.ext.IExt):
     #   - the WebRTC livestream owning the render loop with no client
     #     attached: --/app/livestream/enabled=false changes nothing.
     #
-    # Next thing to try: a client actually attached to the livestream, or
-    # capture through omni.replicator's writer rather than reading an
-    # annotator from the update loop.
+    # MEASURED 2026-10-26, on an A10G, with a probe that bypassed this
+    # extension entirely (bare Isaac Sim, SimulationApp, no viewport):
+    #
+    #   moving the timeline + app.update()        -> annotator EMPTY, 4/4 same
+    #   + rep.orchestrator.step(pause_timeline=False) -> 4 DISTINCT frames
+    #   + the same while orbiting the camera          -> 3 DISTINCT frames
+    #
+    # So a render product does NOT redraw on its own; it has to be
+    # stepped, and the timeline and the camera BOTH reach the pixels
+    # once it is. That is the mechanism, and it works.
+    #
+    # What does not work is doing it from inside this extension:
+    #   - the synchronous step is refused outright: "Synchronous call to
+    #     `step` can only be performed in a standalone workflow".
+    #   - step_async(pause_timeline=False) runs without error, but the
+    #     annotator here is attached to the VIEWPORT's render product,
+    #     which Replicator does not manage, so the step renders a
+    #     product nobody reads. The capture keeps serving the single
+    #     frame the viewport drew when it started.
+    #   - creating our own render product on the stage camera and
+    #     attaching the annotator to THAT -- the probe's exact sequence,
+    #     attach then step then read -- does get live data through, but
+    #     every frame comes out BLACK inside the streaming app, while
+    #     the identical sequence in a standalone app renders the scene.
+    #     Two render products on one camera is the obvious suspect.
+    #
+    # Beware the >1000-byte guard below when testing this: a black frame
+    # encodes smaller than that, so it is dropped and the PREVIOUS frame
+    # keeps being served. A stale image then looks like a frozen render
+    # rather than a black one.
+    #
+    # Next: give the capture its own camera prim rather than sharing the
+    # viewport's, or drive it through an omni.replicator writer instead
+    # of reading an annotator from the update loop.
 
     def _have_content(self) -> bool:
         """Is there anything worth rendering yet?
