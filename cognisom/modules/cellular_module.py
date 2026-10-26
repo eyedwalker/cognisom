@@ -324,6 +324,21 @@ class CellularModule(SimulationModule):
         self.hla_alleles: List[str] = list(
             self.config.get('hla_alleles', DEFAULT_HLA_ALLELES)
         )
+        #: The simulated patient's somatic missense mutations, as dicts
+        #: with gene / aa_change / label / oncogenic -- built by
+        #: cognisom.dashboard.patient_engine.engine_inputs, which checks
+        #: each against the reference protein and reports every one it
+        #: leaves out. Empty means no patient was given, and every cancer
+        #: cell carries the historical KRAS_G12D, as before.
+        self.patient_mutations: List[Dict[str, Any]] = [
+            dict(m) for m in (self.config.get('patient_mutations') or [])
+        ]
+        #: Whether a patient was given at all. Separate from whether that
+        #: patient has presentable mutations: a patient with none must get
+        #: a tumour that presents nothing, not the historical KRAS_G12D.
+        #: Conflating the two made a "nothing presentable" control quietly
+        #: present KRAS.
+        self.patient_given = self.config.get('patient_mutations') is not None
         #: One record per (gene, mutation) whose peptides bound nothing on
         #: this patient's HLA panel: the best IC50 reached, on which
         #: allele, and which scorer said so. See on_mutation_occurred.
@@ -434,7 +449,7 @@ class CellularModule(SimulationModule):
             z = 50 + np.random.uniform(-5, 5)
 
             cell_id = self.add_cell(position=[x, y, z], cell_type='cancer')
-            self.cells[cell_id].mutations = ['KRAS_G12D']
+            self.cells[cell_id].mutations = self._founding_mutations()
             self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
             # KRAS alone does not drive intrinsic PD-L1, so this stays
             # at 0; PIK3CA/MYC/EGFR mutations would bump it here via
@@ -479,7 +494,7 @@ class CellularModule(SimulationModule):
             self.add_cell(position=position, cell_type='normal')
         for position in layout['cancer']:
             cell_id = self.add_cell(position=position, cell_type='cancer')
-            self.cells[cell_id].mutations = ['KRAS_G12D']
+            self.cells[cell_id].mutations = self._founding_mutations()
             self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
 
         self.slab_layout = layout
@@ -492,6 +507,77 @@ class CellularModule(SimulationModule):
               f"{layout['nodule_center'][1]:.0f}, "
               f"{layout['nodule_center'][2]:.0f})")
         return len(layout['normal']), len(layout['cancer'])
+
+    def _founding_mutations(self) -> List[str]:
+        """The mutation labels a founding cancer cell carries.
+
+        The patient's, when one was given; otherwise the historical
+        KRAS_G12D every run used to carry whoever the patient was.
+        """
+        if self.patient_given:
+            return [m['label'] for m in self.patient_mutations]
+        return ['KRAS_G12D']
+
+    def _present_patient_mutations_on(self, cell_id: int) -> None:
+        """Run the patient's mutations through presentation on one cell."""
+        for mutation in self.patient_mutations:
+            self.on_mutation_occurred({
+                'cell_id': cell_id,
+                'gene': mutation['gene'],
+                'mutation': mutation['label'],
+                'aa_change': mutation['aa_change'],
+                'oncogenic': bool(mutation.get('oncogenic', False)),
+            })
+
+    def present_patient_mutations(self) -> Dict[str, Any]:
+        """Present the patient's mutations on every founding cancer cell.
+
+        Runs each mutation through on_mutation_occurred -- the same path
+        a mutation acquired during the run takes -- so the peptides are
+        cut from the reference protein, scored against this patient's
+        HLA, and kept on the cell only if they bind. Daughters copy their
+        parent's displayed peptides, so presentation is inherited.
+
+        Must run after the molecular module is linked, which supplies the
+        reference proteins. Returns what happened, including every
+        mutation that produced nothing presentable on this patient's
+        alleles, because a mutation the immune system cannot see is a
+        result, not an error.
+        """
+        cancer_ids = [cid for cid, cell in self.cells.items()
+                      if cell.cell_type == 'cancer']
+        report: Dict[str, Any] = {
+            'cancer_cells': len(cancer_ids),
+            'mutations': [m['label'] for m in self.patient_mutations],
+            'hla_alleles': list(self.hla_alleles),
+            'presented': [],
+            'unpresented': [],
+            'cells_displaying': 0,
+        }
+        if not self.patient_mutations:
+            report['reason'] = 'no patient mutations'
+            return report
+        if self.molecular_module is None:
+            report['reason'] = ('no molecular module linked, so there are no '
+                                'reference proteins to cut peptides from')
+            return report
+
+        before = len(self.unpresented_mutations)
+        for cell_id in cancer_ids:
+            self._present_patient_mutations_on(cell_id)
+
+        displayed_genes = set()
+        for cell_id in cancer_ids:
+            peptides = self.cells[cell_id].mhc1_displayed_peptides
+            if peptides:
+                report['cells_displaying'] += 1
+            for pres in peptides:
+                displayed_genes.add(pres.peptide.source_gene)
+        report['presented'] = [m['label'] for m in self.patient_mutations
+                               if m['gene'] in displayed_genes]
+        report['unpresented'] = [dict(u) for u in
+                                 self.unpresented_mutations[before:]]
+        return report
 
     def add_cell(self, position, cell_type='normal'):
         """Add new cell"""
@@ -870,9 +956,18 @@ class CellularModule(SimulationModule):
                 label = f'{gene_name}_{mutation_label}'
                 if label not in cell.mutations:
                     cell.mutations.append(label)
+        elif self.patient_given:
+            # The cell joins THIS patient's tumour: it carries the
+            # patient's mutations and presents them, instead of the
+            # historical KRAS_G12D the patient does not have.
+            for label in self._founding_mutations():
+                if label not in cell.mutations:
+                    cell.mutations.append(label)
         else:
             cell.mutations.append('KRAS_G12D')
         cell.mhc1_expression = 0.3
+        if self.patient_given and not mutations and self.molecular_module is not None:
+            self._present_patient_mutations_on(cell_id)
         
         # Emit event
         self.emit_event(EventTypes.CELL_TRANSFORMED, {

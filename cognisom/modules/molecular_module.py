@@ -31,6 +31,18 @@ from cognisom.engine.py.molecular.sequence_view import CellGenomeView
 from cognisom.engine.py.molecular.mutation_effect import MutationEffectClassifier
 
 
+def _mane_reference_protein(gene_name: str) -> str:
+    """The MANE Select protein for a gene, or "" if there is none.
+
+    Imported lazily: the modules layer may depend on genomics, and this
+    table is loaded once, on first use, from a file in the package.
+    """
+    from cognisom.genomics.gene_protein_mapper import BUILTIN_PROTEINS
+
+    info = BUILTIN_PROTEINS.get(str(gene_name).upper())
+    return info.sequence if info is not None else ""
+
+
 class MolecularModule(SimulationModule):
     """
     Molecular simulation module
@@ -100,6 +112,14 @@ class MolecularModule(SimulationModule):
         self.translation_rate = self.config.get('translation_rate', 0.5)
         self.exosome_release_rate = self.config.get('exosome_release_rate', 0.1)
         self.mutation_rate = self.config.get('mutation_rate', 0.001)
+        #: The driver written into a cell transformed without an
+        #: attributed mutation. KRAS G12D is the historical default; a
+        #: run given a real patient sets this to None, because a cell that
+        #: joins that patient's tumour must not acquire a KRAS mutation
+        #: the patient does not have -- and hand the T cells a target the
+        #: patient's tumour never presented.
+        driver = self.config.get('default_transform_driver', ('KRAS', 'G12D'))
+        self.default_transform_driver = tuple(driver) if driver else None
 
         # Cap on retained full-length RNA objects per cell. The pool has
         # exactly one consumer (_package_exosome, which reads index [0]),
@@ -202,11 +222,20 @@ class MolecularModule(SimulationModule):
         generation on MUTATION_OCCURRED (Upgrade 2). Translation starts
         at the first base (CDS-aligned reference sequences are stored
         in reference_cds.py) and stops at the first stop codon.
-        Returns an empty string if the gene is not in the reference
-        genome.
+        Genes outside this module's DNA reference fall back to the MANE
+        Select protein table the genomics package ships offline (19,293
+        genes). The DNA reference holds only the handful of genes this
+        module can mutate base by base -- KRAS, TP53, BRAF -- so before
+        the fallback a patient's ARID1A or NOTCH1 mutation reached this
+        method, got "", and was skipped without a word: the simulation
+        could not present a real patient's tumour even once it was told
+        about it. Genes the DNA reference does hold keep their own
+        translation, so nothing that worked before changes.
+
+        Returns an empty string if neither source has the gene.
         """
         if self.reference_genome is None or not self.reference_genome.has_gene(gene_name):
-            return ""
+            return _mane_reference_protein(gene_name)
         dna = self.reference_genome.get_reference_sequence(gene_name)
         rna = RNA(dna.replace("T", "U"), gene_name, NucleicAcidType.mRNA)
         protein = rna.translate()
@@ -491,8 +520,9 @@ class MolecularModule(SimulationModule):
         position = data['position']
 
         if cell_id in self.cell_views:
-            if not self.cell_oncogene_flags.get(cell_id):
-                self.introduce_mutation(cell_id, 'KRAS', 'G12D')
+            if (not self.cell_oncogene_flags.get(cell_id)
+                    and self.default_transform_driver):
+                self.introduce_mutation(cell_id, *self.default_transform_driver)
 
             exosome = self.create_exosome(cell_id, oncogenic=True)
             if exosome:

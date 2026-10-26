@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from .patient_profile import PatientProfile
 from .cell_state_classifier import ImmuneClassification
+from .hla_typer import hla_is_read_derived
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +108,12 @@ class DigitalTwinConfig:
 
         # HLA alleles
         config.hla_alleles = profile.hla_alleles or []
-        config.hla_is_patient_specific = bool(
-            getattr(profile, 'hla_is_patient_specific', False))
+        # The field's own contract: "True only when these alleles were
+        # typed from this patient's reads". The profile's flag also counts
+        # the invented demo profiles, and this field feeds the NK model's
+        # patient_hla_measured -- so a synthetic typing reached the innate
+        # simulation marked as measured.
+        config.hla_is_patient_specific = hla_is_read_derived(profile)
 
         # MHC-I downregulation based on genomic markers (entity-driven)
         try:
@@ -196,8 +201,7 @@ class DigitalTwinConfig:
             neoantigen_count=neo_count,
             mhc1_downregulation=mhc1_down,
             hla_alleles=profile.hla_alleles or [],
-            hla_is_patient_specific=bool(
-                getattr(profile, 'hla_is_patient_specific', False)),
+            hla_is_patient_specific=hla_is_read_derived(profile),
             predicted_neoantigen_count=len(profile.predicted_neoantigens),
             strong_binder_count=profile.strong_binder_count,
             vaccine_candidate_count=len(profile.vaccine_neoantigens),

@@ -112,6 +112,26 @@ MEASURED_HLA_TYPINGS: Dict[str, MeasuredTyping] = {
     ),
 }
 
+#: Typing methods that read THIS patient's own sequencing reads.
+#:
+#: Narrower than HLATyper.PATIENT_SPECIFIC_METHODS, on purpose. That set
+#: includes "predefined-profile", whose alleles come from
+#: SYNTHETIC_HLA_PROFILES below -- invented for a synthetic demo patient.
+#: For a patient whose whole genome is synthetic, those alleles really are
+#: "that patient's", so patient-specific is a fair word for them. They
+#: are not MEASURED, and the NK licensing model requires types "actually
+#: determined from a patient's reads". Anything that tells the innate
+#: simulation a typing was measured must use this set.
+READ_DERIVED_HLA_METHODS = frozenset({"optitype"})
+
+
+def hla_is_read_derived(profile) -> bool:
+    """True only for a typing determined from this patient's reads."""
+    return (bool(getattr(profile, "hla_is_patient_specific", False))
+            and getattr(profile, "hla_typing_method", None)
+            in READ_DERIVED_HLA_METHODS)
+
+
 SYNTHETIC_HLA_PROFILES: Dict[str, List[str]] = {
     "COGNISOM-DEMO-001": [
         "HLA-A*02:01", "HLA-A*24:02",

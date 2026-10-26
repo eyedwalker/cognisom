@@ -367,6 +367,7 @@ class EngineRunner:
         record_interval: int = 10,
         snapshot_interval_hours: Optional[float] = 0.1,
         tissue: str = "slab",
+        patient: Optional[Any] = None,
     ):
         if tissue not in TISSUE_LAYOUTS:
             raise ValueError(
@@ -379,6 +380,13 @@ class EngineRunner:
         #: dynamics were first calibrated on, kept so the tests that pin
         #: that calibration can still say what they pin. See slab_variant.
         self.tissue = tissue
+        #: What the patient contributed, or None. Before this parameter
+        #: existed every cancer cell carried KRAS_G12D on a generic HLA
+        #: panel whoever the patient was. See patient_engine.
+        self.patient_inputs = None
+        #: Filled by build(): which of the patient's mutations reached the
+        #: cancer cells' MHC-I, and which bound nothing on their alleles.
+        self.presentation_report: Optional[Dict[str, Any]] = None
         self.record_interval = record_interval  # record snapshot every N steps
 
         # Cell snapshots keep their own clock, in SIMULATED HOURS, because
@@ -411,6 +419,13 @@ class EngineRunner:
             "cell_mechanics": {},
             "ar_signaling": {},
         }
+        # The patient goes in after the preset and before the caller's
+        # overrides, so an explicit override still wins.
+        if patient is not None:
+            from cognisom.dashboard.patient_engine import engine_inputs
+            self.patient_inputs = engine_inputs(patient)
+            for mod, params in self.patient_inputs.module_configs().items():
+                self.module_configs[mod].update(params)
         if overrides:
             for mod, params in overrides.items():
                 if mod in self.module_configs:
@@ -550,6 +565,12 @@ class EngineRunner:
 
             # Link modules
             self._link_modules()
+
+            # The patient's mutations need the molecular module's
+            # reference proteins, so they are presented only once linked.
+            cellular = self.engine.modules.get("cellular")
+            if self.patient_inputs is not None and cellular is not None:
+                self.presentation_report = cellular.present_patient_mutations()
 
         # Subscribe to events we want to capture
         self._subscribe_events()
