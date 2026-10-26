@@ -183,7 +183,7 @@ def test_a_full_run_keeps_the_mrna_pool_bounded():
     from cognisom.dashboard.engine_runner import EngineRunner
 
     np.random.seed(12345)
-    runner = EngineRunner(dt=0.05, duration=6.0, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=6.0, scenario="Baseline",
                           record_interval=20)
     runner.build()
     runner.run()

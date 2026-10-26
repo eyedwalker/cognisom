@@ -272,7 +272,7 @@ def test_in_the_shipped_preset_the_rise_changes_no_outcome_and_why():
         np.random.seed(5)
         config = {k: dict(v) for k, v in over.items()}
         config["immune"].update(extra)
-        runner = EngineRunner(dt=0.05, duration=8.0, scenario="Baseline", overrides=config)
+        runner = EngineRunner(tissue="ring", dt=0.05, duration=8.0, scenario="Baseline", overrides=config)
         with redirect_stdout(io.StringIO()):
             runner.build()
             runner.run()
@@ -345,7 +345,7 @@ def test_a_run_carries_the_field_to_every_cell():
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(7)
-    runner = EngineRunner(dt=0.05, duration=2.0, scenario="Baseline")
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline")
     with redirect_stdout(io.StringIO()):
         runner.build()
         runner.run()

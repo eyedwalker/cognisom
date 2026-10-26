@@ -90,7 +90,7 @@ def runs():
     out = {}
     for scenario in ("Baseline", "Hypoxia"):
         np.random.seed(12345)
-        runner = EngineRunner(dt=0.05, duration=24.0, scenario=scenario,
+        runner = EngineRunner(tissue="ring", dt=0.05, duration=24.0, scenario=scenario,
                               record_interval=20)
         runner.build()
         runner.run()

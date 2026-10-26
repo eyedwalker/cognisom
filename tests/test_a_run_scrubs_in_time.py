@@ -28,7 +28,7 @@ from cognisom.visualization.run_usd import (  # noqa: E402
 def run(tmp_path_factory):
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(3)
-    runner = EngineRunner(dt=0.05, duration=2.0, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline",
                           snapshot_interval_hours=0.1)
     with redirect_stdout(io.StringIO()):
         runner.build()
@@ -58,7 +58,7 @@ def test_the_runner_attaches_a_recorder_and_it_saw_the_run(run):
 def test_the_recorder_is_cleared_when_a_run_restarts():
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(4)
-    runner = EngineRunner(dt=0.05, duration=0.3, scenario="Baseline")
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=0.3, scenario="Baseline")
     with redirect_stdout(io.StringIO()):
         runner.build()
         runner.run()

@@ -300,7 +300,7 @@ def test_the_default_interval_gives_a_watchable_number_of_frames():
     a simulated-hours interval of its own.
     """
     np.random.seed(12345)
-    runner = EngineRunner(dt=0.05, duration=2.0, scenario="Baseline")
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline")
     assert runner.snapshot_interval_hours == 0.1
     runner.build()
     runner.run()
@@ -323,7 +323,7 @@ def test_the_time_series_cadence_is_not_the_frame_rate():
     """The two were the same line of code, so asking for coarse plots
     also threw away the animation."""
     np.random.seed(12345)
-    runner = EngineRunner(dt=0.05, duration=1.0, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=1.0, scenario="Baseline",
                           record_interval=20, snapshot_interval_hours=0.1)
     runner.build()
     runner.run()
@@ -338,7 +338,7 @@ def test_a_caller_that_drives_the_engine_itself_can_record():
     6 h run through cognisom/scenarios/ produces no frames.  It now
     takes the callback TissueEngine.run always had."""
     np.random.seed(12345)
-    runner = EngineRunner(dt=0.05, duration=1.0, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=1.0, scenario="Baseline",
                           snapshot_interval_hours=0.2)
     runner.build()
 

@@ -119,7 +119,7 @@ def _run(scenario, hours, overrides=None, seed=11):
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(seed)
-    runner = EngineRunner(dt=0.05, duration=hours, scenario=scenario, modules_enabled=MODS,
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=hours, scenario=scenario, modules_enabled=MODS,
                           overrides=overrides)
     with contextlib.redirect_stdout(io.StringIO()):
         runner.build()

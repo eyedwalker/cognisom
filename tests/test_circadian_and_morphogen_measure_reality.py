@@ -143,7 +143,7 @@ def test_morphogen_tracks_the_living_population_not_the_seeded_one():
     from cognisom.dashboard.engine_runner import EngineRunner
 
     with contextlib.redirect_stdout(io.StringIO()):
-        runner = EngineRunner(dt=0.05, duration=24.0, scenario="Baseline")
+        runner = EngineRunner(tissue="ring", dt=0.05, duration=24.0, scenario="Baseline")
         runner.build()
         runner.run()
         morph = runner.engine.modules['morphogen']
@@ -164,7 +164,7 @@ def test_the_secreted_field_is_driven_by_somebody():
     from cognisom.dashboard.engine_runner import EngineRunner
 
     with contextlib.redirect_stdout(io.StringIO()):
-        runner = EngineRunner(dt=0.05, duration=6.0, scenario="Baseline")
+        runner = EngineRunner(tissue="ring", dt=0.05, duration=6.0, scenario="Baseline")
         runner.build()
         runner.run()
         morph = runner.engine.modules['morphogen']

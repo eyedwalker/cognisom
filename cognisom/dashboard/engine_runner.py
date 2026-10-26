@@ -152,6 +152,118 @@ SCENARIOS = {
 logger = logging.getLogger(__name__)
 
 
+# ── Tissue layout ────────────────────────────────────────────────────
+
+#: Accepted values for EngineRunner(tissue=...).
+TISSUE_LAYOUTS = ("slab", "ring")
+_IMMUNE_KEYS = ("n_t_cells", "n_nk_cells", "n_macrophages")
+#: The legacy Metastasis Risk ring was drawn through the margin of a
+#: ~17 um tumour: inner radius 10 um (0.6 of it), outer 60 um (43 um
+#: past it). The slab version keeps those proportions about the slab's
+#: own, larger nodule.
+_LYMPH_INNER_FRACTION = 0.6
+_LYMPH_OUTER_REACH_UM = 43.0
+
+
+def slab_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
+    """Re-express a ring preset on the close-packed tissue slab.
+
+    Why
+    ---
+    Every preset but TissueSlab was written for the ring: about 90 cells
+    on a circle 1 um thick with a 100 um hole in it. Copying those counts
+    into a slab would carry the ring's worst artefact across. In the ring
+    presets immune cells are 12.6-36.7% of ALL cells, against roughly 3%
+    in the slab, so 13 immune cells against 30 cancer cells in a patch
+    the width of a hair -- which is a large part of why every run ended
+    with the tumour cleared.
+
+    The rule
+    --------
+    One anchor, applied to every preset, so each keeps its character
+    RELATIVE to Baseline rather than its toy-sized absolute numbers:
+
+    * Tumour: Baseline's 10 ring cancer cells map to the slab spec's 80,
+      so every preset's cancer count is scaled by the same factor. Normal
+      cells fill the rest of the slab's 2,040 sites, so the tissue
+      volume is the same in every preset.
+    * Immune: Baseline's 26-cell ring infiltrate maps to TissueSlab's 60
+      (about 3% of the slab), and each lineage of each preset is scaled
+      by that factor -- so "reduced immune response" stays half of
+      Baseline, and each preset keeps its own T/NK/macrophage mix.
+    * Vessels: the slab ignores n_capillaries and lays a lattice at a
+      fixed pitch. Vessel density goes as 1/pitch^2, so a preset with
+      fewer capillaries than Baseline gets a proportionally wider pitch.
+      The override is passed to all three modules that read the slab
+      spec, because they must agree on where the tissue is.
+    * Lymphatics: a hand-placed lymphatic ring is re-centred on the
+      slab's tumour nodule, keeping its proportions to the tumour.
+
+    Every other key of every module (division times, checkpoint blockade,
+    exchange rate, serum testosterone, ...) passes through unchanged.
+    A preset that already seeds the slab is returned as it is.
+    """
+    import copy
+
+    from cognisom.modules.tissue_slab import (
+        DEFAULT_VESSEL_PITCH_UM, SLAB_SPEC, rng_from, seed_slab, slab_spec,
+    )
+
+    if scenario.get("cellular", {}).get("seeding") == "slab":
+        return copy.deepcopy(scenario)
+
+    base = SCENARIOS["Baseline"]
+    ring_cancer_0 = base["cellular"]["n_cancer_cells"]
+    ring_immune_0 = sum(base["immune"].get(k, 0) for k in _IMMUNE_KEYS)
+    ring_capillaries_0 = base["vascular"]["n_capillaries"]
+    slab_sites = SLAB_SPEC["n_normal"] + SLAB_SPEC["n_cancer"]
+    slab_immune_0 = sum(SCENARIOS["TissueSlab"]["immune"].get(k, 0)
+                        for k in _IMMUNE_KEYS)
+
+    out = copy.deepcopy(scenario)
+
+    cellular = out.setdefault("cellular", {})
+    ring_cancer = cellular.get("n_cancer_cells", ring_cancer_0)
+    n_cancer = int(round(SLAB_SPEC["n_cancer"] * ring_cancer / ring_cancer_0))
+    cellular["n_cancer_cells"] = n_cancer
+    cellular["n_normal_cells"] = slab_sites - n_cancer
+    cellular["seeding"] = "slab"
+
+    immune = out.setdefault("immune", {})
+    scale = slab_immune_0 / ring_immune_0
+    for key in _IMMUNE_KEYS:
+        if key in immune and immune[key]:
+            immune[key] = max(1, int(round(immune[key] * scale)))
+    immune["seeding"] = "slab"
+
+    vascular = out.setdefault("vascular", {})
+    vascular["layout"] = "slab"
+    slab_overrides: Dict[str, Any] = {}
+    capillaries = vascular.get("n_capillaries", ring_capillaries_0)
+    if capillaries and capillaries != ring_capillaries_0:
+        slab_overrides["vessel_pitch"] = round(
+            DEFAULT_VESSEL_PITCH_UM * (ring_capillaries_0 / capillaries) ** 0.5, 1)
+    if slab_overrides:
+        for module in ("cellular", "vascular", "immune"):
+            out[module]["slab"] = dict(slab_overrides)
+
+    lymphatic = out.get("lymphatic", {})
+    if "ring_centre_um" in lymphatic:
+        spec = slab_spec(**slab_overrides)
+        layout = seed_slab(
+            cellular["n_normal_cells"], n_cancer,
+            spacing=spec["spacing"], layers=spec["layers"],
+            center=spec["center"], nodule_offset=spec["nodule_offset"],
+            jitter=spec["jitter"], rng=rng_from(spec["seed"]))
+        radius = float(layout["nodule_radius"])
+        lymphatic["ring_centre_um"] = tuple(
+            float(v) for v in layout["nodule_center"])
+        lymphatic["ring_inner_um"] = round(_LYMPH_INNER_FRACTION * radius, 1)
+        lymphatic["ring_outer_um"] = round(radius + _LYMPH_OUTER_REACH_UM, 1)
+
+    return out
+
+
 # ── Data collection ──────────────────────────────────────────────────
 
 @dataclass
@@ -254,10 +366,19 @@ class EngineRunner:
         overrides: Optional[Dict[str, Dict]] = None,
         record_interval: int = 10,
         snapshot_interval_hours: Optional[float] = 0.1,
+        tissue: str = "slab",
     ):
+        if tissue not in TISSUE_LAYOUTS:
+            raise ValueError(
+                f"tissue must be one of {TISSUE_LAYOUTS}, not {tissue!r}")
         self.dt = dt
         self.duration = duration
         self.scenario_name = scenario
+        #: 'slab' (default): every preset runs on a close-packed tissue
+        #: volume. 'ring': the legacy 90-cell bead necklace the module
+        #: dynamics were first calibrated on, kept so the tests that pin
+        #: that calibration can still say what they pin. See slab_variant.
+        self.tissue = tissue
         self.record_interval = record_interval  # record snapshot every N steps
 
         # Cell snapshots keep their own clock, in SIMULATED HOURS, because
@@ -275,6 +396,8 @@ class EngineRunner:
 
         # Merge scenario defaults with any user overrides
         scenario_cfg = SCENARIOS.get(scenario, SCENARIOS["Baseline"])
+        if tissue == "slab":
+            scenario_cfg = slab_variant(scenario_cfg)
         self.module_configs = {
             "cellular": dict(scenario_cfg.get("cellular", {})),
             "immune": dict(scenario_cfg.get("immune", {})),

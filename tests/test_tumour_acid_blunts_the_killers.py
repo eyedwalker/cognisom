@@ -142,7 +142,7 @@ def test_the_field_is_flat_and_the_kills_are_unchanged_in_baseline():
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(7)
-    runner = EngineRunner(dt=0.05, duration=2.0, scenario="Baseline")
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline")
     with redirect_stdout(io.StringIO()):
         runner.build()
         runner.run()
@@ -153,7 +153,7 @@ def test_the_field_is_flat_and_the_kills_are_unchanged_in_baseline():
     assert all(c.lactate_mM is not None for c in cells)
     # the same seed without the gate gives the same kills: it is inert here
     np.random.seed(7)
-    off = EngineRunner(dt=0.05, duration=2.0, scenario="Baseline",
+    off = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline",
                        overrides={"immune": {"lactate_max_suppression": 0.0}})
     with redirect_stdout(io.StringIO()):
         off.build()

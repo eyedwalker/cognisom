@@ -114,7 +114,7 @@ def _runner(gating, duration=24.0, seed=12345):
     from cognisom.dashboard.engine_runner import EngineRunner
 
     np.random.seed(seed)
-    runner = EngineRunner(dt=0.05, duration=duration, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=duration, scenario="Baseline",
                           overrides={"circadian": {"enable_gating": gating}})
     with redirect_stdout(io.StringIO()):
         runner.build()

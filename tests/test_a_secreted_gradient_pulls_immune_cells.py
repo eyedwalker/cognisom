@@ -252,7 +252,7 @@ def _runner(bias, duration=6.0, seed=3):
     from cognisom.dashboard.engine_runner import EngineRunner
 
     np.random.seed(seed)
-    runner = EngineRunner(dt=0.05, duration=duration, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=duration, scenario="Baseline",
                           overrides={"immune": {"chemotaxis_bias": bias}})
     with redirect_stdout(io.StringIO()):
         runner.build()

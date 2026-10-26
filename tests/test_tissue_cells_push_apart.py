@@ -181,7 +181,7 @@ def _runner(on):
                "immune": False, "lymphatic": False, "molecular": False,
                "epigenetic": False, "circadian": False, "morphogen": False,
                "cell_mechanics": on}
-    runner = EngineRunner(dt=0.05, duration=1.0, scenario="Baseline",
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=1.0, scenario="Baseline",
                           modules_enabled=enabled)
     with redirect_stdout(io.StringIO()):
         runner.build()
@@ -192,7 +192,7 @@ def _runner(on):
 def test_it_is_off_unless_asked_for():
     from cognisom.dashboard.engine_runner import EngineRunner
 
-    runner = EngineRunner(dt=0.05, duration=0.1, scenario="Baseline")
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=0.1, scenario="Baseline")
     assert runner.modules_enabled.get("cell_mechanics") is False
 
 
