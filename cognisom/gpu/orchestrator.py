@@ -216,7 +216,7 @@ class GPUOrchestrator:
                 module._divide_cell(int(cid))
 
             # Death detection (vectorized)
-            normal_die, cancer_die = detect_death_candidates(arrays)
+            normal_die, cancer_die = detect_death_candidates(arrays, dt=dt)
             for cid in normal_die:
                 module._kill_cell(int(cid), cause="hypoxia")
             for cid in cancer_die:

@@ -35,7 +35,7 @@ import pytest
 
 from cognisom.core.event_bus import EventBus, EventTypes
 from cognisom.modules.cellular_module import (
-    HYPOXIC_CANCER_DEATH_PER_HOUR, CellState, CellularModule,
+    ANOXIC_DEATH_PER_HOUR, CellState, CellularModule,
 )
 from cognisom.modules.immune_module import (
     DEFAULT_LETHAL_CONTACT_MIN, DEFAULT_NONLETHAL_CONTACT_MIN,
@@ -181,18 +181,31 @@ def test_a_long_contact_is_one_engagement():
     assert 1 <= encounters <= 5                        # ~60 min / 20 min contacts
 
 
-# ── starving cancer cells ───────────────────────────────────────────────
+# ── anoxic cells ─────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("dt", [0.01, 0.05])
-def test_a_starving_cancer_cell_dies_at_a_rate_per_hour(dt):
+def _six_hours_at(oxygen, dt, kind):
     np.random.seed(4)
+    n = {"n_normal_cells": 600, "n_cancer_cells": 0} if kind == "normal" else \
+        {"n_normal_cells": 0, "n_cancer_cells": 600}
     with contextlib.redirect_stdout(io.StringIO()):
-        cel = CellularModule({"n_normal_cells": 0, "n_cancer_cells": 600,
-                              "initial_cell_cycle": "synchronous"})
+        cel = CellularModule({**n, "initial_cell_cycle": "synchronous"})
         cel.initialize()
-    for _ in range(int(round(1.0 / dt))):
+    for _ in range(int(round(6.0 / dt))):
         for c in cel.cells.values():
-            c.oxygen = 0.0
+            c.oxygen = oxygen
         cel.update(dt)
-    dead = 1 - sum(c.alive for c in cel.cells.values()) / 600
-    assert dead == pytest.approx(1 - math.exp(-HYPOXIC_CANCER_DEATH_PER_HOUR), abs=0.06)
+    return 1 - sum(c.alive for c in cel.cells.values()) / 600
+
+
+@pytest.mark.parametrize("kind", ["normal", "cancer"])
+@pytest.mark.parametrize("dt", [0.01, 0.05])
+def test_an_anoxic_cell_dies_at_a_rate_per_hour(dt, kind):
+    dead = _six_hours_at(0.0, dt, kind)
+    assert dead == pytest.approx(1 - math.exp(-6 * ANOXIC_DEATH_PER_HOUR), abs=0.05)
+
+
+@pytest.mark.parametrize("kind", ["normal", "cancer"])
+def test_hypoxia_short_of_anoxia_kills_nobody(kind):
+    # 0.01 is ~1.3% O2. Papandreou 2005 grew cells normally at 0.5%; the
+    # old rule killed a normal cell the step it fell below 0.02.
+    assert _six_hours_at(0.01, 0.05, kind) == 0.0

@@ -610,7 +610,11 @@ def test_without_a_patient_typing_the_legacy_rule_runs_and_says_so():
     # The measured legacy behaviour: a hard step at 0.4.
     assert m._recognize(nk, _Target(mhc1=0.39))[0] is True
     assert m._recognize(nk, _Target(mhc1=0.4))[0] is False
-    assert m._target_kill_probability(nk, _Target(mhc1=0.0)) == pytest.approx(0.8)
+    # Its per-contact probability is NK cells' own calibrated number now,
+    # not the shared 0.8 (tests/test_kill_calibration.py).
+    from cognisom.engine.py.immune.kill_calibration import NK_KILL_PER_CONTACT
+    assert m._target_kill_probability(nk, _Target(mhc1=0.0)) == pytest.approx(
+        NK_KILL_PER_CONTACT.value)
 
 
 def test_an_unknown_patient_id_does_not_invent_a_typing():
@@ -799,7 +803,10 @@ def test_a_licensed_clone_spares_an_intact_mhc_target_through_the_engine():
     # Not weak killing -- no engagement at all. This is self-tolerance,
     # and it is what the previous rule got exactly backwards above its
     # 0.4 threshold (no NK activity at all, licensed or not).
-    cfg = {"patient_id": "SEQC2"}
+    # The subject is who engages, not how often a contact kills, so the
+    # per-contact probability is held high enough that one engaging clone
+    # visibly kills in this short run.
+    cfg = {"patient_id": "SEQC2", "nk_kill_probability": 0.8}
     intact, killers = _colocated_nk_run(
         1.0, immune_cfg=cfg, subset=KIR.KIR2DL1,
         mutations=("TP53:R175H",) * 50,
@@ -821,7 +828,7 @@ def test_an_unlicensed_clone_is_mhc_independent_through_the_engine():
     # identical at MHC-I 0.0 and 1.0 -- the licensing model's signature
     # prediction, and the reason an MHC-intact tumour is not simply
     # invisible to the whole NK compartment.
-    cfg = {"patient_id": "SEQC2"}
+    cfg = {"patient_id": "SEQC2", "nk_kill_probability": 0.8}   # see above
     counts = []
     for mhc in (0.0, 0.5, 1.0):
         mod, _ = _colocated_nk_run(mhc, immune_cfg=cfg, subset=KIR.KIR3DL1)
@@ -902,6 +909,10 @@ def test_the_tcell_closed_loop_is_unchanged_by_the_innate_rewrite():
         # contact lasts ~75 min by the library's measured value, longer than
         # this run, so it is made one minute long here.
         "lethal_contact_minutes": {"T_cell": 1.0},
+        # For the same reason one T cell kills on one draw here; against a
+        # solid tumour it takes ~3 hits from successive contacts
+        # (tcell_additive_cytotoxicity, Weigelin 2021).
+        "tcell_additive_cytotoxicity": False,
     })
     engine.initialize()
     molecular = engine.modules["molecular"]

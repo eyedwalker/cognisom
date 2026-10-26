@@ -39,6 +39,7 @@ from cognisom.core.module_base import SimulationModule
 from cognisom.core.event_bus import EventTypes
 from cognisom.engine.py.immune.mhc_loading import MHCPresentation
 from cognisom.engine.py.immune.tcr_repertoire import (
+    EXHAUSTION_ONSET_HOURS,
     ExhaustionState,
     TCRMatch,
     TCRRepertoire,
@@ -96,6 +97,10 @@ from cognisom.engine.py.immune.macrophage_polarization import (
 )
 from cognisom.engine.py.immune.lactate import (  # noqa: E402
     DEFAULT_LACTATE_MAX_SUPPRESSION, lactate_attenuation,
+)
+from cognisom.engine.py.immune.kill_calibration import (  # noqa: E402
+    HITS_PER_CONTACT, LETHAL_DAMAGE, MACROPHAGE_KILL_PER_CONTACT,
+    NK_KILL_PER_CONTACT, calibration_report, contact_hits, damage_now,
 )
 
 #: patrol_speed is quoted in um/min; the engine steps in hours.
@@ -356,14 +361,29 @@ class ImmuneModule(SimulationModule):
         # different effector mechanisms, and validation/calibrator.py
         # has declared `nk_kill_probability` as an immune-module
         # parameter all along with nothing on this side reading it.
-        self.nk_kill_probability = float(
-            self.config.get('nk_kill_probability', self.kill_probability)
-        )
-        self.macrophage_kill_probability = float(
-            self.config.get(
-                'macrophage_kill_probability', self.kill_probability,
-            )
-        )
+        # They used to fall back to that 0.8, which made the innate arm 92-98%
+        # of all kills on the slab. Now each falls back to its own calibrated
+        # per-contact number (kill_calibration; both ESTIMATE with a range),
+        # unless a config names a shared 'kill_probability' outright, which
+        # keeps every config that did so behaving as it did.
+        shared = self.config.get('kill_probability')
+        self.nk_kill_probability = float(self.config.get(
+            'nk_kill_probability',
+            shared if shared is not None else NK_KILL_PER_CONTACT.value))
+        self.macrophage_kill_probability = float(self.config.get(
+            'macrophage_kill_probability',
+            shared if shared is not None
+            else MACROPHAGE_KILL_PER_CONTACT.value))
+        # T-cell kills integrate sublethal perforin hits (Weigelin 2021).
+        # False restores one Bernoulli draw of the Hill rule per contact.
+        self.tcell_additive_cytotoxicity = bool(
+            self.config.get('tcell_additive_cytotoxicity', True))
+        self.tcell_hits_per_contact = float(self.config.get(
+            'tcell_hits_per_contact', HITS_PER_CONTACT.value))
+        self.tcell_lethal_damage = float(self.config.get(
+            'tcell_lethal_damage', LETHAL_DAMAGE.value))
+        #: Perforin hits delivered, and kills they caused, over the run.
+        self.total_perforin_hits = 0
         # The legacy NK step rule's threshold, lifted out of the middle
         # of _recognize where it was a bare 0.4 literal. Used only when
         # no patient class-I typing is on record. It has no source.
@@ -442,6 +462,21 @@ class ImmuneModule(SimulationModule):
             'macrophage_m2_fraction', self.config.get('m2_fraction', None))
         self.macrophage_m2_fraction = (
             None if m2_fraction is None else float(m2_fraction))
+        # A population mix of M1 / M0 / M2, drawn PER CELL. A fraction of
+        # cells in each state is what a deconvolution reports, so each
+        # macrophage is drawn into one, at that state's endpoint, and the
+        # cytokine drive moves it from there. Takes precedence over
+        # macrophage_m2_fraction, which seeds a compartment mean. Its own
+        # stream, so drawing it moves no other roll.
+        mix = self.config.get('macrophage_polarization_mix')
+        self.macrophage_polarization_mix = (
+            None if mix is None else {k: float(v) for k, v in mix.items()})
+        self.macrophage_polarization_source = self.config.get(
+            'macrophage_polarization_source')
+        self._polarization_rng = np.random.default_rng(
+            int(self.config.get('macrophage_seed', 0)))
+        self._recruit_rng = np.random.default_rng(
+            int(self.config.get('recruit_seed', 0)))
         self.immune_profile_measured = bool(self.config.get('measured', False))
         # 'treg_fraction' and 't_cell_initial_exhaustion' are the other
         # two keys to_simulation_params emits. They are deliberately NOT
@@ -458,6 +493,13 @@ class ImmuneModule(SimulationModule):
             self.config.get('tcr_recognition_threshold', 0.7)
         )
         self.tcr_seed = int(self.config.get('tcr_seed', 0))
+        # Exhaustion on a clock (days of antigen exposure, Philip 2017),
+        # not on a count of contacts shared by every T cell of a clone.
+        # None restores the count rule.
+        onset = self.config.get('tcell_exhaustion_onset_hours',
+                                EXHAUSTION_ONSET_HOURS)
+        self.tcell_exhaustion_onset_hours = (
+            None if onset is None else float(onset))
         # Costimulation strength on the tumor side. Real tumors
         # downregulate CD80/CD86; we leave this exposed for sensitivity
         # studies (immunotherapy ON / OFF).
@@ -476,6 +518,7 @@ class ImmuneModule(SimulationModule):
 
         # Statistics
         self.total_kills = 0
+        self.total_perforin_hits = 0
         #: A separate stream for the granule draw, so recording the cost
         #: of a kill cannot move the simulation that produced it.
         self._granule_rng = np.random.default_rng(
@@ -563,6 +606,7 @@ class ImmuneModule(SimulationModule):
             size=self.tcr_repertoire_size,
             recognition_threshold=self.tcr_recognition_threshold,
             seed=self.tcr_seed,
+            exhaustion_onset_hours=self.tcell_exhaustion_onset_hours,
         )
 
         # Subscribe to events
@@ -604,6 +648,20 @@ class ImmuneModule(SimulationModule):
             rng=rng_from(spec['seed']),
         )
 
+    _POLARIZATION_ENDPOINT = {'M1': -1.0, 'M0': 0.0, 'M2': 1.0}
+
+    def _initial_macrophage_polarization(self) -> float:
+        """One macrophage's starting polarization: drawn from the mix, else
+        the compartment mean of macrophage_m2_fraction, else M0."""
+        mix = self.macrophage_polarization_mix
+        if not mix:
+            return initial_polarization(self.macrophage_m2_fraction)
+        states = sorted(mix)
+        weights = np.array([mix[k] for k in states], dtype=float)
+        state = states[int(self._polarization_rng.choice(
+            len(states), p=weights / weights.sum()))]
+        return self._POLARIZATION_ENDPOINT[state]
+
     def add_immune_cell(self, position, cell_type):
         """Add immune cell"""
         cell_id = self.next_immune_id
@@ -619,7 +677,7 @@ class ImmuneModule(SimulationModule):
             # not any individual cell; the per-cell cytokine drive then
             # diverges them.
             polarization=(
-                initial_polarization(self.macrophage_m2_fraction)
+                self._initial_macrophage_polarization()
                 if cell_type == 'macrophage' else 0.0
             ),
         )
@@ -1107,7 +1165,13 @@ class ImmuneModule(SimulationModule):
         if immune_cell.contact_ends_at is None:
             self._register_tcr_engagement(immune_cell)
             p_kill = self._target_kill_probability(immune_cell, target)
-            immune_cell.contact_lethal = bool(np.random.random() < p_kill)
+            if (self.tcell_additive_cytotoxicity
+                    and immune_cell.cell_type == 'T_cell'
+                    and immune_cell.active_tcr_match is not None):
+                immune_cell.contact_lethal = self._deliver_perforin_hits(
+                    target, p_kill, now)
+            else:
+                immune_cell.contact_lethal = bool(np.random.random() < p_kill)
             minutes = self._contact_minutes_for(
                 immune_cell.cell_type, immune_cell.contact_lethal)
             immune_cell.contact_ends_at = (
@@ -1125,6 +1189,25 @@ class ImmuneModule(SimulationModule):
             self._kill_target(immune_cell, target)
         else:
             self._release(immune_cell)
+
+    def _deliver_perforin_hits(self, target, hill_probability: float,
+                               now: float) -> bool:
+        """Add one T-cell contact's perforin hits to the target's damage.
+
+        Weigelin 2021: against solid tumour cells a CTL contact rarely
+        kills on its own; sublethal hits from successive CTLs add up and
+        decay between them. The Hill rule's output scales the hit rate.
+        Returns whether the target's damage has reached lethal.
+        """
+        _mean, hits = contact_hits(hill_probability, np.random.poisson,
+                                   self.tcell_hits_per_contact)
+        damage = damage_now(getattr(target, 'cytotoxic_damage', 0.0),
+                            getattr(target, 'cytotoxic_damage_at_h', now),
+                            now) + hits
+        target.cytotoxic_damage = damage
+        target.cytotoxic_damage_at_h = now
+        self.total_perforin_hits += hits
+        return damage >= self.tcell_lethal_damage
 
     def _release(self, immune_cell: ImmuneCell) -> None:
         """End an engagement: the effector disengages and patrols again."""
@@ -1146,7 +1229,8 @@ class ImmuneModule(SimulationModule):
             return
         match = immune_cell.active_tcr_match
         tcr_id = match.tcr.tcr_id
-        new_count, did_exhaust = self._tcr_repertoire.register_engagement(tcr_id)
+        new_count, did_exhaust = self._tcr_repertoire.register_engagement(
+            tcr_id, now_h=self.clock_h)
         if did_exhaust:
             self.total_exhaustion_transitions += 1
             pres = match.presentation
@@ -1789,7 +1873,10 @@ class ImmuneModule(SimulationModule):
             label = polarization_label(c.polarization)
             labels[label] = labels.get(label, 0) + 1
 
-        if self.macrophage_m2_fraction is None:
+        if self.macrophage_polarization_mix:
+            # A cohort's mix, e.g. TCGA PRAD -- never this patient's.
+            source = 'population_prior'
+        elif self.macrophage_m2_fraction is None:
             source = 'unmeasured'
         elif self.immune_profile_measured:
             source = 'patient_measured'
@@ -1804,6 +1891,11 @@ class ImmuneModule(SimulationModule):
                 else 'missing_self_threshold'
             ),
             'nk_kill_probability': self.nk_kill_probability,
+            'macrophage_kill_probability': self.macrophage_kill_probability,
+            'tcell_additive_cytotoxicity': self.tcell_additive_cytotoxicity,
+            'total_perforin_hits': self.total_perforin_hits,
+            'kill_calibration': calibration_report(),
+            'macrophage_polarization_source': self.macrophage_polarization_source,
             'nk_missing_self_threshold': self.nk_missing_self_threshold,
             'nk_patient_specific': (
                 lic.hla.is_patient_specific if lic is not None else False
@@ -1928,15 +2020,34 @@ class ImmuneModule(SimulationModule):
     
     def on_cell_divided(self, data):
         """Handle cell division - track population"""
-        # Could recruit more immune cells if cancer is dividing rapidly
+        # Could recruit more immune cells if cancer is dividing rapidly.
+        # The 10% per division is unsourced. The recruit used to be an NK
+        # cell every time, whatever the configured infiltrate -- it put NK
+        # cells into a run configured with none, and pushed every run back
+        # toward NK cells after the mix was set from prostate tumours. It
+        # is now drawn from the configured mix, on its own stream.
         if data['cell_type'] == 'cancer':
             if np.random.random() < 0.1:  # 10% chance
+                lineage = self._recruit_lineage()
+                if lineage is None:
+                    return
                 position = data['position']
                 offset = np.random.randn(3) * 20
                 new_pos = np.array(position) + offset
                 
-                self.add_immune_cell(new_pos, 'NK_cell')
+                self.add_immune_cell(new_pos, lineage)
                 self.total_recruited += 1
+
+    def _recruit_lineage(self) -> Optional[str]:
+        """A lineage drawn from the configured infiltrate, or None if empty."""
+        weights = {'T_cell': self.n_t_cells, 'NK_cell': self.n_nk_cells,
+                   'macrophage': self.n_macrophages}
+        total = sum(weights.values())
+        if total <= 0:
+            return None
+        names = list(weights)
+        p = np.array([weights[k] for k in names], dtype=float) / total
+        return names[int(self._recruit_rng.choice(len(names), p=p))]
 
 
 # Test

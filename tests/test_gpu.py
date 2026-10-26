@@ -248,13 +248,17 @@ class TestCellOps:
     def test_detect_death_candidates(self, cell_dict):
         from cognisom.gpu.cell_ops import CellArrays, detect_death_candidates
         arrays = CellArrays.from_cell_dict(cell_dict)
-        # Set some cells to very low O2
-        arrays.oxygen[0] = 0.01  # Normal cell -> should die
-        arrays.oxygen[5] = 0.01  # Cancer cell -> stochastic
+        # 0.01 is hypoxic, not anoxic: nobody dies of it.
+        arrays.oxygen[0] = 0.01
+        arrays.oxygen[5] = 0.01
+        normal_die, cancer_die = detect_death_candidates(arrays, dt=100.0, seed=42)
+        assert 0 not in normal_die and 5 not in cancer_die
 
-        normal_die, cancer_die = detect_death_candidates(arrays, seed=42)
-        # Normal cell 0 should die
-        assert 0 in normal_die
+        # Anoxic, over a step long enough that the rate makes it certain.
+        arrays.oxygen[0] = 0.0
+        arrays.oxygen[5] = 0.0
+        normal_die, cancer_die = detect_death_candidates(arrays, dt=1e4, seed=42)
+        assert 0 in normal_die and 5 in cancer_die
 
     def test_detect_division_candidates(self, cell_dict):
         from cognisom.gpu.cell_ops import CellArrays, detect_division_candidates

@@ -33,6 +33,8 @@ import os
 from types import SimpleNamespace as N
 
 import numpy as np
+
+from cognisom.core.event_bus import EventTypes
 import pytest
 
 from cognisom.dashboard.engine_runner import EngineRunner
@@ -348,8 +350,12 @@ def test_the_genome_decides_whether_t_cells_can_kill():
     different T-cell outcomes. With NK cells and macrophages removed so
     innate killing cannot mask it, measured over 6 h on three seeds:
 
-        HCC1395, ARID1A and NOTCH1 presented   T-cell kills 9, 10, 13
+        HCC1395, ARID1A and NOTCH1 presented   T-cell kills 4, 3, 5
         same patient, nothing presentable       T-cell kills 0, 0, 0
+
+    (9, 10, 13 before kill calibration on 2026-10-26: a T-cell contact now
+    adds decaying perforin damage instead of killing on one draw. Counted
+    by killer: a run with no NK cells configured used to recruit them.)
 
     A tumour presenting the patient's neoantigens is killed; one
     presenting nothing is invisible to T cells.
@@ -366,7 +372,9 @@ def test_the_genome_decides_whether_t_cells_can_kill():
                 contextlib.redirect_stderr(io.StringIO()):
             runner.build()
             runner.run()
-        return sum(1 for e in runner.recorder.events if e.kind == "kill")
+        return sum(1 for e in runner.event_log
+                   if e["event"] == EventTypes.CANCER_KILLED
+                   and e["data"].get("killer_type") == "T_cell")
 
     assert t_cell_kills(_patient([])) == 0
     assert t_cell_kills(HCC_LIKE) > 0

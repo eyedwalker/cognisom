@@ -198,12 +198,13 @@ class TestItColoursByTypeAndState:
         [
             ({"oxygen": 0.21, "glucose": 5.0}, "alive"),
             ({"alive": False}, "dead"),
-            ({"oxygen": 0.01}, "dying"),            # CellularModule kills < 0.02
+            ({"oxygen": 0.0001}, "dying"),          # CellularModule: anoxic
+            ({"oxygen": 0.01}, "hypoxic"),          # 1.3% O2 is hypoxic, not lethal
             ({"glucose": 0.2}, "dying"),            # ... or glucose < 0.5
             ({"oxygen": 0.04}, "hypoxic"),          # VascularModule flags < 0.05
             ({"phase": "M"}, "dividing"),
             ({"activated": True}, "activated"),
-            ({"oxygen": 0.01, "phase": "M"}, "dying"),   # precedence
+            ({"oxygen": 0.0001, "phase": "M"}, "dying"),   # precedence
         ],
     )
     def test_the_classifier_uses_the_engine_thresholds(self, cell, expected):

@@ -137,6 +137,10 @@ def test_daughter_is_killable_end_to_end():
     t_cell = immune.immune_cells[next(iter(immune.immune_cells))]
     daughter.position = np.array([100, 100, 50], dtype=np.float32)
     t_cell.position = np.array([100, 100, 50], dtype=np.float32)
+    # No vessels here, so the daughter is anoxic within two hours and dies
+    # of it at a rate per hour -- measured: once with her lethal contact
+    # already under way. The subject is whether she is killable.
+    cellular.anoxic_death_per_hour = 0.0
 
     # A kill is now a contact with a sourced duration -- an exponential
     # with a 60 min mean when lethal, 15 min when not -- and a per-contact

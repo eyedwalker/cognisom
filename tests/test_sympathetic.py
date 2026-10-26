@@ -156,6 +156,10 @@ def _build_engine(**immune_overrides):
         # contact lasts ~75 min by the library's measured value, longer than
         # this run, so it is made one minute long here.
         "lethal_contact_minutes": {"T_cell": 1.0},
+        # For the same reason one T cell kills on one draw here; against a
+        # solid tumour it takes ~3 hits from successive contacts
+        # (tcell_additive_cytotoxicity, Weigelin 2021).
+        "tcell_additive_cytotoxicity": False,
     }
     immune_cfg.update(immune_overrides)
     engine.register_module("immune", ImmuneModule, immune_cfg)

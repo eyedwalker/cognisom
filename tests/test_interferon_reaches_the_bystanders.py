@@ -252,15 +252,17 @@ def test_the_mhc1_rise_reaches_the_t_cell_kill_rule():
 
 
 @pytest.mark.slow
-def test_in_the_shipped_preset_the_rise_changes_no_outcome_and_why():
+def test_in_the_shipped_preset_the_t_cell_path_now_reads_the_rise():
     """The honest other half. Measured over 8 h with 300 cancer cells:
-    MHC-I rises 0.300 -> 0.380, and the kill count does not move, because
-    every kill in this configuration is made by an NK cell or a
-    macrophage -- and the NK path falls back to a flat baseline when the
-    patient's class-I typing is not on record, so it never reads
-    mhc1_expression. The T-cell path reads it and is the one that is
-    inert here. Wiring NK missing-self to patient HLA is the next step,
-    and this test is what will catch it when that changes."""
+    MHC-I rises 0.300 -> 0.380. Until 2026-10-26 the kill count did not
+    move, because every kill was an NK cell's or a macrophage's: the T-cell
+    path, the one that reads mhc1_expression, was inert -- every T cell
+    against a peptide shared one clone and its five-contact exhaustion
+    count, so the compartment exhausted within minutes. Exhaustion now runs
+    on a clock of days (Philip 2017), and T cells kill here: 4 with the
+    field, 2 without, on this seed (NK 16 vs 20). One seed does not
+    establish that the rise raises T-cell killing; what is pinned is that
+    the path that reads the rise is live."""
     os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from collections import Counter
     from cognisom.core.event_bus import EventTypes
@@ -285,8 +287,7 @@ def test_in_the_shipped_preset_the_rise_changes_no_outcome_and_why():
     (mhc_on, killers_on), (mhc_off, killers_off) = results["on"], results["off"]
     assert mhc_off == pytest.approx(0.30, abs=1e-6), "no signal, no change"
     assert mhc_on > 0.36, f"the field raised MHC-I to {mhc_on:.3f}"
-    assert sum(killers_on.values()) == sum(killers_off.values())
-    assert killers_on["T_cell"] == 0, "no T-cell kill here: that is why nothing moved"
+    assert killers_on["T_cell"] > 0, "the T-cell path is live"
     assert killers_on["NK_cell"] > 0
 
 

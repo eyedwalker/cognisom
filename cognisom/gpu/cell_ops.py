@@ -180,25 +180,42 @@ def update_metabolism_vectorized(
 
 def detect_death_candidates(
     arrays: CellArrays,
-    o2_threshold: float = 0.02,
-    glucose_threshold: float = 0.5,
-    cancer_death_prob: float = 0.01,
+    dt: float = 0.01,
+    o2_threshold: Optional[float] = None,
+    glucose_threshold: Optional[float] = None,
+    death_per_hour: Optional[float] = None,
     seed: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Detect cells that should die (vectorized).
+
+    The same rule as CellularModule.update, whose constants are the
+    defaults: a cell that is anoxic or starving dies at a rate per hour,
+    normal and cancer alike. This copy used to kill every normal cell
+    below 0.02 at once, as the module did.
 
     Returns indices of cells to kill, separated by type.
 
     Args:
         arrays: CellArrays.
-        o2_threshold: O2 level below which normal cells die.
-        glucose_threshold: Glucose level below which normal cells die.
-        cancer_death_prob: Probability of cancer cell death under stress.
+        dt: Step length, hours.
+        o2_threshold: O2 level below which a cell is anoxic.
+        glucose_threshold: Glucose level, mM, below which a cell starves.
+        death_per_hour: Death rate of an anoxic or starving cell.
         seed: Random seed for reproducibility.
 
     Returns:
         (normal_death_ids, cancer_death_ids): arrays of cell_ids to kill.
     """
+    from cognisom.modules.cellular_module import (
+        ANOXIC_DEATH_PER_HOUR, ANOXIC_O2_LEVEL, STARVATION_GLUCOSE_MM)
+    if o2_threshold is None:
+        o2_threshold = ANOXIC_O2_LEVEL
+    if glucose_threshold is None:
+        glucose_threshold = STARVATION_GLUCOSE_MM
+    if death_per_hour is None:
+        death_per_hour = ANOXIC_DEATH_PER_HOUR
+    p_die = -np.expm1(-death_per_hour * dt)
+
     xp = arrays._backend.xp
     rng = np.random.default_rng(seed)
 
@@ -209,15 +226,10 @@ def detect_death_candidates(
     is_normal = xp.asarray(arrays.cell_types == CellArrays.TYPE_NORMAL)
     is_cancer = xp.asarray(arrays.cell_types == CellArrays.TYPE_CANCER)
 
-    # Normal cells die deterministically under stress
-    normal_die = xp.logical_and(stressed, xp.logical_and(is_normal, arrays.alive))
-
-    # Cancer cells die stochastically under stress
     rand = xp.asarray(rng.random(arrays.n).astype(np.float32))
-    cancer_die = xp.logical_and(
-        stressed,
-        xp.logical_and(is_cancer, xp.logical_and(arrays.alive, rand < cancer_death_prob)),
-    )
+    dying = xp.logical_and(stressed, xp.logical_and(arrays.alive, rand < p_die))
+    normal_die = xp.logical_and(dying, is_normal)
+    cancer_die = xp.logical_and(dying, is_cancer)
 
     # Convert to numpy for cell ID lookup
     normal_mask = arrays._backend.to_numpy(normal_die)

@@ -215,10 +215,15 @@ class _Target:
         self.mhc1_displayed_peptides = []
         self.pdl1_expression = 0.0
         self.local_ecm_density = 0.0
-def test_the_two_innate_lineages_default_to_the_shared_kill_probability():
+def test_the_two_innate_lineages_default_to_their_own_calibrated_numbers():
+    # They used to inherit the shared, unsourced 0.8; see
+    # tests/test_kill_calibration.py.
+    from cognisom.engine.py.immune.kill_calibration import (
+        MACROPHAGE_KILL_PER_CONTACT, NK_KILL_PER_CONTACT)
     module = _immune()
-    assert module.nk_kill_probability == module.kill_probability == 0.8
-    assert module.macrophage_kill_probability == 0.8
+    assert module.kill_probability == 0.8
+    assert module.nk_kill_probability == NK_KILL_PER_CONTACT.value
+    assert module.macrophage_kill_probability == MACROPHAGE_KILL_PER_CONTACT.value
 def test_the_shared_kill_probability_still_moves_both_lineages():
     module = _immune(kill_probability=0.5)
     assert module.nk_kill_probability == 0.5
@@ -476,6 +481,10 @@ def _flagship_engine():
         # contact lasts ~75 min by the library's measured value, longer than
         # this run, so it is made one minute long here.
         'lethal_contact_minutes': {'T_cell': 1.0},
+        # For the same reason one T cell kills on one draw here; against a
+        # solid tumour it takes ~3 hits from successive contacts
+        # (tcell_additive_cytotoxicity, Weigelin 2021).
+        'tcell_additive_cytotoxicity': False,
     })
     engine.initialize()
     return engine

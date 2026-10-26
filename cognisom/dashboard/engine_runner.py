@@ -35,6 +35,27 @@ from cognisom.modules import (
 
 # ── Scenario presets ─────────────────────────────────────────────────
 
+#: Immune cells in the tissue slab, ~3% of its 2,040 cells.
+SLAB_IMMUNE_TOTAL = 60
+
+
+def _slab_immune(total: int = SLAB_IMMUNE_TOTAL) -> Dict[str, Any]:
+    """The slab's infiltrate as prostate tumours carry it.
+
+    T / NK / macrophage counts split by the TCGA PRAD CIBERSORT medians,
+    and macrophages drawn M1 / M0 / M2 from the same cohort -- a
+    population prior, labelled as one, not a patient measurement. See
+    engine/py/immune/kill_calibration.py.
+    """
+    from cognisom.engine.py.immune.kill_calibration import (
+        PRAD_MACROPHAGE_POLARIZATION, PRAD_SOURCE, split_immune)
+    return {
+        **split_immune(total),
+        "macrophage_polarization_mix": dict(PRAD_MACROPHAGE_POLARIZATION),
+        "macrophage_polarization_source": PRAD_SOURCE,
+    }
+
+
 SCENARIOS = {
     "Baseline": {
         "desc": "Normal tissue with a small tumor seed. All 9 modules active.",
@@ -135,13 +156,16 @@ SCENARIOS = {
                 "volume, which is what makes it renderable as tissue. "
                 "Geometry: cognisom/modules/tissue_slab.py.",
         "cellular": {"seeding": "slab"},
-        # ~3% of the population, which is the lymphocyte fraction of
-        # normal stroma. Scaling the ring presets' 12/8/6 by the 23x
-        # larger population would put 600 immune cells in the slab and
-        # make the immune module's per-cell scan the cost of the run.
+        # 60 cells, ~3% of the population, which is the lymphocyte
+        # fraction of normal stroma. Scaling the ring presets' 12/8/6 by
+        # the 23x larger population would put 600 immune cells in the
+        # slab and make the immune module's per-cell scan the cost of the
+        # run. Split T/NK/macrophage 19/6/35 as prostate tumours are
+        # (TCGA PRAD, see _slab_immune); it was 30/15/15, a quarter NK
+        # where tumours have a tenth.
         "immune": {
             "seeding": "slab",
-            "n_t_cells": 30, "n_nk_cells": 15, "n_macrophages": 15,
+            **_slab_immune(),
         },
         "vascular": {"layout": "slab"},
         "lymphatic": {"n_vessels": 4, "metastasis_probability": 0.001},
@@ -187,10 +211,14 @@ def slab_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
       so every preset's cancer count is scaled by the same factor. Normal
       cells fill the rest of the slab's 2,040 sites, so the tissue
       volume is the same in every preset.
-    * Immune: Baseline's 26-cell ring infiltrate maps to TissueSlab's 60
-      (about 3% of the slab), and each lineage of each preset is scaled
-      by that factor -- so "reduced immune response" stays half of
-      Baseline, and each preset keeps its own T/NK/macrophage mix.
+    * Immune: Baseline's ring infiltrate maps to TissueSlab's 60 cells
+      (about 3% of the slab) split as prostate tumours are, T/NK/
+      macrophage 19/6/35 (TCGA PRAD). Each lineage of each preset is
+      scaled by its own ratio to Baseline's -- so "reduced immune
+      response" stays half of Baseline in every lineage, and
+      Immunotherapy keeps its 2.5x T cells. The ring presets' own
+      12/8/6-style mixes were 31% NK; prostate tumours carry ~10%.
+      Macrophages are drawn M1/M0/M2 from the same cohort.
     * Vessels: the slab ignores n_capillaries and lays a lattice at a
       fixed pitch. Vessel density goes as 1/pitch^2, so a preset with
       fewer capillaries than Baseline gets a proportionally wider pitch.
@@ -214,11 +242,8 @@ def slab_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
 
     base = SCENARIOS["Baseline"]
     ring_cancer_0 = base["cellular"]["n_cancer_cells"]
-    ring_immune_0 = sum(base["immune"].get(k, 0) for k in _IMMUNE_KEYS)
     ring_capillaries_0 = base["vascular"]["n_capillaries"]
     slab_sites = SLAB_SPEC["n_normal"] + SLAB_SPEC["n_cancer"]
-    slab_immune_0 = sum(SCENARIOS["TissueSlab"]["immune"].get(k, 0)
-                        for k in _IMMUNE_KEYS)
 
     out = copy.deepcopy(scenario)
 
@@ -230,10 +255,13 @@ def slab_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
     cellular["seeding"] = "slab"
 
     immune = out.setdefault("immune", {})
-    scale = slab_immune_0 / ring_immune_0
+    slab_base = _slab_immune()
     for key in _IMMUNE_KEYS:
         if key in immune and immune[key]:
-            immune[key] = max(1, int(round(immune[key] * scale)))
+            ratio = immune[key] / base["immune"][key]
+            immune[key] = max(1, int(round(slab_base[key] * ratio)))
+    for key in ("macrophage_polarization_mix", "macrophage_polarization_source"):
+        immune.setdefault(key, slab_base[key])
     immune["seeding"] = "slab"
 
     vascular = out.setdefault("vascular", {})

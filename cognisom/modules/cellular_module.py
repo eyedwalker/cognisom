@@ -62,12 +62,27 @@ def _intrinsic_pdl1_for_oncogenes(oncogenes) -> float:
     return float(max(0.0, min(1.0, total)))
 
 
-#: Death rate of a cancer cell below the hypoxia or starvation threshold,
-#: per hour. ILLUSTRATIVE: it is the 0.01-per-step roll this replaced, read
-#: at the module's design step of 0.01 h, so behaviour at that step is
-#: unchanged and every other step now agrees with it. No measured
-#: survival time under these thresholds was found to source it from.
-HYPOXIC_CANCER_DEATH_PER_HOUR = 1.0
+#: Oxygen below which a cell is ANOXIC and starts to die, on the engine's
+#: normalised scale (0.21 == arterial 100 mmHg; VascularModule). Low oxygen
+#: is not lethal: murine fibroblasts and human tumour cells grew normally at
+#: 0.5% O2, and only severe hypoxia below 0.01% O2 induced apoptosis
+#: (Papandreou 2005, PMID 15833847). 0.01% of a 713 mmHg dry-gas pressure is
+#: 0.071 mmHg. This used to be 0.02 (9.5 mmHg, ~1.3% O2) and killed a normal
+#: cell on the step it crossed it -- a level ~2.6x ABOVE the one the paper
+#: found harmless -- which is why the Hypoxia preset lost 83% of its normal
+#: tissue in 12 h.
+ANOXIC_O2_LEVEL = 0.21 * (0.0001 * 713.0) / 100.0
+#: Glucose below which a cell is starving, mM. Unchanged from the module's
+#: original threshold; unsourced.
+STARVATION_GLUCOSE_MM = 0.5
+#: Death rate of a cell, normal or cancer, while anoxic or starving, per
+#: hour. ESTIMATE, range 1/72-1/6: Papandreou 2005 reports apoptosis under
+#: anoxia without a survival time in its abstract, and no measured survival
+#: curve was found to source it from. A mean survival of a day is the
+#: centre. Normal and cancer cells share it because the paper found the
+#: same threshold for both. This replaces instant death for a normal cell
+#: and an illustrative 1.0/h for a cancer cell.
+ANOXIC_DEATH_PER_HOUR = 1.0 / 24.0
 
 
 #: Lactate production, mM per hour on the cell's own volume: the rates
@@ -173,6 +188,12 @@ class CellState:
     # and per cell here: ESTIMATE.
     ar_dependent: bool = False
 
+    # Sublethal cytotoxic damage from T-cell perforin hits, in hits, as it
+    # stood at cytotoxic_damage_at_h (the immune module's clock). It decays
+    # between hits; see engine/py/immune/kill_calibration.py.
+    cytotoxic_damage: float = 0.0
+    cytotoxic_damage_at_h: float = 0.0
+
     # Cancer properties
     mhc1_expression: float = 1.0
     # Where mhc1_expression sits with no IFN-gamma around. Captured the
@@ -258,6 +279,8 @@ class CellularModule(SimulationModule):
         self.ar_dependent_fraction = float(self.config.get('ar_dependent_fraction', 1.0 / 3.0))
         self.androgen_withdrawal_death_per_hour = float(
             self.config.get('androgen_withdrawal_death_per_hour', 0.01))   # ESTIMATE, /h at full withdrawal
+        self.anoxic_death_per_hour = float(
+            self.config.get('anoxic_death_per_hour', ANOXIC_DEATH_PER_HOUR))
         # Where the initial cells start in their cycle: 'asynchronous' (the
         # default) staggers them over the steady-state age distribution;
         # 'synchronous' starts every cell at age 0, as before -- for tests
@@ -673,16 +696,11 @@ class CellularModule(SimulationModule):
             if cell.age >= division_time and self._division_permitted(cell_id):
                 cells_to_divide.append(cell_id)
             
-            # Check for death (hypoxia, starvation). A normal cell dies at
-            # once; a cancer cell is more resistant and dies at a rate per
-            # hour. That rate used to be a bare 0.01 per step, so a
-            # starving cancer cell lived ~1 h at dt = 0.01 and ~5 h at
-            # dt = 0.05.
-            if cell.oxygen < 0.02 or cell.glucose < 0.5:
-                if cell.cell_type == 'normal':
-                    cells_to_die.append(cell_id)
-                elif np.random.random() < -np.expm1(
-                        -HYPOXIC_CANCER_DEATH_PER_HOUR * dt):
+            # Check for death (anoxia, starvation): a rate per hour, the
+            # same for normal and cancer cells. See ANOXIC_O2_LEVEL.
+            if (cell.oxygen < ANOXIC_O2_LEVEL
+                    or cell.glucose < STARVATION_GLUCOSE_MM):
+                if np.random.random() < -np.expm1(-self.anoxic_death_per_hour * dt):
                     cells_to_die.append(cell_id)
             # The AR-dependent third dies at a rate that grows with the
             # signalling it has lost. No draw at all while signalling is

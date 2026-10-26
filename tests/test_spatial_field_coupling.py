@@ -383,12 +383,15 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # stream shifts by a few draws and a different cell ends up at the
     # oxygen floor. Nothing about oxygen changed; the cell counts above
     # did not move.
+    # 364.7340 / 0.0673 since kill calibration (2026-10-26): contacts now
+    # kill at different moments, which shifts the shared RNG stream; every
+    # count above held.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(363.5638, abs=0.01)
-    # The oxygen floor: no normal cell is near death.
-    assert min(c.oxygen for c in alive) > 0.02          # the death threshold
+        pytest.approx(364.7340, abs=0.01)
+    # The oxygen floor: no normal cell is near death -- nor even hypoxic.
+    assert min(c.oxygen for c in alive) > 0.05          # the hypoxia flag
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0710, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0673, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -414,22 +417,26 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # the changed immune trajectory, not the vasculature.
     # 54 now that the clock gates division: fewer daughters are born
     # into the capillary-poor corner to starve there.
-    assert _deaths(runner, "hypoxia", "normal") == 54
+    # 44 since kill calibration (2026-10-26): a cell dies only once ANOXIC
+    # (<0.01% O2, Papandreou 2005) and then at 1/24 per hour, where it
+    # used to die the step it fell below ~1.3% O2.
+    assert _deaths(runner, "hypoxia", "normal") == 44
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
     # Cancer cells used to starve here too when the immune compartment
     # did not reach them first: 16 while the chase step was frozen, 0
     # while every contact killed within a step or two, 7 once a kill
-    # took a measured contact time. 0 now: with the patrol biased up the
-    # tumour's own chemokine, every cancer cell is reached and killed
-    # before the capillary-poor corner starves it.
-    assert _deaths(runner, "hypoxia", "cancer") == 0
-    assert _deaths(runner, "immune_killed", "cancer") == 21
-    assert cells.total_deaths == 75
-    # The 24 h snapshot: the survivors are the best-perfused normal
-    # cells, and no cancer cell is left.
-    assert vascular.hypoxic_regions == 0
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0747, abs=1e-3)
+    # took a measured contact time, 0 once the patrol followed the
+    # chemokine. 6 now, with 15 immune kills (was 21) and 8 cancer cells
+    # alive at 24 h: innate cells kill on 15% / 5% of contacts instead of
+    # an unsourced 80%, so the tumour is no longer cleared first.
+    assert _deaths(runner, "hypoxia", "cancer") == 6
+    assert _deaths(runner, "immune_killed", "cancer") == 15
+    assert cells.total_deaths == 65
+    # The 24 h snapshot: hypoxic cells are still there at the end now --
+    # hypoxia is survivable, as Papandreou found -- and some are near anoxia.
+    assert vascular.hypoxic_regions == 32
+    assert sum(1 for c in alive if c.oxygen < 0.05) == 32
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0034, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

@@ -82,10 +82,12 @@ CELL_STATE_CODES = {
 #: counts `cell.oxygen < 0.05` as a hypoxic region.
 HYPOXIA_O2_THRESHOLD = 0.05
 
-#: The engine's lethal thresholds: `CellularModule.update` kills a cell
-#: when `cell.oxygen < 0.02 or cell.glucose < 0.5`.  A still-alive cell
-#: past either one is drawn as 'dying'.
-DYING_O2_THRESHOLD = 0.02
+#: The engine's lethal thresholds: `CellularModule.update` starts killing
+#: a cell when `cell.oxygen < ANOXIC_O2_LEVEL` (0.01% O2, Papandreou 2005)
+#: or `cell.glucose < STARVATION_GLUCOSE_MM`.  A still-alive cell past
+#: either one is drawn as 'dying'.  Copied, not imported, so this module
+#: does not load the engine; tests/test_kill_calibration.py holds them equal.
+DYING_O2_THRESHOLD = 0.21 * (0.0001 * 713.0) / 100.0
 DYING_GLUCOSE_THRESHOLD = 0.5
 
 
@@ -829,7 +831,7 @@ class SceneExporter:
             "",
             "  state (blended over the type colour, first match wins):",
             "    dead       flat grey, type erased          (alive is False)",
-            "    dying      dark maroon, 70%                (O2 < 0.02 or glucose < 0.5)",
+            "    dying      dark maroon, 70%                (anoxic O2 < 0.00015 or glucose < 0.5)",
             "    hypoxic    dark blue-violet, 60%           (O2 < 0.05)",
             "    dividing   pale/bright, 55%                (phase == 'M')",
             "    activated  hot yellow, 50%                 (activated is True)",

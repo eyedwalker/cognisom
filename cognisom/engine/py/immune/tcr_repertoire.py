@@ -46,6 +46,24 @@ _SIGMOID_SCALE: float = 4.0  # see ``affinity()`` for rationale
 # chronic-antigen models put this in the 3-10 range; 5 is the default.
 EXHAUSTION_ENCOUNTER_THRESHOLD: int = 5
 
+# The same transition on a clock, which is the unit the biology is
+# measured in. In mouse tumours antigen-specific CD8 T cells were PD1-hi
+# and lost IFN-gamma/TNF-alpha by day 5 but could still be rescued; their
+# chromatin then fixed "between days 7 and 14", after which IL-15 no
+# longer restored them (Philip et al. 2017, Nature 545:452, PMID 28514453;
+# Schietinger et al. 2016, PMID 27521269). EXHAUSTED here is that fixed,
+# non-rescuable state, so it begins 10 days after a clone first meets its
+# antigen. ESTIMATE, range 7-14 days.
+#
+# The encounter count above is NOT that clock: every T cell that
+# recognises a peptide takes the same best-matching clone, so the count is
+# shared by the whole compartment and five contacts -- minutes into a run
+# -- exhausted every T cell against that peptide. Measured on the
+# Immunotherapy slab: 728 T-cell contacts in 6 h, every one from an
+# exhausted clone.
+EXHAUSTION_ONSET_HOURS: float = 10 * 24.0
+EXHAUSTION_ONSET_RANGE_HOURS: Tuple[float, float] = (7 * 24.0, 14 * 24.0)
+
 # Multiplier applied to an exhausted clone's contribution to kill
 # probability. Clinical observation (Dolina): exhausted TILs retain
 # some cytotoxicity but at a fraction of the precursor pool. 0.1
@@ -221,10 +239,18 @@ class TCRRepertoire:
         recognition_threshold: float = 0.7,
         seed: int = 0,
         exhaustion_threshold: int = EXHAUSTION_ENCOUNTER_THRESHOLD,
+        exhaustion_onset_hours: Optional[float] = None,
     ):
         self.size = int(size)
         self.recognition_threshold = float(recognition_threshold)
         self.exhaustion_threshold = int(exhaustion_threshold)
+        #: When set, a clone exhausts this many hours after its first
+        #: engagement instead of at exhaustion_threshold encounters. See
+        #: EXHAUSTION_ONSET_HOURS.
+        self.exhaustion_onset_hours = (
+            None if exhaustion_onset_hours is None
+            else float(exhaustion_onset_hours))
+        self._first_engaged_h: Dict[str, float] = {}
         self._rng = np.random.default_rng(seed)
         self.tcrs: List[TCR] = self._generate(self.size)
 
@@ -301,7 +327,8 @@ class TCRRepertoire:
 
     # ----- exhaustion bookkeeping -------------------------------------
 
-    def register_engagement(self, tcr_id: str) -> Tuple[int, bool]:
+    def register_engagement(self, tcr_id: str,
+                            now_h: Optional[float] = None) -> Tuple[int, bool]:
         """Record one successful TCR-pMHC engagement.
 
         Increments the clone's encounter counter and, when the
@@ -322,11 +349,15 @@ class TCRRepertoire:
             raise KeyError(f"unknown TCR id {tcr_id!r}")
         new_count = self._encounters[tcr_id] + 1
         self._encounters[tcr_id] = new_count
+        if now_h is not None:
+            self._first_engaged_h.setdefault(tcr_id, float(now_h))
+        if self.exhaustion_onset_hours is not None:
+            due = (now_h is not None and now_h - self._first_engaged_h[tcr_id]
+                   >= self.exhaustion_onset_hours)
+        else:
+            due = new_count >= self.exhaustion_threshold
         did_exhaust = False
-        if (
-            self._states[tcr_id] is ExhaustionState.PRECURSOR
-            and new_count >= self.exhaustion_threshold
-        ):
+        if self._states[tcr_id] is ExhaustionState.PRECURSOR and due:
             self._states[tcr_id] = ExhaustionState.EXHAUSTED
             did_exhaust = True
         return new_count, did_exhaust

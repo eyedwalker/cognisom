@@ -24,7 +24,10 @@ Measured on the 2 h slab runs (seed 1):
 
 The aggressive tumour now persists. Baseline is still cleared fast: the
 innate arm kills on 80% of contacts with no source for that number,
-which is item 2 of the realism plan, not this one.
+which is item 2 of the realism plan, not this one. (Since done: the
+infiltrate is now split as prostate tumours are and every per-contact
+number is calibrated -- tests/test_kill_calibration.py. The counts in
+the table above are the ones this file was written against.)
 """
 
 from __future__ import annotations
@@ -132,18 +135,24 @@ def test_the_aggressive_tumour_is_bigger_and_less_watched():
 def test_immunotherapy_keeps_its_infiltrate_and_its_drug():
     base = slab_variant(SCENARIOS["Baseline"])
     immuno = slab_variant(SCENARIOS["Immunotherapy"])
-    assert _immune_total(immuno) > 2 * _immune_total(base)
+    # The T cells are what anti-PD-1 expands: 2.5x Baseline's, as on the ring.
+    assert immuno["immune"]["n_t_cells"] > 2 * base["immune"]["n_t_cells"]
+    assert _immune_total(immuno) > 1.5 * _immune_total(base)
     assert immuno["immune"]["checkpoint_block"] == 1.0
 
 
 @pytest.mark.parametrize("name", RING_PRESETS)
-def test_each_preset_keeps_its_own_lineage_mix(name):
+def test_each_lineage_keeps_its_ratio_to_baseline(name):
+    # Each preset used to keep its own ring mix, which was ~31% NK in every
+    # one of them; prostate tumours carry ~10%. Baseline is now split as
+    # TCGA PRAD is (tests/test_kill_calibration.py) and every other preset
+    # keeps, lineage by lineage, its ratio to Baseline.
+    base_ring = SCENARIOS["Baseline"]["immune"]
+    base_slab = slab_variant(SCENARIOS["Baseline"])["immune"]
     ring, slab = SCENARIOS[name]["immune"], slab_variant(SCENARIOS[name])["immune"]
-    ring_total = sum(ring.get(k, 0) for k in IMMUNE)
-    slab_total = sum(slab.get(k, 0) for k in IMMUNE)
     for key in IMMUNE:
-        assert slab[key] / slab_total == pytest.approx(
-            ring[key] / ring_total, abs=0.03), key
+        expected = base_slab[key] * ring[key] / base_ring[key]
+        assert slab[key] == max(1, round(expected)), key
 
 
 def test_hypoxia_gets_sparser_vessels_agreed_by_all_three_modules():

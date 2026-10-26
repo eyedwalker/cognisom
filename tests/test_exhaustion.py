@@ -275,6 +275,9 @@ def test_chronic_antigen_drives_tcell_exhausted_event_and_drops_kill():
         "hla_alleles": ["HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02"],
     })
     engine.register_module("immune", ImmuneModule, {
+        # The count rule, which this test drives by setting the threshold;
+        # the default is a clock of days (EXHAUSTION_ONSET_HOURS).
+        "tcell_exhaustion_onset_hours": None,
         "n_t_cells": 1, "n_nk_cells": 0, "n_macrophages": 0,
         "tcr_recognition_threshold": 0.0,
         "tcr_repertoire_size": 200,
@@ -370,6 +373,9 @@ def test_kill_probability_drops_when_clone_exhausts_mid_engagement():
         "hla_alleles": ["HLA-A*02:01", "HLA-A*24:02", "HLA-B*07:02"],
     })
     engine.register_module("immune", ImmuneModule, {
+        # The count rule, which this test drives by setting the threshold;
+        # the default is a clock of days (EXHAUSTION_ONSET_HOURS).
+        "tcell_exhaustion_onset_hours": None,
         "n_t_cells": 1, "n_nk_cells": 0, "n_macrophages": 0,
         "tcr_recognition_threshold": 0.0,
         "tcr_repertoire_size": 200,
@@ -437,3 +443,44 @@ def test_kill_probability_drops_when_clone_exhausts_mid_engagement():
         "though the cached TCRMatch still reports PRECURSOR "
         f"(precursor={p_precursor:.6f}, exhausted={p_exhausted:.6f})"
     )
+
+
+# ── exhaustion on a clock ────────────────────────────────────────────────
+
+def test_a_hundred_contacts_in_an_hour_do_not_exhaust_a_clone():
+    # The count was shared by every T cell of a clone, so five contacts --
+    # minutes into a slab run -- exhausted the whole compartment.
+    from cognisom.engine.py.immune.tcr_repertoire import EXHAUSTION_ONSET_HOURS
+    rep = TCRRepertoire(size=3, seed=0, exhaustion_onset_hours=EXHAUSTION_ONSET_HOURS)
+    tcr_id = rep.tcrs[0].tcr_id
+    for k in range(100):
+        _, did = rep.register_engagement(tcr_id, now_h=k / 100)
+        assert not did
+    assert rep.exhaustion_state(tcr_id) is ExhaustionState.PRECURSOR
+
+
+def test_ten_days_of_antigen_exhausts_a_clone_once():
+    from cognisom.engine.py.immune.tcr_repertoire import (
+        EXHAUSTION_ONSET_HOURS, EXHAUSTION_ONSET_RANGE_HOURS)
+    assert EXHAUSTION_ONSET_HOURS == 240.0
+    assert EXHAUSTION_ONSET_RANGE_HOURS == (168.0, 336.0)
+    rep = TCRRepertoire(size=3, seed=0, exhaustion_onset_hours=240.0)
+    tcr_id = rep.tcrs[0].tcr_id
+    assert rep.register_engagement(tcr_id, now_h=5.0)[1] is False
+    assert rep.register_engagement(tcr_id, now_h=244.0)[1] is False
+    assert rep.register_engagement(tcr_id, now_h=245.0)[1] is True
+    assert rep.register_engagement(tcr_id, now_h=300.0)[1] is False
+    assert rep.exhaustion_state(tcr_id) is ExhaustionState.EXHAUSTED
+
+
+def test_the_immune_module_exhausts_on_the_clock_by_default():
+    import contextlib, io
+    from cognisom.modules.immune_module import ImmuneModule
+    with contextlib.redirect_stdout(io.StringIO()):
+        m = ImmuneModule({"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0})
+        m.initialize()
+    assert m._tcr_repertoire.exhaustion_onset_hours == 240.0
+    with contextlib.redirect_stdout(io.StringIO()):
+        m = ImmuneModule({"n_t_cells": 0, "tcell_exhaustion_onset_hours": None})
+        m.initialize()
+    assert m._tcr_repertoire.exhaustion_onset_hours is None
