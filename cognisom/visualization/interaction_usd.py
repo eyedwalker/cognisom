@@ -405,7 +405,7 @@ def author_interaction_markers(
             stage, f"{pi_path}/Prototypes/Marker", style.shape,
             style.peak_radius * scale,
         )
-        UsdShade.MaterialBindingAPI(proto).Bind(
+        UsdShade.MaterialBindingAPI.Apply(proto.GetPrim()).Bind(
             _emissive_material(stage, f"{pi_path}/Prototypes/Marker/Mat",
                                style.color, opacity=style.opacity)
         )
@@ -514,7 +514,7 @@ def author_engagement_bonds(
             widths.append(float(width) * (1.0 - age / hold_frames) if on else 0.0)
         widths_attr.Set(Vt.FloatArray(widths), frame)
 
-    UsdShade.MaterialBindingAPI(curves).Bind(
+    UsdShade.MaterialBindingAPI.Apply(curves.GetPrim()).Bind(
         _emissive_material(stage, f"{root}/Engagements/Mat", BOND_COLOR)
     )
     curves.GetPrim().SetMetadata(
@@ -818,7 +818,7 @@ def author_cell_oxygen(
             proto.GetExtentAttr().Set(Vt.Vec3fArray([
                 Gf.Vec3f(-halo_radius, -halo_radius, -halo_radius),
                 Gf.Vec3f(halo_radius, halo_radius, halo_radius)]))
-            UsdShade.MaterialBindingAPI(proto).Bind(_emissive_material(
+            UsdShade.MaterialBindingAPI.Apply(proto.GetPrim()).Bind(_emissive_material(
                 stage, f"{path}/Prototypes/Halo/Mat", (0.75, 0.06, 0.10),
                 opacity=0.42))
             pi.CreatePrototypesRel().SetTargets([proto.GetPath()])
@@ -922,7 +922,7 @@ def author_event_camera(
     backdrop.CreateFaceVertexCountsAttr().Set(Vt.IntArray([4]))
     backdrop.CreateFaceVertexIndicesAttr().Set(Vt.IntArray([0, 1, 2, 3]))
     backdrop.CreateSubdivisionSchemeAttr().Set(UsdGeom.Tokens.none)
-    UsdShade.MaterialBindingAPI(backdrop).Bind(
+    UsdShade.MaterialBindingAPI.Apply(backdrop.GetPrim()).Bind(
         _emissive_material(stage, path + "/Backdrop/Mat", backdrop_color))
 
     return {
@@ -989,7 +989,7 @@ def author_legend(
     surface.CreateIdAttr("UsdPreviewSurface")
     reader = UsdShade.Shader.Define(stage, mat_path + "/StReader")
     reader.CreateIdAttr("UsdPrimvarReader_float2")
-    reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
+    reader.CreateInput("varname", Sdf.ValueTypeNames.String).Set("st")
     reader.CreateOutput("result", Sdf.ValueTypeNames.Float2)
     tex = UsdShade.Shader.Define(stage, mat_path + "/Texture")
     tex.CreateIdAttr("UsdUVTexture")
@@ -1004,7 +1004,7 @@ def author_legend(
                         ).ConnectToSource(tex.ConnectableAPI(), "rgb")
     surface.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(1.0)
     mat.CreateSurfaceOutput().ConnectToSource(surface.ConnectableAPI(), "surface")
-    UsdShade.MaterialBindingAPI(quad).Bind(mat)
+    UsdShade.MaterialBindingAPI.Apply(quad.GetPrim()).Bind(mat)
     return path
 
 

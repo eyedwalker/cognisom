@@ -201,6 +201,30 @@ def test_the_timeline_validates_as_bio_usd(run):
     assert report.ok, [str(i) for i in report.issues]
 
 
+def test_the_timeline_applies_the_schema_to_both_populations_and_claims_the_profile(run):
+    """Bio-USD 0.2.0 on a real run: apiSchemas BioCellAPI on /World/Cells
+    and /World/ImmuneCells, UsdProfiles claims on /World (cells hard,
+    ontology an enhancement -- every immune cell asserts CL:0000738), and
+    the validator has nothing to say about either."""
+    from cognisom.biousd.standard.api_schema import applied_api_schemas
+    from cognisom.biousd.standard.profiles import check_claims, read_claims
+    from cognisom.biousd.standard.validate import validate
+    _, path, report, stage = run
+    assert report.api_applied == [CELLS_PATH, IMMUNE_PATH]
+    assert report.claims_prim == "/World"
+    for prim_path in (CELLS_PATH, IMMUNE_PATH):
+        assert applied_api_schemas(stage.GetPrimAtPath(prim_path)) == ["BioCellAPI"], prim_path
+    claims = read_claims(stage)
+    assert claims.applied and claims.present
+    assert claims.usages == {"biousd.cells": "hard", "biousd.ontology": "enhancement"}
+    assert claims.profiles == {"biousd.profile_v1": []}
+    assert check_claims(stage) == []
+    conformance = validate(path)
+    assert conformance.ok
+    assert not [c for c in conformance.codes if c.startswith(("schema.", "profile."))], (
+        conformance.describe())
+
+
 def test_nothing_to_write_is_an_error(tmp_path):
     class _Empty:
         cell_snapshots = []

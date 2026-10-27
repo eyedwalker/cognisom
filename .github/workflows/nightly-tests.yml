@@ -26,3 +26,43 @@ jobs:
 
       - name: Run full suite (both trees, including slow tests)
         run: python -m pytest --tb=short -q --durations=20
+
+  # ── The second OpenUSD ─────────────────────────────────────────────
+  # requirements.txt pins usd-core 25.11, which production runs and which
+  # the job above tests. Bio-USD 0.2.0 has paths that exist only on newer
+  # OpenUSD: Python registration of validators with the validation
+  # framework (26.05, PR #4015) and UsdProfiles claims (26.08). On 25.11
+  # those tests skip by name, so without this job they would never run
+  # anywhere. This installs usd-core 26.11 over the pin -- the pin itself
+  # is a separate decision -- and runs only the USD-touching files, the
+  # one list scripts/usd_matrix.sh holds (it runs the same files locally
+  # under both versions). Reports, does not gate, like the job above.
+  usd-26:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install usd-core 26.11 over the 25.11 pin
+        run: |
+          pip install usd-core==26.11
+          python -c "
+          from pxr import Usd
+          v = Usd.GetVersion()
+          assert v[:2] == (0, 26), f'expected usd-core 26.x, pxr reports {v}'
+          print('usd-core', '.'.join(map(str, v[1:])))
+          "
+
+      - name: Run the USD tests on usd-core 26.11
+        run: |
+          files="$(bash scripts/usd_matrix.sh --list)"
+          test -n "$files"
+          python -m pytest --tb=short -q -p no:cacheprovider $files

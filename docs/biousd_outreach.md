@@ -160,11 +160,46 @@ are identifiable. Each was proven against real USD builds the same day
 - Our USD-touching tests pass unchanged under usd-core 26.11, so the pin
   bump that enables all three is cheap (wheels need Python ≥ 3.11).
 
-Reply drafted (schema works, reader bug found and fixed, Python validator
-registration confirmed on 26.05+, one README discrepancy —
-`UsdValidation.TimeRange` vs `ValidationTimeRange` — and two questions:
-is `apiSchemaCanOnlyApplyTo` meant to be advisory, and is a
-geometry/PointInstancer capability planned in the core profile graph).
+**Shipped as Bio-USD 0.2.0 (2026-10-27, on the `realism` branch; not yet
+pushed to the public mirror, so the forum reply cannot link it until it
+is).** All three suggestions are code now, not spikes, each verified on
+usd-core 25.11 and 26.11 by tests that run under both
+(`scripts/usd_matrix.sh`; a nightly CI job installs 26.11 over the
+25.11 pin, which itself is unchanged):
+
+- `BioCellAPI`: a codeless applied schema generated from `vocabulary.py`
+  (`schema.usda` → `plugin/plugInfo.json` + `generatedSchema.usda`;
+  regeneration is byte-identical under either wheel), registered by
+  `import biousd` before the first stage is opened, with the late-import
+  trap documented and warned once. The reader regression is fixed
+  (gates on authored primvars, not defined ones): the spike's file that
+  omitted an optional primvar now conforms with one warning with and
+  without the plugin. The PointInstancer restriction is enforced by the
+  validator (`schema.misapplied`) since USD treats it as advisory.
+- Validation framework: `biousdValidators:StageMetadata`,
+  `:CellPopulation` and the suite register with `pxr.UsdValidation` on
+  26.05 and later, implemented on the same check functions as the
+  standalone validator; `biousd-check` chains the framework and Bio-USD
+  into one report with one exit status on any wheel, and on 25.11 says
+  why the framework path cannot run instead of running it silently.
+- Profiles: `biousd`, `biousd.cells`, `biousd.ontology` and the profile
+  `biousd.profile_v1` are declared in the one `plugInfo.json`; the writer
+  records `ClaimsAPI` claims by hand on any wheel, and a 26.11 reader
+  with the plugin answers `IsCompatibleWith("biousd.profile_v1") →
+  ValidPath`. The validator checks the claims against the stage
+  (`profile.*`, warnings only).
+- Cognisom's own exports — the still (`usd_writer.write_cells`) and the
+  scrubbable run timeline (`run_usd.write_run`, both populations) — apply
+  the schema and write the claims, and the dashboard registers the
+  plugin at startup so the schema is known in the process that writes.
+
+Still to send: the reply itself (the draft stands — schema works, reader
+bug found and fixed, Python validator registration confirmed on 26.05+,
+one README discrepancy, `UsdValidation.TimeRange` vs
+`ValidationTimeRange` — plus two questions: is `apiSchemaCanOnlyApplyTo`
+meant to be advisory, and is a geometry/PointInstancer capability
+planned in the core profile graph), after the 0.2.0 package is pushed so
+the links resolve.
 
 **Decision rule:** one "yes, we'd read it" = the opening; proceed to a
 second implementation with them and propose the AOUSD group. Three

@@ -899,7 +899,7 @@ class SceneExporter:
 
         reader = UsdShade.Shader.Define(stage, f"{path}/ColorReader")
         reader.CreateIdAttr("UsdPrimvarReader_float3")
-        reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayColor")
+        reader.CreateInput("varname", Sdf.ValueTypeNames.String).Set("displayColor")
         reader.CreateInput("fallback", Sdf.ValueTypeNames.Float3).Set(
             Gf.Vec3f(*UNKNOWN_CELL_USD_COLOR)
         )

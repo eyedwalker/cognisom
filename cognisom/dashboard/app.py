@@ -20,6 +20,20 @@ if _project_root not in sys.path:
 import streamlit as st
 import os
 
+# ── Bio-USD schema plugin: register before any page opens a stage ──
+# USD builds its schema registry once per process, the first time a
+# stage with typed prims is created or opened, and a plugin registered
+# after that is never consulted (measured; see cognisom/biousd/__init__).
+# Pages open stages lazily -- the run timeline (3), the Omniverse
+# connector (12), the Bio-USD export (16) -- and any of them may be the
+# first in this process, so the one import that registers the plugin is
+# here, once, before navigation. Quiet without usd-core: the dashboard
+# must come up on a deployment that has no USD at all.
+try:
+    import cognisom.biousd  # noqa: F401  (registers BioCellAPI with Plug)
+except Exception:  # noqa: BLE001
+    pass
+
 # ── Check auth state FIRST (before navigation) ──────────────────────
 
 try:

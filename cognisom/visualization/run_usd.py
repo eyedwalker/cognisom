@@ -91,6 +91,16 @@ the ``bio:`` namespace because the vocabulary has no such primvars.
 ``cognisom:cell:appearance`` on both instancers is the per-frame
 appearance key (``macrophage_M2``, ``cancer``, ...).
 
+Both instancers apply the ``BioCellAPI`` schema (Bio-USD 0.2.0) and
+``/World`` carries the UsdProfiles claims: ``biousd.cells`` is ``hard``,
+``biousd.ontology`` an ``enhancement`` when any cell of either population
+asserts a term (an immune population always does, ``CL:0000738``; a run
+of ``normal`` cells alone asserts none). Both are metadata authored
+after the primvars and need no plugin to write; the plugin is registered
+anyway, because importing this module imports ``cognisom.biousd`` before
+any stage is created here, so in a Cognisom process the schema is known
+and a reader of the written stage sees its ``allowedTokens`` and docs.
+
 ``/World/Interactions/*``, ``/World/Fields/*``, ``/World/Cameras/EventCam``
 -- from :mod:`.interaction_usd`, unchanged.
 
@@ -115,6 +125,8 @@ import numpy as np
 #: elongated_spindle meshes as a 44-triangle blob with a unit-cube
 #: extent, so an M2 macrophage would be a ball again.
 from cognisom.biousd.usd_writer import PROTOTYPE_GRID
+from cognisom.biousd.standard.api_schema import apply_api
+from cognisom.biousd.standard.profiles import write_claims
 
 from .interaction_recorder import VisualEvent
 from .interaction_usd import (
@@ -167,6 +179,10 @@ class RunWriteReport:
     #: the two drawn radii (diameter/2 each: the mean-extent sphere, not
     #: the anisotropic prototype), and the mean overlap depth over those.
     overlap: Dict[str, float] = field(default_factory=dict)
+    #: Instancer paths that apply ``BioCellAPI`` (Bio-USD 0.2.0).
+    api_applied: List[str] = field(default_factory=list)
+    #: The prim carrying the UsdProfiles claims (``/World``).
+    claims_prim: Optional[str] = None
 
     def describe(self) -> str:
         drawn = ", ".join(f"{k} {v}" for k, v in sorted(
@@ -194,6 +210,10 @@ class RunWriteReport:
                 text += (" -- most drawn cells are inside a neighbour on this lattice, so "
                          "the shapes are not legible here; the stage data is right and the "
                          "spacing is the engine's to fix")
+        if self.api_applied:
+            text += f"; BioCellAPI on {len(self.api_applied)} population(s)"
+            if self.claims_prim:
+                text += f", profile claims on {self.claims_prim}"
         return text
 
 
@@ -406,13 +426,17 @@ def _author_population(stage, path: str, tl: _Timeline, *,
                        prototype_paths: Sequence[Any], proto_bounds: np.ndarray,
                        proto_indices: np.ndarray, diameters: np.ndarray,
                        type_tokens: Sequence[str], colours: np.ndarray,
-                       extra_primvars: Dict[str, Tuple[Any, Any]]) -> None:
+                       extra_primvars: Dict[str, Tuple[Any, Any]]) -> Tuple[bool, bool]:
     """One time-sampled PointInstancer. ``proto_indices`` and
     ``diameters`` are ``(n_frames, n)`` and ``colours`` is
     ``(n_frames, n, 3)``; ``type_tokens`` is per id and constant;
     ``proto_bounds`` is the ``(n_prototypes, 2, 3)`` unit-scale bound of
     each prototype; ``extra_primvars`` maps name -> (Sdf type, per-frame
-    list of per-id values)."""
+    list of per-id values).
+
+    Returns ``(api_applied, ontology_asserted)``: whether ``BioCellAPI``
+    was applied to the instancer, and whether any cell carries an
+    ontology term -- what the stage's claims must say about it."""
     from pxr import Sdf, UsdGeom, Vt
 
     n = len(tl.ids)
@@ -466,8 +490,9 @@ def _author_population(stage, path: str, tl: _Timeline, *,
         Vt.IntArray.FromNumpy(np.asarray(tl.ids, dtype="int32")))
     api.CreatePrimvar("bio:cell:type", Sdf.ValueTypeNames.TokenArray, varying).Set(
         Vt.TokenArray(list(type_tokens)))
+    terms = [_ontology_term(t) for t in type_tokens]
     api.CreatePrimvar("bio:cell:ontologyTerm", Sdf.ValueTypeNames.TokenArray, varying).Set(
-        Vt.TokenArray([_ontology_term(t) for t in type_tokens]))
+        Vt.TokenArray(terms))
     alive = api.CreatePrimvar("bio:cell:alive", Sdf.ValueTypeNames.BoolArray, varying)
     alive.Set(Vt.BoolArray([bool(v) for v in tl.present[last]]))
     for k in range(tl.n_frames):
@@ -483,6 +508,10 @@ def _author_population(stage, path: str, tl: _Timeline, *,
         pv.Set(per_frame[last])
         for k in range(tl.n_frames):
             pv.Set(per_frame[k], float(k))
+    # The schema goes on last: every primvar above, timed or not, carries
+    # its own `varying`, so the file never depends on the schema's
+    # fallback. AddAppliedSchema needs no plugin.
+    return apply_api(instancer.GetPrim()), any(terms)
 
 
 def write_run(path: str, source: Any, *,
@@ -578,6 +607,7 @@ def write_run(path: str, source: Any, *,
     counts: Dict[str, int] = {}
     drawn_positions: List[np.ndarray] = []
     drawn_radii: List[np.ndarray] = []
+    ontology_asserted = False
 
     def _count_last(tl: _Timeline, keys: List[List[str]], diam: np.ndarray) -> None:
         last = tl.n_frames - 1
@@ -618,10 +648,13 @@ def write_run(path: str, source: Any, *,
                 Sdf.ValueTypeNames.FloatArray,
                 [Vt.FloatArray([float(v if v is not None else 0.0) for v in row])
                  for row in cells.fields["oxygen"]])
-        _author_population(stage, CELLS_PATH, cells, prototype_paths=proto_paths,
-                           proto_bounds=proto_bounds,
-                           proto_indices=proto_idx, diameters=diam,
-                           type_tokens=types_last, colours=colours, extra_primvars=extra)
+        applied, asserted = _author_population(
+            stage, CELLS_PATH, cells, prototype_paths=proto_paths, proto_bounds=proto_bounds,
+            proto_indices=proto_idx, diameters=diam, type_tokens=types_last, colours=colours,
+            extra_primvars=extra)
+        if applied:
+            report.api_applied.append(CELLS_PATH)
+        ontology_asserted = ontology_asserted or asserted
         _count_last(cells, cell_keys, diam)
 
     # ── immune cells ──────────────────────────────────────────────
@@ -645,11 +678,22 @@ def write_run(path: str, source: Any, *,
                  for row in immune.fields["polarization"]])
         extra["cognisom:cell:appearance"] = (
             Sdf.ValueTypeNames.TokenArray, [Vt.TokenArray(row) for row in immune_keys])
-        _author_population(stage, IMMUNE_PATH, immune, prototype_paths=proto_paths,
-                           proto_bounds=proto_bounds,
-                           proto_indices=proto_idx, diameters=diam,
-                           type_tokens=["immune"] * n, colours=colours, extra_primvars=extra)
+        applied, asserted = _author_population(
+            stage, IMMUNE_PATH, immune, prototype_paths=proto_paths, proto_bounds=proto_bounds,
+            proto_indices=proto_idx, diameters=diam, type_tokens=["immune"] * n, colours=colours,
+            extra_primvars=extra)
+        if applied:
+            report.api_applied.append(IMMUNE_PATH)
+        ontology_asserted = ontology_asserted or asserted
         _count_last(immune, immune_keys, diam)
+
+    # ── the claims: what this stage uses, on the default prim ─────
+    # Written whenever a population was: the cells are a hard usage, the
+    # ontology terms an enhancement claimed only when some cell asserts
+    # one, so the validator's consistency check (profile.inconsistent)
+    # agrees with the primvars beside it.
+    if report.api_applied:
+        report.claims_prim = write_claims(stage, ontology=ontology_asserted)
 
     # ── the record of what was drawn ──────────────────────────────
     for key, app in apps.items():

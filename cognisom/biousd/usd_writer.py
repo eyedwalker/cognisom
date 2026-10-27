@@ -47,6 +47,22 @@ BINARY BY DEFAULT
 ``.usdc`` is about three times smaller than ``.usda`` for this content and
 opens faster. Text is still available and still what you want when a human
 has to read the file or a diff.
+
+THE SCHEMA AND THE CLAIMS (BIO-USD 0.2.0)
+-----------------------------------------
+The instancer applies the codeless ``BioCellAPI`` schema and ``/World``
+carries UsdProfiles claims (``ClaimsAPI`` + ``profilesInfo``: the cell
+population is a ``hard`` usage, ontology terms an ``enhancement`` when at
+least one cell asserts one). Both are plain metadata --
+``AddAppliedSchema`` and ``customData`` -- so writing them needs no plugin
+loaded, and a consumer without it sees the 0.1 file plus two entries it
+ignores. They are applied AFTER every primvar is authored with its explicit
+``varying`` interpolation, so nothing in the file relies on the schema's
+fallbacks. Importing this module imports ``cognisom.biousd``, which
+registers the plugin before any stage here is created; that order is
+what makes the schema *known* in the writing process (see that package's
+docstring), and a consumer that loads the plugin then reads
+``allowedTokens`` and documentation off these primvars.
 """
 
 from __future__ import annotations
@@ -58,6 +74,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 
 from cognisom.biousd import ontology as onto
+from cognisom.biousd.standard.api_schema import apply_api
+from cognisom.biousd.standard.profiles import write_claims
 
 log = logging.getLogger(__name__)
 
@@ -120,6 +138,12 @@ class WriteResult:
     sizes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     #: Cells drawn at the ``scale_um`` they carried.
     sized_by_cell: int = 0
+    #: ``BioCellAPI`` was applied to the instancer (Bio-USD 0.2.0).
+    api_applied: bool = False
+    #: The prim the UsdProfiles claims were written to (``/World``), or
+    #: None when nothing was written (an empty population has no carrier
+    #: to claim).
+    claims_prim: Optional[str] = None
 
     def describe(self) -> str:
         size = self.bytes_written / 1048576
@@ -154,6 +178,10 @@ class WriteResult:
                 for token, rec in sorted(self.sizes.items()))
         if self.sized_by_cell and self.sizes:
             text += f"; {self.sized_by_cell:,} at their own scale_um"
+        if self.api_applied:
+            text += "; BioCellAPI applied"
+            if self.claims_prim:
+                text += f", profile claims on {self.claims_prim}"
         return text
 
 
@@ -307,14 +335,14 @@ def author_cell_material(stage, path: str = "/World/Looks/BioCell"):
 
     colour = UsdShade.Shader.Define(stage, f"{path}/ColorReader")
     colour.CreateIdAttr("UsdPrimvarReader_float3")
-    colour.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayColor")
+    colour.CreateInput("varname", Sdf.ValueTypeNames.String).Set("displayColor")
     colour.CreateInput("fallback", Sdf.ValueTypeNames.Float3).Set(
         Gf.Vec3f(0.74, 0.80, 0.88))
     colour.CreateOutput("result", Sdf.ValueTypeNames.Float3)
 
     alpha = UsdShade.Shader.Define(stage, f"{path}/OpacityReader")
     alpha.CreateIdAttr("UsdPrimvarReader_float")
-    alpha.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("displayOpacity")
+    alpha.CreateInput("varname", Sdf.ValueTypeNames.String).Set("displayOpacity")
     alpha.CreateInput("fallback", Sdf.ValueTypeNames.Float).Set(1.0)
     alpha.CreateOutput("result", Sdf.ValueTypeNames.Float)
 
@@ -708,6 +736,15 @@ def write_cells(path: str, cells: Sequence[Any], *,
     primvar("bio:cell:ontologyTerm", Sdf.ValueTypeNames.TokenArray,
             Vt.TokenArray(terms))
     result.unmapped = sorted(missing)
+
+    # Bio-USD 0.2.0: the schema on the carrier, the claims on the default
+    # prim. Last among the primvars on purpose -- every one above carries
+    # its own interpolation, so the schema adds documentation and
+    # fallbacks to this file and never data. Neither call needs the
+    # plugin to be loaded; the ontology usage is claimed only when some
+    # cell actually asserts a term.
+    result.api_applied = apply_api(instancer.GetPrim())
+    result.claims_prim = write_claims(stage, ontology=any(terms))
 
     # What size each cell was drawn at and why, for the cells that did
     # not bring their own: the library's record, by type token.
