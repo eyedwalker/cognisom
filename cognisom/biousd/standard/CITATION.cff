@@ -10,8 +10,11 @@ identifiers:
     value: 10.5281/zenodo.23603569
     description: "Concept DOI: resolves to the latest archived version."
   - type: doi
+    value: 10.5281/zenodo.23700359
+    description: "Version DOI for 0.2.0, this version."
+  - type: doi
     value: 10.5281/zenodo.23603570
-    description: "Version DOI for 0.1.2 (0.2.0 receives its own when archived)."
+    description: "Version DOI for 0.1.2."
 type: software
 authors:
   - family-names: Walker

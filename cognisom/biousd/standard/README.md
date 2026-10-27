@@ -1,7 +1,7 @@
 # Bio-USD
 
 **Biological cells on OpenUSD, as a convention anyone can write to.**
-Draft v0.2.0 · Apache 2.0 · [SPEC.md](SPEC.md) · DOI [10.5281/zenodo.23603569](https://doi.org/10.5281/zenodo.23603569)
+Draft v0.2.0 · Apache 2.0 · [SPEC.md](SPEC.md) · DOI [10.5281/zenodo.23603569](https://doi.org/10.5281/zenodo.23603569) (this version: [10.5281/zenodo.23700359](https://doi.org/10.5281/zenodo.23700359))
 
 A Bio-USD file is an ordinary OpenUSD stage. Cells are instances of a
 `PointInstancer`; what each cell *is* rides along as per-instance primvars.
