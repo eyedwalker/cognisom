@@ -1,0 +1,126 @@
+{
+ "about": "Chemical structures resolved from PubChem by cognisom.library.structures.backfill_structures and verified against each entity's own recorded formula and weight. Committed because the pass needs the network and the library database is local state; apply_structures puts them into any fresh library. Regenerate with: python -m cognisom.library.structures export",
+ "entities": {
+  "ATP": {
+   "inchikey": "ZKHQWZAMYRWXGA-KQYNXXCUSA-N",
+   "molecular_formula": "C10H16N5O13P3",
+   "molecular_weight": 507.182,
+   "smiles": "C1=NC(=C2C(=N1)N(C=N2)[C@H]3[C@@H]([C@@H]([C@H](O3)COP(=O)(O)OP(=O)(O)OP(=O)(O)O)O)O)N"
+  },
+  "Abiraterone": {
+   "inchikey": "GZOSMCIZMLWJML-VJLLXTKPSA-N",
+   "molecular_formula": "C24H31NO",
+   "molecular_weight": 349.518,
+   "smiles": "C[C@]12CC[C@@H](CC1=CC[C@@H]3[C@@H]2CC[C@]4([C@H]3CC=C4C5=CN=CC=C5)C)O"
+  },
+  "Acetyl-CoA": {
+   "inchikey": "ZSLZBFCDCINBPY-ZSJPKINUSA-N",
+   "molecular_formula": "C23H38N7O17P3S",
+   "molecular_weight": 809.578,
+   "smiles": "CC(=O)SCCNC(=O)CCNC(=O)[C@@H](C(C)(C)COP(=O)(O)OP(=O)(O)OC[C@@H]1[C@H]([C@H]([C@@H](O1)N2C=NC3=C(N=CN=C32)N)O)OP(=O)(O)O)O"
+  },
+  "Apalutamide": {
+   "inchikey": "HJBWBFZLDZWPHF-UHFFFAOYSA-N",
+   "molecular_formula": "C21H15F4N5O2S",
+   "molecular_weight": 477.443,
+   "smiles": "CNC(=O)C1=C(C=C(C=C1)N2C(=S)N(C(=O)C23CCC3)C4=CC(=C(N=C4)C#N)C(F)(F)F)F"
+  },
+  "Cabazitaxel": {
+   "inchikey": "BMQGVNUXMIRLCK-OAGWZNDDSA-N",
+   "molecular_formula": "C45H57NO14",
+   "molecular_weight": 835.944,
+   "smiles": "CC1=C2[C@H](C(=O)[C@@]3([C@H](C[C@@H]4[C@]([C@H]3[C@@H]([C@@](C2(C)C)(C[C@@H]1OC(=O)[C@@H]([C@H](C5=CC=CC=C5)NC(=O)OC(C)(C)C)O)O)OC(=O)C6=CC=CC=C6)(CO4)OC(=O)C)OC)C)OC"
+  },
+  "DHT": {
+   "inchikey": "NVKAWKQGWWIWPM-ABEVXSGRSA-N",
+   "molecular_formula": "C19H30O2",
+   "molecular_weight": 290.447,
+   "smiles": "C[C@]12CCC(=O)C[C@@H]1CC[C@@H]3[C@@H]2CC[C@]4([C@H]3CC[C@@H]4O)C"
+  },
+  "Darolutamide": {
+   "inchikey": "BLIJXOOIHRSQRB-PXYINDEMSA-N",
+   "molecular_formula": "C19H19ClN6O2",
+   "molecular_weight": 398.854,
+   "smiles": "C[C@@H](CN1C=CC(=N1)C2=CC(=C(C=C2)C#N)Cl)NC(=O)C3=NNC(=C3)C(C)O"
+  },
+  "Docetaxel": {
+   "inchikey": "ZDZOTLJHXYCWBA-VCVYQWHSSA-N",
+   "molecular_formula": "C43H53NO14",
+   "molecular_weight": 807.89,
+   "smiles": "CC1=C2[C@H](C(=O)[C@@]3([C@H](C[C@@H]4[C@]([C@H]3[C@@H]([C@@](C2(C)C)(C[C@@H]1OC(=O)[C@@H]([C@H](C5=CC=CC=C5)NC(=O)OC(C)(C)C)O)O)OC(=O)C6=CC=CC=C6)(CO4)OC(=O)C)O)C)O"
+  },
+  "Enzalutamide": {
+   "inchikey": "WXCXUHSOUPDCQV-UHFFFAOYSA-N",
+   "molecular_formula": "C21H16F4N4O2S",
+   "molecular_weight": 464.444,
+   "smiles": "CC1(C(=O)N(C(=S)N1C2=CC(=C(C=C2)C(=O)NC)F)C3=CC(=C(C=C3)C#N)C(F)(F)F)C"
+  },
+  "Glucose": {
+   "inchikey": "WQZGKKKJIJFFOK-GASJEMHNSA-N",
+   "molecular_formula": "C6H12O6",
+   "molecular_weight": 180.156,
+   "smiles": "C([C@@H]1[C@H]([C@@H]([C@H](C(O1)O)O)O)O)O"
+  },
+  "Glutamine": {
+   "inchikey": "ZDXPYRJPNDTMRX-VKHMYHEASA-N",
+   "molecular_formula": "C5H10N2O3",
+   "molecular_weight": 146.146,
+   "smiles": "C(CC(=O)N)[C@@H](C(=O)O)N"
+  },
+  "Imiquimod": {
+   "inchikey": "DOUYETYNHWVLEO-UHFFFAOYSA-N",
+   "molecular_formula": "C14H16N4",
+   "molecular_weight": 240.31,
+   "smiles": "CC(C)CN1C=NC2=C1C3=CC=CC=C3N=C2N"
+  },
+  "Ipatasertib": {
+   "inchikey": "GRZXWCHAXNAUHY-NSISKUIASA-N",
+   "molecular_formula": "C24H32ClN5O2",
+   "molecular_weight": 458.006,
+   "smiles": "C[C@@H]1C[C@H](C2=C1C(=NC=N2)N3CCN(CC3)C(=O)[C@H](CNC(C)C)C4=CC=C(C=C4)Cl)O"
+  },
+  "Olaparib": {
+   "inchikey": "FDLYAMZZIXQODN-UHFFFAOYSA-N",
+   "molecular_formula": "C24H23FN4O3",
+   "molecular_weight": 434.471,
+   "smiles": "C1CC1C(=O)N2CCN(CC2)C(=O)C3=C(C=CC(=C3)CC4=NNC(=O)C5=CC=CC=C54)F"
+  },
+  "Oxygen": {
+   "inchikey": "MYMOFIZGZYHOMD-UHFFFAOYSA-N",
+   "molecular_formula": "O2",
+   "molecular_weight": 31.998,
+   "smiles": "O=O"
+  },
+  "Rucaparib": {
+   "inchikey": "HMABYWSNWIZPAG-UHFFFAOYSA-N",
+   "molecular_formula": "C19H18FN3O",
+   "molecular_weight": 323.371,
+   "smiles": "CNCC1=CC=C(C=C1)C2=C3CCNC(=O)C4=C3C(=CC(=C4)F)N2"
+  },
+  "Ruxolitinib": {
+   "inchikey": "HFNKQEVNSGCOJV-OAHLLOKOSA-N",
+   "molecular_formula": "C17H18N6",
+   "molecular_weight": 306.373,
+   "smiles": "C1CCC(C1)[C@@H](CC#N)N2C=C(C=N2)C3=C4C=CNC4=NC=N3"
+  },
+  "Talazoparib": {
+   "inchikey": "HWGQMRYQVZSGDQ-HZPDHXFCSA-N",
+   "molecular_formula": "C19H14F2N6O",
+   "molecular_weight": 380.358,
+   "smiles": "CN1C(=NC=N1)[C@@H]2[C@H](NC3=CC(=CC4=C3C2=NNC4=O)F)C5=CC=C(C=C5)F"
+  },
+  "Testosterone": {
+   "inchikey": "MUMGGOZAMZWBJJ-DYKIIFRCSA-N",
+   "molecular_formula": "C19H28O2",
+   "molecular_weight": 288.431,
+   "smiles": "C[C@]12CC[C@H]3[C@H]([C@@H]1CC[C@@H]2O)CCC4=CC(=O)CC[C@]34C"
+  },
+  "Tofacitinib": {
+   "inchikey": "UJLAWZDWDVHWOW-YPMHNXCESA-N",
+   "molecular_formula": "C16H20N6O",
+   "molecular_weight": 312.377,
+   "smiles": "C[C@@H]1CCN(C[C@@H]1N(C)C2=NC=NC3=C2C=CN3)C(=O)CC#N"
+  }
+ },
+ "source": "PubChem (https://pubchem.ncbi.nlm.nih.gov/)"
+}

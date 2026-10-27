@@ -28,10 +28,12 @@ is made rather than trusting the result.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -331,13 +333,149 @@ def backfill_structures(store, *, dry_run: bool = False,
     return summary
 
 
+#: Where the backfilled structures are kept so that every library has them.
+#:
+#: backfill_structures made the pass RE-RUNNABLE, which was the first half of
+#: the problem; this file is the second. The pass needs PubChem over the
+#: network, and CI has neither the network nor a reason to depend on it, so a
+#: fresh library built from the seeds alone carried exactly ONE structure --
+#: the single SMILES literal in seed_data -- while this machine's database
+#: carried twenty. tests/test_molecular_usd.py asserts twenty, so it passed
+#: here and failed everywhere else, for two nights on main before anyone
+#: looked. The same shape as curated_parameters.json beside it: a sourcing
+#: pass runs once, its result is committed, and every library applies it.
+STRUCTURES_PATH = Path(__file__).resolve().parent / "structures.json"
+
+#: The properties a resolved structure writes. Kept narrow on purpose: these
+#: are what resolve_small_molecule returns and what validate_structure can
+#: check. Descriptors PubChem also offers (logP, TPSA, H-bond counts) are not
+#: carried, because nothing recomputes them and an unverifiable number in an
+#: evidence file is the thing this library exists to avoid.
+STRUCTURE_FIELDS = ("smiles", "molecular_formula", "molecular_weight",
+                    "inchikey", "inchi_key", "pubchem_cid", "structure_source")
+
+
+def _structure_of(entity) -> Dict[str, Any]:
+    """The structure an entity carries, as a flat dict, or {}.
+
+    The formula, weight and InChIKey are RECOMPUTED from the SMILES rather
+    than copied from the record, because the record mostly does not have
+    them -- the library stores 0.0 where a weight was never filled in -- and
+    because computing them here is what gives apply_structures something to
+    check against. A SMILES that no longer produces this formula is a
+    different molecule, and nobody reads a SMILES string and notices.
+    """
+    smiles = (getattr(entity, "smiles", "") or "").strip()
+    if not smiles:
+        return {}
+    props = getattr(entity, "properties", None) or {}
+    out: Dict[str, Any] = {"smiles": smiles}
+    check = validate_structure(smiles)
+    if check.smiles_parses:
+        out["molecular_formula"] = check.formula
+        out["molecular_weight"] = round(check.molecular_weight, 4)
+        if check.inchikey:
+            out["inchikey"] = check.inchikey
+    for field_name in ("pubchem_cid", "structure_source"):
+        value = props.get(field_name)
+        if value not in (None, ""):
+            out[field_name] = value
+    return out
+
+
+def export_structures(store, path: Path = STRUCTURES_PATH) -> int:
+    """Write every structure this library holds to ``path``. Returns the count."""
+    entities, _ = store.search(limit=10000)
+    found = {}
+    for entity in sorted(entities, key=lambda e: e.name):
+        if entity.entity_type.value not in STRUCTURED_TYPES:
+            continue
+        structure = _structure_of(entity)
+        if structure:
+            found[entity.name] = structure
+    payload = {
+        "about": ("Chemical structures resolved from PubChem by "
+                  "cognisom.library.structures.backfill_structures and verified "
+                  "against each entity's own recorded formula and weight. "
+                  "Committed because the pass needs the network and the library "
+                  "database is local state; apply_structures puts them into any "
+                  "fresh library. Regenerate with: python -m "
+                  "cognisom.library.structures export"),
+        "source": "PubChem (https://pubchem.ncbi.nlm.nih.gov/)",
+        "entities": found,
+    }
+    path.write_text(json.dumps(payload, indent=1, sort_keys=True) + "\n")
+    return len(found)
+
+
+def apply_structures(store, path: Path = STRUCTURES_PATH,
+                     *, overwrite: bool = False) -> Dict[str, List[str]]:
+    """Put the committed structures into ``store``.
+
+    Only fills an EMPTY structure unless ``overwrite``; a library that has
+    resolved its own is left alone. Every SMILES is re-checked against the
+    formula and weight recorded beside it before it is stored, so a damaged
+    or edited file cannot quietly change which molecule an entity means --
+    the same guard backfill_structures applies to PubChem's own answers.
+    """
+    report: Dict[str, List[str]] = {"written": [], "already": [],
+                                    "missing": [], "refused": []}
+    if not path.exists():
+        return report
+    try:
+        payload = json.loads(path.read_text())
+    except Exception as exc:                                # noqa: BLE001
+        log.warning("structures file unreadable (%s): %s", path, exc)
+        report["refused"].append(f"{path}: {exc}")
+        return report
+
+    for name, structure in sorted((payload.get("entities") or {}).items()):
+        smiles = (structure.get("smiles") or "").strip()
+        if not smiles:
+            continue
+        entity = store.find_entity_by_name(name)
+        if entity is None:
+            report["missing"].append(name)
+            continue
+        if (getattr(entity, "smiles", "") or "").strip() and not overwrite:
+            report["already"].append(name)
+            continue
+        check = validate_structure(
+            smiles,
+            expected_formula=structure.get("molecular_formula", ""),
+            expected_mw=float(structure.get("molecular_weight") or 0) or None)
+        if not check.ok:
+            report["refused"].append(f"{name}: {'; '.join(check.problems)}")
+            continue
+        entity.smiles = smiles
+        extra = getattr(entity, "_extra_properties", None)
+        if isinstance(extra, dict):
+            for field_name in STRUCTURE_FIELDS:
+                value = structure.get(field_name)
+                if field_name != "smiles" and value not in (None, ""):
+                    extra.setdefault(field_name, value)
+        store.update_entity(entity, changed_by="structures.apply")
+        report["written"].append(name)
+    if report["written"] or report["refused"]:
+        log.info("structures applied: %d written, %d refused, %d already present",
+                 len(report["written"]), len(report["refused"]),
+                 len(report["already"]))
+    return report
+
+
 def main(argv=None) -> int:                                 # pragma: no cover
-    """``python -m cognisom.library.structures`` -- fill the structures."""
+    """``python -m cognisom.library.structures`` -- fill or move the structures."""
     import argparse
     import contextlib
     import io
 
     parser = argparse.ArgumentParser(description=backfill_structures.__doc__)
+    parser.add_argument("command", nargs="?", default="backfill",
+                        choices=("backfill", "export", "apply"),
+                        help="backfill: resolve from PubChem (needs the "
+                             "network). export: write what this library holds "
+                             "to structures.json. apply: put that file into "
+                             "this library.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args(argv)
@@ -345,6 +483,21 @@ def main(argv=None) -> int:                                 # pragma: no cover
     from .store import EntityStore
     with contextlib.redirect_stdout(io.StringIO()):
         store = EntityStore()
+
+    if args.command == "export":
+        count = export_structures(store)
+        print(f"wrote {count} structures to {STRUCTURES_PATH}")
+        return 0
+    if args.command == "apply":
+        report = apply_structures(store)
+        print(f"{len(report['written'])} written, "
+              f"{len(report['already'])} already present, "
+              f"{len(report['missing'])} entities absent, "
+              f"{len(report['refused'])} refused")
+        for line in report["refused"]:
+            print(f"    {line}")
+        return 0
+
     out = backfill_structures(store, dry_run=args.dry_run, limit=args.limit)
     print(f"already had a structure : {out['already']}")
     print(f"filled                  : {len(out['filled'])}")

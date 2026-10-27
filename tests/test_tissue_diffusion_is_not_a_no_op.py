@@ -95,6 +95,7 @@ def test_the_implicit_scheme_actually_consumes_oxygen():
     assert lo >= 0.0, "oxygen went negative"
 
 
+@pytest.mark.timeout(400)   # four converged solves; ~63 s here, slower on CI
 def test_depletion_tracks_the_diffusion_length():
     """Raising uptake must deepen the gradient, the way sqrt(D/k) says.
 

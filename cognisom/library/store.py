@@ -144,6 +144,7 @@ class EntityStore:
             self._init_db()
             self._auto_seed_if_empty()
             self._apply_curated_parameters()
+            self._apply_structures()
 
     def _auto_seed_if_empty(self):
         """Auto-seed the library with base catalogs if the DB is empty."""
@@ -320,6 +321,22 @@ class EntityStore:
             apply_curated(self)
         except Exception as e:
             log.warning("Applying curated parameters failed (non-fatal): %s", e)
+
+    def _apply_structures(self):
+        """Put the repository's committed chemical structures into the library.
+
+        They are resolved from PubChem by library/structures.py, which needs
+        the network; a library built from the seeds alone carried ONE SMILES
+        where this repository has twenty, so the molecular USD export raised
+        "no library entities carry a SMILES" anywhere but the machine that
+        ran the pass. Only an EMPTY structure is filled, and each SMILES is
+        re-checked against the formula recorded beside it first.
+        """
+        try:
+            from .structures import apply_structures
+            apply_structures(self)
+        except Exception as e:                   # noqa: BLE001
+            log.warning("Applying structures failed (non-fatal): %s", e)
 
     def get_meta(self, key: str) -> Optional[str]:
         """A value from library_meta, or None."""
