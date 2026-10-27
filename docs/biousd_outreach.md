@@ -133,7 +133,38 @@ USD, and would an interest group find a second member?
 |---|---|---|---|---|
 | Macklin / PhysiCell | email or GitHub Discussion | | | |
 | Mol* / Scripps | GitHub issue (+ email once verified) | | | |
-| NVIDIA / AOUSD | AOUSD forum post (+ developer forum) | | | |
+| NVIDIA / AOUSD | AOUSD forum post (+ developer forum) | posted (DW) | 2026-10-27, spiff (Pixar USD lead) | **opening** — three integration suggestions, see below |
+
+### What came back from the forum (2026-10-27)
+
+spiff (Pixar) replied with three ways to make the convention "more robust,
+introspectable and discoverable": (1) an API schema plugin applied to the
+PointInstancer (and verifiably only to PointInstancers); (2) registering
+the validator with USD's Validation framework so usdchecker and usdview
+discover it; (3) the Profiles featureset, so scenes using the extension
+are identifiable. Each was proven against real USD builds the same day
+(scratch spikes, re-run by a critic; nothing shipped yet):
+
+- A codeless `BioCellAPI` works on our usd-core 25.11: generated from
+  `vocabulary.py`, two data files, files stay valid without the plugin.
+  Two traps: the PointInstancer restriction is advisory (`ApplyAPI`
+  applies anyway), and our reader treats a schema-defined-but-unauthored
+  optional primvar as present, so with the plugin loaded an omitted
+  optional becomes an error. Fix the reader first; ship as 0.2.0 (the
+  spec says "adds no prim types").
+- Validators can be registered from Python only from OpenUSD 26.05;
+  verified end to end on usd-core 26.11. On 25.x the plugin is listed but
+  never runs. Apple's bundled macOS `usdchecker` loads no plugins at all.
+- Profiles shipped in 26.08 (`UsdProfiles`), a stub upstream (four
+  capabilities, no profiles); half a session on top of the schema.
+- Our USD-touching tests pass unchanged under usd-core 26.11, so the pin
+  bump that enables all three is cheap (wheels need Python ≥ 3.11).
+
+Reply drafted (schema works, reader bug found and fixed, Python validator
+registration confirmed on 26.05+, one README discrepancy —
+`UsdValidation.TimeRange` vs `ValidationTimeRange` — and two questions:
+is `apiSchemaCanOnlyApplyTo` meant to be advisory, and is a
+geometry/PointInstancer capability planned in the core profile graph).
 
 **Decision rule:** one "yes, we'd read it" = the opening; proceed to a
 second implementation with them and propose the AOUSD group. Three
