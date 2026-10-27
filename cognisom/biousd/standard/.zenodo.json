@@ -1,7 +1,7 @@
 {
   "title": "Bio-USD: a convention for biological cells on OpenUSD",
   "upload_type": "software",
-  "description": "A convention for carrying a population of biological cells in an OpenUSD stage as a PointInstancer with per-instance primvars, including a Cell Ontology / NCI Thesaurus term per cell for interoperability with single-cell atlases. Adds no prim types; any OpenUSD tool reads it. Includes a validator, example stages, and a converter from PhysiCell / MultiCellDS snapshots. Draft, seeking a second implementation.",
+  "description": "A convention for carrying a population of biological cells in an OpenUSD stage as a PointInstancer with per-instance primvars, including a Cell Ontology / NCI Thesaurus term per cell for interoperability with single-cell atlases. Adds no prim types; any OpenUSD tool reads it. Includes an optional codeless API schema (BioCellAPI) with UsdProfiles capabilities (OpenUSD 26.08 or later reads them), a validator that also registers with OpenUSD's validation framework on OpenUSD 26.05 or later, example stages, and a converter from PhysiCell / MultiCellDS snapshots. Draft, seeking a second implementation.",
   "creators": [
     {
       "name": "Walker, David",

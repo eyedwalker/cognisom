@@ -6,3 +6,20 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 OpenUSD itself is distributed under the Tomorrow Open Source Technology
 License, which is Apache 2.0 with a different trademark section; the two
 are compatible.
+
+VENDORED FILES
+--------------
+vendor/openusd/ holds two files copied unmodified from OpenUSD at tag
+v25.11 (https://github.com/PixarAnimationStudios/OpenUSD/tree/v25.11):
+
+    vendor/openusd/usd/schema.usda                 <- pxr/usd/usd/schema.usda
+    vendor/openusd/codegenTemplates/plugInfo.json  <- pxr/usd/usd/codegenTemplates/plugInfo.json
+
+They are build inputs for `python -m biousd.build_plugin`, which runs
+usdGenSchema; the usd-core 25.11 wheel ships neither (the 26.x wheels
+ship both, and are used in preference when present). Nothing in them is
+imported or executed at runtime. They are Copyright 2016 Pixar and are
+distributed under the Tomorrow Open Source Technology License 1.0, which
+is the Apache License 2.0 with a modified Section 6 ("Trademarks"); that
+license, as shipped with OpenUSD, is reproduced in
+vendor/openusd/LICENSE.txt.

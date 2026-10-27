@@ -1,0 +1,31 @@
+{
+    "Plugins": [
+        {
+            "Info": {
+                "Validators": {
+                    "BioUSDSuite": {
+                        "doc": "Every Bio-USD validator.",
+                        "isSuite": true
+                    },
+                    "CellPopulation": {
+                        "doc": "A PointInstancer that authors primvars:bio:cell:id or applies BioCellAPI has bio:cell:id and bio:cell:type with the stated type, varying interpolation and one value per instance; tokens are in their allowed sets; ontology terms are CL:/NCIT: CURIEs or empty; bio:cell:id is unique. Bio-USD 0.2.0.",
+                        "keywords": [
+                            "BioUSDCells"
+                        ],
+                        "schemaTypes": [
+                            "UsdGeomPointInstancer"
+                        ]
+                    },
+                    "StageMetadata": {
+                        "doc": "On a Bio-USD stage (bio:version in customLayerData, a cell population, or BioCellAPI applied; any other stage gets no finding): metersPerUnit must be 1e-06 (one stage unit is one micrometre), upAxis Y or Z, and the root layer's customLayerData must carry bio:version; BioCellAPI may be applied to a PointInstancer only; UsdProfiles claims, when present, must agree with the stage; a stage that names bio:version holds at least one cell population. Bio-USD 0.2.0."
+                    },
+                    "keywords": [
+                        "BioUSDValidators"
+                    ]
+                }
+            },
+            "Name": "biousdValidators",
+            "Type": "python"
+        }
+    ]
+}

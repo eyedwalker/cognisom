@@ -8,8 +8,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "biousd"
-version = "0.1.2"
-description = "Biological cells on OpenUSD: a primvar convention any OpenUSD tool reads, with a Cell Ontology term per cell"
+version = "0.2.0"
+description = "Biological cells on OpenUSD: a primvar convention any OpenUSD tool reads, with a Cell Ontology term per cell, a codeless API schema and a validator"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
@@ -17,11 +17,10 @@ dependencies = [
     "numpy>=1.24",
     "usd-core>=24.0",
 ]
-
-[project.optional-dependencies]
-# Reading PhysiCell / MultiCellDS snapshots needs scipy for the MATLAB v4 matrices.
-physicell = ["scipy>=1.10"]
-
+# These two belong to [project]. They sat below [project.optional-dependencies]
+# in 0.1.2, where TOML files them under that table and setuptools refuses
+# the metadata ("`project.optional-dependencies.keywords[2]` must be
+# pep508"), so no 0.1.2 wheel could ever have been built. A test builds one.
 keywords = ["OpenUSD", "USD", "Cell Ontology", "cells", "visualization", "digital twin"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -31,8 +30,14 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Visualization",
 ]
 
+[project.optional-dependencies]
+# Reading PhysiCell / MultiCellDS snapshots needs scipy for the MATLAB v4 matrices.
+physicell = ["scipy>=1.10"]
+
 [project.scripts]
 biousd-validate = "biousd.validate:main"
+biousd-check = "biousd.check:main"
+biousd-build-plugin = "biousd.build_plugin:main"
 biousd-from-physicell = "biousd.physicell:main"
 
 [tool.setuptools]
@@ -42,3 +47,19 @@ biousd-from-physicell = "biousd.physicell:main"
 # `pip install .` installs it the same way.
 packages = ["biousd"]
 package-dir = { biousd = "." }
+
+[tool.setuptools.package-data]
+# The schema plugin is data: Plug reads plugInfo.json from disk, so the
+# wheel must carry plugin/ (and the validators plugin inside it, whose
+# __init__.py is imported by Plug, not as a subpackage), the generated
+# schema.usda, the two vendored usdGenSchema inputs, the examples and the
+# documents a user is told to read. Verified by listing a built wheel.
+biousd = [
+    "schema.usda",
+    "plugin/*",
+    "plugin/biousdValidators/*",
+    "vendor/openusd/*",
+    "vendor/openusd/*/*",
+    "examples/*",
+    "README.md", "SPEC.md", "LICENSE", "NOTICE", "CITATION.cff",
+]

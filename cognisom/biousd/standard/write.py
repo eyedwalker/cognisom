@@ -11,6 +11,13 @@ Cells may be objects or mappings. Fields read, each defensively:
 ``position`` (3, um), ``cell_id``, ``cell_type``, ``ontology_term``,
 ``phase``, ``age``, ``alive``, ``volume``, ``scale_um`` (the diameter,
 um) and optionally ``color`` (3, 0-1).
+
+Since 0.2.0 the instancer also applies the ``BioCellAPI`` schema and the
+default prim carries UsdProfiles claims, both authored as plain metadata
+that needs no plugin to write (:mod:`.api_schema`, :mod:`.profiles`).
+Every primvar is still authored with its type and ``varying``
+interpolation explicitly, so a reader without the plugin sees exactly
+the file a 0.1 writer produced plus two metadata entries it ignores.
 """
 
 from __future__ import annotations
@@ -20,6 +27,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 
+from .api_schema import apply_api
+from .profiles import write_claims
 from .vocabulary import (
     CELL_PHASES, CELL_PRIMVARS, CELL_TYPES, METERS_PER_UNIT, VERSION, is_curie)
 
@@ -35,6 +44,10 @@ class WriteReport:
     #: Ontology terms that were not well-formed CURIEs and were written
     #: as empty instead, by original value.
     rejected_terms: List[str] = field(default_factory=list)
+    #: ``BioCellAPI`` was applied to the instancer.
+    api_applied: bool = False
+    #: The prim the UsdProfiles claims were written to (the default prim).
+    claims_prim: Optional[str] = None
 
 
 def _get(cell: Any, name: str, default: Any = None) -> Any:
@@ -143,6 +156,13 @@ def write_cells(path: str, cells: Iterable[Any], *,
     if n and all(col is not None for col in colours):
         api.CreatePrimvar("displayColor", Sdf.ValueTypeNames.Color3fArray, varying).Set(
             Vt.Vec3fArray.FromNumpy(np.array(colours, dtype="float32").reshape(n, 3)))
+
+    # The schema is applied AFTER the primvars are authored with their
+    # explicit interpolation, so a reader without the plugin sees no
+    # difference; and the claims say what the stage uses: cells always,
+    # ontology terms when at least one cell asserts one.
+    report.api_applied = apply_api(instancer.GetPrim())
+    report.claims_prim = write_claims(stage, ontology=any(terms))
 
     stage.GetRootLayer().Save()
     return report

@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use Bio-USD, please cite it as below and name the version you wrote to."
 title: "Bio-USD: a convention for biological cells on OpenUSD"
-version: 0.1.2
-date-released: 2026-10-23
+version: 0.2.0
+date-released: 2026-10-27
 license: Apache-2.0
 doi: 10.5281/zenodo.23603569
 identifiers:
@@ -11,7 +11,7 @@ identifiers:
     description: "Concept DOI: resolves to the latest archived version."
   - type: doi
     value: 10.5281/zenodo.23603570
-    description: "Version DOI for 0.1.2."
+    description: "Version DOI for 0.1.2 (0.2.0 receives its own when archived)."
 type: software
 authors:
   - family-names: Walker
@@ -22,7 +22,9 @@ abstract: >-
   A convention for carrying a population of biological cells in an OpenUSD
   stage as a PointInstancer with per-instance primvars, including a Cell
   Ontology / NCI Thesaurus term per cell for interoperability with
-  single-cell atlases. Adds no prim types; any OpenUSD tool reads it.
+  single-cell atlases. Adds no prim types; any OpenUSD tool reads it. An
+  optional codeless API schema (BioCellAPI) declares the primvars to tools
+  that load its plugin, and a validator checks conformance.
 keywords:
   - OpenUSD
   - Cell Ontology

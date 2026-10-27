@@ -30,6 +30,13 @@ cellxgene-census>=1.0.0
 # Testing
 pytest>=7.3.0
 pytest-cov>=4.1.0
+# tests/test_biousd_is_publishable.py builds the biousd wheel with
+# `pip wheel --no-build-isolation`, so the build backend comes from THIS
+# environment: setuptools >= 70.1 builds a wheel without the `wheel`
+# package (the local venv passes on 84.0 with no `wheel` installed).
+# actions/setup-python ships an older bundled setuptools, and nothing
+# else here pins it, so every CI job that runs the suite needs this line.
+setuptools>=70.1
 # Hung tests otherwise block the whole run indefinitely. pytest-timeout
 # was removed in commit 57a1cbb to unblock CI; the timeout in pytest.ini
 # is the safer version of that fix.

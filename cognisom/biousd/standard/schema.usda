@@ -1,0 +1,61 @@
+#usda 1.0
+(
+    "Bio-USD 0.2.0: codeless applied API schema. GENERATED from vocabulary.py by biousd.api_schema.render_schema_usda; do not edit."
+    subLayers = [
+        @usd/schema.usda@
+    ]
+)
+
+over "GLOBAL" (
+    customData = {
+        string libraryName = "bioUsd"
+        bool skipCodeGeneration = true
+        bool useLiteralIdentifier = true
+    }
+)
+{
+}
+
+class "BioCellAPI" (
+    inherits = </APISchemaBase>
+    doc = """A population of biological cells carried by a PointInstancer (Bio-USD 0.2.0). Each instance is one cell, and the properties declared here are the convention's per-cell primvars, one value per instance (interpolation 'varying'). Required for conformance: primvars:bio:cell:id, primvars:bio:cell:type. The convention also requires stage metersPerUnit = 1e-06 and a 'bio:version' entry in the root layer's customLayerData; a schema cannot express those, so the biousd validator still checks them. Generated from vocabulary.py; do not edit."""
+    customData = {
+        token apiSchemaType = "singleApply"
+        token[] apiSchemaCanOnlyApplyTo = ["PointInstancer"]
+        dictionary extraPlugInfo = {
+            string[] impliesCapabilities = ["biousd.cells"]
+        }
+    }
+)
+{
+    int[] primvars:bio:cell:id (
+        doc = """Stable identifier, unique within the stage. Required for Bio-USD conformance."""
+        interpolation = "varying"
+    )
+    token[] primvars:bio:cell:type (
+        allowedTokens = ["normal", "cancer", "immune", "stromal", "endothelial", "basal", "luminal", "neuroendocrine", "stem", "fibroblast"]
+        doc = """Coarse lineage, for a consumer that has only the token. Required for Bio-USD conformance."""
+        interpolation = "varying"
+    )
+    token[] primvars:bio:cell:ontologyTerm (
+        doc = """Cell Ontology (CL) or NCI Thesaurus (NCIT) CURIE naming the cell's identity; empty when not asserted. A CURIE matching ^(CL|NCIT):[0-9A-Za-z]+$, or the empty string. Optional; when present it must have this type and one value per instance."""
+        interpolation = "varying"
+    )
+    token[] primvars:bio:cell:phase (
+        allowedTokens = ["G0", "G1", "S", "G2", "M"]
+        doc = """Cell-cycle phase. Optional; when present it must have this type and one value per instance."""
+        interpolation = "varying"
+    )
+    float[] primvars:bio:cell:age (
+        doc = """Time since the cell's last division. Units: h. Minimum 0. Optional; when present it must have this type and one value per instance."""
+        interpolation = "varying"
+    )
+    bool[] primvars:bio:cell:alive (
+        doc = """Viability. A dead cell may be kept in the stage for an animation; a consumer that counts cells should check it. Optional; when present it must have this type and one value per instance."""
+        interpolation = "varying"
+    )
+    float[] primvars:bio:cell:volume (
+        doc = """Volume relative to the type's resting volume (1.0 = resting). The instance scale carries the absolute diameter in um. Minimum 0. Optional; when present it must have this type and one value per instance."""
+        interpolation = "varying"
+    )
+}

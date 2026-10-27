@@ -15,6 +15,7 @@ must therefore import nothing from Cognisom.
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
 import re
 import subprocess
@@ -86,7 +87,13 @@ def test_one_version_everywhere():
     assert f'version = "{VERSION}"' in (PKG / "pyproject.toml").read_text()
     assert f"version: {VERSION}" in (PKG / "CITATION.cff").read_text()
     assert f"Bio-USD {VERSION}" in (PKG / "SPEC.md").read_text()
-    assert VERSION in (PKG / "README.md").read_text()
+    assert f"v{VERSION}" in (PKG / "README.md").read_text()
+    assert f"**{VERSION}**" in (PKG / "README.md").read_text(), "no Changes entry"
+    assert f"Bio-USD {VERSION}" in (PKG / "schema.usda").read_text()
+    assert f"(Bio-USD {VERSION})" in (PKG / "plugin" / "generatedSchema.usda").read_text()
+    for name in ("minimal_200_cells.usda", "tissue_slab_10k_cells.usdc",
+                 "coloured_by_age_2k_cells.usdc"):
+        assert biousd.read_stage(str(PKG / "examples" / name)).layer_data["bio:version"] == VERSION
 
 
 def test_the_spec_is_rendered_from_the_vocabulary():
@@ -212,6 +219,22 @@ def test_the_readable_example_is_readable():
     assert '"bio:version"' in text
 
 
+def test_the_readme_example_conforms(tmp_path):
+    """The README's own usda block, saved verbatim, must conform and pass
+    biousd-check: a reader who copies it got DOES NOT CONFORM before (no
+    prototypes relationship behind protoIndices, and an ontologyTerm
+    line without its interpolation)."""
+    text = (PKG / "README.md").read_text()
+    match = re.search(r"```\n(#usda 1\.0\n.*?)```", text, re.S)
+    assert match, "the README has lost its usda example"
+    path = tmp_path / "readme.usda"
+    path.write_text(match.group(1))
+    report = biousd.validate(str(path))
+    assert report.ok, report.describe()
+    assert report.populations == 1 and report.cells == 2
+    assert biousd.check_file(str(path)).status == 0
+
+
 # ── Cognisom's own writer and schema agree with the standard ────────
 
 
@@ -275,3 +298,112 @@ def test_cognisoms_ontology_module_is_the_same_map():
     assert ontology.curie_for("Regulatory T cell") == ontology.curie_for(
         "Regulatory T cell (Treg)")
     assert ontology.curie_for("no such cell") is None
+
+
+# ── the extraction, rehearsed ───────────────────────────────────────
+
+
+def _copy_package(tmp_path) -> pathlib.Path:
+    import shutil
+
+    dest = tmp_path / "biousd"
+    shutil.copytree(PKG, dest, ignore=shutil.ignore_patterns("__pycache__", ".DS_Store"))
+    return dest
+
+
+def test_the_package_runs_standalone_as_biousd(tmp_path):
+    """`python -I`: no PYTHONPATH, no user site, the repository nowhere on
+    sys.path. The copy must import as `biousd`, register its plugin, and
+    validate and check its own example."""
+    import json
+
+    root = _copy_package(tmp_path).parent
+    example = str(root / "biousd" / "examples" / "minimal_200_cells.usda")
+    # -I drops cwd from sys.path too (it implies -P), so the copy's parent
+    # is put there by hand; the 26.11 shadow, when present, comes in the
+    # same way because -I ignores PYTHONPATH.
+    extra = [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
+    code = f"""
+import json, sys
+sys.path[:0] = {extra!r} + [{str(root)!r}]
+import biousd
+from biousd.check import main as check_main
+from biousd.validate import main as validate_main
+print(json.dumps(dict(version=biousd.__version__, known=biousd.schema_is_known(),
+                      registered=biousd.schema_registered,
+                      plugin=biousd.plugin_path(),
+                      validate=validate_main([{example!r}]), check=check_main([{example!r}]),
+                      claims=biousd.check_claims(__import__("pxr").Usd.Stage.Open({example!r})),
+                      cognisom=[m for m in sys.modules if m.startswith("cognisom")])))
+"""
+    run = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True,
+                         cwd=str(tmp_path))
+    assert run.returncode == 0, run.stdout + run.stderr
+    out = json.loads(run.stdout.strip().splitlines()[-1])
+    assert out["version"] == VERSION and out["known"] and out["registered"]
+    assert out["plugin"] == str(root / "biousd" / "plugin")
+    assert out["validate"] == 0 and out["check"] == 0 and out["claims"] == []
+    assert out["cognisom"] == []
+    assert "CONFORMS" in run.stdout
+
+
+def test_a_wheel_ships_the_plugin_and_installs(tmp_path):
+    """pip wheel on the copy, then import from the installed wheel alone.
+
+    0.1.2's pyproject.toml could not build a wheel at all (keywords and
+    classifiers filed under optional-dependencies); this is the check
+    that was missing.
+    """
+    import json
+    import zipfile
+
+    src = _copy_package(tmp_path)
+    wheels = tmp_path / "wheels"
+    run = subprocess.run([sys.executable, "-m", "pip", "wheel", str(src), "--no-deps",
+                          "--no-build-isolation", "-w", str(wheels), "-q"],
+                         capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout + run.stderr
+    (wheel,) = list(wheels.glob("biousd-*.whl"))
+    assert f"biousd-{VERSION}-" in wheel.name
+    names = set(zipfile.ZipFile(wheel).namelist())
+    for rel in ("schema.usda", "plugin/plugInfo.json", "plugin/generatedSchema.usda",
+                "plugin/biousdValidators/__init__.py", "plugin/biousdValidators/plugInfo.json",
+                "vendor/openusd/usd/schema.usda", "vendor/openusd/codegenTemplates/plugInfo.json",
+                "vendor/openusd/LICENSE.txt", "examples/minimal_200_cells.usda",
+                "README.md", "SPEC.md", "LICENSE", "NOTICE", "CITATION.cff",
+                "check.py", "api_schema.py", "profiles.py", "validators.py", "build_plugin.py"):
+        assert f"biousd/{rel}" in names, rel
+    entry_points = next(n for n in names if n.endswith("entry_points.txt"))
+    scripts = zipfile.ZipFile(wheel).read(entry_points).decode()
+    for script in ("biousd-validate", "biousd-check", "biousd-build-plugin",
+                   "biousd-from-physicell"):
+        assert f"{script} = " in scripts
+
+    site = tmp_path / "site"
+    run = subprocess.run([sys.executable, "-m", "pip", "install", str(wheel), "--no-deps",
+                          "--target", str(site), "-q"], capture_output=True, text=True)
+    assert run.returncode == 0, run.stdout + run.stderr
+    # Inherited PYTHONPATH entries are made ABSOLUTE against this process's
+    # cwd, and the installation comes first. The subprocess runs in tmp_path,
+    # which holds the source copy this wheel was built from, so a relative
+    # entry -- `PYTHONPATH=.`, which is how the full suite runs -- resolved
+    # to tmp_path and `import biousd` returned the copy, not the wheel. The
+    # test then proved nothing about the installation and said so by
+    # failing on the path assertion below.
+    extra = [os.path.abspath(p)
+             for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
+    code = f"""
+import json, os, sys
+sys.path[:0] = [{str(site)!r}] + {extra!r}
+import biousd
+example = os.path.join(os.path.dirname(biousd.__file__), "examples", "minimal_200_cells.usda")
+print(json.dumps(dict(file=biousd.__file__, known=biousd.schema_is_known(),
+                      plugin_exists=os.path.isfile(os.path.join(biousd.plugin_path(), "plugInfo.json")),
+                      status=biousd.check_file(example).status)))
+"""
+    run = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True,
+                         cwd=str(tmp_path))
+    assert run.returncode == 0, run.stdout + run.stderr
+    out = json.loads(run.stdout.strip().splitlines()[-1])
+    assert out["file"].startswith(str(site)) and out["known"] and out["plugin_exists"]
+    assert out["status"] == 0
