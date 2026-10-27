@@ -44,7 +44,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 log = logging.getLogger(__name__)
 
 #: Micrometres, matching the cell-scale exporters in this package
-#: (``exporters``, ``usd_animation``). ``molecular_usd`` uses 1e-10 for
+#: (``exporters``, ``run_usd``). ``molecular_usd`` uses 1e-10 for
 #: angstroms, so the two cannot share a stage without a scaled reference.
 METERS_PER_UNIT = 1e-6
 

@@ -74,10 +74,12 @@ def written(tmp_path_factory):
 
 def test_openusd_opens_what_was_written(written):
     """The text path's output once did not parse at all."""
-    _result, stage = written
+    result, stage = written
     assert stage is not None
     assert stage.GetDefaultPrim().IsValid()
     assert UsdGeom.GetStageMetersPerUnit(stage) == pytest.approx(1e-6)
+    # every cell here brought its own scale_um, so nothing was sized by the library
+    assert result.sized_by_cell == result.cells and not result.sizes
 
 
 def test_the_prim_count_does_not_follow_the_population(tmp_path):
@@ -156,6 +158,42 @@ def test_an_unknown_cell_gets_no_term_rather_than_a_near_one(tmp_path):
     stage = Usd.Stage.Open(result.path)
     api = UsdGeom.PrimvarsAPI(stage.GetPrimAtPath(CELLS))
     assert list(api.GetPrimvar("bio:cell:ontologyTerm").Get()) == [""]
+
+
+@pytest.mark.parametrize("ctype", [CellType.CANCER, CellType.FIBROBLAST, CellType.NORMAL])
+def test_a_typed_cell_with_no_mesh_and_no_size_is_drawn_from_the_library(tmp_path, ctype):
+    """A BioCell carries a type and neither a mesh_type nor a scale_um --
+    the dataclass has no such fields -- which is every cell through sync
+    and write_scene. Shape AND size come from the lineage resolver, with
+    the library's source on the result (the shape did; the size was a
+    silent 10 um). A state token keeps the sphere and the labelled
+    default: 'normal' is one here, being also the default for an untyped
+    cell, and the default bucket must not wear a lineage's shape or size.
+    """
+    from cognisom.biousd.usd_writer import DEFAULT_DIAMETER_UM
+    from cognisom.visualization.lineage_appearance import appearance_for
+
+    cell = BioCell(cell_id=7, position=(1.0, 2.0, 3.0), cell_type=ctype)
+    assert not hasattr(cell, "mesh_type") and not hasattr(cell, "scale_um")
+    result = write_cells(str(tmp_path / f"{ctype.value}.usdc"), [cell])
+    stage = Usd.Stage.Open(result.path)          # kept: a prim outlives no stage
+    instancer = UsdGeom.PointInstancer(stage.GetPrimAtPath(CELLS))
+    target = instancer.GetPrototypesRel().GetTargets()[instancer.GetProtoIndicesAttr().Get()[0]]
+    prototype = str(target).rsplit("/", 1)[-1]
+    diameter = instancer.GetScalesAttr().Get()[0][0]
+    record = result.sizes[ctype.value]
+    assert record["cells"] == 1 and result.sized_by_cell == 0
+    if ctype is CellType.NORMAL:
+        assert prototype == "smooth_sphere"
+        assert diameter == pytest.approx(DEFAULT_DIAMETER_UM)
+        assert record["size_source"].startswith("estimate:") and not record["cited"]
+    else:
+        app = appearance_for(ctype.value)
+        assert prototype == app.mesh_type != "smooth_sphere"
+        assert diameter == pytest.approx(app.diameter_um)
+        assert record["size_source"] == app.size_source
+        assert record["cited"] == app.cited
+    assert "sized from the library" in result.describe()
 
 
 def test_colour_is_authored_so_a_dense_scene_is_not_a_white_mass(written):

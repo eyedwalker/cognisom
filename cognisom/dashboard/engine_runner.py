@@ -372,6 +372,15 @@ class CellSnapshot:
     # animation built on row order teleports the infiltrate between
     # frames. ImmuneModule has had cell_id on every cell all along.
     immune_ids: list = field(default_factory=list)
+    # M1/M2 polarization per immune cell, in immune_ids order:
+    # ImmuneCell.polarization in [-1, +1] (-1 = M1, +1 = M2), and 0.0 for
+    # every non-macrophage. Recorded so the run exporter can draw an M1
+    # and an M2 macrophage as the two library entities they are, on the
+    # frame a cell crosses the +/-0.3 label cutoff, rather than one shape
+    # for the whole lineage for the whole run. Macrophages are seeded
+    # per cell as M1 / M0 / M2 from a cohort mix, so a Baseline run has
+    # all three from frame 0.
+    immune_polarization: list = field(default_factory=list)
 
     capillary_starts: list = field(default_factory=list)   # list of (x,y,z)
     capillary_ends: list = field(default_factory=list)
@@ -946,6 +955,10 @@ class EngineRunner:
                 snap.immune_types = [ic.cell_type for ic in active]
                 snap.immune_activated = [ic.activated for ic in active]
                 snap.immune_ids = [ic.cell_id for ic in active]
+                snap.immune_polarization = [
+                    float(getattr(ic, 'polarization', 0.0))
+                    if ic.cell_type == 'macrophage' else 0.0
+                    for ic in active]
 
         # Capillaries
         vascular = mods.get("vascular")

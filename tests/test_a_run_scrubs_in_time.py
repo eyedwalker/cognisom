@@ -71,6 +71,28 @@ def test_the_recorder_is_cleared_when_a_run_restarts():
         "a second run must not carry the first run's events")
 
 
+def test_a_caller_that_drives_the_engine_itself_can_record():
+    """SimulationEngine.run() records nothing on its own -- that is why a
+    6 h run through cognisom/scenarios/ produces no frames. It takes the
+    callback TissueEngine.run always had, and the runner's recorder is
+    the thing to pass. (This was the only test of run(callback=...) and
+    it lived in the parallel exporter's test file, which went with it.)"""
+    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
+    np.random.seed(12345)
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=1.0, scenario="Baseline",
+                          snapshot_interval_hours=0.2)
+    with redirect_stdout(io.StringIO()):
+        runner.build()
+        runner.engine.run(duration=0.5)
+    assert runner.cell_snapshots == []        # the engine records nothing
+
+    with redirect_stdout(io.StringIO()):
+        runner.engine.run(duration=0.5, callback=runner.record_cell_snapshot)
+    times = [s.time for s in runner.cell_snapshots]
+    assert len(times) >= 2, times
+    assert times[-1] > times[0]
+
+
 # ── the cells are where the snapshots say, when they say ───────────
 
 

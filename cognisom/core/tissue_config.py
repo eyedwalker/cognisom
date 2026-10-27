@@ -535,6 +535,20 @@ class TissueScaleConfig:
         evidence. An archetype already in archetype_radius_um keeps its
         value: explicit config outranks the library. Fails soft -- with no
         library the config is unchanged and says so. Returns self.
+
+        These radii are the engine's physics -- the contact range, the
+        mechanics bucket, daughter placement and volume exclusion -- so a
+        sourcing pass that writes a MEASURED radius resizes the simulated
+        cell, not only the drawn one. As the library stands (2026-10-27)
+        that is the macrophage at 10.6 um (PMID:9400735) and, since
+        ``seed_cell_size``, cancer_epithelial 5.35 um (a circulating
+        tumour cell, PMID:23626725; the record calls it a probable
+        underestimate of the in-situ cell), t_cell 5.65 um (a 72 h
+        CD3/CD28 blast, PMID:39273504) and nk_cell 4.15 um (IL-2-cultured,
+        PMID:21103395), each in place of the 5.0 um fallback. The resolver
+        does not read the row's ``diameter_convention``: a suspension
+        measurement sizes the in-situ archetype until a tissue-section
+        measurement replaces it, and the source string names the paper.
         """
         if resolver is None:
             try:

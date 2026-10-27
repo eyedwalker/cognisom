@@ -111,6 +111,15 @@ class WriteResult:
     #: Cells whose identity has no ontology term, by library name.
     unmapped: List[str] = field(default_factory=list)
     primvars: List[str] = field(default_factory=list)
+    #: cell_type token -> what the cells WITHOUT their own ``scale_um``
+    #: were drawn at: ``diameter_um``, ``size_source`` (the library's
+    #: ``radius_um <citation>`` or an ``estimate: ...``), ``cited`` and
+    #: ``cells``. The record the run exporter keeps as
+    #: ``RunWriteReport.appearance``; a BioCell has no size of its own,
+    #: so this is where every cell through sync and write_scene lands.
+    sizes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    #: Cells drawn at the ``scale_um`` they carried.
+    sized_by_cell: int = 0
 
     def describe(self) -> str:
         size = self.bytes_written / 1048576
@@ -137,6 +146,14 @@ class WriteResult:
             text += f"; coloured by {self.colour_by} [{lo:g}, {hi:g}]"
         elif self.colour_skipped:
             text += f"; colour-by skipped: {self.colour_skipped}"
+        if self.sizes:
+            text += "; sized from the library: " + ", ".join(
+                f"{token} {rec['diameter_um']:.1f} um "
+                f"({rec['size_source'].split(' ', 1)[1] if rec['cited'] else 'est'}) "
+                f"x{rec['cells']:,}"
+                for token, rec in sorted(self.sizes.items()))
+        if self.sized_by_cell and self.sizes:
+            text += f"; {self.sized_by_cell:,} at their own scale_um"
         return text
 
 
@@ -146,6 +163,72 @@ def _mesh_type_of(cell: Any) -> Optional[str]:
         if value:
             return str(value)
     return None
+
+
+def _resolved_mesh_of(cell: Any) -> str:
+    """The prototype a cell instances: its own ``mesh_type`` if it carries
+    one, else the library shape its ``cell_type`` token resolves to, else
+    a smooth sphere.
+
+    The middle step is what :mod:`cognisom.biousd.sync` and
+    :func:`write_scene` were missing. A ``BioCell`` carries a type and
+    no mesh, so every cancer cell those paths wrote was a smooth sphere
+    while the same cell in a run export was the library's
+    irregular_ruffled epithelium. The resolver is
+    :func:`~cognisom.visualization.lineage_appearance.mesh_type_for_cell_token`,
+    which answers ``None`` for a state token -- and ``normal`` is one
+    there, because it is also this writer's default for an untyped cell
+    (:func:`_token_of`), and the default bucket must not wear a lineage's
+    shape.
+    """
+    explicit = _mesh_type_of(cell)
+    if explicit:
+        return explicit
+    token = getattr(cell, "cell_type", None)
+    if token is not None:
+        from cognisom.visualization.lineage_appearance import mesh_type_for_cell_token
+        resolved = mesh_type_for_cell_token(token)
+        if resolved:
+            return resolved
+    return "smooth_sphere"
+
+
+#: Diameter for a cell that carries no ``scale_um`` and whose type the
+#: library cannot size: a state token, or one with no row. This was the
+#: writer's silent constant for EVERY cell without a scale_um -- which
+#: is every BioCell, the dataclass having no such field -- so a cancer
+#: cell through sync or write_scene was the library's shape at a made-up
+#: size. It is now the last resort, and the result says so.
+DEFAULT_DIAMETER_UM = 10.0
+
+#: ``size_source`` for a cell drawn at its own ``scale_um``.
+EXPLICIT_SIZE = "scale_um on the cell"
+
+
+def _resolved_diameter_of(cell: Any) -> Tuple[float, str]:
+    """The diameter a cell is drawn at and where it came from: its own
+    ``scale_um`` if it carries one; else the library's size for its
+    ``cell_type`` token, with the library's source, which is what the
+    run exporter draws the same lineage at; else
+    :data:`DEFAULT_DIAMETER_UM`, labelled an estimate.
+
+    The size half of :func:`_resolved_mesh_of`, and with the same rule
+    for a state token: ``normal`` is this writer's default for an
+    untyped cell, so it takes the default size as it takes the sphere,
+    rather than the luminal cell's 15 um.
+    """
+    explicit = getattr(cell, "scale_um", None)
+    if explicit:
+        return float(explicit), EXPLICIT_SIZE
+    token = getattr(cell, "cell_type", None)
+    if token is not None:
+        from cognisom.visualization.lineage_appearance import diameter_for_cell_token
+        resolved = diameter_for_cell_token(token)
+        if resolved is not None:
+            return float(resolved[0]), str(resolved[1])
+    return DEFAULT_DIAMETER_UM, (
+        f"estimate: {DEFAULT_DIAMETER_UM:g} um default (no scale_um on the "
+        "cell and no library size for its type)")
 
 
 def _name_of(cell: Any) -> Optional[str]:
@@ -446,14 +529,15 @@ def write_cells(path: str, cells: Sequence[Any], *,
     # that protoIndices mean the same thing across two writes of the same
     # population.
     material = author_cell_material(stage)
-    types = sorted({_mesh_type_of(c) or "smooth_sphere" for c in cells})
+    mesh_of = [_resolved_mesh_of(c) for c in cells]
+    types = sorted(set(mesh_of))
 
     positions = np.array([tuple(getattr(c, "position", (0.0, 0.0, 0.0)))
                           for c in cells], dtype="float32")
     # Volume is a multiplier on the prototype, which is authored at unit
     # diameter, so the instance scale IS the cell's size in micrometres.
-    diameters = np.array([float(getattr(c, "scale_um", 0) or 10.0)
-                          for c in cells], dtype="float32")
+    sized = [_resolved_diameter_of(c) for c in cells]
+    diameters = np.array([d for d, _ in sized], dtype="float32")
     volume = np.array([float(getattr(c, "volume", 1.0) or 1.0)
                        for c in cells], dtype="float32")
     # The camera's eye point, needed before the prototypes because LOD
@@ -461,7 +545,6 @@ def write_cells(path: str, cells: Sequence[Any], *,
     half = float(np.abs(positions).max()) + float(diameters.max())
     eye_np = half * np.asarray(CAMERA_DIRECTION, dtype=float)
 
-    mesh_of = [_mesh_type_of(c) or "smooth_sphere" for c in cells]
     if geometry and lod:
         # Level of detail without a second instancer. A PointInstancer
         # can target any number of prototypes, so the far tier is just
@@ -625,6 +708,18 @@ def write_cells(path: str, cells: Sequence[Any], *,
     primvar("bio:cell:ontologyTerm", Sdf.ValueTypeNames.TokenArray,
             Vt.TokenArray(terms))
     result.unmapped = sorted(missing)
+
+    # What size each cell was drawn at and why, for the cells that did
+    # not bring their own: the library's record, by type token.
+    from cognisom.visualization.lineage_appearance import is_citation
+    for cell, (diameter, source) in zip(cells, sized):
+        if source == EXPLICIT_SIZE:
+            result.sized_by_cell += 1
+            continue
+        record = result.sizes.setdefault(_token_of(cell), {
+            "diameter_um": float(diameter), "size_source": source,
+            "cited": is_citation(source), "cells": 0})
+        record["cells"] += 1
 
     # A dense population occludes its own subject -- of 20,000 cells,
     # 15,200 stroma hide the 2,378 that carry the biology. invisibleIds

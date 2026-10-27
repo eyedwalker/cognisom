@@ -7,8 +7,9 @@ same literal, and no archetype could have its own size. Now:
 
 - ``cell_radius_um`` is the radius of any archetype without its own;
 - ``archetype_radius_um`` holds the rest, filled from the entity library by
-  ``resolve_radii_from_library`` where the value is evidence -- today the
-  macrophage's measured 10.6 um (PMID:9400735) -- and carried in the config
+  ``resolve_radii_from_library`` where the value is evidence -- first the
+  macrophage's measured 10.6 um (PMID:9400735), since seed_cell_size also
+  the cancer cell, the T cell and the NK cell -- and carried in the config
   JSON so a remote run sees the same sizes;
 - a ghost carries its real radius;
 - the mechanics bucket is sized to the largest cell. At the old fixed 15 um
@@ -88,14 +89,33 @@ def shipped_store():
 
 # ── the default is unchanged, and the config radius is live ─────────────
 
+def _evidenced():
+    """archetype -> measured radius, as the library answers today.
+
+    The macrophage was the only one for a while; seed_cell_size added the
+    cancer cell, the T cell and the NK cell. Read from the library rather
+    than listed here, so the next curation pass lands without touching
+    this file; what is asserted is that whatever is NOT evidenced falls
+    back, and that the macrophage is still among the evidenced.
+    """
+    cfg = _cfg().resolve_radii_from_library()
+    assert cfg.archetype_radius_um["macrophage"] == pytest.approx(MACROPHAGE_UM)
+    return dict(cfg.archetype_radius_um)
+
+
 def test_a_default_configuration_gives_five_microns_to_all_but_the_evidenced():
     """It used to give 5.0 to every archetype including the macrophage,
     because nothing resolved the library outside the dashboard. The
-    engine resolves now, so the one archetype with a measured radius
-    gets it and everything else still falls back."""
+    engine resolves now, so every archetype with a measured radius gets
+    it and everything else still falls back."""
+    evidenced = _evidenced()
+    assert set(evidenced) < set(_cfg().initial_composition), (
+        "every archetype is evidenced; the fallback is no longer exercised")
     eng = _engine(_cfg())
     radii = {r for rs in _radii_by_type(eng).values() for r in rs}
-    assert radii == {5.0, MACROPHAGE_UM}
+    assert radii == {5.0} | {round(r, 4) for r in evidenced.values()}
+    assert max(evidenced.values()) == pytest.approx(MACROPHAGE_UM), (
+        "the bucket assertions below assume the macrophage is the largest cell")
 
     # And the neighbour bucket grew to match. This assertion used to read
     # `== MechanicsConfig().bucket_size_um`, i.e. the 15 um default, which
@@ -113,13 +133,16 @@ def test_a_default_configuration_gives_five_microns_to_all_but_the_evidenced():
 def test_cell_radius_um_is_read_for_every_archetype_without_evidence():
     """cell_radius_um is the fallback, not a global override: a measured
     archetype keeps its measurement."""
+    evidenced = _evidenced()
     cfg = _cfg(cell_radius_um=6.0)
     eng = _engine(cfg)
     by_type = _radii_by_type(eng)
     names = list(cfg.initial_composition)
     for index, radii in by_type.items():
-        expected = (MACROPHAGE_UM if names[index] == "macrophage" else 6.0)
+        expected = round(evidenced.get(names[index], 6.0), 4)
         assert radii == {expected}, names[index]
+    assert by_type[names.index("macrophage")] == {MACROPHAGE_UM}
+    assert any(radii == {6.0} for radii in by_type.values()), "no archetype fell back"
 
 
 # ── the library ─────────────────────────────────────────────────────────

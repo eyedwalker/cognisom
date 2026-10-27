@@ -22,52 +22,15 @@ cut away the stroma that hides the subject.
 
 from __future__ import annotations
 
-import contextlib
 import functools
-import io
 from typing import Any, Dict, Mapping, Optional, Sequence
 
-#: Composer prototype name -> the cell library's own name for it.
-#:
-#: This is what turns an exported scene from one sphere prototype into
-#: real cell shapes. The composer's prototype library knows three
-#: geometries -- sphere, capsule, ellipsoid -- while the cell library
-#: carries a built morphology per entity, so going through the name
-#: gets a neutrophil its multilobed nucleus and a dendritic cell its
-#: branches:
-#:
-#:     tumor_cell      -> irregular_ruffled      macrophage_m1 -> ruffled_pseudopod
-#:     neutrophil      -> multilobed_granular    macrophage_m2 -> elongated_spindle
-#:     dendritic_cell  -> stellate_branching     nk_cell       -> granular_sphere
-#:     plasma_cell     -> eccentric_nucleus_er   mast_cell     -> dense_granular
-#:     endothelial_cell-> flat_squamous
-#:
-#: Generic prototypes (``immune_cell``, ``white_blood_cell``,
-#: ``generic_cell``) are deliberately absent. They name no lineage, so
-#: there is no entity to point at, and they fall back to a sphere --
-#: which is what they are.
-LIBRARY_ENTITY_FOR_PROTOTYPE: Dict[str, str] = {
-    "tumor_cell": "Prostatic adenocarcinoma cell",
-    "t_cell_cd4": "CD4+ T cell",
-    "t_cell_cd8": "CD8+ T cell",
-    "b_cell": "Naive B cell",
-    "plasma_cell": "Plasma cell",
-    "nk_cell": "NK cell",
-    "macrophage_m1": "Macrophage M1",
-    "macrophage_m2": "Macrophage M2",
-    "mast_cell": "Mast cell",
-    "neutrophil": "Neutrophil",
-    "dendritic_cell": "Conventional dendritic cell (cDC)",
-    "endothelial_cell": "Endothelial cell",
-}
-
-
-@functools.lru_cache(maxsize=1)
-def _store():
-    """One store, opened quietly; this would run once per cell otherwise."""
-    from cognisom.library.store import EntityStore
-    with contextlib.redirect_stdout(io.StringIO()):
-        return EntityStore()
+#: Composer prototype name -> the cell library's own name for it. The
+#: table lives in :mod:`cognisom.visualization.lineage_appearance`, the
+#: one place that says what a cell of a given lineage looks like, and is
+#: re-exported here where the composer's callers have always found it.
+from cognisom.visualization.lineage_appearance import (  # noqa: F401
+    LIBRARY_ENTITY_FOR_PROTOTYPE, appearance_for)
 
 
 @functools.lru_cache(maxsize=256)
@@ -75,16 +38,13 @@ def mesh_type_for_prototype(proto_name: str) -> Optional[str]:
     """The library's mesh for a composer prototype, or ``None``.
 
     ``None`` rather than a sphere, so the caller can tell "this entity
-    has no shape in the library" from "this entity is round".
+    has no shape in the library" from "this entity is round". Only names
+    in :data:`LIBRARY_ENTITY_FOR_PROTOTYPE` resolve: a generic
+    ``immune_cell`` or a ``mitochondrion`` names no cell lineage.
     """
-    entity_name = LIBRARY_ENTITY_FOR_PROTOTYPE.get(str(proto_name).lower())
-    if entity_name is None:
+    if str(proto_name).lower() not in LIBRARY_ENTITY_FOR_PROTOTYPE:
         return None
-    try:
-        entity = _store().find_entity_by_name(entity_name)
-    except Exception:                       # pragma: no cover - no library
-        return None
-    return getattr(entity, "mesh_type", None) if entity is not None else None
+    return appearance_for(proto_name).mesh_type
 
 #: Composer prototype name -> Bio-USD cell-type token.
 #:

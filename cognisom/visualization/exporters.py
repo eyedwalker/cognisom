@@ -8,7 +8,6 @@ PDB (protein/cell coordinates), glTF (3D meshes), and VTK
 visualization tools (PyMOL, Blender, ParaView).
 """
 
-import functools
 import json
 import struct
 import base64
@@ -175,57 +174,30 @@ def cell_state_name(cell) -> str:
 
 
 #: The exporter's cell_type vocabulary is not the library's. Five names
-#: overlap outright; these are the rest that have a real shape behind
-#: them. The remainder -- normal, dead, dividing, differentiated,
+#: overlap outright; the alias table maps the rest that have a real shape
+#: behind them. The remainder -- normal, dead, dividing, differentiated,
 #: progenitor -- are STATES wearing a type's clothing, and a state has no
 #: morphology, so they get a sphere and are counted as unresolved rather
-#: than drawn as whatever cell sorts first.
-CELL_TYPE_MESH_ALIASES = {
-    "cancer": "cancer_epithelial",
-    "stem": "cancer_epithelial",
-    "immune": "t_cell",
-}
-
-#: What an unresolved cell instances. Named so a reader of the stage can
-#: see which cells the library had no shape for.
-UNRESOLVED_PROTOTYPE = "unresolved_sphere"
+#: than drawn as whatever cell sorts first. The tables and the resolver
+#: now live in :mod:`.lineage_appearance`, which is also what the run
+#: exporter and the Bio-USD writer draw from; they are re-exported here
+#: because this is where callers and tests have always found them.
+from .lineage_appearance import (  # noqa: E402,F401
+    CELL_TYPE_MESH_ALIASES, STATE_TOKENS, UNRESOLVED_PROTOTYPE,
+    mesh_type_for_cell_token)
 
 
 def cell_mesh_type(cell) -> Optional[str]:
     """The library mesh_type for a cell, or ``None`` if it has no shape.
 
-    Goes through ``ARCHETYPE_ENTITY``, which is the same route
-    ``cell_scene`` takes to draw a library card, so a macrophage in a
-    population export and a macrophage on its card are one object.
+    Delegates to :func:`~.lineage_appearance.mesh_type_for_cell_token`,
+    which goes through ``ARCHETYPE_ENTITY`` -- the same route
+    ``cell_scene`` takes to draw a library card -- so a macrophage in a
+    population export and a macrophage on its card are one object. A
+    state token (``normal`` among them, here: it is also this exporter's
+    default for an untyped cell) resolves to ``None``.
     """
-    raw = _cell_field(cell, "cell_type", None)
-    key = str(raw).lower() if raw is not None else ""
-    key = CELL_TYPE_MESH_ALIASES.get(key, key)
-    try:
-        from cognisom.core.tissue_config import ARCHETYPE_ENTITY
-        from cognisom.library.store import EntityStore
-    except Exception:                                    # pragma: no cover
-        return None
-    entry = ARCHETYPE_ENTITY.get(key)
-    if entry is None:
-        return None
-    name, _etype = entry
-    try:
-        entity = _mesh_type_store().find_entity_by_name(name)
-    except Exception:                                    # pragma: no cover
-        return None
-    return getattr(entity, "mesh_type", None) if entity is not None else None
-
-
-@functools.lru_cache(maxsize=1)
-def _mesh_type_store():
-    """One store, opened quietly; this runs once per cell otherwise."""
-    import contextlib
-    import io
-
-    from cognisom.library.store import EntityStore
-    with contextlib.redirect_stdout(io.StringIO()):
-        return EntityStore()
+    return mesh_type_for_cell_token(_cell_field(cell, "cell_type", None))
 
 
 def cell_display_color(cell):

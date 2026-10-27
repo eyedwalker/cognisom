@@ -155,16 +155,24 @@ def test_only_the_resting_lymphocytes_take_the_bulk_measurement(store, name):
 
 @pytest.mark.parametrize("name", [
     "CD4+ Th1 cell", "CD8+ Effector T cell", "NK cell", "Plasma cell"])
-def test_the_effector_subsets_were_left_alone(store, name):
-    """A blasting effector is not a small resting lymphocyte, so these
-    keep their placeholders. Filling them from this paper would have
-    been the easy sixteen extra values and all of them wrong."""
+def test_the_effector_subsets_did_not_take_the_bulk_measurement(store, name):
+    """A blasting effector is not a small resting lymphocyte, so none of
+    these took Downey's number. Filling them from this paper would have
+    been the easy sixteen extra values and all of them wrong. Two of the
+    four have since been sized from their own papers (seed_cell_size:
+    a CD3/CD28 blast, an IL-2-cultured NK cell); the other two are still
+    placeholders."""
     from cognisom.library.parameters import Provenance
     from cognisom.library.seed_leukocyte_size import DECLINED
 
     value = _pv(store, name, "radius_um")
-    assert value.provenance is Provenance.PLACEHOLDER
+    assert value.citation != "PMID:2272970"
     assert name in DECLINED, "left unfilled without recording why"
+    if name in ("CD4+ Th1 cell", "Plasma cell"):
+        assert value.provenance is Provenance.PLACEHOLDER
+    else:
+        assert value.provenance is Provenance.MEASURED
+        assert value.value > 3.025, "a blast is larger than the resting cell"
 
 
 def test_the_transcribed_table_reproduces_the_papers_own_text(store):
@@ -201,7 +209,9 @@ def test_an_unsourced_size_is_still_used_and_labelled(store):
     keeps drawing at scale_um, and the caption marks it an estimate."""
     from cognisom.visualization.cell_scene import resolved_scale_um, scene_for
 
-    entity = store.find_entity_by_name("NK cell")
+    # The NK cell used to be the example here; it has a measured radius
+    # now (PMID 21103395). The plasma cell is still a placeholder.
+    entity = store.find_entity_by_name("Plasma cell")
     _diameter, source = resolved_scale_um(entity)
     assert source == "scale_um (no provenance)"
     assert "(est)" in scene_for(entity).caption()

@@ -98,7 +98,13 @@ def test_the_radii_land_in_the_textbook_range(sized_entities):
             f"{name} radius {pv.value} um is outside the {lo/2}-{hi/2} um "
             f"implied by a {lo}-{hi} um diameter")
         checked += 1
-    assert checked >= 3, f"only {checked} alias-derived cell types were checked"
+    # Two left: Eosinophil and Plasma cell. The others in the table have
+    # been curated since -- the neutrophil, naive B and naive CD8 from
+    # PMID 2272970, the macrophage from PMID 9400735 and, on 2026-10-27,
+    # the NK cell from PMID 21103395 -- and a curated radius is checked
+    # against its own paper, not this table. The floor falls as the
+    # placeholders do; at zero this test has nothing left to catch.
+    assert checked >= 2, f"only {checked} alias-derived cell types were checked"
 
 
 def test_a_conversion_does_not_become_evidence(sized_entities):

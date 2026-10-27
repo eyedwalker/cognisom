@@ -133,13 +133,26 @@ def test_the_spec_says_what_it_is_not():
 
 def test_coverage_is_limited_by_cells_of_known_size(store):
     """A count needs a volume, so only cells with an evidenced radius
-    can carry one. That is the honest limit and it should be visible."""
+    can carry one. That is the honest limit and it should be visible.
+
+    It used to be visible as a skip list: receptors whose only abundance
+    was measured in a cell with no evidenced radius. On 2026-10-27 the NK
+    cell got a measured radius (PMID 21103395) and the list emptied --
+    every receptor with an abundance now has a sized cell to count in,
+    and the values measured in sorted NK cells are written instead of
+    skipped. The limit is the same set of sized cells; it now shows as
+    which cells the counts land in rather than as what was left out.
+    """
     from cognisom.library.seed_copy_numbers import seed, sized_cells
 
     volumes = sized_cells(store)
     assert len(volumes) >= 6
+    assert "NK cell" in volumes
     run = seed(store, dry_run=True)
     assert len(run.written) >= 20
-    assert run.no_sized_cell, (
-        "nothing was skipped for want of a sized cell; the limit has "
-        "moved and this test no longer measures it")
+    assert not run.no_sized_cell, (
+        f"{run.no_sized_cell} skipped for want of a sized cell: a radius "
+        "was removed, or a receptor measured only in an unsized cell added")
+    assert any("NK" in w.measured_in for w in run.written), (
+        "the abundances measured in sorted NK cells are what the NK "
+        "radius unlocked; none was written")
