@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
 # Run the USD-touching tests under both OpenUSD versions, locally.
 #
-#   scripts/usd_matrix.sh                    # usd-core 25.11 (the venv's pin), then 26.11
+#   scripts/usd_matrix.sh                    # usd-core 26.11 (the venv's pin), then 25.11
 #   scripts/usd_matrix.sh --list             # print the test files, one per line, and exit
-#   scripts/usd_matrix.sh --only 26.11       # one side only (25.11 or 26.11)
+#   scripts/usd_matrix.sh --only 25.11       # one side only (26.11 or 25.11)
 #   scripts/usd_matrix.sh -- -x -k schema    # anything after -- goes to pytest
 #
-# WHY TWO. requirements.txt pins usd-core 25.11, which production runs, and
-# the suite normally sees nothing else. Bio-USD 0.2.0 has paths that exist
-# only on newer OpenUSD -- Python registration of validators with the
-# validation framework arrived in 26.05 (PR #4015), UsdProfiles in 26.08 --
-# and on 25.11 those tests skip by name. Without a second USD they would
-# never run anywhere. The nightly workflow's `usd-26` job does the same
-# thing in CI (pip install usd-core==26.11 over the pin); the pin itself is
-# a separate decision and this script does not touch it.
+# WHY TWO. requirements.txt pins usd-core 26.11 (since 2026-10-27), which
+# production installs, and the suite normally sees nothing else. Bio-USD is
+# published for other people, some of whom are on an older OpenUSD: before
+# 26.05 (PR #4015) validators cannot be registered from Python, and before
+# 26.08 there is no UsdProfiles. The package must behave there -- reporting
+# that its checks could not be registered rather than implying they ran --
+# and only the older side exercises those guards. The nightly workflow's
+# `usd-25` job does the same in CI.
 #
-# HOW THE SECOND USD GETS IN WITHOUT A SECOND ENVIRONMENT. usd-core 26.11 is
-# installed with `pip install --no-deps --target` into a directory that
-# holds only `pxr`, and that directory is PREPENDED to PYTHONPATH, so
-# `from pxr import Usd` resolves there while numpy, scipy and everything
-# else still come from the venv. Verified: 241 USD tests pass that way,
-# and Usd.GetVersion() reports (0, 26, 11). USD_26_SITE names an existing
-# such directory; otherwise one is created under
-# ${XDG_CACHE_HOME:-$HOME/.cache}/cognisom/usd-core-26.11 (one download).
+# HOW THE SECOND USD GETS IN WITHOUT A SECOND ENVIRONMENT. The older
+# usd-core is installed with `pip install --no-deps --target` into a
+# directory that holds only `pxr`, and that directory is PREPENDED to
+# PYTHONPATH, so `from pxr import Usd` resolves there while numpy, scipy
+# and everything else still come from the venv. USD_OLD_SITE names an
+# existing such directory; otherwise one is created under
+# ${XDG_CACHE_HOME:-$HOME/.cache}/cognisom/usd-core-25.11 (one download).
 #
 # Nothing is written under the repository: pytest runs with
 # -p no:cacheprovider and the logs go to a temporary directory whose path
@@ -54,8 +53,11 @@ USD_TEST_FILES=(
     tests/test_biousd_reads_a_physicell_snapshot.py
 )
 
-USD_26_VERSION="${USD_26_VERSION:-26.11}"
-USD_26_SITE="${USD_26_SITE:-${XDG_CACHE_HOME:-$HOME/.cache}/cognisom/usd-core-$USD_26_VERSION}"
+#: The version the venv is pinned to (requirements.txt), run first.
+USD_PINNED_VERSION="${USD_PINNED_VERSION:-26.11}"
+#: The older one, fetched into its own pxr-only directory.
+USD_OLD_VERSION="${USD_OLD_VERSION:-25.11}"
+USD_OLD_SITE="${USD_OLD_SITE:-${XDG_CACHE_HOME:-$HOME/.cache}/cognisom/usd-core-$USD_OLD_VERSION}"
 if [ -z "${PYTHON:-}" ]; then
     if [ -x ./venv/bin/python ]; then PYTHON=./venv/bin/python; else PYTHON=python3; fi
 fi
@@ -77,7 +79,10 @@ while [ $# -gt 0 ]; do
             echo "usd_matrix.sh: unknown argument $1 (try --help)" >&2; exit 2 ;;
     esac
 done
-case "$only" in ""|25.11|26.11) ;; *) echo "usd_matrix.sh: --only takes 25.11 or 26.11" >&2; exit 2 ;; esac
+case "$only" in
+    ""|"$USD_PINNED_VERSION"|"$USD_OLD_VERSION") ;;
+    *) echo "usd_matrix.sh: --only takes $USD_PINNED_VERSION or $USD_OLD_VERSION" >&2; exit 2 ;;
+esac
 
 logdir="$(mktemp -d "${TMPDIR:-/tmp}/usd_matrix.XXXXXX")"
 declare -a summary=()
@@ -116,17 +121,17 @@ run_side() {
     [ "$rc" -eq 0 ] || status=1
 }
 
-if [ -z "$only" ] || [ "$only" = "25.11" ]; then
-    run_side 25.11 PYTHONPATH="${PYTHONPATH:-}"
+if [ -z "$only" ] || [ "$only" = "$USD_PINNED_VERSION" ]; then
+    run_side "$USD_PINNED_VERSION" PYTHONPATH="${PYTHONPATH:-}"
 fi
 
-if [ -z "$only" ] || [ "$only" = "26.11" ]; then
-    if [ ! -d "$USD_26_SITE/pxr" ]; then
-        echo "== installing usd-core $USD_26_VERSION into $USD_26_SITE (pxr only, one download) =="
+if [ -z "$only" ] || [ "$only" = "$USD_OLD_VERSION" ]; then
+    if [ ! -d "$USD_OLD_SITE/pxr" ]; then
+        echo "== installing usd-core $USD_OLD_VERSION into $USD_OLD_SITE (pxr only, one download) =="
         "$PYTHON" -m pip install --quiet --disable-pip-version-check --no-deps \
-            --target "$USD_26_SITE" "usd-core==$USD_26_VERSION"
+            --target "$USD_OLD_SITE" "usd-core==$USD_OLD_VERSION"
     fi
-    run_side "$USD_26_VERSION" PYTHONPATH="$USD_26_SITE${PYTHONPATH:+:$PYTHONPATH}"
+    run_side "$USD_OLD_VERSION" PYTHONPATH="$USD_OLD_SITE${PYTHONPATH:+:$PYTHONPATH}"
 fi
 
 echo

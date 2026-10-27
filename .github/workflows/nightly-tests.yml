@@ -27,17 +27,17 @@ jobs:
       - name: Run full suite (both trees, including slow tests)
         run: python -m pytest --tb=short -q --durations=20
 
-  # ── The second OpenUSD ─────────────────────────────────────────────
-  # requirements.txt pins usd-core 25.11, which production runs and which
-  # the job above tests. Bio-USD 0.2.0 has paths that exist only on newer
-  # OpenUSD: Python registration of validators with the validation
-  # framework (26.05, PR #4015) and UsdProfiles claims (26.08). On 25.11
-  # those tests skip by name, so without this job they would never run
-  # anywhere. This installs usd-core 26.11 over the pin -- the pin itself
-  # is a separate decision -- and runs only the USD-touching files, the
-  # one list scripts/usd_matrix.sh holds (it runs the same files locally
-  # under both versions). Reports, does not gate, like the job above.
-  usd-26:
+  # ── The older OpenUSD ──────────────────────────────────────────────
+  # requirements.txt pins usd-core 26.11 (since 2026-10-27), which the job
+  # above tests and which production installs. This job pins the OLD one,
+  # 25.11, because Bio-USD is published for other people to use and some of
+  # them will be on an older OpenUSD: there, registering validators from
+  # Python (26.05, PR #4015) and UsdProfiles (26.08) do not exist, and the
+  # package must say so rather than imply its checks ran. Those guards are
+  # only exercised here. Runs the USD-touching files, the one list
+  # scripts/usd_matrix.sh holds (it runs the same files locally under both
+  # versions). Reports, does not gate, like the job above.
+  usd-25:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -51,17 +51,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Install usd-core 26.11 over the 25.11 pin
+      - name: Install usd-core 25.11 under the 26.11 pin
         run: |
-          pip install usd-core==26.11
+          pip install usd-core==25.11
           python -c "
           from pxr import Usd
           v = Usd.GetVersion()
-          assert v[:2] == (0, 26), f'expected usd-core 26.x, pxr reports {v}'
+          assert v[:2] == (0, 25), f'expected usd-core 25.x, pxr reports {v}'
           print('usd-core', '.'.join(map(str, v[1:])))
           "
 
-      - name: Run the USD tests on usd-core 26.11
+      - name: Run the USD tests on usd-core 25.11
         run: |
           files="$(bash scripts/usd_matrix.sh --list)"
           test -n "$files"

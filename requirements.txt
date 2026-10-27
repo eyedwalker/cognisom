@@ -19,7 +19,21 @@ matplotlib>=3.7.0
 # pxr is absent, which collapses all 102 into four skip lines and still exits
 # 0 -- so a clean install lost the entire USD surface silently. Pinned exactly
 # because the USD tests assert on emitted .usda structure.
-usd-core==25.11
+#
+# 26.11 since 2026-10-27, up from 25.11. Two capabilities exist only on
+# newer OpenUSD and Bio-USD 0.2.0 uses both: registering validators from
+# Python, so usdchecker and usdview discover this project's checks (26.05,
+# PR #4015), and UsdProfiles, which makes a stage's profile claims
+# answerable rather than inert metadata (26.08). Verified before the bump:
+# every USD-touching test passes under 26.11 unchanged. The wheels need
+# Python >= 3.11 (production's image is python:3.11-slim) and are
+# manylinux_2_28, which both the production image (Debian bookworm,
+# glibc 2.36) and the GPU box (Ubuntu 22.04, glibc 2.35) satisfy. Isaac
+# Sim bundles its own USD and is unaffected. The nightly `usd-25` job
+# keeps the older path tested, because the package must still behave on a
+# host that ships an older USD -- there it reports that its validators
+# could not be registered rather than implying they ran.
+usd-core==26.11
 
 # Data handling
 pandas>=2.0.0

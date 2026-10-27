@@ -233,6 +233,7 @@ def _twelve_hours(preset, **immune):
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(400)   # one 12 h slab run, ~90 s alone
 def test_an_untreated_tumour_is_no_longer_cleared_in_half_a_day():
     # Measured, 12 h, seeds 1-3: Baseline 80 -> 116/114/116. Under the
     # replaced model the same runs ended at 3 (and Immunotherapy at 0).
@@ -242,6 +243,7 @@ def test_an_untreated_tumour_is_no_longer_cleared_in_half_a_day():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(400)   # one 12 h slab run, ~90 s alone
 def test_under_anti_pd1_the_t_cells_do_most_of_the_killing():
     # Measured, 12 h, seeds 1-3: T 57%, NK 28%, macrophage 16% of kills.
     # Before this file every preset's kills were 92-98% innate, and the
@@ -253,6 +255,7 @@ def test_under_anti_pd1_the_t_cells_do_most_of_the_killing():
 
 
 @pytest.mark.slow
+@pytest.mark.timeout(400)   # one 12 h slab run, ~90 s alone
 def test_the_replaced_model_still_clears_everything():
     # The sweep's anchor: the old flat 0.8 innate rate, one Bernoulli draw
     # per T-cell contact and the five-contact exhaustion count.
