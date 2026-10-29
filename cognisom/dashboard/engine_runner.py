@@ -313,6 +313,26 @@ class SimulationSnapshot:
     avg_psa: float = 0.0
     psa_total: float = 0.0
     psa_cancer_total: float = 0.0
+    # Heritable immune escape. The ratio n_escaped / n_cancer rising over
+    # a run IS the selection signal -- recording only the end state would
+    # make selection and mutation supply indistinguishable.
+    #
+    # THERE ARE TWO WAYS OUT OF THE T-CELL LOOP and both are recorded,
+    # because n_mhc1_lost on its own is the one cellular_module's own
+    # docstring calls misleading. n_mhc1_lost counts cells below
+    # _recognize's 0.05 surface floor; n_escaped_without_display counts
+    # escaped cells displaying NOTHING, which _recognize also rejects
+    # whatever their surface level is. Measured on the default panel
+    # with the real MHCflurry predictor, the second is the DOMINANT
+    # form: KRAS G12D binds HLA-A*02:01 and nothing else, so 2 of 12
+    # founders seeded with HLA LOH displayed nothing while
+    # n_mhc1_lost was 0. n_tcell_invisible is their sum, which is the
+    # number to plot if only one is plotted.
+    n_escaped: int = 0
+    mean_mhc1: float = 0.0
+    n_mhc1_lost: int = 0
+    n_escaped_without_display: int = 0
+    n_tcell_invisible: int = 0
 
     # Immune
     n_immune: int = 0
@@ -844,6 +864,17 @@ class EngineRunner:
         snap.psa_total = state.get("ar_signaling", {}).get("psa_total", 0.0)
         snap.psa_cancer_total = state.get("ar_signaling", {}).get("psa_cancer_total", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
+        esc = cs.get("escape", {})
+        snap.n_escaped = esc.get("n_escaped", 0)
+        snap.mean_mhc1 = esc.get("mean_mhc1", 0.0)
+        snap.n_mhc1_lost = esc.get("n_below_recognition", 0)
+        snap.n_escaped_without_display = esc.get(
+            "n_escaped_without_display", 0)
+        # The UNION, taken in escape_distribution rather than summed
+        # here: the two counts overlap, because a total-loss cell is
+        # both below the surface floor and displaying nothing, so
+        # n_mhc1_lost + n_escaped_without_display would double-count it.
+        snap.n_tcell_invisible = esc.get("n_tcell_invisible", 0)
 
         # Immune
         ims = state.get("immune", {})
@@ -1139,6 +1170,12 @@ class EngineRunner:
             "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa", "psa_total", "psa_cancer_total",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",
+            # Heritable immune escape. These were recorded on the
+            # snapshot and left out of here, so no page could plot them
+            # and the selection signal this item exists to show was
+            # reachable only from a notebook.
+            "n_escaped", "mean_mhc1", "n_mhc1_lost",
+            "n_escaped_without_display", "n_tcell_invisible",
             "avg_cell_O2", "avg_cell_glucose", "hypoxic_regions",
             "total_metastases", "immune_in_vessels", "cancer_in_vessels",
             "avg_methylation", "silenced_genes",

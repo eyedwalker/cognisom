@@ -224,7 +224,44 @@ class DigitalTwinConfig:
                 "n_t_cells": _scale_count(30, self.immune_cell_fraction, 5),
                 "n_nk_cells": _scale_count(10, self.immune_cell_fraction, 3),
                 "n_macrophages": _scale_count(15, self.immune_cell_fraction, 3),
-                "t_cell_initial_exhaustion": self.mean_exhaustion,
+                # The FRACTION of T-cell clones to seed already
+                # exhausted, which is what the immune module now
+                # consumes this key as.
+                #
+                # This used to emit `mean_exhaustion`, which is the MEAN
+                # of per-cell exhaustion SCORES
+                # (cell_state_classifier line 159,
+                # `np.mean(exhaustion_scores)`). A mean score is not a
+                # fraction of cells: a cohort where every T cell scores
+                # 0.4 and one where 40% score 1.0 and 60% score 0.0 give
+                # the same 0.4, and only the second has exhausted cells
+                # in it. The quantity that IS a fraction is
+                # `exhausted_fraction` -- "Fraction with score > 0.6" --
+                # which this config already carries as
+                # t_cell_exhaustion_fraction and did not emit. The key
+                # had no consumer when it was written, so nothing caught
+                # the mismatch.
+                #
+                # This is a smaller mismatch, not none. exhausted_fraction
+                # is a fraction of T CELLS and the engine applies it to
+                # CLONES (TCRRepertoire._seed_initial_exhaustion picks
+                # round(f * n_clones) clones uniformly, ignoring their
+                # power-law frequencies), so the two coincide only if
+                # exhaustion is clone-exclusive and clones are equally
+                # abundant. Read it as a cohort-level dose; the per-run
+                # realisation is nearly binary, because best_match takes
+                # the argmax clone -- see
+                # test_a_pre_exhausted_fraction_is_a_coin_flip_on_the_dominant_clone.
+                #
+                # And NOTE WHERE THIS GOES. to_simulation_params() has two
+                # non-test callers, both on _pages/28_digital_twin.py: a
+                # st.download_button and a st.json expander. Nothing here
+                # reaches an engine -- PatientEngineInputs.module_configs()
+                # is the only patient-to-module-config path and emits
+                # neither this key nor treg_fraction -- so both keys are
+                # consumable (immune_module reads them from its config)
+                # but still not connected from a patient to a run.
+                "t_cell_initial_exhaustion": self.t_cell_exhaustion_fraction,
                 "treg_fraction": self.treg_fraction,
                 "m2_fraction": self.m2_macrophage_fraction,
                 "neoantigen_count": self.neoantigen_count,

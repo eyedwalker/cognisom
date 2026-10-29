@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 
 from cognisom.core.module_base import SimulationModule
 from cognisom.core.event_bus import EventTypes
+from cognisom.engine.py.immune import escape_variation as escape
 from cognisom.engine.py.immune.mhc_loading import MHCLoader, MHCPresentation
 from cognisom.engine.py.molecular.peptidome import (
     Peptide,
@@ -230,6 +231,32 @@ class CellState:
     # matching. Empty for cells without displayed neoantigens.
     mhc1_displayed_peptides: List[MHCPresentation] = field(default_factory=list)
 
+    # Heritable immune-escape state. Empty on every cell until an escape
+    # event happens at division, so a run with escape off -- or one in
+    # which no event occurred -- carries exactly the state it always did.
+    #
+    # escape_traits names the ROUTE(s) this lineage carries, from
+    # engine/py/immune/escape_variation.ESCAPE_TRAITS. The two MHC-I
+    # routes are not interchangeable: 'mhc1_allele_loss' leaves the
+    # cell recognised at a lower signal (checkpoint blockade still
+    # works), 'mhc1_total_loss' puts it below ImmuneModule._recognize's
+    # 0.05 floor, where it is invisible to T cells and blockade cannot
+    # reach it.
+    #
+    # escape_born_at_h is when the lineage FIRST escaped, on the
+    # cellular module's clock, so selection can be measured against
+    # trait age later. A second hit does not move it: the quantity of
+    # interest is how long the escaped lineage has been under pressure.
+    #
+    # escape_lost_hla names the panel allele(s) lost to LOH, which is
+    # what makes parallel evolution checkable (McGranahan 2017 saw the
+    # same allele lost on distinct branches in four tumours). It stays
+    # empty for a total-loss event, because B2M loss does not delete an
+    # HLA gene.
+    escape_traits: tuple = ()
+    escape_born_at_h: Optional[float] = None
+    escape_lost_hla: tuple = ()
+
     def __post_init__(self):
         if self.mutations is None:
             self.mutations = []
@@ -292,6 +319,118 @@ class CellularModule(SimulationModule):
                 "initial_cell_cycle must be 'asynchronous' or 'synchronous', "
                 f"got {self.initial_cell_cycle!r}")
         self.cell_cycle_seed = int(self.config.get('cell_cycle_seed', 0))
+
+        # ── Heritable immune escape ───────────────────────────────────
+        #
+        # ON BY DEFAULT, and the defence of that choice is a
+        # measurement, not a preference. Without heritable variation
+        # immune pressure has nothing to select on, so escape could only
+        # ever be imposed by hand; a capability that is off by default
+        # in this repo is a capability nobody passes in. What makes ON
+        # safe is that the sourced rate is 1.55e-6 per division
+        # (escape_variation), so one expected event needs 6.5e5 CANCER
+        # divisions -- and every draw comes from a generator of its own,
+        # so the global stream that every pinned run depends on is
+        # untouched whether an event fires or not.
+        #
+        # MEASURED, 2026-10-28, escape on vs off, same seeds. The
+        # denominator is CANCER divisions, because _maybe_escape returns
+        # None for every other cell type -- the earlier version of this
+        # table quoted totals and so overstated the expectation by 14x
+        # on the slab, and by everything on the ring:
+        #
+        #   run (24 h)                total div  CANCER div  de novo
+        #   ring Baseline  seed 12345        35           0      0
+        #   ring Hypoxia   seed 12345        26           0      0
+        #   slab Baseline  seed 1 (PWM)     849          56      0
+        #   slab Baseline  seed 1 (flurry)  846          53      0
+        #   slab Aggressive seeds 1-3  ~930-980     226-238      0
+        #
+        # All eight pairs are identical on every number a pinned test
+        # asserts -- cell counts, divisions, deaths by cause, mean
+        # oxygen, mean MHC-I -- and the 24 h ring Baseline (115 normal
+        # alive, 35 divisions, 10 cancer deaths) and Hypoxia (44 normal
+        # hypoxia deaths, 65 deaths, 32 hypoxic cells) pins both hold.
+        # 56 cancer divisions expect 8.7e-5 events, so zero is the
+        # correct behaviour at this scale rather than a broken mechanism:
+        # see escape_variation.expected_events. NOTE that the ring
+        # presets have ZERO cancer divisions in 24 h, so an on/off
+        # identity measured on the ring never reaches the draw at all;
+        # the slab Baseline run is the one that crosses it.
+        # For escape to be PRESENT in a short run, seed it
+        # (escape_founder_hla_loh_fraction) instead of raising mu.
+        self.escape_enabled = bool(self.config.get('escape_enabled', True))
+        #: Its own seed, so a new draw cannot shift any other module's.
+        #: Three independent sub-streams are derived from it -- one per
+        #: route plus the founder seeder -- so enabling PD-L1 escape does
+        #: not move the MHC-I draws, which an interleaved single stream
+        #: would.
+        #:
+        #: It defaults to 0 INDEPENDENTLY of the run seed, which matters
+        #: to anyone sweeping seeds: np.random.seed(s) does not reach
+        #: these streams, so 12 replicates that differ only in the global
+        #: seed draw the SAME founder-escape pattern and are correlated
+        #: on the one axis a founder-seeded run is measuring. It is
+        #: harmless for the de novo route at 1.55e-6 and load-bearing for
+        #: founder seeding. Every measurement in realism item 1 passes
+        #: escape_seed=seed explicitly, which is what made the 12-seed
+        #: sd meaningful; a caller sweeping seeds must do the same. Left
+        #: as an explicit knob rather than derived from the global stream
+        #: because drawing it at initialize() would advance that stream
+        #: and break the on/off byte-identity this default rests on.
+        self.escape_seed = int(self.config.get('escape_seed', 0))
+        self._escape_rng_mhc1 = np.random.default_rng([self.escape_seed, 0])
+        self._escape_rng_pdl1 = np.random.default_rng([self.escape_seed, 1])
+        self._escape_rng_founder = np.random.default_rng([self.escape_seed, 2])
+        self.escape_mhc1_loss_per_division = float(self.config.get(
+            'escape_mhc1_loss_per_division',
+            escape.MHC1_ALLELE_LOSS_PER_DIVISION.value))
+        self.escape_mhc1_second_hit_per_division = float(self.config.get(
+            'escape_mhc1_second_hit_per_division',
+            escape.MHC1_SECOND_HIT_PER_DIVISION.value))
+        self.escape_pdl1_gain_per_division = float(self.config.get(
+            'escape_pdl1_gain_per_division',
+            escape.PDL1_HERITABLE_GAIN_PER_DIVISION.value))
+        self.escape_pdl1_gain_magnitude = float(self.config.get(
+            'escape_pdl1_gain_magnitude',
+            escape.PDL1_HERITABLE_GAIN_MAGNITUDE.value))
+        #: Fraction of FOUNDING cancer cells seeded already escaped. 0.0
+        #: by default: McGranahan's 40% is a fraction of tumours under
+        #: selection, and the fraction of cells inside one tumour -- the
+        #: quantity this needs -- is not measured. Any non-zero value is
+        #: the caller's ESTIMATE and the report says so.
+        self.escape_founder_hla_loh_fraction = float(self.config.get(
+            'escape_founder_hla_loh_fraction',
+            escape.FOUNDER_HLA_LOH_FRACTION.value))
+        #: DE NOVO events by route -- escape that happened at a division
+        #: during this run. Deaths do not decrement them: they are
+        #: mutation supply, not standing population, and the population
+        #: side is escape_distribution().
+        #:
+        #: Founder seeding is counted SEPARATELY, below, and that
+        #: separation is load-bearing rather than tidiness. Until it
+        #: existed, _seed_founder_escape went through _record_escape and
+        #: so landed in this counter, which meant a founder-seeded run
+        #: reported 42 'events' and there was no way to read the de novo
+        #: count back out -- the one number that says whether the
+        #: literature rate can produce escape at this scale. It cannot:
+        #: measured over 12 founder-seeded 24 h Baseline slab runs
+        #: (~850 divisions each), de novo events are 0, as 1.55e-6 per
+        #: division says they must be.
+        self.escape_events: Dict[str, int] = {
+            name: 0 for name in escape.ESCAPE_TRAITS}
+        #: Escape imposed on the FOUNDING population, by route. An
+        #: initial condition, not supply.
+        self.escape_founder_events: Dict[str, int] = {
+            name: 0 for name in escape.ESCAPE_TRAITS}
+        self.escape_founder_cells = 0
+        #: True only while _seed_founder_escape is running, so the two
+        #: counters above cannot be conflated by a shared code path.
+        self._seeding_founders = False
+        #: The module's own clock in hours, so an escape event can be
+        #: dated. Same pattern as ImmuneModule.clock_h.
+        self.clock_h = 0.0
+
         self.glucose_consumption_normal = self.config.get('glucose_consumption', 0.2)
         self.glucose_consumption_cancer = self.config.get('glucose_consumption_cancer', 0.5)
 
@@ -409,6 +548,10 @@ class CellularModule(SimulationModule):
         if self.initial_cell_cycle == 'asynchronous':
             self._stagger_initial_ages()
 
+        # An established tumour has already escaped. Off by default, and
+        # it takes no draw at all when off -- see _seed_founder_escape.
+        n_founders = self._seed_founder_escape()
+
         # Subscribe to events
         self.subscribe(EventTypes.EXOSOME_UPTAKEN, self.on_exosome_uptaken)
         self.subscribe(EventTypes.CANCER_KILLED, self.on_cancer_killed)
@@ -418,6 +561,10 @@ class CellularModule(SimulationModule):
         print(f"    ✓ {n_cancer} cancer cells")
         print(f"    ✓ MHC-I display: {len(self.hla_alleles)} HLA alleles "
               f"({', '.join(self.hla_alleles)})")
+        if n_founders:
+            print(f"    ✓ {n_founders} founding cancer cells seeded with "
+                  f"HLA LOH (ESTIMATE, fraction "
+                  f"{self.escape_founder_hla_loh_fraction:.2f})")
     
     def _stagger_initial_ages(self) -> None:
         """Start each initial cell at a random point in its cycle.
@@ -654,7 +801,10 @@ class CellularModule(SimulationModule):
         cells_to_divide = []
         cells_to_die = []
         cells_to_die_withdrawn = []
-        
+
+        # The module's own clock, so an escape event can be dated.
+        self.clock_h += dt
+
         for cell_id, cell in list(self.cells.items()):
             if not cell.alive:
                 continue
@@ -836,6 +986,14 @@ class CellularModule(SimulationModule):
           Sampled before the daughter is registered, so its own seeded
           baseline does not pull the neighbourhood mean toward
           ``cancer_baseline_ecm``.
+        * ``escape_traits`` / ``escape_born_at_h`` / ``escape_lost_hla``
+          -- clonal, inherited, and then the daughter MAY DIFFER. Copy
+          alone was the defect this path carried: with mhc1_expression,
+          mhc1_baseline and pdl1_expression copied exactly from a
+          population seeded uniformly at 0.3, immune pressure had
+          nothing to select on and escape could only be imposed. See
+          _maybe_escape; with no escape event the daughter is exactly
+          what it was before, down to the global RNG stream.
         """
         if cell_id not in self.cells:
             return
@@ -885,7 +1043,14 @@ class CellularModule(SimulationModule):
         daughter.pdl1_expression = parent.pdl1_expression
         if sampled_ecm is not None:
             daughter.local_ecm_density = sampled_ecm
-        
+        # Escape traits are clonal: a grandchild keeps what its
+        # grandparent acquired. Copied BEFORE the draw below, which may
+        # then add to them.
+        daughter.escape_traits = parent.escape_traits
+        daughter.escape_born_at_h = parent.escape_born_at_h
+        daughter.escape_lost_hla = parent.escape_lost_hla
+        self._maybe_escape(daughter)
+
         # Reset parent age
         parent.age = 0.0
         
@@ -899,6 +1064,365 @@ class CellularModule(SimulationModule):
         
         self.total_divisions += 1
     
+    # ── heritable immune escape ──────────────────────────────────────
+
+    def _maybe_escape(self, daughter: CellState) -> Optional[str]:
+        """A daughter may differ from its parent. Returns the route that
+        fired, or None.
+
+        The whole point of the module this lives in: an established
+        tumour is one that escaped, and nothing here could escape
+        because nothing varied. Every cancer cell was seeded at
+        mhc1_expression 0.3 and every daughter copied its parent
+        exactly, so selection had no raw material.
+
+        What fires, and why those two routes and not one
+        ------------------------------------------------
+        * An intact cell loses ONE HLA haplotype at the sourced rate
+          (escape_variation.MHC1_ALLELE_LOSS_PER_DIVISION, 1.55e-6
+          per division, the geometric mean of five measured
+          per-cell-per-generation rates). Surface class I falls to
+          (n-1)/n of its baseline and the presentations bound to the
+          lost allele are dropped. The cell is STILL recognised, at a
+          lower signal, so checkpoint blockade still reaches it.
+        * A cell that already lost one haplotype loses presentation
+          altogether at MHC1_SECOND_HIT_PER_DIVISION (an ESTIMATE: no
+          per-division B2M rate exists). mhc1_expression AND
+          mhc1_baseline go to 0 and the displayed peptides are cleared,
+          which puts the cell under _recognize's 0.05 floor -- invisible
+          to T cells and NOT rescuable by blockade. Setting the baseline
+          to 0, not just the level, is what makes that stick: a
+          B2M-null cell does not answer IFN-gamma with surface class I,
+          and _update_mhc1 relaxes toward baseline * (1 + gain), so a
+          zero baseline is a zero target. The IFN-gamma gain and
+          saturation are untouched -- that mechanism is the one thing
+          here that passed an external test on 592 TCGA tumours.
+
+        Making total loss a SECOND hit rather than an independent
+        first-order route is the structural claim: biallelic
+        inactivation needs two hits, so de novo total loss is ~mu^2 and
+        effectively never, while total loss from an already-hemizygous
+        cell is ~mu. That matches B2M loss showing up under therapy
+        pressure (Sade-Feldman 2017) rather than in naive tumours.
+
+        Which allele is lost is drawn UNIFORMLY from the panel. A draw
+        biased toward the allele carrying the most neoantigens would
+        impose the selection this module exists to let the immune module
+        discover; a uniform supply under selection is what produces
+        McGranahan's parallel evolution.
+
+        PD-L1 is last and inert: the heritable rate is 0.0 because every
+        PD-L1 genomic number found is a prevalence in an established
+        tumour, never a rate, and the engine already carries the
+        dominant inducible routes (see escape_variation).
+
+        Cancer cells only. de Nooij measured these rates in NORMAL
+        lymphoid lines, so the event is not tumour-specific -- but in
+        this engine a normal cell's mhc1_expression is read by nothing
+        except NK missing-self, where lowering it would invent an
+        artefact at a rate too low to ever be observed. The consequence
+        for any expectation arithmetic is that the denominator is CANCER
+        divisions and not a run's division count: on the 24 h Baseline
+        slab that is 53-56 of ~849, and on the ring presets it is ZERO,
+        so a ring run never reaches this method's draw.
+
+        THE CONVENTION, because a caller scaling mu needs to know which
+        quantity it is scaling. The draw is taken ONCE PER DIVISION, on
+        the new cell; the parent persists in self.cells, has its age
+        reset and is never drawn for. The cited rates are explicitly
+        "per cell per generation" (de Nooij-van Dalen 1998, PMID
+        9443039), which applies to BOTH products of a division, so the
+        realised rate here is mu per new cell and about half the
+        literature quantity per division event. Immaterial at preset
+        scale -- 53 or 974 divisions give 0 events either way -- and it
+        is a factor of 2 on anything deliberately scaled.
+
+        Every draw is from self._escape_rng_*, never the global stream,
+        so a pinned run is unchanged whether or not an event fires.
+        """
+        if not self.escape_enabled or daughter.cell_type != 'cancer':
+            return None
+
+        route = None
+        traits = daughter.escape_traits
+        if escape.TRAIT_TOTAL_LOSS in traits:
+            pass                      # nothing left to lose; no draw
+        elif escape.TRAIT_ALLELE_LOSS in traits:
+            if (self.escape_mhc1_second_hit_per_division > 0.0
+                    and self._escape_rng_mhc1.random()
+                    < self.escape_mhc1_second_hit_per_division):
+                self._lose_mhc1_entirely(daughter)
+                route = escape.TRAIT_TOTAL_LOSS
+        elif (self.escape_mhc1_loss_per_division > 0.0
+                and self._escape_rng_mhc1.random()
+                < self.escape_mhc1_loss_per_division):
+            route = self._lose_one_allele(daughter)
+
+        if (self.escape_pdl1_gain_per_division > 0.0
+                and escape.TRAIT_PDL1_GAIN not in daughter.escape_traits
+                and self._escape_rng_pdl1.random()
+                < self.escape_pdl1_gain_per_division):
+            daughter.pdl1_expression = float(min(
+                1.0, daughter.pdl1_expression
+                + self.escape_pdl1_gain_magnitude))
+            self._record_escape(daughter, escape.TRAIT_PDL1_GAIN)
+            route = route or escape.TRAIT_PDL1_GAIN
+
+        return route
+
+    def _presentable_on(self, cell: CellState,
+                        presentations: List[MHCPresentation]
+                        ) -> List[MHCPresentation]:
+        """The subset of ``presentations`` this cell can actually display.
+
+        A cell with no surface class I displays nothing; a cell that has
+        lost an HLA allele displays nothing bound to it. Both are
+        no-ops on a cell with no escape trait, which is every cell in a
+        run where nothing escaped, so the shipped runs are untouched.
+
+        The result is a cell that cannot present a mutation, per cell
+        rather than per patient. It is NOT recorded in
+        ``unpresented_mutations``: that diagnostic runs in
+        ``on_mutation_occurred`` on the RAW score_all output, before
+        this filter is applied, so when score_all returns binders and
+        this filter empties them execution falls through -- kept == [],
+        nothing appended, no PEPTIDE_PRESENTED event, and
+        unpresented_mutations stays empty. The population of cells that
+        went dark this way is found only in
+        ``escape_distribution()['n_escaped_without_display']``.
+        """
+        if not cell.escape_traits:
+            return presentations
+        if escape.TRAIT_TOTAL_LOSS in cell.escape_traits:
+            return []
+        if not cell.escape_lost_hla:
+            return presentations
+        return [p for p in presentations
+                if p.hla_allele not in cell.escape_lost_hla]
+
+    def _record_escape(self, cell: CellState, trait: str) -> None:
+        """Add a trait, date the lineage's first escape, count the event.
+
+        The count goes to escape_founder_events while the founding
+        population is being seeded and to escape_events otherwise, so
+        the de novo supply stays readable in a run that also imposed
+        escape on its founders. Both routes share this method, which is
+        why the flag is here rather than at the two call sites.
+        """
+        if trait not in cell.escape_traits:
+            cell.escape_traits = tuple(cell.escape_traits) + (trait,)
+        if cell.escape_born_at_h is None:
+            cell.escape_born_at_h = float(self.clock_h)
+        counter = (self.escape_founder_events if self._seeding_founders
+                   else self.escape_events)
+        counter[trait] = counter.get(trait, 0) + 1
+
+    def _lose_one_allele(self, cell: CellState) -> str:
+        """One panel allele goes: the partial route, still recognised.
+
+        ONE ALLELE, not one haplotype, and the name says so since
+        2026-10-28. A class I haplotype is an A, a B and a C allele in
+        cis; this removes a single entry of self.hla_alleles, which is
+        the quantity McGranahan 2017 measures ("Allele-Specific HLA
+        Loss") and the quantity de Nooij's assay rates. The engine's
+        panels carry no phase information, so no haplotype can be
+        identified to drop; see escape_variation's "ALLELE, not
+        HAPLOTYPE" section.
+
+        The REPERTOIRE hit is the patient's own -- every presentation on
+        the lost allele is dropped, so how much this costs the cell
+        depends on where this patient's neoantigens bind (McGranahan's
+        CRUK0020 lost 92% of its predicted neoantigens to its lost
+        alleles; a patient whose peptides avoid that allele loses
+        nothing). The SURFACE hit is arithmetic: (n-1)/n of the alleles
+        are left, which is a PER-ALLELE magnitude -- a true haplotype
+        loss on a 6-allele genotype would leave 0.5, not 5/6.
+
+        A one-allele panel has no partial state, so the event is the
+        total one instead -- a cell with no presenting allele left is
+        the invisible phenotype whatever the mechanism was called. The
+        trait actually recorded is returned, so the caller cannot report
+        a partial loss that was in fact a total one.
+
+        A consequence worth stating, because it looks like a bug and is
+        not: a cell whose ENTIRE displayed repertoire sat on the lost
+        allele becomes unrecognised even though it still has surface
+        class I, since _recognize also requires a non-empty presentation
+        list. That is the correct reading of McGranahan -- if all of a
+        patient's neoantigens bind the lost haplotype, blockade has
+        nothing to un-block -- and it is why the consequence of this
+        route is patient-specific rather than a constant.
+        """
+        panel = [a for a in self.hla_alleles if a not in cell.escape_lost_hla]
+        if not panel:
+            self._lose_mhc1_entirely(cell)
+            return escape.TRAIT_TOTAL_LOSS
+        lost = panel[int(self._escape_rng_mhc1.integers(len(panel)))]
+        fraction = escape.surviving_surface_fraction(len(panel))
+        if fraction <= 0.0:
+            cell.escape_lost_hla = tuple(cell.escape_lost_hla) + (lost,)
+            self._lose_mhc1_entirely(cell)
+            return escape.TRAIT_TOTAL_LOSS
+
+        if cell.mhc1_baseline is None:
+            # Same convention as _update_mhc1: the level a cell returns
+            # to with no IFN-gamma around is where it sits now. Capture
+            # it before scaling, or the drop would be undone the first
+            # time the IFN-gamma response ran.
+            cell.mhc1_baseline = float(cell.mhc1_expression)
+        cell.mhc1_baseline = float(cell.mhc1_baseline) * fraction
+        cell.mhc1_expression = float(cell.mhc1_expression) * fraction
+        cell.escape_lost_hla = tuple(cell.escape_lost_hla) + (lost,)
+        self._record_escape(cell, escape.TRAIT_ALLELE_LOSS)
+        # Recorded first, then the repertoire is re-derived through the
+        # same filter the ingest path uses, so there is one definition
+        # of what a cell can display and not two that can drift apart.
+        cell.mhc1_displayed_peptides = self._presentable_on(
+            cell, cell.mhc1_displayed_peptides)
+        return escape.TRAIT_ALLELE_LOSS
+
+    def _lose_mhc1_entirely(self, cell: CellState) -> None:
+        """No surface class I at all: the T-cell-invisible route.
+
+        Baseline as well as level, so IFN-gamma cannot raise it back --
+        _update_mhc1 relaxes toward mhc1_baseline * (1 + gain * drive),
+        and a B2M-null cell has no class I to induce.
+        """
+        cell.mhc1_expression = 0.0
+        cell.mhc1_baseline = 0.0
+        cell.mhc1_displayed_peptides = []
+        self._record_escape(cell, escape.TRAIT_TOTAL_LOSS)
+
+    def _seed_founder_escape(self) -> int:
+        """Seed a fraction of the FOUNDING cancer cells already escaped.
+
+        Off by default (see escape_founder_hla_loh_fraction), because
+        the prevalence data is per tumour and the quantity this needs is
+        per cell. When off, no draw is taken at all, so the founder
+        sub-stream is not advanced either.
+
+        This exists because the de novo route is silent at preset scale:
+        one expected event needs 6.5e5 divisions and a 24 h Baseline
+        slab run makes 56-59 CANCER divisions (of 849 total; see
+        _maybe_escape, which draws only for a cancer daughter). The
+        item's own premise is the way out -- an established tumour has
+        already escaped -- so a run that wants escape present starts
+        with it present and says that is what it did, instead of raising
+        mu until a demo works.
+
+        ``escape_enabled`` gates this route too, which it did NOT before
+        2026-10-28: the guard was on the founder fraction alone, so a
+        run that declared escape disabled and also named a founder
+        fraction started with 60-70% of its tumour carrying HLA LOH and
+        a mean surface MHC-I of 0.23 instead of 0.30, while
+        escape_distribution() reported 'enabled': False. Measured on 50
+        cancer cells at founder 0.5, escape_enabled False gave
+        founder_cells 30 and n_escaped 30 -- identical to the enabled
+        run. One flag now means one thing: no escape, by either route.
+        """
+        if (not self.escape_enabled
+                or self.escape_founder_hla_loh_fraction <= 0.0):
+            return 0
+        founders = [c for c in self.cells.values() if c.cell_type == 'cancer']
+        n = 0
+        # Counted as an initial condition, not as mutation supply: see
+        # escape_events / escape_founder_events.
+        self._seeding_founders = True
+        try:
+            for cell in founders:
+                if (self._escape_rng_founder.random()
+                        < self.escape_founder_hla_loh_fraction):
+                    self._lose_one_allele(cell)
+                    n += 1
+        finally:
+            self._seeding_founders = False
+        self.escape_founder_cells = n
+        return n
+
+    def escape_distribution(self) -> Dict[str, Any]:
+        """What escape traits the living tumour carries, and what it cost.
+
+        Counts, not rates: ``events`` is the DE NOVO mutation supply over
+        the life of the run (a cell that died still happened),
+        ``founder_events`` is the escape imposed on the founding
+        population before the run began, and ``traits`` is what the
+        standing population carries now. All three are reported because
+        they part company: supply and standing population part company
+        under selection, which is the point, and supply and founder
+        seeding must never be added together -- a founder-seeded run
+        that reported 42 'events' would look like a run in which the
+        literature rate produced 42, when measured de novo events over
+        12 such runs are 0.
+
+        ``n_below_recognition`` counts cells under
+        escape_variation.T_CELL_RECOGNITION_MHC1_FLOOR -- the value
+        mirrored from ImmuneModule._recognize, pinned to it by behaviour
+        in tests/test_escape_can_be_inherited.py. It is NOT the whole
+        T-cell-invisible population, and reporting only it would have
+        been misleading: _recognize also needs a non-empty presentation
+        list, so an escaped cell whose entire repertoire sat on the lost
+        allele is invisible at surface MHC-I 0.2. Measured on the
+        default panel with the real MHCflurry predictor, that is the
+        DOMINANT form: KRAS G12D binds HLA-A*02:01 and nothing else, so
+        2 of 12 founders seeded with HLA LOH displayed nothing while
+        n_below_recognition was 0. ``n_escaped_without_display`` is that
+        population, and ``n_tcell_invisible`` is the UNION of the two --
+        the number to read if only one is read. The union, not the sum:
+        a total-loss cell is in both, because it has neither surface
+        class I nor peptides.
+        """
+        cancer = [c for c in self.cells.values()
+                  if c.alive and c.cell_type == 'cancer']
+        floor = escape.T_CELL_RECOGNITION_MHC1_FLOOR
+        traits: Dict[str, int] = {name: 0 for name in escape.ESCAPE_TRAITS}
+        lost_alleles: Dict[str, int] = {}
+        for cell in cancer:
+            for trait in cell.escape_traits:
+                traits[trait] = traits.get(trait, 0) + 1
+            for allele in cell.escape_lost_hla:
+                lost_alleles[allele] = lost_alleles.get(allele, 0) + 1
+        escaped = [c for c in cancer if c.escape_traits]
+        invisible = [c for c in cancer if c.mhc1_expression < floor]
+        dark = [c for c in escaped if not c.mhc1_displayed_peptides]
+        n = len(cancer)
+        return {
+            'enabled': self.escape_enabled,
+            'seed': self.escape_seed,
+            'n_cancer': n,
+            'traits': traits,
+            'n_escaped': len(escaped),
+            'fraction_escaped': (len(escaped) / n) if n else 0.0,
+            'mean_mhc1': (float(np.mean([c.mhc1_expression for c in cancer]))
+                          if n else 0.0),
+            'recognition_threshold': floor,
+            'n_below_recognition': len(invisible),
+            'fraction_below_recognition': (len(invisible) / n) if n else 0.0,
+            # Escaped cells displaying nothing at all: invisible to T
+            # cells whatever their surface level, because _recognize
+            # needs a presentation. The repertoire route out of the
+            # T-cell loop, as opposed to the surface one above.
+            'n_escaped_without_display': len(dark),
+            # The UNION of the two routes, which is what a reader that
+            # plots one number wants. It is NOT the sum: a total-loss
+            # cell is below the floor AND displaying nothing, so it is
+            # in both lists above and adding them double-counts it.
+            'n_tcell_invisible': len(
+                {c.cell_id for c in invisible} | {c.cell_id for c in dark}),
+            'lost_hla_alleles': lost_alleles,
+            'events': dict(self.escape_events),
+            'founder_events': dict(self.escape_founder_events),
+            'founder_cells': self.escape_founder_cells,
+            'first_escape_at_h': (
+                min(c.escape_born_at_h for c in escaped) if escaped else None),
+            'calibration': escape.calibration_report(
+                mhc1_loss=self.escape_mhc1_loss_per_division,
+                second_hit=self.escape_mhc1_second_hit_per_division,
+                pdl1_gain=self.escape_pdl1_gain_per_division,
+                founder_fraction=self.escape_founder_hla_loh_fraction,
+                n_alleles=len(self.hla_alleles),
+            ),
+        }
+
     def depart_cell(self, cell_id: int, destination: str = 'lymphatic'):
         """A living cell leaves the tissue -- intravasation into a
         lymphatic or a vessel. It is not a death and is not counted as
@@ -1019,6 +1543,10 @@ class CellularModule(SimulationModule):
             # panel, with the best IC50 each reached and the scorer that
             # said so. Empty when every mutation presented something.
             'unpresented_mutations': list(self.unpresented_mutations),
+            # Heritable immune escape: what the standing tumour carries,
+            # how many events the run has supplied, and the provenance
+            # of every rate behind them. See escape_distribution.
+            'escape': self.escape_distribution(),
         }
     
     def set_molecular_module(self, molecular_module):
@@ -1217,10 +1745,19 @@ class CellularModule(SimulationModule):
                     getattr(self._mhc_loader._scorer, "_binding_method", "unknown"),
                 )
             return
+        cell = self.cells[cell_id]
+        # A cell that has lost presentation cannot display a mutation on
+        # the machinery it no longer has. Without this, an escaped cell
+        # acquiring a new mutation -- or a founder seeded with HLA LOH
+        # before the patient's mutations are presented -- would display
+        # it on the lost allele and become recognisable again, which
+        # would quietly undo the escape event. Filtered BEFORE the
+        # top-N truncation, so the cell keeps its best binders among the
+        # alleles it still has rather than the panel's best overall.
+        presentations = self._presentable_on(cell, presentations)
         presentations.sort(key=lambda p: p.ic50_nm)
         kept = presentations[:self.max_displayed_per_mutation]
 
-        cell = self.cells[cell_id]
         cell.mhc1_displayed_peptides.extend(kept)
         self.total_peptides_presented += len(kept)
 

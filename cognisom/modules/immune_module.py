@@ -102,6 +102,11 @@ from cognisom.engine.py.immune.kill_calibration import (  # noqa: E402
     HITS_PER_CONTACT, LETHAL_DAMAGE, MACROPHAGE_KILL_PER_CONTACT,
     NK_KILL_PER_CONTACT, calibration_report, contact_hits, damage_now,
 )
+from cognisom.engine.py.immune.treg_suppression import (  # noqa: E402
+    TREG_MAX_CYTOLYTIC_LOSS, TREG_RATIO_FULL_SUPPRESSION,
+    calibration_report as treg_calibration_report,
+    treg_cytolytic_attenuation,
+)
 
 #: patrol_speed is quoted in um/min; the engine steps in hours.
 MINUTES_PER_HOUR = 60.0
@@ -478,12 +483,69 @@ class ImmuneModule(SimulationModule):
         self._recruit_rng = np.random.default_rng(
             int(self.config.get('recruit_seed', 0)))
         self.immune_profile_measured = bool(self.config.get('measured', False))
-        # 'treg_fraction' and 't_cell_initial_exhaustion' are the other
-        # two keys to_simulation_params emits. They are deliberately NOT
-        # consumed here: both would modify the flagship T-cell closed
-        # loop, which this upgrade does not touch. They stay
-        # producer-only, and that is a known gap rather than an
-        # oversight.
+        # ── Regulatory T cells ─────────────────────────────────────
+        # 'treg_fraction' and 't_cell_initial_exhaustion' were the two
+        # keys to_simulation_params emitted and nothing read. The
+        # comment that stood here said so: "They stay producer-only,
+        # and that is a known gap rather than an oversight." Both are
+        # consumed HERE now -- which is half of it. No shipped preset
+        # sets either key and to_simulation_params() still reaches no
+        # engine (its only two non-test callers are a download button
+        # and a st.json expander in _pages/28_digital_twin.py), so the
+        # route a run has today is an explicit
+        # EngineRunner(overrides={'immune': {...}}). There is no path
+        # from a patient's measured profile. See the "What is and is
+        # not connected" section of treg_suppression.py.
+        #
+        # A Treg load does not get a fourth copy of the arginase /
+        # sympathetic / lactate gate shape. It scales the CYTOLYTIC
+        # CAPACITY of a T-cell contact -- the perforin and granzyme
+        # expression TGF-beta represses (Thomas & Massague 2005,
+        # PMID 16286245), which is the mechanism by which Tregs
+        # abolished CD8 cytotoxicity in vivo while leaving expansion
+        # and IFN-gamma intact (Chen 2005, PMID 15623559). See
+        # engine/py/immune/treg_suppression.py, which also records the
+        # measurement that ruled out the costimulation route (the
+        # existing ICB-rescue term is largest at ZERO costimulation, so
+        # a Treg routed through it would INCREASE killing by 29.5%
+        # under full blockade) and the measurement that ruled out MDSCs.
+        #
+        # None means UNMEASURED and is the default, because nothing in
+        # this platform measures a Treg fraction for any patient today.
+        # None and 0.0 both give a multiplier of exactly 1.0, so every
+        # existing configuration is a provable no-op.
+        treg = self.config.get('treg_fraction', None)
+        self.treg_fraction = None if treg is None else float(treg)
+        self.treg_max_cytolytic_loss = float(self.config.get(
+            'treg_max_cytolytic_loss', TREG_MAX_CYTOLYTIC_LOSS.value))
+        self.treg_ratio_full_suppression = float(self.config.get(
+            'treg_ratio_full_suppression',
+            TREG_RATIO_FULL_SUPPRESSION.value))
+
+        # ── T cells already exhausted when the run starts ──────────
+        # Applied as a FRACTION OF CLONES to seed in the PD-1-hi state,
+        # not as a mean exhaustion score -- see the units note in
+        # twin_config.to_simulation_params, which emitted the wrong one
+        # of its two exhaustion fields under this key. What arrives is a
+        # fraction of CELLS (the classifier's exhausted_fraction) and it
+        # is applied to CLONES, drawn uniformly and unweighted by
+        # clone_frequency, so it is a cohort-level dose and not a
+        # per-cell measurement; within one run its realisation is nearly
+        # binary because best_match takes the argmax clone. The full
+        # note is in tcr_repertoire._seed_initial_exhaustion.
+        #
+        # Measured, before this was wired: the exhaustion multiplier was
+        # exactly 1.0 at all 53,388 instrumented T-cell contacts across
+        # 27 slab runs, because EXHAUSTION_ONSET_HOURS is 10 days and no
+        # preset runs that long. So a patient measured to have an
+        # exhausted infiltrate reached no run at all, and this key is
+        # the only route by which that measurement can. It adds no new
+        # constant: the fraction is the patient's, and the 0.1 residual
+        # cytotoxicity of an exhausted clone was already sourced
+        # (Dolina 2021, EXHAUSTION_KILL_MULTIPLIER).
+        initial_exh = self.config.get('t_cell_initial_exhaustion', None)
+        self.t_cell_initial_exhaustion = (
+            None if initial_exh is None else float(initial_exh))
 
         # TCR-pMHC matching for T cells (Upgrade 2). The repertoire is
         # patient-specific; seed is stable so the closed-loop test can
@@ -607,6 +669,7 @@ class ImmuneModule(SimulationModule):
             recognition_threshold=self.tcr_recognition_threshold,
             seed=self.tcr_seed,
             exhaustion_onset_hours=self.tcell_exhaustion_onset_hours,
+            initial_exhausted_fraction=self.t_cell_initial_exhaustion,
         )
 
         # Subscribe to events
@@ -1616,8 +1679,18 @@ class ImmuneModule(SimulationModule):
                 max_suppression=self.arginase_max_suppression,
             )
             lactate_mult = self._lactate_attenuation_at(immune_cell)
+            # Treg suppression of the cytolytic machinery. A DIFFERENT
+            # mechanism from the three above it, not a fourth copy of
+            # one: TGF-beta represses perforin and granzyme expression
+            # (Thomas & Massague 2005), and perforin hits are what this
+            # engine's T-cell kill path actually counts, so this scales
+            # the hit rate rather than recognition -- which is what
+            # Chen 2005 measured being left intact. Exactly 1.0 with no
+            # Treg fraction configured, which is every preset.
+            treg_mult = self._treg_cytolytic_attenuation()
             return (
-                outcome.kill_probability * sympathetic_mult * arginase_mult * lactate_mult
+                outcome.kill_probability * sympathetic_mult * arginase_mult
+                * lactate_mult * treg_mult
             )
 
         if immune_cell.cell_type == 'NK_cell':
@@ -1628,6 +1701,29 @@ class ImmuneModule(SimulationModule):
                 target_cell, immune_cell,
             )
         return self.kill_probability
+
+    def _treg_cytolytic_attenuation(self) -> float:
+        """Cytolytic capacity a T-cell contact retains at this Treg load.
+
+        Exactly 1.0 when ``treg_fraction`` is None (unmeasured, the
+        default) or 0.0, so every preset and every test that does not
+        name a Treg fraction is a provable no-op.
+
+        Compartment-grained on purpose. ``treg_fraction`` is a fraction
+        of the T-cell compartment -- what a deconvolution reports -- and
+        a population fraction constrains the compartment mean, not any
+        one cell's neighbourhood. There is no Treg agent in this
+        simulation to read a local density off, and inventing one would
+        need a spatial Treg density that nothing here measures. Same
+        reasoning as ``initial_polarization``'s docstring.
+        """
+        if not self.treg_fraction:
+            return 1.0
+        return treg_cytolytic_attenuation(
+            self.treg_fraction,
+            max_loss=self.treg_max_cytolytic_loss,
+            ratio_full=self.treg_ratio_full_suppression,
+        )
 
     def _lactate_attenuation_at(self, immune_cell: ImmuneCell) -> float:
         """Kill function retained at the effector's interstitial lactate;
@@ -1951,6 +2047,20 @@ class ImmuneModule(SimulationModule):
             },
             'total_activations': self.total_activations,
             'total_recruited': self.total_recruited,
+            # ── Adaptive suppression ───────────────────────────────
+            # Both of these were producer-only keys until this change,
+            # so the readout says the realised multiplier and the
+            # realised clone count, not just the fraction that was
+            # asked for. None means unmeasured; 1.0 / 0 means no effect.
+            'treg_fraction': self.treg_fraction,
+            'treg_cytolytic_retained': self._treg_cytolytic_attenuation(),
+            'treg_calibration': treg_calibration_report(self.treg_fraction),
+            't_cell_initial_exhaustion': self.t_cell_initial_exhaustion,
+            'n_clones_exhausted': (
+                self._tcr_repertoire.exhausted_count()
+                if self._tcr_repertoire is not None else None
+            ),
+            'total_exhaustion_transitions': self.total_exhaustion_transitions,
             # Innate arm. nk_model names the rule that actually ran.
             # The HLA and KIR halves of patient-specificity are reported
             # separately because only the HLA half can be measured here:

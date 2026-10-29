@@ -183,6 +183,20 @@ if run_btn or st.session_state.get("sim_engine_ran"):
     fig.add_trace(go.Scatter(x=time_arr, y=ts["total_kills"], name="Cumulative Kills",
                              line=dict(color="#9b59b6", width=2), fill="tozeroy",
                              fillcolor="rgba(155,89,182,0.15)"), row=1, col=2)
+    # Heritable immune escape. The escaped COUNT rising faster than the
+    # tumour is the selection signal; a count alone cannot distinguish
+    # selection from growth, so "T-cell-invisible" is plotted beside it
+    # -- that is the union of the two ways out of the T-cell loop (below
+    # the 0.05 recognition floor, or displaying nothing at all), not
+    # just the surface one.
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["n_escaped"],
+                             name="Escaped (MHC-I / PD-L1)",
+                             line=dict(color="#16a085", width=2,
+                                       dash="dash")), row=1, col=2)
+    fig.add_trace(go.Scatter(x=time_arr, y=ts["n_tcell_invisible"],
+                             name="T-cell-invisible",
+                             line=dict(color="#d35400", width=1,
+                                       dash="dot")), row=1, col=2)
 
     # 3. Oxygen
     fig.add_trace(go.Scatter(x=time_arr, y=ts["avg_cell_O2"], name="Avg Cell O2",

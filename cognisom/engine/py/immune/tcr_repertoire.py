@@ -240,6 +240,7 @@ class TCRRepertoire:
         seed: int = 0,
         exhaustion_threshold: int = EXHAUSTION_ENCOUNTER_THRESHOLD,
         exhaustion_onset_hours: Optional[float] = None,
+        initial_exhausted_fraction: Optional[float] = None,
     ):
         self.size = int(size)
         self.recognition_threshold = float(recognition_threshold)
@@ -264,6 +265,47 @@ class TCRRepertoire:
             t.tcr_id: ExhaustionState.PRECURSOR for t in self.tcrs
         }
 
+        # A patient can present with part of their repertoire already
+        # exhausted, and until this there was no way to say so: the
+        # transition takes EXHAUSTION_ONSET_HOURS = 10 days of antigen
+        # exposure, and no preset in this repository runs that long, so
+        # the exhaustion multiplier was measured to be exactly 1.0 at
+        # all 53,388 T-cell contacts of 27 instrumented 24 h slab runs.
+        #
+        # The fraction is the patient's measurement, not a constant, and
+        # it is applied here as a FRACTION OF CLONES. The quantity that
+        # arrives is cell_state_classifier's exhausted_fraction, which
+        # is "Fraction with score > 0.6" over T CELLS -- not its
+        # mean_exhaustion, which is a mean score and cannot be read as a
+        # fraction at all.
+        #
+        # So this swaps one units mismatch for a smaller one and does
+        # not remove it: a fraction of CELLS is being applied to CLONES,
+        # and _seed_initial_exhaustion draws those clones UNIFORMLY,
+        # ignoring the power-law clone_frequency the repertoire assigns.
+        # The two coincide only if exhaustion is clone-exclusive and
+        # clones are equally abundant, which the repertoire's own
+        # Pareto frequencies say they are not. Treat the key as a
+        # COHORT-LEVEL DOSE, never as a per-cell severity: within one
+        # run the realised effect is close to binary, because
+        # best_match funnels every recognition to the single
+        # highest-affinity clone -- measured in
+        # tests/test_suppressors_act_where_there_is_room.py::
+        # test_a_pre_exhausted_fraction_is_a_coin_flip_on_the_dominant_clone,
+        # where phi 0.5 and phi 1.0 give the identical 1,335 exhausted
+        # contacts and 4 perforin hits.
+        #
+        # None and 0.0 both leave every clone a PRECURSOR, so an
+        # existing repertoire is byte-identical. The draw uses its OWN
+        # generator: reusing self._rng would be safe today (it is only
+        # read by _generate, which has already run) but would couple the
+        # TCR sequences to this fraction the moment anything else drew
+        # from it.
+        self.initial_exhausted_fraction = (
+            None if initial_exhausted_fraction is None
+            else float(initial_exhausted_fraction))
+        self._seed_initial_exhaustion(seed)
+
     def _generate(self, size: int) -> List[TCR]:
         tcrs: List[TCR] = []
         # Clonal frequencies follow a power law; normalize so they sum
@@ -280,6 +322,28 @@ class TCRRepertoire:
                 clone_frequency=float(freqs[i]),
             ))
         return tcrs
+
+    def _seed_initial_exhaustion(self, seed: int) -> None:
+        """Put a fraction of the clones in the EXHAUSTED state at t=0.
+
+        Drawn WITHOUT replacement over clones, so the realised count is
+        exactly ``round(fraction * size)`` rather than a binomial draw
+        around it: the input is a measured fraction of a patient's
+        T cells, and a measurement should not come back as a sample.
+
+        Does nothing at all for None or 0.0 -- no draw, no generator
+        constructed, every clone left PRECURSOR.
+        """
+        f = self.initial_exhausted_fraction
+        if not f or f <= 0.0 or not self.tcrs:
+            return
+        n = int(round(min(1.0, float(f)) * len(self.tcrs)))
+        if n <= 0:
+            return
+        rng = np.random.default_rng([int(seed), 0x45584821])  # 'EXH!'
+        chosen = rng.choice(len(self.tcrs), size=n, replace=False)
+        for i in chosen:
+            self._states[self.tcrs[int(i)].tcr_id] = ExhaustionState.EXHAUSTED
 
     # ----- public API --------------------------------------------------
 

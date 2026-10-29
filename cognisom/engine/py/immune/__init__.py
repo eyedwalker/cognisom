@@ -19,4 +19,15 @@ macrophage_polarization
     phenotype, and the arginase gate M2 macrophages impose on T cells.
 sympathetic
     beta2-adrenergic attenuation of T-cell kill function.
+escape_variation
+    The per-division rates and magnitudes of heritable immune escape:
+    loss of one HLA class I ALLELE (partial, still recognised -- not a
+    whole haplotype, which would be three alleles in cis) and the
+    second hit that takes a cell out of the T-cell loop altogether.
+treg_suppression
+    TGF-beta repression of the cytolytic machinery by regulatory T
+    cells, scaled by the patient's Treg fraction. Also records, with
+    the measurement, why MDSCs are NOT a second gate here: their
+    mechanism is the arginine depletion the arginase gate already
+    models, and that gate is already at its floor.
 """
