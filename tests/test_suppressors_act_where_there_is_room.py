@@ -553,33 +553,34 @@ def test_a_pre_exhausted_fraction_is_a_coin_flip_on_the_dominant_clone():
 
 # ── part 4: the costimulation route, and why it was not taken ────────
 
-def test_the_icb_rescue_term_makes_the_costimulation_route_unusable():
-    """FOUND, not fixed. The brief preferred routing a Treg through the
-    kill rule's existing costimulation input, which would need no new
-    multiplier at all. The measurement ruled it out, and the reason is a
-    defect in the existing rule rather than anything about Tregs.
+def test_the_costimulation_route_is_no_longer_sign_inverted_by_icb():
+    """FOUND here, FIXED since. This test recorded the defect that made
+    the costimulation route unusable; it now guards against its return.
 
-    ``kill_probability`` adds an ICB-rescue term
-    ``(1 - costimulation) * checkpoint_block * 0.5``, which is LARGEST
-    at zero costimulation. Since affinity x MHC-I measures 0.2755 in a
-    real contact and the rescue slope is 0.5, the combined signal starts
-    RISING as costimulation falls once ``checkpoint_block`` passes
-    0.551. Projected over the measured contacts, a Treg routed through
-    costimulation gives -27.4% expected perforin hits in Baseline
-    (checkpoint_block 0) and +29.5% in the Immunotherapy preset
-    (checkpoint_block 1.0): under blockade the model would make an
-    anergic T cell kill BETTER than a costimulated one, and a Treg would
-    read as a pro-immune intervention.
+    The brief preferred routing a Treg through the kill rule's existing
+    costimulation input, which would need no new multiplier at all. The
+    measurement ruled it out: ``kill_probability`` added an ICB-rescue
+    term ``(1 - costimulation) * checkpoint_block * 0.5``, LARGEST at
+    zero costimulation. Since affinity x MHC-I measures 0.2755 in a
+    real contact and the rescue slope was 0.5, the combined signal
+    started RISING as costimulation fell once ``checkpoint_block``
+    passed 0.551. Projected over the measured contacts, a Treg routed
+    through costimulation gave -27.4% expected perforin hits in
+    Baseline (checkpoint_block 0) and +29.5% in Immunotherapy
+    (checkpoint_block 1.0) -- it would have read as a pro-immune
+    intervention under blockade.
 
     The literature says which way round it should be. PD-1 "suppresses
     T cell function primarily by inactivating CD28 signaling" (Hui 2017,
-    PMID 28280247) and "Rescue of exhausted CD8 T cells by PD-1-targeted
-    therapies is CD28-dependent", with "a cell-intrinsic requirement of
-    CD28 for CD8 T cell proliferation after PD-1 blockade" (Kamphorst
-    2017, PMID 28280249). ICB rescue should scale WITH costimulation.
+    PMID 28280247), and Kamphorst 2017 (PMID 28280249) is titled
+    "Rescue of exhausted CD8 T cells by PD-1-targeted therapies is
+    CD28-dependent". Blockade now multiplies costimulation rather than
+    adding to the signal, so suppressing costimulation lowers killing
+    at EVERY blockade level and rescue vanishes when CD28 does.
 
-    Rewriting that term changes the flagship Immunotherapy preset, so
-    it is recorded here and the costimulation route stays unused.
+    ``treg_suppression`` still routes through perforin rather than
+    costimulation, for the reason Chen 2005 measured rather than for
+    this defect -- see that module's docstring.
     """
     a, m = MEASURED_AFFINITY, MEASURED_MHC1
     # Without blockade, falling costimulation falls the kill probability,
@@ -589,19 +590,28 @@ def test_the_icb_rescue_term_makes_the_costimulation_route_unusable():
     assert open_full > open_none
     assert open_none == 0.0
 
-    # Under full blockade the sign flips: no costimulation kills better.
+    # Under full blockade the sign no longer flips. It used to:
+    # blocked_none was 1.25x blocked_full.
     blocked_full = kill_probability(a, m, COSTIM, 1.0)
     blocked_none = kill_probability(a, m, 0.0, 1.0)
-    assert blocked_none > blocked_full, (blocked_none, blocked_full)
-    assert blocked_none / blocked_full > 1.25
+    assert blocked_full > blocked_none, (blocked_full, blocked_none)
+    assert blocked_none == 0.0
 
-    # The crossover is where affinity x MHC-I meets the rescue slope.
+    # Monotone in costimulation at every blockade level, which is the
+    # property the additive term violated above its crossover.
+    for block in (0.0, 0.25, 0.551, 0.75, 1.0):
+        ps = [kill_probability(a, m, c / 20.0, block) for c in range(21)]
+        assert ps == sorted(ps), (block, ps)
+
+    # The old term's crossover, kept on the record because it is what
+    # made the defect measurable: above checkpoint_block 0.551 the
+    # additive rescue outgrew the recognition it was displacing. The
+    # inversion is gone on BOTH sides of it now.
     crossover = a * m / 0.5
     assert crossover == pytest.approx(0.5512, abs=1e-3)
-    assert kill_probability(a, m, 0.0, crossover - 0.05) < kill_probability(
-        a, m, COSTIM, crossover - 0.05)
-    assert kill_probability(a, m, 0.0, crossover + 0.05) > kill_probability(
-        a, m, COSTIM, crossover + 0.05)
+    for block in (crossover - 0.05, crossover + 0.05):
+        assert kill_probability(a, m, 0.0, block) < kill_probability(
+            a, m, COSTIM, block)
 
     # The route this module took instead is blockade-independent, so it
     # cannot invert: the Treg multiplier is a plain factor on the path.
@@ -613,15 +623,21 @@ def test_the_icb_rescue_term_makes_the_costimulation_route_unusable():
 
 
 def test_the_hill_rule_sits_below_its_ec50_in_a_real_contact():
-    """Why the costimulation route would have been a big lever if the
-    rescue term were right, and why the measurement had to be taken
-    before choosing: at the measured mean signal of 0.1654 against the
-    rule's EC50 of 0.30, the Hill is in its quartic region, so
-    d(ln p)/d(ln costim) is 3.66 at the mean inputs (3.61 as the mean
-    of the per-contact elasticities, which is the quantity the runs
-    recorded) -- a 10% costimulation cut would be a 31%
-    kill-probability cut. Under full blockade the same elasticity
-    measures 1.26, a 2.9x difference between presets."""
+    """Why costimulation is a big lever, and why the measurement had to
+    be taken before choosing: at the measured mean signal of 0.1654
+    against the rule's EC50 of 0.30, the Hill is in its quartic region,
+    so d(ln p)/d(ln costim) is 3.66 at the mean inputs (3.61 as the
+    mean of the per-contact elasticities, which is the quantity the
+    runs recorded) -- a 10% costimulation cut is a 31%
+    kill-probability cut.
+
+    Under full blockade the elasticity is 2.34, a 1.57x difference
+    between presets. It was 1.26 and 2.9x when the rescue term was
+    additive: blockade used to push the signal far higher by adding to
+    it directly, flattening the Hill more. Now it restores
+    costimulation to its ceiling instead, which lands lower, so the
+    lever stays steeper under therapy than it used to be.
+    """
     a, m = MEASURED_AFFINITY, MEASURED_MHC1
     signal = a * m * COSTIM
     assert signal == pytest.approx(MEASURED_SIGNAL, abs=5e-4)
@@ -630,9 +646,9 @@ def test_the_hill_rule_sits_below_its_ec50_in_a_real_contact():
     elasticity = 4.0 * (1.0 - p)
     assert elasticity == pytest.approx(3.662, abs=0.01)
     p_blocked = kill_probability(a, m, COSTIM, 1.0)
-    assert 4.0 * (1.0 - p_blocked) == pytest.approx(1.257, abs=0.01)
+    assert 4.0 * (1.0 - p_blocked) == pytest.approx(2.337, abs=0.01)
     assert elasticity / (4.0 * (1.0 - p_blocked)) == pytest.approx(
-        2.91, abs=0.05)
+        1.567, abs=0.05)
 
 
 # ── part 5: sensitivity to each new constant ─────────────────────────

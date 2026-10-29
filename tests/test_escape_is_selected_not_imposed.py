@@ -482,9 +482,17 @@ def test_a_t_cell_never_kills_a_cell_that_lost_mhc1_even_under_blockade():
     """The structural claim of the whole item. 20 intact and 20
     total-loss cells in one arena, 20 T cells, 6 h, seeds 1-3: the
     escaped half takes 0 kills at checkpoint_block 0.0 AND at 1.0,
-    while the intact half goes 13 -> 49. Blockade acts downstream of
-    recognition, and _recognize has already returned (False, None)."""
-    for block, expect_intact in ((0.0, 13), (1.0, 49)):
+    while the intact half goes 13 -> 36.
+
+    This now holds for TWO independent reasons, where it used to hold
+    for one. _recognize still hard-gates below MHC-I 0.05 and has
+    already returned (False, None). But the kill rule itself also
+    returns exactly 0.0 at MHC-I 0.0 under full blockade, where the old
+    additive rescue term returned 0.165 -- so the result no longer
+    rests entirely on the gate. Remove the gate and this test still
+    passes.
+    """
+    for block, expect_intact in ((0.0, 13), (1.0, 36)):
         escaped = intact = 0
         for seed in (1, 2, 3):
             out = arena('total_loss', n_t=20, checkpoint_block=block,
@@ -497,48 +505,55 @@ def test_a_t_cell_never_kills_a_cell_that_lost_mhc1_even_under_blockade():
 
 
 def test_a_partial_loss_is_rescued_by_blockade_and_a_total_loss_is_not():
-    """Why the two MHC-I routes had to stay structurally apart -- and the
-    half of the item's done-when that this engine does NOT support.
+    """Why the two MHC-I routes stay structurally apart -- and the half
+    of the item's done-when that this engine STILL does not support,
+    now for a different and more interesting reason.
 
     A one-allele loss keeps the cell recognised at a lower signal: it
-    takes 0 kills against the intact half's 7 without blockade, and
-    blockade brings it all the way back to PARITY, 30 against 31. A
-    total loss is 0 at both (test above).
+    takes 0 kills against the intact half's 7 without blockade, and 16
+    against 19 under full blockade. A total loss is 0 at both (test
+    above).
 
-    WHAT THAT DOES AND DOES NOT ESTABLISH. It establishes that blockade
-    separates PARTIAL from TOTAL MHC-I loss. It does NOT establish the
-    done-when, which was "checkpoint blockade restores killing only
-    where PD-L1 was the escape route" -- this docstring used to claim it
-    did, and the test's own numbers contradict that claim. Blockade
-    rescues the HLA-loss route, the one route with a sourced rate and
-    the only one founder seeding uses, and it rescues it HARDER than it
-    helps an intact cell. Measured per contact at affinity 0.95 and
-    costimulation 0.6:
+    WHAT CHANGED. The ICB rescue term used to be additive and
+    MHC-I-blind, and it took the escape penalty from 0.21 to 0.78 of
+    the intact cell -- near parity, so therapy nearly erased the cost
+    of escape. It is now multiplicative on costimulation, and the
+    per-contact penalty survives therapy:
 
       target MHC-I   p_kill at block 0.0   at block 1.0   ratio
-          0.20 (escaped)      0.0204           0.5455     26.7x
-          0.30 (intact)       0.0955           0.7005      7.3x
+          0.20 (escaped)      0.0204           0.1386      6.8x
+          0.30 (intact)       0.0955           0.4489      4.7x
 
-    The escape penalty shrinks from 0.21 to 0.78 of the intact cell.
-    The cause is structural and is pinned two tests above
-    (test_the_t_cell_arm_never_reads_the_targets_pdl1): the rescue term
-    is (1 - costim) * block * 0.5, which contains neither affinity nor
-    MHC-I nor the target's PD-L1. Total loss resists blockade only
-    because _recognize hard-gates below 0.05 -- the rule itself still
-    returns p = 0.165 at MHC-I 0.0 and p = 0.233 at 0.04 under full
-    blockade -- so it is a gate, not a graded mechanism. And the PD-L1
-    half of the criterion is demonstrated only on a hand-set
-    pdl1_expression of 1.0 against a MACROPHAGE (next test), because
-    PDL1_HERITABLE_GAIN_PER_DIVISION is 0.0 and the T-cell arm never
-    reads PD-L1 at all.
+    Escape penalty under full blockade: 0.31 of the intact cell, where
+    it used to be 0.78. And p at MHC-I 0.0 is now exactly 0.0 rather
+    than 0.165, so total loss resists blockade structurally instead of
+    only via _recognize's 0.05 floor.
 
-    So: total MHC-I loss is not rescuable by blockade; PD-L1 gain is,
-    on the macrophage arm; partial MHC-I loss is ALSO rescued, because
-    the ICB term is independent of MHC-I. Making the three separable
-    means rewriting that term to scale with costimulation and with the
-    target's PD-L1 (Hui 2017 PMID 28280247, Kamphorst 2017 PMID
-    28280249), which changes the flagship Immunotherapy preset and is
-    not this change.
+    WHAT STILL DOES NOT HOLD. The done-when was "checkpoint blockade
+    restores killing only where PD-L1 was the escape route", and the
+    arena still refutes it: 16 escaped kills against 19 intact is not
+    far off parity even though the per-contact penalty is 0.31. The
+    cause is no longer the rescue term -- it is ADDITIVE CYTOTOXICITY.
+    Death integrates perforin hits across repeated contacts (Weigelin
+    2021, see kill_calibration), so over 6 h a cell at 31% of the
+    intact per-contact probability still accumulates lethal damage. A
+    per-contact penalty does not become a population-level penalty when
+    contacts are plentiful.
+
+    That is a real property of the kill model rather than a defect, and
+    it means the route-separation criterion can only be met for TOTAL
+    loss, which is absolute, and not for partial loss, which is a
+    rate. Blockade still rescues the escaped cell proportionally MORE
+    (6.8x against 4.7x) -- but that is the Hill curve's convexity in
+    its low region, not an MHC-I-blind bonus, and the absolute gap is
+    preserved.
+
+    The PD-L1 half is demonstrated only on a hand-set pdl1_expression
+    of 1.0 against a MACROPHAGE (next test), because
+    PDL1_HERITABLE_GAIN_PER_DIVISION is 0.0. The T-cell arm reads no
+    PD-L1 at all, and per Klement 2023 (PMID 36917954) it should not:
+    tumour PD-L1 conferred no protection against CTL cytotoxicity in
+    4T1 or CT26, unrescuable by IFN-gamma pretreatment.
     """
     open_ = [arena('allele_loss', n_t=20, checkpoint_block=0.0, seed=s)
              for s in (1, 2, 3)]
@@ -547,30 +562,30 @@ def test_a_partial_loss_is_rescued_by_blockade_and_a_total_loss_is_not():
     assert (sum(o['escaped'] for o in open_),
             sum(o['intact'] for o in open_)) == (0, 7)
     assert (sum(b['escaped'] for b in blocked),
-            sum(b['intact'] for b in blocked)) == (30, 31)
+            sum(b['intact'] for b in blocked)) == (16, 19)
 
     # The per-contact numbers behind the paragraph above, so the claim
-    # "blockade helps the escaped cell MORE" is pinned to the rule and
-    # not left as prose. If the ICB term is ever made MHC-I-dependent
-    # these ratios change and this assertion is where it shows.
+    # about what blockade does to the escape penalty is pinned to the
+    # rule and not left as prose.
     esc_open = kill_probability(0.95, MHC1_AFTER_ONE_ALLELE_LOST, 0.6, 0.0)
     esc_block = kill_probability(0.95, MHC1_AFTER_ONE_ALLELE_LOST, 0.6, 1.0)
     int_open = kill_probability(0.95, MHC1_SEEDED, 0.6, 0.0)
     int_block = kill_probability(0.95, MHC1_SEEDED, 0.6, 1.0)
     assert esc_open == pytest.approx(0.0204255, abs=1e-6)
-    assert esc_block == pytest.approx(0.5454844, abs=1e-6)
+    assert esc_block == pytest.approx(0.1385920, abs=1e-6)
     assert int_open == pytest.approx(0.0954810, abs=1e-6)
-    assert int_block == pytest.approx(0.7004997, abs=1e-6)
+    assert int_block == pytest.approx(0.4488859, abs=1e-6)
+    # Blockade still raises the dim cell proportionally more, because the
+    # Hill curve is convex below its EC50 -- but the ABSOLUTE penalty now
+    # survives therapy, which is the property that matters for selection.
     assert esc_block / esc_open > int_block / int_open
     assert esc_open / int_open == pytest.approx(0.2139, abs=1e-3)
-    assert esc_block / int_block == pytest.approx(0.7787, abs=1e-3)
-    # A cell just under the recognition floor would be rescued too, so
-    # the "blockade cannot rescue MHC-I loss" result is the floor and
-    # nothing else.
+    assert esc_block / int_block == pytest.approx(0.3087, abs=1e-3)
+    # Total loss is resisted by the RULE, not only by the 0.05 floor:
+    # a cell just under the floor is no longer handed a kill either.
     assert kill_probability(0.95, 0.04, 0.6, 1.0) == pytest.approx(
-        0.2332, abs=1e-3)
-    assert kill_probability(0.95, 0.0, 0.6, 1.0) == pytest.approx(
-        0.1649, abs=1e-3)
+        0.000257, abs=1e-5)
+    assert kill_probability(0.95, 0.0, 0.6, 1.0) == 0.0
 
 
 def test_blockade_restores_phagocytosis_of_a_pdl1_high_cell():

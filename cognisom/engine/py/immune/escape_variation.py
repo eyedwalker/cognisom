@@ -246,33 +246,38 @@ Three consequences for anyone reading these rates:
   ``checkpoint_block`` 1.0. "Raise the T-cell share" therefore helps
   only WITHOUT blockade. These three seeds are not pinned in the
   suite; the 12-seed Baseline and Aggressive arms are.
-* BLOCKADE DOES NOT SEPARATE THE ROUTES, which is the half of the
-  item's done-when that this engine does not support. The intent was
-  that an MHC-I-loss cell resist checkpoint blockade while a PD-L1-gain
-  cell is rescued by it, so blockade identifies the escape route. What
-  the engine does instead (``tcell_kill.kill_probability``, measured):
-  the ICB term is ``(1 - costimulation) * block * 0.5``, which contains
-  neither affinity nor the target's MHC-I nor the target's PD-L1 --
-  and the T-cell branch of ``ImmuneModule._target_kill_probability``
-  never passes ``pdl1_expression`` at all. Per contact at affinity 0.95
-  and costimulation 0.6, full blockade takes an escaped cell at MHC-I
-  0.20 from p 0.0204 to 0.5455 (26.7x) and an intact one at 0.30 from
-  0.0955 to 0.7005 (7.3x): the escape PENALTY shrinks from 0.21 to 0.78
-  of the intact cell, so blockade helps the escaped cell MORE. The only
-  route that resists blockade is TOTAL loss, and only because
-  ``_recognize`` hard-gates below 0.05 -- the rule itself still returns
-  p = 0.165 at MHC-I 0.0 under full blockade, and p = 0.233 at 0.04.
-  So blockade separates PARTIAL from TOTAL MHC-I loss and not
-  MHC-I loss from PD-L1 gain. PD-L1 gates only the MACROPHAGE path
-  (measured: pdl1 1.0 goes 0.015 -> 0.050 under blockade, pdl1 0.0
-  unchanged at 0.050), and the heritable PD-L1 rate here is 0.0, so the
-  PD-L1 half of the criterion is demonstrated only on a hand-set
-  phenotype. Fixing it means making the rescue term scale WITH
-  costimulation and with the target's PD-L1 -- which is the sign
-  Hui 2017 (PMID 28280247) and Kamphorst 2017 (PMID 28280249) give, and
-  the same defect ``treg_suppression`` records from the other
-  direction. That rewrite changes the flagship Immunotherapy preset and
-  is not this change.
+* BLOCKADE NOW SEPARATES THE ROUTES, but through two lineages rather
+  than one rule. The item's done-when was that an MHC-I-loss cell
+  resist checkpoint blockade while a PD-L1-gain cell is rescued by it,
+  so blockade identifies the escape route.
+
+  When this module was written it did not. The ICB term was
+  ``(1 - costimulation) * block * 0.5``, containing neither affinity
+  nor the target's MHC-I, so at affinity 0.95 and costimulation 0.6
+  full blockade took an escaped cell at MHC-I 0.20 from p 0.0204 to
+  0.5455 (26.7x) against an intact cell's 0.9287 to 0.9775 (1.1x): the
+  escape PENALTY went from 0.022 to 0.558 of the intact cell, so
+  therapy helped the escaped cell more. Only TOTAL loss resisted
+  blockade, and only because ``_recognize`` hard-gates below 0.05 --
+  the rule itself returned p = 0.165 at MHC-I 0.0.
+
+  That term has since been rewritten (see ``tcell_kill``): blockade
+  relieves PD-1 suppression of CD28 multiplicatively, so the signal is
+  ``affinity * mhc1 * c_eff`` and cannot exist without recognition. The
+  escape penalty under full blockade is now 0.140, p at MHC-I 0.0 is
+  0.0 rather than 0.165, and ``checkpoint_block = 0`` is bit-identical
+  to the old rule -- so the 12-seed Baseline and Aggressive numbers
+  above are unaffected, since neither preset sets it.
+
+  The PD-L1 half resolved the other way, and not by code: Klement 2023
+  (PMID 36917954) deleted Cd274 in 4T1 and CT26 and found tumour PD-L1
+  "conferred no protection against ... cytotoxicity", unrescuable by
+  IFN-gamma pretreatment. So a PD-L1-gain cell is NOT supposed to be
+  rescued on the T-cell path, and PD-L1 correctly gates only the
+  MACROPHAGE path (measured: pdl1 1.0 goes 0.015 -> 0.050 under
+  blockade, pdl1 0.0 unchanged at 0.050). The heritable PD-L1 rate here
+  is still 0.0, so that half is demonstrated only on a hand-set
+  phenotype.
 * the NK step is a LIVE sign error, not a latent one. This previously
   read "both phenotypes sit below 0.4 in a shipped run ... 0 of 55 at or
   above the step at 23 of 24 hourly samples", and the measurement it

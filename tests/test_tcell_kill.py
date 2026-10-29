@@ -6,7 +6,9 @@ Covers engine/py/immune/tcell_kill.py:
   * zero affinity, zero MHC, or zero costim with no checkpoint block
     yields zero kill probability
   * monotone in each of affinity, mhc_level, costimulation
-  * checkpoint block provides a partial rescue when costim is low
+  * checkpoint block rescues a PARTIALLY costimulated clone, and cannot
+    rescue a CD28-null one (Kamphorst 2017, PMID 28280249) nor push
+    past full costimulation
   * out-of-range inputs are clamped (no exceptions, no extrapolation)
   * Hill threshold lowers the EC50 (more permissive kills)
   * kill_outcome carries the full decomposition
@@ -19,6 +21,7 @@ import pytest
 
 from cognisom.engine.py.immune.tcell_kill import (
     DEFAULT_HILL_THRESHOLD,
+    PD1_CD28_RELIEF,
     KillOutcome,
     kill_outcome,
     kill_probability,
@@ -91,22 +94,40 @@ def test_monotone_in_costim_when_checkpoint_block_zero():
 # Checkpoint rescue
 # ---------------------------------------------------------------------------
 
-def test_checkpoint_block_rescues_low_costim_state():
-    # Affinity and MHC are high but costim is zero; without checkpoint
-    # block, probability is 0. Adding checkpoint block should produce
-    # a non-zero probability.
-    p_no_block = kill_probability(0.9, 0.9, 0.0, checkpoint_block=0.0)
-    p_with_block = kill_probability(0.9, 0.9, 0.0, checkpoint_block=1.0)
-    assert p_no_block == 0.0
-    assert p_with_block > 0.0
+def test_checkpoint_block_rescues_a_partly_costimulated_state():
+    # Affinity and MHC are high and costimulation is PARTIAL: PD-1 is
+    # holding down a CD28 signal that exists, which is the state
+    # blockade relieves. Blockade must raise the kill probability.
+    #
+    # This test used to use costim 0.0 and assert rescue there, back
+    # when the rescue term was additive. That is the one place the
+    # literature is explicit there should be NO rescue -- see
+    # test_checkpoint_block_cannot_rescue_a_cd28_null_clone.
+    p_no_block = kill_probability(0.9, 0.9, 0.3, checkpoint_block=0.0)
+    p_with_block = kill_probability(0.9, 0.9, 0.3, checkpoint_block=1.0)
+    assert p_with_block > p_no_block
 
 
-def test_checkpoint_block_below_full_costim_pathway():
-    # Even at full checkpoint block, the rescue term is half-strength,
-    # so it cannot exceed the regular pathway when costim is also full.
+def test_checkpoint_block_cannot_rescue_a_cd28_null_clone():
+    # Kamphorst 2017 (PMID 28280249): "Rescue of exhausted CD8 T cells
+    # by PD-1-targeted therapies is CD28-dependent". With no CD28
+    # signal there is nothing for PD-1 relief to restore, so blockade
+    # does nothing. The additive rescue term was at its MAXIMUM here
+    # and returned 0.885.
+    assert kill_probability(0.9, 0.9, 0.0, checkpoint_block=0.0) == 0.0
+    assert kill_probability(0.9, 0.9, 0.0, checkpoint_block=1.0) == 0.0
+
+
+def test_checkpoint_block_cannot_exceed_full_costimulation():
+    # Blockade restores CD28 signalling; it cannot push past the
+    # ceiling, so a fully costimulated clone gains nothing from it.
     p_full_costim = kill_probability(0.9, 0.9, 1.0, checkpoint_block=0.0)
-    p_full_block = kill_probability(0.9, 0.9, 0.0, checkpoint_block=1.0)
-    assert p_full_costim > p_full_block
+    p_both = kill_probability(0.9, 0.9, 1.0, checkpoint_block=1.0)
+    assert p_full_costim == pytest.approx(p_both)
+    # And a half-costimulated clone under full blockade reaches that
+    # same ceiling, rather than overshooting it.
+    assert kill_probability(0.9, 0.9, 0.5, checkpoint_block=1.0) == pytest.approx(
+        p_full_costim)
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +181,10 @@ def test_kill_outcome_exposes_components():
     assert out.mhc_level == 0.7
     assert out.costimulation == 0.6
     assert out.checkpoint_block == 0.2
-    expected_signal = 0.8 * 0.7 * 0.6 + (1.0 - 0.6) * 0.2 * 0.5
+    # Blockade relieves PD-1 suppression of CD28, so it scales the
+    # costimulation arm rather than adding a floor to the signal.
+    expected_costim = min(1.0, 0.6 * (1.0 + PD1_CD28_RELIEF * 0.2))
+    expected_signal = 0.8 * 0.7 * expected_costim
+    assert math.isclose(out.effective_costimulation, expected_costim, abs_tol=1e-9)
     assert math.isclose(out.combined_signal, expected_signal, abs_tol=1e-9)
     assert 0.0 <= out.kill_probability <= 1.0

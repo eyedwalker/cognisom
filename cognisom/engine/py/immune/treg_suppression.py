@@ -70,30 +70,37 @@ The mechanism, and why it is not the costimulation input
 --------------------------------------------------------
 The engine's kill rule already takes a costimulation input, so lowering
 effective costimulation looked like the way to express a Treg without a
-new multiplier. The measurement killed that option, and the reason is a
-defect in the existing rule rather than anything about Tregs:
+new multiplier. The measurement ruled it out, and at the time the
+reason was a defect in the existing rule rather than anything about
+Tregs:
 
-``tcell_kill.kill_probability`` adds an ICB-rescue term
+``tcell_kill.kill_probability`` added an ICB-rescue term
 ``(1 - costimulation) * checkpoint_block * 0.5``, which is largest when
 costimulation is ZERO. Since ``affinity * mhc1`` measures ~0.28 in a
-real run and the rescue slope is 0.5, the combined signal starts RISING
-as costimulation falls once ``checkpoint_block > 0.56``. Projected on
-the measured contacts, routing a Treg through costimulation gives
--27.4% expected perforin hits in Baseline (checkpoint_block 0) but
-+29.5% in the Immunotherapy preset (checkpoint_block 1.0): under
-blockade the model would make an anergic T cell kill BETTER than a
-costimulated one, and a Treg would read as a pro-immune intervention.
+real run and the rescue slope was 0.5, the combined signal started
+RISING as costimulation fell once ``checkpoint_block > 0.56``.
+Projected on the measured contacts, routing a Treg through
+costimulation gave -27.4% expected perforin hits in Baseline
+(checkpoint_block 0) but +29.5% in the Immunotherapy preset
+(checkpoint_block 1.0): under blockade the model would have made an
+anergic T cell kill BETTER than a costimulated one, and a Treg would
+have read as a pro-immune intervention.
 
-That is backwards, and the literature says which way round it should be:
-PD-1 "suppresses T cell function primarily by inactivating CD28
+That was backwards, and the literature says which way round it should
+be: PD-1 "suppresses T cell function primarily by inactivating CD28
 signaling" (Hui 2017, PMID 28280247) and "Rescue of exhausted CD8 T
-cells by PD-1-targeted therapies is CD28-dependent", with "a
-cell-intrinsic requirement of CD28 for CD8 T cell proliferation after
-PD-1 blockade" (Kamphorst 2017, PMID 28280249). ICB rescue should scale
-WITH costimulation, not with its absence. Rewriting that term changes
-the flagship Immunotherapy preset and is not this change; it is
-recorded here as a found defect, and the costimulation route stays
-unused until it is fixed.
+cells by PD-1-targeted therapies is CD28-dependent" (Kamphorst 2017,
+PMID 28280249). THAT TERM HAS SINCE BEEN FIXED -- blockade now scales
+costimulation multiplicatively, so the sign inversion is gone and the
+costimulation route is no longer structurally blocked.
+
+This module still does not use it, for a reason that does not depend on
+the defect: Chen 2005 measured recognition and expansion being left
+INTACT and cytotoxicity being suppressed, so costimulation is the wrong
+input to express that Treg through whatever its arithmetic. A
+costimulation-routed Treg would also now be partly cancelled by
+blockade rather than inverted by it, which is correct behaviour and
+still not what the paper measured.
 
 So this module uses the mechanism the primary Treg paper actually
 measured. Chen 2005 (PMID 15623559) found Tregs abolish CD8-mediated

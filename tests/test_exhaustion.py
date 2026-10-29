@@ -169,31 +169,55 @@ def test_precursor_kill_unchanged_when_not_exhausted():
 
 
 def test_checkpoint_rescue_works_for_precursor():
-    """Precursor with zero costim still gets some kill via ICB."""
-    p = kill_probability(
-        0.9, 0.9, 0.0,
-        checkpoint_block=1.0,
-        is_exhausted=False,
-    )
-    assert p > 0.0
+    """A precursor under PD-1 restraint is lifted by ICB.
+
+    Costimulation is PARTIAL here, not zero: blockade relieves PD-1
+    suppression of CD28, so there has to be a CD28 signal for it to
+    restore. This test used to pass costim 0.0 and assert rescue there,
+    which is the one case Kamphorst 2017 (PMID 28280249) says cannot be
+    rescued -- see test_checkpoint_rescue_needs_costimulation.
+    """
+    p_restrained = kill_probability(
+        0.9, 0.9, 0.3, checkpoint_block=0.0, is_exhausted=False)
+    p_blocked = kill_probability(
+        0.9, 0.9, 0.3, checkpoint_block=1.0, is_exhausted=False)
+    assert p_blocked > p_restrained
+
+
+def test_checkpoint_rescue_needs_costimulation():
+    """Kamphorst 2017: rescue by PD-1 blockade is CD28-dependent.
+
+    With no CD28 signal there is nothing for PD-1 relief to restore,
+    whatever the clone's exhaustion state.
+    """
+    for exhausted in (False, True):
+        assert kill_probability(
+            0.9, 0.9, 0.0, checkpoint_block=1.0,
+            is_exhausted=exhausted) == 0.0
 
 
 def test_checkpoint_rescue_blocked_for_exhausted():
     """The patent-evidence point: exhausted clones cannot be rescued by
-    checkpoint blockade. Same inputs that would lift the precursor
-    above zero must collapse to ~0 for the exhausted case."""
-    p_precursor = kill_probability(
-        0.9, 0.9, 0.0,
-        checkpoint_block=1.0,
-        is_exhausted=False,
-    )
-    p_exhausted = kill_probability(
-        0.9, 0.9, 0.0,
-        checkpoint_block=1.0,
-        is_exhausted=True,
-    )
-    assert p_precursor > 0.5
-    assert p_exhausted == pytest.approx(0.0, abs=1e-9)
+    checkpoint blockade.
+
+    Stated as the absence of rescue rather than as a zero: the
+    exhausted clone's probability is IDENTICAL with and without
+    blockade, so blockade provably does nothing for it, while the same
+    blockade lifts the precursor well clear of it. The previous form
+    asserted the exhausted case was ~0.0, which it was only because
+    costimulation was 0 and so the signal vanished for an unrelated
+    reason -- it would have passed even if the exhaustion gate were
+    deleted.
+    """
+    kwargs = dict(is_exhausted=True, exhaustion_multiplier=EXHAUSTED_KILL_MULTIPLIER)
+    p_exhausted_open = kill_probability(0.9, 0.9, 0.3, checkpoint_block=0.0, **kwargs)
+    p_exhausted_blocked = kill_probability(0.9, 0.9, 0.3, checkpoint_block=1.0, **kwargs)
+    assert p_exhausted_blocked == pytest.approx(p_exhausted_open)
+
+    p_precursor_blocked = kill_probability(
+        0.9, 0.9, 0.3, checkpoint_block=1.0, is_exhausted=False)
+    assert p_precursor_blocked > 0.5
+    assert p_exhausted_blocked < 0.1 * p_precursor_blocked
 
 
 def test_exhausted_kill_is_scaled_down_with_full_costim():
