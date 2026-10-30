@@ -28,10 +28,13 @@ import time
 import uuid
 from typing import Dict, Optional, Tuple
 
+# One copy of this id lives in gpu_connector. There were three hardcoded
+# copies, and all three named a box that no longer exists.
+from cognisom.infrastructure.gpu_connector import GPU_INSTANCE_ID
+
 logger = logging.getLogger(__name__)
 
 # Configuration
-GPU_INSTANCE_ID = os.environ.get("GPU_INSTANCE_ID", "i-0ac9eb88c1b046163")
 GPU_REGION = os.environ.get("GPU_REGION", "us-west-2")
 PARABRICKS_IMAGE = "nvcr.io/nvidia/clara/clara-parabricks:4.7.0-1"
 REF_DIR = "/opt/cognisom/ref"

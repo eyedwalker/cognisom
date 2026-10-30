@@ -23,6 +23,7 @@ import omni.usd
 from .simulation_manager import SimulationManager
 from .diapedesis_manager import DiapedesisManager
 from .molecular_manager import MolecularManager
+from .usd_scene_manager import UsdSceneManager
 from .streaming_server import StreamingServer, _encode_jpeg
 
 
@@ -36,6 +37,7 @@ class CognisomSimExtension(omni.ext.IExt):
         self._simulation_manager = None
         self._diapedesis_manager = None
         self._molecular_manager = None
+        self._usd_scene_manager = None
         self._streaming_server = None
         self._menu_items = []
         self._update_sub = None
@@ -78,12 +80,17 @@ class CognisomSimExtension(omni.ext.IExt):
         self._simulation_manager = SimulationManager()
         self._diapedesis_manager = DiapedesisManager()
         self._molecular_manager = MolecularManager()
+        # Opens Bio-USD stages written by visualization.run_usd, so
+        # RTX can render what the engine simulated rather than only
+        # scenes this extension builds itself.
+        self._usd_scene_manager = UsdSceneManager()
 
         # Start HTTP server for simulation control + MJPEG streaming.
         # Port 8600 — Isaac Sim's streaming server already uses 8211.
         self._streaming_server = StreamingServer(
             self._diapedesis_manager,
             molecular_manager=self._molecular_manager,
+            usd_scene_manager=self._usd_scene_manager,
             port=8600)
         self._streaming_server.start()
 
@@ -131,6 +138,10 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._molecular_manager:
             self._molecular_manager.clear()
             self._molecular_manager = None
+
+        if self._usd_scene_manager:
+            self._usd_scene_manager.clear()
+            self._usd_scene_manager = None
 
         # Clean up HydraTexture
         if self._hydra_texture:
@@ -996,6 +1007,74 @@ class CognisomSimExtension(omni.ext.IExt):
         if self._diapedesis_manager:
             self._diapedesis_manager.process_pending()
 
+        if self._usd_scene_manager:
+            self._usd_scene_manager.process_pending()
+            # Opening a stage REPLACES the one the RTX annotator was
+            # attached to, which invalidates its render product: capture
+            # then fails with
+            #   '/Render/PostProcess/SDGPipeline/Replicator_LdrColorSDhostPtr'
+            # and /frame.jpg quietly falls back to the PIL placeholder.
+            # The diapedesis and molecular paths already recreate the
+            # annotator after a rebuild; a stage load needs it for the
+            # same reason.
+            usd_status = self._usd_scene_manager.status()
+            load_count = usd_status.get("load_count", 0)
+            if not hasattr(self, "_usd_load_count"):
+                self._usd_load_count = 0
+            if load_count > self._usd_load_count:
+                self._usd_load_count = load_count
+                # The HydraTexture that FEEDS the capture is bound to a
+                # camera path, and headless setup binds it to
+                # /World/DiapedesisCam. Opening a stage replaces the
+                # scene, so that camera no longer exists and the texture
+                # renders nothing. Setting the VIEWPORT camera does not
+                # move the texture; its own camera_path has to be set.
+                # Remember it rather than applying it once: headless
+                # setup is async and may create the texture AFTER the
+                # first stage arrives, in which case a single attempt
+                # here runs against _hydra_texture is None and is lost.
+                self._usd_stage_camera = usd_status.get("camera")
+                carb.log_warn(
+                    "[cognisom.sim] Bio-USD stage opened — recreating annotator")
+                self._empty_frame_count = 0
+                self._orchestrator_kicked = False
+                self._recovering = False
+                asyncio.ensure_future(self._recreate_annotator_after_build())
+
+            # Keep the CAPTURE camera on the stage's own camera. The
+            # HydraTexture that feeds /frame.jpg is bound to a camera
+            # path -- headless setup binds it to /World/DiapedesisCam --
+            # and opening a stage deletes that prim, so the texture
+            # renders an empty scene. Setting the viewport camera does
+            # not move it. Re-checked each tick because the texture may
+            # be created after the stage was already open.
+            # Two capture paths exist and they need different calls. Under
+            # isaac-sim.streaming.sh a real VIEWPORT exists, the annotator
+            # attaches to its render product and _hydra_texture stays None;
+            # only the headless-no-viewport path builds a HydraTexture.
+            # Handling just the latter left the viewport pointed at Kit's
+            # default perspective camera, so /frame.jpg showed the default
+            # scene -- a grey vessel on white -- while the stage it had
+            # just loaded was never in shot.
+            desired = getattr(self, "_usd_stage_camera", None)
+            if desired and desired != getattr(self, "_camera_applied", None):
+                applied = False
+                if self._hydra_texture is not None:
+                    try:
+                        self._hydra_texture.camera_path = desired
+                        applied = True
+                        carb.log_warn(
+                            f"[cognisom.sim] HydraTexture camera -> {desired}")
+                    except Exception as exc:           # noqa: BLE001
+                        carb.log_warn(
+                            f"[cognisom.sim] HydraTexture camera failed: {exc}")
+                else:
+                    self._set_active_camera(desired)
+                    applied = True
+                if applied:
+                    self._camera_path = desired
+                    self._camera_applied = desired
+
         if self._molecular_manager:
             self._molecular_manager.process_pending()
             # Check if molecular scene was just rebuilt — recreate annotator
@@ -1239,6 +1318,77 @@ class CognisomSimExtension(omni.ext.IExt):
         carb.log_warn("[cognisom.sim] Annotator recreated after "
                       "scene build")
 
+    # KNOWN DEFECT -- the RTX capture of a Bio-USD stage is STATIC.
+    #
+    # Opening a stage renders ONE correct RTX frame (right camera, right
+    # content, right lighting) and then /frame.jpg returns the same bytes
+    # forever: through timeline seeks, through camera moves, and while
+    # playing. The stage underneath is fine -- status reports the right
+    # simulated hour and the camera's distance and pivot change -- so
+    # this is the capture, not the scene.
+    #
+    # Measured on an L4 (2026-10-25), and the L40S run of 2026-10-24 shows
+    # it too: four stills saved at hours 0, 3, 6 and 12 were all exactly
+    # 117 KB, which a shrinking tumour cannot produce.
+    #
+    # Ruled out, each by a separate run:
+    #   - the annotator being empty. It returns a full (1080,1920,4)
+    #     uint8 buffer every frame; the PIXELS are identical.
+    #   - which render product feeds it: the viewport's, a standalone
+    #     one, and a forced HydraTexture all behave the same.
+    #   - stepping rep.orchestrator every frame to drive the render
+    #     product (no change, and step_async pauses the timeline).
+    #   - asking the viewport to draw via schedule_update/request_draw.
+    #   - the WebRTC livestream owning the render loop with no client
+    #     attached: --/app/livestream/enabled=false changes nothing.
+    #
+    # MEASURED 2026-10-26, on an A10G, with a probe that bypassed this
+    # extension entirely (bare Isaac Sim, SimulationApp, no viewport):
+    #
+    #   moving the timeline + app.update()        -> annotator EMPTY, 4/4 same
+    #   + rep.orchestrator.step(pause_timeline=False) -> 4 DISTINCT frames
+    #   + the same while orbiting the camera          -> 3 DISTINCT frames
+    #
+    # So a render product does NOT redraw on its own; it has to be
+    # stepped, and the timeline and the camera BOTH reach the pixels
+    # once it is. That is the mechanism, and it works.
+    #
+    # What does not work is doing it from inside this extension:
+    #   - the synchronous step is refused outright: "Synchronous call to
+    #     `step` can only be performed in a standalone workflow".
+    #   - step_async(pause_timeline=False) runs without error, but the
+    #     annotator here is attached to the VIEWPORT's render product,
+    #     which Replicator does not manage, so the step renders a
+    #     product nobody reads. The capture keeps serving the single
+    #     frame the viewport drew when it started.
+    #   - creating our own render product on the stage camera and
+    #     attaching the annotator to THAT -- the probe's exact sequence,
+    #     attach then step then read -- does get live data through, but
+    #     every frame comes out BLACK inside the streaming app, while
+    #     the identical sequence in a standalone app renders the scene.
+    #     Two render products on one camera is the obvious suspect.
+    #
+    # Beware the >1000-byte guard below when testing this: a black frame
+    # encodes smaller than that, so it is dropped and the PREVIOUS frame
+    # keeps being served. A stale image then looks like a frozen render
+    # rather than a black one.
+    #
+    # Next: give the capture its own camera prim rather than sharing the
+    # viewport's, or drive it through an omni.replicator writer instead
+    # of reading an annotator from the update loop.
+
+    def _have_content(self) -> bool:
+        """Is there anything worth rendering yet?
+
+        Either the diapedesis scene was built, or a Bio-USD stage is
+        open. Recovery used to ask only the first question.
+        """
+        if (self._diapedesis_manager
+                and getattr(self._diapedesis_manager, "_scene_built", False)):
+            return True
+        return bool(self._usd_scene_manager
+                    and self._usd_scene_manager.status().get("loaded"))
+
     def _capture_rtx_frame(self):
         """Read RTX frame from replicator annotator and push to streaming buffer.
 
@@ -1285,11 +1435,14 @@ class CognisomSimExtension(omni.ext.IExt):
                 self._empty_frame_count += 1
                 # Recovery: kick orchestrator after scene is built but
                 # annotator still returns empty
+                # A stage load builds no diapedesis scene, so gating
+                # recovery on _scene_built meant neither path could ever
+                # fire for a Bio-USD stage: the annotator stayed empty
+                # and nothing tried to rescue it.
                 if (self._empty_frame_count == 200 and
                         not self._orchestrator_kicked and
                         not self._recovering and
-                        self._diapedesis_manager and
-                        self._diapedesis_manager._scene_built):
+                        self._have_content()):
                     carb.log_warn(
                         "[cognisom.sim] 200 empty frames post-build — "
                         "kicking orchestrator...")
@@ -1298,8 +1451,7 @@ class CognisomSimExtension(omni.ext.IExt):
                     asyncio.ensure_future(self._recovery_kick())
                 elif (self._empty_frame_count == 600 and
                         not self._recovering and
-                        self._diapedesis_manager and
-                        self._diapedesis_manager._scene_built):
+                        self._have_content()):
                     carb.log_warn(
                         "[cognisom.sim] 600 empty frames — "
                         "trying viewport RP swap...")

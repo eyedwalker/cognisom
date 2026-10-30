@@ -22,9 +22,10 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Cognisom-dedicated instance
-GPU_INSTANCE_ID = "i-0ac9eb88c1b046163"
-GPU_REGION = "us-west-2"
+# The GPU box. One copy of this id lives in gpu_connector; this file
+# had its own, naming an instance that no longer exists.
+from cognisom.infrastructure.gpu_connector import (  # noqa: E402
+    GPU_INSTANCE_ID, GPU_REGION)
 
 # Reference data directory on GPU instance
 REF_DIR = "/opt/cognisom/ref"

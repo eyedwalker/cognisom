@@ -11,6 +11,14 @@ Environment variables:
     GPU_INSTANCE_ID: EC2 instance ID of the GPU box (for start/stop)
     GPU_REGION: AWS region of the GPU instance (default: us-west-2)
     IS_GPU_INSTANCE: Set to "true" if running ON the GPU box itself
+
+The defaults below are STALE and kept only so the names resolve. The
+g6e.2xlarge this project rendered on until 2026-09 (L40S 48 GB,
+i-0ac9eb88c1b046163, Elastic IP 52.32.247.131) has been terminated and
+its address released, so ``GPU_HOST`` and ``GPU_INSTANCE_ID`` must both
+be set to reach a real box. ``get_gpu_instance_state`` returns
+``STATE_MISSING`` rather than "unknown" when the instance is gone, so
+this shows up as a fact instead of a silence.
 """
 
 import logging
@@ -36,7 +44,8 @@ KIT_WEBRTC_PORT = 8211
 def get_kit_server_url() -> str:
     """Get the Kit streaming server URL for server-side Python requests.
 
-    Returns URL like "http://52.32.247.131:8600" or "http://host.docker.internal:8600"
+    Returns a URL like "http://<gpu host>:8600" or
+    "http://host.docker.internal:8600"
     depending on deployment mode.
     """
     custom = os.environ.get("KIT_SERVER_URL", "")
@@ -70,10 +79,22 @@ def is_kit_available() -> bool:
         return False
 
 
+#: Returned when EC2 says the configured instance does not exist. It is
+#: NOT "unknown": a terminated box cannot be started, and reporting it as
+#: unknown invites waiting for a machine that is never coming back. The
+#: g6e.2xlarge this project used until 2026-09 (L40S, i-0ac9eb88c1b046163)
+#: was terminated along with its Elastic IP, which is how this state was
+#: found -- the lifecycle code reported "unknown" for months.
+STATE_MISSING = "missing"
+
+
 def get_gpu_instance_state() -> str:
     """Get the current state of the GPU instance.
 
-    Returns: "running", "stopped", "pending", "stopping", or "unknown"
+    Returns "running", "stopped", "pending", "stopping", ``STATE_MISSING``
+    when the configured instance does not exist, or "unknown" when the
+    question could not be asked at all (no credentials, no boto3, no
+    network).
     """
     if IS_GPU_INSTANCE:
         return "running"  # We are the GPU instance
@@ -85,6 +106,11 @@ def get_gpu_instance_state() -> str:
         state = resp["Reservations"][0]["Instances"][0]["State"]["Name"]
         return state
     except Exception as e:
+        if "InvalidInstanceID.NotFound" in str(e):
+            logger.error(
+                "GPU instance %s does not exist in %s. Set GPU_INSTANCE_ID "
+                "to a live instance.", GPU_INSTANCE_ID, GPU_REGION)
+            return STATE_MISSING
         logger.warning(f"Cannot check GPU instance state: {e}")
         return "unknown"
 
@@ -107,6 +133,11 @@ def start_gpu_instance() -> Tuple[bool, str]:
             return True, "GPU instance is already running"
         if state == "pending":
             return True, "GPU instance is starting up"
+        if state == STATE_MISSING:
+            return False, (
+                f"GPU instance {GPU_INSTANCE_ID} does not exist in "
+                f"{GPU_REGION}. It cannot be started. Set GPU_INSTANCE_ID "
+                f"to a live GPU instance, or launch one.")
         if state not in ("stopped", "unknown"):
             return False, f"GPU instance is in state: {state}"
 

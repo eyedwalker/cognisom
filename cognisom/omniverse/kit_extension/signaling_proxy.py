@@ -10,7 +10,7 @@ This proxy sits between nginx and Kit's signaling port (49100), intercepting
 WebSocket messages and rewriting the SDP to use the server's public IP.
 
 Usage:
-    python3 signaling_proxy.py --public-ip 52.32.247.131 --listen-port 49200 --kit-port 49100
+    python3 signaling_proxy.py --public-ip <the box's address> --listen-port 49200 --kit-port 49100
 
 Architecture:
     Browser → nginx (/streaming/) → THIS PROXY (49200) → Kit signaling (49100)

@@ -1,0 +1,5 @@
+# Cognisom: open our Bio-USD run at startup. NVIDIA's docker-compose.yml is
+# left exactly as published; this only adds the startup script.
+services:
+  isaac-sim:
+    command: ["--exec", "/isaac-sim/.local/share/ov/data/cognisom/open_cognisom_stage.py"]

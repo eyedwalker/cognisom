@@ -298,7 +298,10 @@ with tab_run:
                     ec2 = boto3.client("ec2", region_name="us-west-2")
                     ssm = boto3.client("ssm", region_name="us-west-2")
 
-                    GPU_INSTANCE_ID = "i-0ac9eb88c1b046163"
+                    # One copy of this id, in gpu_connector. This page
+                    # had its own, naming a box that no longer exists.
+                    from cognisom.infrastructure.gpu_connector import (
+                        GPU_INSTANCE_ID)
 
                     # Check instance state
                     resp = ec2.describe_instances(InstanceIds=[GPU_INSTANCE_ID])
