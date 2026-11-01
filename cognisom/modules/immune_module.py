@@ -231,6 +231,69 @@ class ImmuneCell:
 
 
 
+#: Below this many targets a KD-tree costs more to build than the scan it
+#: replaces, so the index falls back to the plain loop. Both paths return
+#: the same candidates in the same order, so the threshold changes speed
+#: and nothing else -- which the equivalence test pins at sizes either
+#: side of it.
+_INDEX_MIN_TARGETS = 32
+
+
+class _CellIndex:
+    """Radius queries over the cellular module's cells, in dict order.
+
+    Built once per immune step and shared by every scan that asks "what
+    is near this position". It is strictly a CANDIDATE FILTER: it
+    returns a superset of ids in the cells dict's own insertion order,
+    and each caller applies its own exact predicate unchanged. Nothing
+    about who wins a comparison moves into this class.
+
+    That matters because the callers disagree about their comparisons,
+    and both are observable:
+
+    * the detection pass takes the first RECOGNISED target strictly
+      inside its radius, and recognition consumes the shared RNG stream
+      and raises the target's PD-L1 -- so a different candidate order
+      moves every pinned number in the suite;
+    * ``_local_hypoxia`` keeps the nearest cell using ``<=``, so among
+      equidistant cells the LAST in dict order wins. ``cKDTree.query``
+      breaks ties its own way.
+
+    The tree is also allowed to be stale about liveness: cells are
+    marked dead rather than removed, and a kill pops its entry from the
+    caller's own dict. Callers filter; the index never does.
+    """
+
+    __slots__ = ('_ids', '_pos', '_tree')
+
+    def __init__(self, cells: Dict[int, Any]):
+        self._ids = list(cells.keys())                 # insertion order
+        self._tree = None
+        self._pos = None
+        if len(self._ids) >= _INDEX_MIN_TARGETS:
+            try:
+                from scipy.spatial import cKDTree
+                self._pos = np.array(
+                    [cells[cid].position for cid in self._ids], dtype=float)
+                self._tree = cKDTree(self._pos)
+            except Exception:
+                # scipy missing or a degenerate point set: fall back to
+                # the full scan rather than fail the step.
+                self._tree = None
+
+    def candidates_within(self, position, radius: float):
+        """Ids plausibly within ``radius``, in dict insertion order.
+
+        A superset: scipy's bound is inclusive and the caller's may not
+        be. Falls back to every id when there is no tree, which is the
+        unindexed scan and gives the same answer more slowly.
+        """
+        if self._tree is None or radius <= 0.0:
+            return self._ids
+        hits = self._tree.query_ball_point(position, radius)
+        return [self._ids[i] for i in sorted(hits)]
+
+
 def _or_default(value, default):
     """`value` unless it is None. dict.get's default does not cover a stored None."""
     return default if value is None else value
@@ -1069,7 +1132,27 @@ class ImmuneModule(SimulationModule):
         # Get cancer cells from cellular module
         cancer_cells = {cid: cell for cid, cell in self.cellular_module.cells.items()
                        if cell.cell_type == 'cancer' and cell.alive}
-        
+
+        # Spatial index over the targets, rebuilt once per step.
+        #
+        # Both target searches below -- _target_within_reach and the
+        # detection pass -- were O(n_cancer) per immune cell, so the
+        # module's cost grew as immune x cancer. Measured over a 3x
+        # slab: k = 1.85 against vascular's 1.37, the only near-
+        # quadratic term in the engine and the one that stops a large
+        # run. It is NOT the largest cost at a few thousand cells
+        # (16.8% against vascular's 49.7%); it overtakes at roughly
+        # 19,000 and dominates well before a million.
+        #
+        # The index is an ACCELERATOR, never the decider: it narrows
+        # candidates and the exact `norm(...) < radius` test still
+        # chooses, in the dict's insertion order, because the detection
+        # loop breaks on the FIRST recognised cell and _recognize both
+        # consumes the shared RNG stream and mutates the target. A
+        # tree-ordered scan would pick a different cell and move every
+        # pinned number in the suite. See _targets_near.
+        self._cell_index = _CellIndex(self.cellular_module.cells)
+
         for immune_id, immune_cell in list(self.immune_cells.items()):
             if immune_cell.in_blood:
                 continue
@@ -1110,49 +1193,59 @@ class ImmuneModule(SimulationModule):
                     immune_cell.detection_radius, local_ecm,
                 )
 
-                # Look for cancer cells
-                for cancer_id, cancer_cell in cancer_cells.items():
-                    distance = np.linalg.norm(immune_cell.position - cancer_cell.position)
+                # Look for cancer cells. The index returns exactly the
+                # targets the unindexed scan would have reached, in the
+                # same dict order, already filtered to those strictly
+                # inside effective_detection -- so the break below still
+                # takes the first RECOGNISED one, and _recognize is
+                # called on the same cells in the same sequence.
+                for cancer_id in self._cell_index.candidates_within(
+                        immune_cell.position, effective_detection):
+                    cancer_cell = cancer_cells.get(cancer_id)
+                    if cancer_cell is None:
+                        continue          # not cancer, or already killed
+                    distance = np.linalg.norm(
+                        immune_cell.position - cancer_cell.position)
+                    if distance >= effective_detection:
+                        continue          # the exact test, unchanged
+                    recognized, tcr_match = self._recognize(
+                        immune_cell, cancer_cell
+                    )
+                    if recognized:
+                        immune_cell.activated = True
+                        immune_cell.target_cell_id = cancer_id
+                        immune_cell.active_tcr_match = tcr_match
+                        self.total_activations += 1
+                        if tcr_match is not None:
+                            self.total_tcr_recognitions += 1
+                            # Adaptive PD-L1 induction (Type I TME
+                            # mechanism): an activated TCR-pMHC
+                            # engagement releases IFN-gamma, which
+                            # paramedically up-regulates PD-L1 on
+                            # the target tumor cell. Bumped per
+                            # engagement, clamped to 1.0.
+                            cancer_cell.pdl1_expression = float(min(
+                                1.0,
+                                cancer_cell.pdl1_expression + 0.5,
+                            ))
+                            # Exhaustion is counted per contact, in
+                            # _engage: recognition happens at sensing
+                            # range, and the TCR engages its pMHC only
+                            # once the cells touch.
 
-                    if distance < effective_detection:
-                        recognized, tcr_match = self._recognize(
-                            immune_cell, cancer_cell
-                        )
-                        if recognized:
-                            immune_cell.activated = True
-                            immune_cell.target_cell_id = cancer_id
-                            immune_cell.active_tcr_match = tcr_match
-                            self.total_activations += 1
-                            if tcr_match is not None:
-                                self.total_tcr_recognitions += 1
-                                # Adaptive PD-L1 induction (Type I TME
-                                # mechanism): an activated TCR-pMHC
-                                # engagement releases IFN-gamma, which
-                                # paramedically up-regulates PD-L1 on
-                                # the target tumor cell. Bumped per
-                                # engagement, clamped to 1.0.
-                                cancer_cell.pdl1_expression = float(min(
-                                    1.0,
-                                    cancer_cell.pdl1_expression + 0.5,
-                                ))
-                                # Exhaustion is counted per contact, in
-                                # _engage: recognition happens at sensing
-                                # range, and the TCR engages its pMHC only
-                                # once the cells touch.
-
-                            self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
-                                'immune_id': immune_id,
-                                'immune_type': immune_cell.cell_type,
-                                'target_id': cancer_id,
-                                'position': immune_cell.position.tolist(),
-                                'tcr_id': (
-                                    tcr_match.tcr.tcr_id if tcr_match else None
-                                ),
-                                'affinity': (
-                                    tcr_match.affinity if tcr_match else None
-                                ),
-                            })
-                            break
+                        self.emit_event(EventTypes.IMMUNE_ACTIVATED, {
+                            'immune_id': immune_id,
+                            'immune_type': immune_cell.cell_type,
+                            'target_id': cancer_id,
+                            'position': immune_cell.position.tolist(),
+                            'tcr_id': (
+                                tcr_match.tcr.tcr_id if tcr_match else None
+                            ),
+                            'affinity': (
+                                tcr_match.affinity if tcr_match else None
+                            ),
+                        })
+                        break
             
             # Attack target
             else:
@@ -1408,7 +1501,18 @@ class ImmuneModule(SimulationModule):
         reach = float(getattr(immune_cell, 'detection_radius', 0.0) or 0.0)
         if reach <= 0.0 or not cancer_cells:
             return False
-        for cancer_cell in cancer_cells.values():
+        index = getattr(self, '_cell_index', None)
+        if index is None:
+            # Called outside update() -- tests construct a module and
+            # ask directly. Fall back to the scan.
+            candidates = cancer_cells.values()
+        else:
+            # Order is irrelevant here: this asks only whether anything
+            # is in reach, so the same SET is enough.
+            candidates = (cancer_cells[cid] for cid
+                          in index.candidates_within(immune_cell.position, reach)
+                          if cid in cancer_cells)
+        for cancer_cell in candidates:
             if np.linalg.norm(
                     immune_cell.position - cancer_cell.position) < reach:
                 return True
@@ -1900,13 +2004,27 @@ class ImmuneModule(SimulationModule):
         """
         if self.cellular_module is None:
             return 0.0
+        cells = self.cellular_module.cells
+        radius = self.cytokine_sampling_radius
+        # THIS is the engine's quadratic term, not the target scan: one
+        # pass over every living cell per macrophage per step, measured
+        # at 3.9 s of the immune module's 4.8 s on a 6,120-cell slab.
+        # The index bounds it to the ~25 cells a 30 um sphere holds at
+        # this packing, whatever the population.
+        index = getattr(self, '_cell_index', None)
+        candidates = (cells.values() if index is None else
+                      (cells[cid] for cid in index.candidates_within(
+                          position, radius) if cid in cells))
         best = None
-        best_d2 = self.cytokine_sampling_radius ** 2
-        for cell in self.cellular_module.cells.values():
+        best_d2 = radius ** 2
+        for cell in candidates:
             if not cell.alive:
                 continue
             d = cell.position - position
             d2 = float(np.dot(d, d))
+            # `<=`, so among equidistant cells the LAST in dict order
+            # wins. The index preserves that order precisely so this
+            # comparison keeps choosing what it always chose.
             if d2 <= best_d2:
                 best_d2 = d2
                 best = cell
