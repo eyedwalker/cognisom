@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from typing import Dict, List, Any
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 from cognisom.core.module_base import SimulationModule
@@ -253,6 +253,16 @@ class VascularModule(SimulationModule):
         
         # Reference to cellular module
         self.cellular_module = None
+
+        # Which capillary serves each cell, cached by cell id -- see
+        # _nearest_capillary. Keyed on the position the answer was solved
+        # at, so a cell that moves is re-solved rather than served a
+        # stale vessel.
+        self._nearest_cache: Dict[int, Tuple[Any, float, Any]] = {}
+        # Bumped whenever the network changes, which invalidates every
+        # cached assignment at once.
+        self._network_version = 0
+        self._cache_version = -1
     
     def initialize(self):
         """Initialize vascular network"""
@@ -349,6 +359,11 @@ class VascularModule(SimulationModule):
         )
         
         self.capillaries[capillary_id] = capillary
+        # A new vessel can become the nearest one for any cell, so every
+        # cached assignment is now suspect. Only the two initializers
+        # call this today; the bump is what keeps a future angiogenesis
+        # path from silently reading a pre-angiogenic assignment.
+        self._network_version += 1
         return capillary_id
     
     def set_cellular_module(self, cellular_module):
@@ -542,21 +557,16 @@ class VascularModule(SimulationModule):
         if not self.cellular_module or not self.capillaries:
             return
 
-        caps = list(self.capillaries.values())
-
         for cell in self.cellular_module.cells.values():
             if not cell.alive:
                 continue
 
             # Nearest capillary, by perpendicular distance to the segment.
-            cap = caps[0]
-            distance = cap.distance_to(cell.position)
-            for other in caps[1:]:
-                d = other.distance_to(cell.position)
-                if d < distance:
-                    cap, distance = other, d
+            # Solved once per cell position, not once per step -- see
+            # _serving_capillary for why that is sound and what it costs.
+            cap, distance = self._serving_capillary(cell)
 
-            if distance >= cap.exchange_radius:
+            if cap is None or distance >= cap.exchange_radius:
                 continue
 
             # Krogh geometry factor, shared by all three species.
@@ -588,6 +598,80 @@ class VascularModule(SimulationModule):
                 cell.lactate -= removal
                 self.total_waste_removed += float(removal)
     
+    def _nearest_capillary(self, position) -> Tuple[Optional[Capillary], float]:
+        """The capillary serving ``position``, and the perpendicular
+        distance to it.
+
+        This is the single definition of "nearest", so the cached and
+        freshly-solved paths cannot drift: the comparison is STRICT, so
+        among equidistant vessels the first in network order wins, which
+        is what the uncached loop did before the cache existed.
+        """
+        caps = list(self.capillaries.values())
+        if not caps:
+            return None, float('inf')
+        cap = caps[0]
+        distance = cap.distance_to(position)
+        for other in caps[1:]:
+            d = other.distance_to(position)
+            if d < distance:
+                cap, distance = other, d
+        return cap, distance
+
+    def _serving_capillary(self, cell) -> Tuple[Optional[Capillary], float]:
+        """``_nearest_capillary`` for a cell, solved once per position.
+
+        WHY THIS IS CACHED AT ALL
+        -------------------------
+        The assignment is a fact about GEOMETRY. The capillary network is
+        built in ``initialize`` and nothing adds to it during a run, and a
+        cell's position is fixed unless the opt-in mechanics module moves
+        it (``cell_mechanics`` defaults off). So for the shipped
+        configuration the nearest vessel is decided once per cell and then
+        re-derived on every step forever: at 6,120 cells and 50 vessels
+        that measured 17.9 s of the module's 18.8 s, in 6.1M calls to
+        ``Capillary.distance_to`` whose cost is almost entirely numpy call
+        overhead on three-element vectors.
+
+        WHY IT CANNOT GO STALE
+        ----------------------
+        Neither premise is assumed; both are checked on every lookup.
+        The key is the cell's position AS BYTES, so a cell the mechanics
+        module moves is re-solved on the step it moves -- in-place
+        mutation is caught as well as rebinding, which comparing array
+        identity would miss. ``_network_version`` is bumped by
+        ``add_capillary``, which drops every assignment at once, so a
+        future angiogenesis path cannot serve a pre-angiogenic answer.
+
+        WHAT IS STILL O(cells x capillaries)
+        ------------------------------------
+        The first step, and any step on which cells move. This turns a
+        per-step cost into a one-off; it does not make the one-off cheap.
+        If that ever matters, the exact fix is the candidate-filter shape
+        used by ImmuneModule: a KD-tree over sample points along each
+        segment bounds the true segment distance within the sample
+        spacing, which gives a provable SUPERSET of the nearest vessel to
+        hand to the strict loop above.
+        """
+        if self._cache_version != self._network_version:
+            self._nearest_cache.clear()
+            self._cache_version = self._network_version
+
+        position = cell.position
+        try:
+            key = position.tobytes()
+        except AttributeError:
+            # A preset that stores positions as plain sequences.
+            key = tuple(position)
+
+        cached = self._nearest_cache.get(cell.cell_id)
+        if cached is not None and cached[2] == key:
+            return cached[0], cached[1]
+
+        cap, distance = self._nearest_capillary(position)
+        self._nearest_cache[cell.cell_id] = (cap, distance, key)
+        return cap, distance
+
     def _check_hypoxia(self):
         """Check for hypoxic regions"""
         if not self.cellular_module:
@@ -669,7 +753,11 @@ class VascularModule(SimulationModule):
     
     def on_cell_died(self, data):
         """Handle cell death - reduced demand"""
-        pass
+        # Drop the dead cell's vessel assignment. Nothing reads it again
+        # -- the exchange loop skips dead cells before consulting the
+        # cache -- so this only bounds the cache to the LIVE population
+        # instead of to every cell that ever existed.
+        self._nearest_cache.pop(data.get('cell_id'), None)
 
 
 # Test
