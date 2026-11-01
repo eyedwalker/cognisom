@@ -354,7 +354,14 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # stated as what it always was.
     assert len(normal) == 80 + cells.total_divisions
     waiting = [c for c in normal if c.age >= cells.division_time_normal]
-    assert len(normal) == 115 and len(waiting) == 45
+    # 115 normal / 45 waiting while normal cells divided every 24 h.
+    # 90 / 8 since division_time_normal became 90 h, which carries the
+    # measured normal:cancer turnover ratio of 7.5:1 (Meyer 1982, PMID
+    # 6185700; normal epithelium labels at 0.12% against adenocarcinoma's
+    # 0.90%). Fewer normal cells reach their division time inside a day,
+    # so both the count and the backlog fall; the survival claim above is
+    # untouched, and cancer is untouched because its period did not move.
+    assert len(normal) == 90 and len(waiting) == 8
     assert _deaths(runner, "hypoxia", "normal") == 0
     # What this test exists for is above: normal-cell survival at 160, and
     # no normal cell dying of anything. The rest pins the run.
@@ -376,7 +383,10 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # 35: each normal cell's timer fires once in the day, but only the
     # 35 whose own clock was in its permissive window when it fired
     # divided inside the run. 80 while the clock was unwired.
-    assert cells.total_divisions == 35
+    # 10 since division_time_normal became 90 h: most normal cells no
+    # longer reach their division time inside a 24 h run at all, so the
+    # circadian window is no longer what limits them.
+    assert cells.total_divisions == 10
     # 363.5638 / 0.0710 (were 363.1047 / 0.0619): on 2026-10-23 the
     # lymphatic module stopped rolling its dice at five sample points
     # per vessel and rolls once per exposed cell, so the shared RNG
@@ -386,12 +396,21 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # 364.7340 / 0.0673 since kill calibration (2026-10-26): contacts now
     # kill at different moments, which shifts the shared RNG stream; every
     # count above held.
+    # 306.7012 / 0.0690 since division_time_normal became 90 h. This one
+    # is NOT an RNG shift: delivery is consumption, and a normal
+    # population that grows to 90 instead of 115 over the day simply
+    # consumes less. The floor rises with it, 0.0673 -> 0.0690, because
+    # the cells that remain are competing for the same supply.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(364.7340, abs=0.01)
+        pytest.approx(306.7012, abs=0.01)
     # The oxygen floor: no normal cell is near death -- nor even hypoxic.
+    # THE PROPERTY is the line below: the floor sits above the hypoxia
+    # flag. The exact value is a pin and rose 0.0673 -> 0.0690 with the
+    # 90 h division period, for the same reason delivery fell: fewer
+    # cells competing for the same supply.
     assert min(c.oxygen for c in alive) > 0.05          # the hypoxia flag
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0673, abs=1e-3)
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0690, abs=1e-3)
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -420,23 +439,47 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # 44 since kill calibration (2026-10-26): a cell dies only once ANOXIC
     # (<0.01% O2, Papandreou 2005) and then at 1/24 per hour, where it
     # used to die the step it fell below ~1.3% O2.
-    assert _deaths(runner, "hypoxia", "normal") == 44
+    # 32 since division_time_normal became 90 h, which is the same cause
+    # as the 54 above, one step further: consumption in this engine is
+    # per cell per voxel, so hypoxia is DENSITY-driven, and a normal
+    # population that grows 115 -> 90 over the day consumes less oxygen
+    # and starves less. That the mechanism survives a 27% cut in deaths
+    # is the point -- the preset still starves normal cells and no other
+    # preset does, which is the line below.
+    assert _deaths(runner, "hypoxia", "normal") == 32
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
     # Cancer cells used to starve here too when the immune compartment
     # did not reach them first: 16 while the chase step was frozen, 0
     # while every contact killed within a step or two, 7 once a kill
     # took a measured contact time, 0 once the patrol followed the
-    # chemokine. 6 now, with 15 immune kills (was 21) and 8 cancer cells
-    # alive at 24 h: innate cells kill on 15% / 5% of contacts instead of
-    # an unsourced 80%, so the tumour is no longer cleared first.
-    assert _deaths(runner, "hypoxia", "cancer") == 6
-    assert _deaths(runner, "immune_killed", "cancer") == 15
-    assert cells.total_deaths == 65
+    # chemokine. 6 with 15 immune kills: innate cells kill on 15% / 5%
+    # of contacts instead of an unsourced 80%, so the tumour was no
+    # longer cleared first.
+    #
+    # 0 since division_time_normal became 90 h, and this is the most
+    # informative consequence of that change. Normal tissue was
+    # COMPETING WITH THE TUMOUR FOR OXYGEN: consumption is per cell per
+    # voxel, so a normal population that now grows to 90 instead of 115
+    # leaves more oxygen behind, and no cancer cell reaches anoxia.
+    # The tumour does not survive it -- immune kills rise 15 -> 21 and
+    # take exactly the cells starvation used to. Total cancer deaths are
+    # 21 either way; only the CAUSE moved, from the environment to the
+    # immune compartment. That invariant is the check that this change
+    # did not quietly spare the tumour, so assert it directly.
+    assert _deaths(runner, "hypoxia", "cancer") == 0
+    assert _deaths(runner, "immune_killed", "cancer") == 21
+    assert (_deaths(runner, "hypoxia", "cancer")
+            + _deaths(runner, "immune_killed", "cancer")) == 21
+    assert cells.total_deaths == 53
     # The 24 h snapshot: hypoxic cells are still there at the end now --
     # hypoxia is survivable, as Papandreou found -- and some are near anoxia.
-    assert vascular.hypoxic_regions == 32
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 32
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0034, abs=1e-3)
+    # 32 -> 26 since division_time_normal became 90 h, the same cause as
+    # the death counts above: fewer normal cells consuming the same
+    # supply leaves fewer cells below the hypoxia flag. The preset is
+    # still hypoxic and still the only one that is.
+    assert vascular.hypoxic_regions == 26
+    assert sum(1 for c in alive if c.oxygen < 0.05) == 26
+    assert min(c.oxygen for c in alive) == pytest.approx(0.0033, abs=1e-3)
 
 
 def test_cell_oxygen_is_not_the_field_value(runs):

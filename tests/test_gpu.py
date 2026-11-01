@@ -263,13 +263,21 @@ class TestCellOps:
     def test_detect_division_candidates(self, cell_dict):
         from cognisom.gpu.cell_ops import CellArrays, detect_division_candidates
         arrays = CellArrays.from_cell_dict(cell_dict)
-        # Set one cell's age past division time
-        arrays.ages[0] = 25.0  # Normal, div time = 24
+        # Set one cell's age past division time. The normal period is 90 h,
+        # not 24: it carries the measured normal:cancer turnover ratio of
+        # 7.5:1 (Meyer 1982, PMID 6185700). These defaults must track
+        # CellularModule's -- that is the whole point of the comment on
+        # detect_division_candidates.
+        arrays.ages[0] = 91.0  # Normal, div time = 90
         arrays.ages[5] = 13.0  # Cancer, div time = 12
 
         div_ids = detect_division_candidates(arrays)
-        assert 0 in div_ids  # Normal cell at age 25 > 24
+        assert 0 in div_ids  # Normal cell at age 91 > 90
         assert 5 in div_ids  # Cancer cell at age 13 > 12
+        # And a normal cell that would have divided under the old 24 h
+        # period is correctly NOT a candidate now.
+        arrays.ages[0] = 25.0
+        assert 0 not in detect_division_candidates(arrays)
 
 
 # ── Spatial Operations Tests ─────────────────────────────────────

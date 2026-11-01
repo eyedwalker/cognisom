@@ -77,8 +77,27 @@ def test_an_intact_run_divides_exactly_as_it_did_without_the_coupling():
 
 @pytest.mark.slow
 def test_baseline_cancer_doubles_every_twelve_hours_for_three_days(baseline):
+    """Cancer doubles six times in three days; normal tissue does not.
+
+    The cancer half is unchanged and is the pin that matters: a 12 h
+    period over 72 h is six doublings, 10 -> 640.
+
+    The normal half used to be 80 * 2**3 = 640, i.e. normal epithelium
+    kept pace with the tumour to within a factor of one. It no longer
+    does, because division_time_normal is 90 h rather than 24 h, which
+    carries the measured normal:cancer turnover ratio of 7.5:1 -- normal
+    prostate epithelium labels at 0.12% against adenocarcinoma's 0.90%
+    (Meyer 1982, PMID 6185700). Over 72 h a normal cell divides at most
+    once, and only those seeded old enough to reach 90 h do: 80 + 61.
+
+    That contrast is the point of the test now. A tumour that outgrows
+    its surrounding tissue 4.5-fold over three days is the behaviour; a
+    tumour and its host tissue both octupling was an artefact.
+    """
     s = _state(baseline)
-    assert s["n_cancer"] == 10 * 2 ** 6 and s["n_normal"] == 80 * 2 ** 3
+    assert s["n_cancer"] == 10 * 2 ** 6          # 640, unchanged
+    assert s["n_normal"] == 141                  # was 640
+    assert s["n_cancer"] / s["n_normal"] > 4.0   # the tumour outgrows it
     assert s["androgen_withdrawal_deaths"] == 0
 
 

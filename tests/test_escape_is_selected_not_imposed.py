@@ -855,35 +855,44 @@ def _scorer() -> str:
 #: -- zero T-cell kills, zero de novo events, escaped cells never over
 #: the NK step -- hold under both and are asserted outside this table.
 SHIPPED_24H_PINS = {
+    # Re-measured when division_time_normal became 90 h. EVERY field
+    # here is downstream of cell density, so all twenty-six moved;
+    # `divisions_total` 849 -> 237 is the change itself, and the rest
+    # follows from a smaller population. `observed` vs `expected` is
+    # ALL LINEAGES POOLED, so it is diluted toward parity by the
+    # macrophages and NK cells that cannot see the escape trait -- it
+    # is not the T-cell O/E 0.084 result and should not be read against
+    # it. At 15-17 kills neither direction is distinguishable from
+    # chance.
     'pwm': {
-        'survivors': (115, 60),
-        'delta': -0.00326,
-        'n_kills': 21,
-        'by_lineage': {'macrophage': 11, 'NK_cell': 10},
-        'observed': 13,
-        'expected': 10.96,
-        'intact_mean': 0.34797,
-        'escaped_mean': 0.22904,
+        'survivors': (121, 65),
+        'delta': 0.01219,
+        'n_kills': 17,
+        'by_lineage': {'NK_cell': 10, 'macrophage': 6, 'T_cell': 1},
+        'observed': 8,
+        'expected': 8.96369,
+        'intact_mean': 0.35576,
+        'escaped_mean': 0.23770,
         'intact_above_at_end': 0,
-        'intact_samples_above': 4,
-        'max_intact_over_run': 0.40102,
-        'cancer_divisions': 56,
-        'divisions_total': 849,
+        'intact_samples_above': 2,          # was 4; still just crosses
+        'max_intact_over_run': 0.40926,
+        'cancer_divisions': 60,
+        'divisions_total': 237,
     },
     'mhcflurry': {
-        'survivors': (110, 63),
-        'delta': 0.04773,
-        'n_kills': 23,
-        'by_lineage': {'macrophage': 11, 'NK_cell': 12},
-        'observed': 12,
-        'expected': 12.72,
-        'intact_mean': 0.33901,
-        'escaped_mean': 0.22162,
-        'intact_above_at_end': 2,
-        'intact_samples_above': 16,
-        'max_intact_over_run': 0.42523,
-        'cancer_divisions': 53,
-        'divisions_total': 846,
+        'survivors': (125, 67),
+        'delta': 0.01100,
+        'n_kills': 15,
+        'by_lineage': {'macrophage': 9, 'NK_cell': 5, 'T_cell': 1},
+        'observed': 9,
+        'expected': 7.97097,
+        'intact_mean': 0.34680,
+        'escaped_mean': 0.23296,
+        'intact_above_at_end': 0,
+        'intact_samples_above': 0,          # was 16; no longer crosses
+        'max_intact_over_run': 0.38846,
+        'cancer_divisions': 61,
+        'divisions_total': 238,
     },
 }
 
@@ -906,19 +915,42 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
     run-to-run scatter and that the MECHANISM behind it does not move.
 
     The kill composition in this one seed says why there is nothing to
-    find: 21 kills (PWM) or 23 (MHCflurry), all of them NK and
-    macrophage and ZERO T-cell. The arm that can see the escape trait
-    did not kill anything, under either scorer.
+    find: under MHCflurry, 15 kills -- macrophage 9, NK 5, T cell 1.
+    The arm that can see the escape trait does under 7% of the killing,
+    so the pressure it applies is diluted by lineages that cannot see
+    the trait at all. (Before division_time_normal became 90 h this read
+    21 kills under PWM and 23 under MHCflurry, with ZERO T-cell in both;
+    fewer normal cells changed the immune trajectories and the shared
+    RNG stream, and the composition was re-measured rather than
+    re-pinned.)
 
     The MHC-I regime is pinned on the HOURLY SERIES and not on the final
-    frame, because the final frame lies under the PWM scorer: intact
-    cells cross the 0.4 missing-self step at 4 of 24 hourly samples
-    (h 17.3-20.3, max 0.4010) and are back under it at hour 24. Under
-    the real predictor they are over it at 16 of 24 samples and 2 are
-    over it at the end. So the NK arm's counter-selection regime IS
-    entered in a shipped preset. Escaped cells never cross the step
-    under either scorer, which is the asymmetry that makes it
-    counter-selection rather than noise.
+    frame, because the final frame lies under the PWM scorer.
+
+    This preset USED TO enter the NK missing-self regime under both
+    scorers: intact cells crossed the 0.4 step at 4 of 24 hourly samples
+    under PWM and 16 of 24 under MHCflurry. Since division_time_normal
+    became 90 h -- fewer normal cells, so fewer kills, so less
+    IFN-gamma and less bystander MHC-I induction -- it has mostly
+    stopped, and the two scorers now disagree about whether it happens
+    at all:
+
+      scorer        max intact MHC-I    samples at/above 0.4
+      MHCflurry           0.3885               0 of 24
+      PWM fallback        0.4093               2 of 24
+
+    So under the predictor CI and production use, the shipped preset no
+    longer enters the regime; under the fallback it still just does.
+    "The NK counter-selection regime is entered in a shipped preset" is
+    therefore no longer a claim the model supports on its own -- it
+    depends on which binding predictor is installed, which is not a
+    biological fact about NK cells.
+
+    What survives under both is the asymmetry the claim rested on:
+    IFN-gamma raises intact MHC-I far above escaped MHC-I, and escaped
+    cells never approach the step. That asymmetry is the mechanism;
+    whether a configuration clears an absolute unsourced threshold is
+    not, and it is pinned per scorer below rather than asserted here.
     """
     scorer = _scorer()
     pin = SHIPPED_24H_PINS[scorer]
@@ -932,27 +964,78 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
         'pdl1_heritable_gain': 0}
 
     # ── scorer-independent: the mechanism behind the null.
+    #
+    # This used to assert ZERO T-cell kills, with a message saying the
+    # explanation needed re-measuring if that ever changed. It changed
+    # when division_time_normal became 90 h (fewer normal cells, so
+    # immune cells travel differently and the shared RNG stream shifts),
+    # and it was re-measured rather than re-pinned: 15 kills, macrophage
+    # 9, NK 5, T cell 1.
+    #
+    # The claim was never "T cells kill nothing"; it is that the arm
+    # which can SEE the escape trait is a small minority of the killing,
+    # so MHC-I-blind killing dilutes the selective pressure. 1 of 15 is
+    # that claim, so it is now stated as the minority share it always
+    # meant. The population-level finding it supports (T-cell O/E 0.084
+    # on escaped cells) rests on 12 seeds and tens of thousands of
+    # contacts, not on this one run.
     by_lineage = Counter(k[0] for k in out['kills'])
-    assert by_lineage['T_cell'] == 0, (
-        'a T cell killed in the shipped slab run; the diluted-T-cell '
-        'explanation of the population null needs re-measuring')
+    t_share = by_lineage['T_cell'] / max(1, len(out['kills']))
+    assert t_share <= 0.15, (
+        f'T cells did {t_share:.0%} of the killing in the shipped slab '
+        f'run ({dict(by_lineage)}); the diluted-T-cell explanation of '
+        f'the population null needs re-measuring')
+    assert by_lineage['macrophage'] + by_lineage['NK_cell'] \
+        >= 4 * by_lineage['T_cell'], dict(by_lineage)
+    # The one T-cell kill in this seed was on an ESCAPED cell, at a
+    # moment when 0.5285 of living cancer cells were escaped. Against
+    # that expectation a single draw distinguishes nothing, and it is
+    # recorded here so the next reader does not mistake it for a
+    # counter-example to the O/E result.
     # The delta sits inside the measured run-to-run scatter (sd 0.0253
     # over 12 seeds), which is all one seed can say.
     p0 = out['founders_escaped'] / out['founders']
     p1 = out['survivors_escaped'] / out['survivors']
     assert abs(p1 - p0) < 3 * 0.0253
 
-    # ── scorer-independent: the regime is entered, and only by intact
-    # cells. Asserted over the run, not at the end.
+    # ── scorer-independent: the IFN-gamma asymmetry, and whether the NK
+    # step is reached. Asserted over the run, not at the end.
+    #
+    # THE SHIPPED PRESET NO LONGER ENTERS THE NK REGIME. It used to --
+    # intact cells were over the 0.4 missing-self step at 16 of 24
+    # hourly samples under MHCflurry, and that was recorded as the one
+    # place the NK missing-self mechanism did anything in a
+    # configuration we ship. Since division_time_normal became 90 h it
+    # misses, by 2.9%: max intact MHC-I over the run is 0.3885.
+    #
+    # The cause is the density chain, not the NK code. Fewer normal
+    # cells -> fewer kills (23 -> 15) -> less IFN-gamma released by
+    # activated immune cells -> less bystander MHC-I induction, so the
+    # intact cells top out just under the step instead of just over it.
+    #
+    # What survives is the ASYMMETRY, which is what made this
+    # counter-selection rather than noise: intact cells rise far higher
+    # than escaped ones (0.3885 against 0.2784). That is the robust
+    # claim and it is asserted first. Reaching an absolute threshold
+    # was always the fragile half, and it is now recorded as NOT
+    # reached rather than quietly re-pinned.
     assert out['n_regime_samples'] == 24
-    assert out['intact_samples_above_nk_step'] > 0, (
-        'intact cells no longer cross the 0.4 NK step in the shipped '
-        'run -- if the step or the IFN-gamma gain was fixed, re-pin '
-        'this and say so; it was a live defect when measured')
-    assert out['max_intact_over_run'] >= DEFAULT_MISSING_SELF_THRESHOLD
+    # The asymmetry is the mechanism and it holds under both scorers.
+    assert out['max_intact_over_run'] > out['max_escaped_over_run'], (
+        'IFN-gamma no longer raises intact MHC-I above escaped MHC-I; '
+        'that asymmetry is the mechanism, not the threshold crossing')
+    # Escaped cells never approach the step under either scorer. THIS is
+    # what makes it counter-selection rather than noise, and it is the
+    # half that is genuinely scorer-independent.
     assert out['escaped_ever_above_nk_step'] is False
     assert out['escaped_above_nk_step'] == 0
     assert out['max_escaped_over_run'] < DEFAULT_MISSING_SELF_THRESHOLD
+    # Whether INTACT cells reach the step is scorer-dependent and is
+    # pinned in SHIPPED_24H_PINS below, not here. Under MHCflurry they
+    # now top out at 0.3885 and never cross; under PWM they reach
+    # 0.4093 and cross at 2 of 24 samples. Asserting a crossing either
+    # way in this block would pin one scorer's answer as if it were
+    # the model's.
 
     # ── scorer-dependent: the exact end state.
     assert (out['survivors'], out['survivors_escaped']) == pin['survivors']
@@ -976,12 +1059,22 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
     # ── and the division counts, because only a CANCER daughter draws.
     assert out['cancer_divisions'] == pin['cancer_divisions']
     assert out['divisions_total'] == pin['divisions_total']
-    assert out['cancer_divisions'] < 0.1 * out['divisions_total'], (
-        'the de novo expectation must be computed on cancer divisions')
+    # The guard this replaces asserted cancer_divisions < 10% of the
+    # total, which was true when normal cells divided every 24 h (53 of
+    # 846) and is not now (61 of 238, 26%). The THRESHOLD was never the
+    # point: the point is that computing the de novo expectation on
+    # total divisions overstates it, by exactly this factor. It was
+    # 16.0x and is now 3.9x -- smaller, still material, still a bug if
+    # anyone does it.
+    overstatement = out['divisions_total'] / out['cancer_divisions']
+    assert overstatement > 2.0, (
+        'the de novo expectation must be computed on cancer divisions; '
+        f'using the total would overstate it {overstatement:.1f}x')
 
-    # And no de novo event, as 1.55e-6 per division over ~850 divisions
-    # requires. Every number above is about SEEDED variation, and the
-    # two counters have to stay apart for that sentence to be checkable.
+    # And no de novo event, as 1.55e-6 per division over ~61 cancer
+    # divisions requires (expectation 9.5e-5). Every number above is
+    # about SEEDED variation, and the two counters have to stay apart
+    # for that sentence to be checkable.
     assert sum(out['de_novo'].values()) == 0
     assert out['founder_events'] == {
         'mhc1_allele_loss': 42, 'mhc1_total_loss': 0,
@@ -993,11 +1086,17 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
 def test_drift_alone_moves_the_composition_as_much_as_immune_pressure():
     """The control the claim needs: the same run with the immune module
     removed, so nothing can select and only sampling and division
-    remain. Seed 1 goes 42 of 80 -> 78 of 145, a move of +0.0129 --
-    LARGER than the +0.0043 mean the shipped infiltrate produces and of
-    the opposite sign to that seed's own -0.0033. Over 12 seeds drift
-    alone is +0.0062 (sd 0.0093), and that sd is the noise floor every
-    number in this file is measured against.
+    remain. Seed 1 goes 42 of 80 -> 78 of 146, a move of +0.0092 --
+    still LARGER than the +0.0043 mean the shipped infiltrate produces,
+    which is the whole point of the control. Over 12 seeds drift alone
+    is +0.0062 (sd 0.0093), and that sd is the noise floor every number
+    in this file is measured against.
+
+    (145 -> 146 survivors, delta +0.0129 -> +0.0092, since
+    division_time_normal became 90 h. The cancer period did not move,
+    so this is one cell of RNG stream drift: fewer normal divisions
+    means every later draw in the shared stream shifts. The comparison
+    the test exists to make is unaffected.)
 
     With no immune cells there is also no IFN-gamma, so surface MHC-I
     stays exactly where it was seeded -- 0.300 intact, 0.200 after one
@@ -1006,11 +1105,15 @@ def test_drift_alone_moves_the_composition_as_much_as_immune_pressure():
     """
     out = _preset_run('immune_off', seed=1)
     assert (out['founders'], out['founders_escaped']) == (80, 42)
-    assert (out['survivors'], out['survivors_escaped']) == (145, 78)
+    assert (out['survivors'], out['survivors_escaped']) == (146, 78)
     assert out['kills'] == []
     p0 = out['founders_escaped'] / out['founders']
     p1 = out['survivors_escaped'] / out['survivors']
-    assert p1 - p0 == pytest.approx(0.01293, abs=5e-5)
+    assert p1 - p0 == pytest.approx(0.00925, abs=5e-5)
+    # THE PROPERTY, stated so it does not depend on the exact delta:
+    # drift with no immune compartment at all still moves the
+    # composition further than the shipped infiltrate's 12-seed mean.
+    assert p1 - p0 > 0.0043
     assert out['mhc1_intact_mean'] == pytest.approx(MHC1_SEEDED, abs=1e-9)
     assert out['mhc1_escaped_mean'] == pytest.approx(
         MHC1_AFTER_ONE_ALLELE_LOST, abs=1e-9)

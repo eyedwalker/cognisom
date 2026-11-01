@@ -1013,8 +1013,12 @@ def test_a_pinned_24h_run_is_identical_with_escape_on_and_off():
         cancer_divisions[enabled] = by_type.get('cancer', 0)
 
     assert out[True] == out[False], out
-    assert out[True][2] == 35, f"the pinned division count moved: {out[True]}"
-    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 35 divisions"
+    # 35 -> 10 divisions since division_time_normal became 90 h: this
+    # ring preset divides no cancer cells (asserted below), so every
+    # division here is a normal one and the count falls with the period.
+    # Verified identical under both scorers.
+    assert out[True][2] == 10, f"the pinned division count moved: {out[True]}"
+    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 10 divisions"
     # The limitation, measured rather than assumed.
     assert cancer_divisions[True] == 0, (
         'the ring preset now divides cancer cells, so this run DOES '
@@ -1069,7 +1073,13 @@ def test_a_six_hour_slab_run_is_identical_with_escape_on_and_off():
             round(cells.escape_distribution()['mean_mhc1'], 9))
 
     assert out[True] == out[False], out
-    assert out[True][:7] == (2241, 85, 208, 6, 0, 12, 0.354054035), out[True]
+    # Was (2241, 85, 208, 6, 0, 12, 0.354054035) when normal cells
+    # divided every 24 h. Since the period became 90 h: 142 fewer cells,
+    # a third of the divisions (208 -> 66), and a slightly lower mean
+    # MHC-I because fewer kills means less IFN-gamma. Cancer divisions
+    # went 12 -> 13, which is RNG stream drift -- the cancer period did
+    # not move. Verified identical under both scorers.
+    assert out[True][:7] == (2099, 86, 66, 6, 0, 13, 0.346884065), out[True]
     # The point of this test: the draw WAS reached.
     assert out[True][5] > 0
-    assert ev.expected_events(out[True][5]) == pytest.approx(1.9e-5, rel=0.05)
+    assert ev.expected_events(out[True][5]) == pytest.approx(2.0e-5, rel=0.05)

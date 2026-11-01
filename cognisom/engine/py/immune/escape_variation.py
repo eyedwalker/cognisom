@@ -288,17 +288,40 @@ Three consequences for anyone reading these rates:
     PWM fallback          4 of 24  (h 17.3-20.3, 1 cell)      0.4010
     real MHCflurry       16 of 24  (h 8.3 on, 2-3 cells)      0.4252
 
-  Under the predictor CI and production use, intact cancer cells are
-  over the missing-self step for two thirds of the run and 2 of them end
-  the run there. Escaped cells never cross it under either scorer (max
-  0.2653 / 0.2835). That is exactly the counter-selecting regime: an
-  intact cell leaves NK's view while its escaped neighbour stays in it,
-  so NK kills the escaped one -- in a 12 h arena at full IFN drive, 187
-  escaped and 0 intact. Escape becomes a liability, which is backwards,
-  and it is an artefact of an unsourced step function. It is live today
-  in the shipped Baseline slab and belongs on the defect list, not the
-  watch list; grading NK recognition BY MHC-I instead of stepping at an
+  Under the predictor CI and production use, intact cancer cells were
+  over the missing-self step for two thirds of the run and 2 of them
+  ended the run there. Escaped cells never crossed it under either
+  scorer (max 0.2653 / 0.2835). That is exactly the counter-selecting
+  regime: an intact cell leaves NK's view while its escaped neighbour
+  stays in it, so NK kills the escaped one -- in a 12 h arena at full
+  IFN drive, 187 escaped and 0 intact. Escape becomes a liability,
+  which is backwards, and it is an artefact of an unsourced step
+  function. Grading NK recognition BY MHC-I instead of stepping at an
   unsourced 0.4 would remove it.
+
+  MOSTLY STOPPED, and now SCORER-DEPENDENT, re-measured after
+  division_time_normal became 90 h. Fewer normal cells means fewer
+  kills (23 -> 15), which means less IFN-gamma and less bystander
+  MHC-I induction, so the shipped run sits near the step instead of
+  over it:
+
+    scorer        max intact MHC-I    samples at/above 0.4
+    MHCflurry           0.3885               0 of 24   (was 16)
+    PWM fallback        0.4093               2 of 24   (was 4)
+
+  So under CI and production the shipped Baseline slab no longer
+  enters the regime; under the fallback it still just does. Whether it
+  fires now depends on which binding predictor is installed, which is
+  not a fact about NK cells -- that dependence is itself the reason
+  the unsourced step is the wrong shape.
+
+  This is NOT a fix. The step function still inverts selection wherever
+  it is crossed; the shipped preset merely stopped reaching it under
+  one scorer, by 0.0115 of MHC-I. Anything that raises IFN drive --
+  more immune cells, more kills, a denser infiltrate -- puts it back.
+  Grading NK recognition BY MHC-I instead of stepping at an unsourced
+  0.4 remains the fix, and the margin is small enough that leaving it
+  on the watch list means watching.
 
 tests/test_escape_is_selected_not_imposed.py holds all of it.
 

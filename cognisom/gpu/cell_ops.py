@@ -243,7 +243,12 @@ def detect_death_candidates(
 
 def detect_division_candidates(
     arrays: CellArrays,
-    division_time_normal: float = 24.0,
+    # Must match CellularModule's defaults. The measured normal:cancer
+    # turnover ratio is 7.5:1 (Meyer 1982, PMID 6185700 -- see the comment
+    # on CellularModule.division_time_normal for the derivation); this
+    # pair carries that ratio on a compressed scale. A GPU copy silently
+    # drifting from the CPU one has cost this project twice already.
+    division_time_normal: float = 90.0,
     division_time_cancer: float = 12.0,
 ) -> np.ndarray:
     """Detect cells ready to divide (vectorized).

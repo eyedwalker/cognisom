@@ -69,17 +69,44 @@ def _normal(cel):
 def test_a_day_of_growth_no_longer_depends_on_the_time_step():
     coarse, _ = _baseline(0.05)
     fine, _ = _baseline(0.02)
-    assert _normal(coarse) == _normal(fine) == 160
-    # Synchronised, the same day at dt = 0.02 fell one rounding short of 24 h.
+    # THE PROPERTY: the two time steps agree. The absolute count is a pin
+    # and has moved twice -- 160 when normal cells divided every 24 h, 98
+    # since division_time_normal became 90 h to carry the measured
+    # normal:cancer turnover ratio of 7.5:1 (Meyer 1982, PMID 6185700).
+    assert _normal(coarse) == _normal(fine)
+    assert _normal(coarse) == 98
+    # Synchronised, every normal cell starts at age 0, so with a 90 h
+    # period none reaches division inside 24 h and the count is the seed.
+    # It was also 80 before the ratio fix, then because the same day at
+    # dt = 0.02 fell one rounding short of 24 h -- same number, different
+    # reason.
     synchronised, _ = _baseline(0.02, initial_cell_cycle="synchronous")
     assert _normal(synchronised) == 80
 
 
 def test_divisions_are_spread_through_the_run():
+    """Synchronised seeding bunches divisions into a step; staggered
+    seeding spreads them across the day.
+
+    Stated as a FRACTION of each arm's own divisions rather than as an
+    absolute count. The thresholds used to be >= 80 in one step and <= 8,
+    which were counts calibrated to normal cells dividing every 24 h.
+    Once division_time_normal became 90 h the synchronised arm's biggest
+    step fell to 20 and the test failed, though the behaviour it exists
+    to describe was unchanged -- an absolute count cannot survive a
+    change to how many divisions there are.
+    """
     _, staggered = _baseline(0.05)
     _, synchronised = _baseline(0.05, initial_cell_cycle="synchronous")
-    assert max(np.unique(synchronised, return_counts=True)[1]) >= 80   # one step
-    assert max(np.unique(staggered, return_counts=True)[1]) <= 8
+
+    def biggest_share(times):
+        return max(np.unique(times, return_counts=True)[1]) / len(times)
+
+    # Synchronised: 20 of 30 divisions land in one step (67%).
+    assert biggest_share(synchronised) >= 0.5
+    # Staggered: the busiest step holds 2 of 48 (4%), across 38 steps.
+    assert biggest_share(staggered) <= 0.1
+    assert len(np.unique(staggered)) >= 20
     assert min(staggered) < 6.0 < 18.0 < max(staggered)
 
 

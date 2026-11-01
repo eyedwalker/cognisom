@@ -384,7 +384,15 @@ class TissueScaleConfig:
     #: with the value's grade and citation, or why the library gave none
     #: (and cell_radius_um applies).
     archetype_radius_source: Dict[str, str] = field(default_factory=dict)
-    division_time_normal_hr: float = 48.0
+    #: Division periods, hours. The measured normal:cancer turnover ratio
+    #: is 7.5:1 -- normal prostate epithelium labels at 0.12% against
+    #: adenocarcinoma's 0.90% (Meyer 1982, PMID 6185700), which at a ~10 h
+    #: S phase is ~8,333 h against ~1,111 h. This pair carries that ratio
+    #: on a compressed scale; see CellularModule.division_time_normal for
+    #: why the scale is compressed and the real numbers are not used.
+    #: This used to be 48.0/12.0, a 4:1 ratio, so normal tissue here
+    #: proliferated 1.875x too fast relative to cancer.
+    division_time_normal_hr: float = 90.0
     division_time_cancer_hr: float = 12.0
     #: Start cells staggered over the steady-state age distribution
     #: (core.cell_cycle) rather than all at age 0, which made each lineage

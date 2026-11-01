@@ -293,7 +293,38 @@ class CellularModule(SimulationModule):
         self.next_cell_id = 0
 
         # Parameters
-        self.division_time_normal = self.config.get('division_time_normal', 24.0)  # hours
+        # Division periods, hours. These are a COMPRESSED timescale whose
+        # RATIO is the measured one -- read on before changing either.
+        #
+        # Meyer JS, Sufrin G, Martin SA, J Urol 1982;128:1353-6 (PMID
+        # 6185700) gives thymidine labelling indices for prostate:
+        #
+        #     normal peripheral zone    0.12%   (central zone 0.11%)
+        #     nodular hyperplasia       0.31%
+        #     adenocarcinoma            0.90%   (range 0.14-3.90)
+        #
+        # With an in-vivo S-phase duration of ~10 h -- the median across
+        # normal tissues and tumours in halogenated-pyrimidine studies --
+        # turnover is Ts/LI: ~8,333 h (~347 d) for normal epithelium and
+        # ~1,111 h (~46 d) for adenocarcinoma. A Ki-67 cross-check agrees:
+        # benign Ki-67 ~1.3% is the GROWTH FRACTION, not the turnover, and
+        # 1.3% of cells cycling at ~108 h each gives the same ~347 d.
+        #
+        # Those real values are not what is set here. At 8,333 h a 24 h run
+        # shows no division at all, and every 24 h pin in the suite would
+        # have to be re-taken against a multi-week default duration. So the
+        # scale stays compressed and the RATIO is corrected, which is the
+        # part that drives behaviour: measured normal:cancer is 7.5:1 and
+        # this used to run 2:1 (24/12), i.e. normal tissue proliferated
+        # 3.75x too fast RELATIVE to cancer. That ratio error is what
+        # produced "normal tissue grows 37% in 12 h" while a tumour was
+        # being killed beside it.
+        #
+        # So: cancer unchanged, normal = 12.0 * 7.5. Changing the cancer
+        # period means changing this one by the same factor, or the ratio
+        # silently breaks again. gpu/cell_ops.detect_division_candidates
+        # and core/tissue_config carry their own copies -- move all three.
+        self.division_time_normal = self.config.get('division_time_normal', 90.0)  # hours
         self.division_time_cancer = self.config.get('division_time_cancer', 12.0)  # hours
         # Androgen withdrawal, read from the AR module when linked. The
         # proliferation gate applies to every cancer cell (15 of 18 tumours
