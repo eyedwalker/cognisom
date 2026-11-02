@@ -133,6 +133,29 @@ class SpatialField:
         self._cfl_warned = False
         self._solver_warned = False
     
+    def __getstate__(self):
+        """Drop the cached factorisation so the field can be pickled.
+
+        ``_lu`` is a scipy ``SuperLU`` handle, which pickle refuses. It is
+        a CACHE -- ``_solve_steady_state`` rebuilds it from
+        ``_assemble_matrix`` whenever it is None -- so dropping it costs
+        one factorisation after a restore and nothing else.
+
+        This exists for ``cognisom.core.checkpoint``, which decides what
+        is state and what is wiring by offering each attribute to pickle.
+        Without this method the whole ``fields`` dict would refuse, and
+        every concentration array in it would be classified as wiring and
+        silently left at its freshly-built value -- a restored run with
+        the right cells and the wrong diffusion state. The checkpoint
+        round-trip test is what would catch that, and this is what stops
+        it happening.
+        """
+        state = dict(self.__dict__)
+        state['_lu'] = None
+        state['_lu_key'] = None
+        state['_lu_is_dir'] = None
+        return state
+
     def add_source(self, position: np.ndarray, rate: float):
         """Add source"""
         idx = self._position_to_index(position)
