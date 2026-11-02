@@ -67,6 +67,23 @@ def card(title, body, accent=None):
     return f'<div class="card"{bar}><h3>{title}</h3>{body}</div>'
 
 
+def headshot():
+    """The avatar, as a photo if one has been dropped in.
+
+    Put a photo at pitch/img/headshot.jpg (or .jpeg/.png) and rebuild --
+    no code change needed. Until then this renders the grey placeholder
+    circle, which is visibly unfinished on purpose: a deck that goes out
+    with a grey disc where the founder should be is worse than one that
+    makes the gap obvious while drafting.
+    """
+    for ext in ("jpg", "jpeg", "png"):
+        f = HERE / "img" / ("headshot." + ext)
+        if f.exists():
+            return ('<div class="avatar"><img src="img/%s" alt="David Walker"></div>'
+                    % f.name)
+    return '<div class="avatar">headshot</div>'
+
+
 S = []
 
 
@@ -241,7 +258,7 @@ S.append(slide("9 · What we do not claim",
 S.append(slide("10 · Team: AI-led, and deliberately adding science",
   "Cognisom is built AI-first. That is how one founder covers genomics to simulation to rendering &mdash; and it is why the expertise we are adding next is scientific, not engineering.",
   f'''<div class="team">
- <div class="person"><div class="avatar">headshot</div>
+ <div class="person">{headshot()}
   <h3>David Walker<span>Founder and CEO, Eyentelligence, Inc. &mdash; AI-led development &middot; Flower Mound, TX</span></h3>
   {li(["<b>Builds with AI as the primary method.</b> The whole pipeline &mdash; variant ingestion and somatic calling, HLA typing and neoantigen prediction, the ten-module agent-based tumour&ndash;immune engine, the literature-sourced parameter library, the OpenUSD and Omniverse layers &mdash; built by one founder working AI-first",
        "<b>With the discipline to match the speed:</b> 3,841 automated tests; optimisations verified bit-identical before shipping; scaling measured and re-measured rather than asserted; every parameter sourced to a PMID or flagged ESTIMATE",
@@ -310,7 +327,8 @@ figcaption{font-size:9pt;color:var(--muted)}
 .team{display:grid;grid-template-columns:1.2fr 1fr;gap:0.25in}
 .person{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:0.18in 0.22in;font-size:10.5pt;line-height:1.38;display:grid;grid-template-columns:1.1in 1fr;gap:0.18in;align-content:start}
 .person h3{grid-column:2}.person ul{grid-column:2}
-.avatar{width:1.1in;height:1.1in;border-radius:50%;background:#e7e9ee;display:flex;align-items:center;justify-content:center;text-align:center;font-size:8pt;grid-row:1/3;align-self:start}
+.avatar{width:1.1in;height:1.1in;border-radius:50%;background:#e7e9ee;display:flex;align-items:center;justify-content:center;text-align:center;font-size:8pt;grid-row:1/3;align-self:start;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
 .side{display:flex;flex-direction:column;gap:0.16in}
 .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:0.08in;align-items:center}
 .flow div{background:var(--panel);border:1.5px solid var(--navy);border-radius:6px;padding:0.1in 0.14in;align-self:stretch}
