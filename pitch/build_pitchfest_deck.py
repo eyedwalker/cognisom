@@ -89,8 +89,10 @@ S.append('''<section class="slide cover">
   <p class="lede">Variants in, mechanism out: somatic calling on NVIDIA Parabricks, HLA typing, neural peptide&ndash;MHC binding, AlphaFold2-Multimer structure through NVIDIA BioNeMo, then a ten-module agent-based tumour&ndash;immune simulation that renders in NVIDIA Omniverse. Every parameter is traceable to a published measurement or flagged as an estimate.</p>
   <div class="chips">
    <span class="chip">cognisom.com</span>
-   <span class="chip">''' + FILL("entity line: Eyentelligence, Inc. — state of incorporation and date") + '''</span>
-   <span class="chip">''' + FILL("founder name · email") + '''</span>
+   <span class="chip">Eyentelligence, Inc. &middot; Delaware C-corporation, incorporated June 2026 &middot; Flower Mound, TX</span>
+   <span class="chip">David Walker &middot; david@eyentelligence.com</span>
+   <span class="chip">Harvard Innovation Labs venture</span>
+   <span class="chip">NVIDIA Inception member</span>
    <span class="chip">Research use only &mdash; not a clinical decision tool</span>
   </div>
  </div>
@@ -217,7 +219,8 @@ S.append(slide("8 · Market and traction",
   "<b>No pilots, letters of intent, design partners or grants to date.</b> Effort has gone into making the prediction path real and falsifiable before taking on commitments we could not support.",
   "What exists: a closed loop on public reference data, one externally tested mechanism, a published open standard with a DOI, and five NVIDIA technologies in production use.",
   "The next milestone is deliberately experimental rather than commercial &mdash; the pre-registered binding assay on the previous slide.",
-  FILL("if any advisor, collaborator or institutional relationship can be named, it belongs here")]))}
+  "Institutional: Cognisom is a <b>Harvard Innovation Labs</b> venture, and Eyentelligence is an <b>NVIDIA Inception</b> member.",
+  "<b>No formal scientific advisor yet</b> &mdash; early conversations with a Harvard faculty member, and nothing signed. Closing that is what we want from this programme's introductions."]))}
 </div>''',
   'Sources: biosimulation figures, Global Market Insights, Biosimulation Market, accessed 2 November 2026. Neoantigen cancer vaccine figures, Meticulous Research, accessed 2 November 2026.'))
 
@@ -239,11 +242,12 @@ S.append(slide("10 · Team: AI-led, and deliberately adding science",
   "Cognisom is built AI-first. That is how one founder covers genomics to simulation to rendering &mdash; and it is why the expertise we are adding next is scientific, not engineering.",
   f'''<div class="team">
  <div class="person"><div class="avatar">headshot</div>
-  <h3>{FILL("founder name")}<span>Founder, Eyentelligence, Inc. &mdash; AI-led development</span></h3>
+  <h3>David Walker<span>Founder and CEO, Eyentelligence, Inc. &mdash; AI-led development &middot; Flower Mound, TX</span></h3>
   {li(["<b>Builds with AI as the primary method.</b> The whole pipeline &mdash; variant ingestion and somatic calling, HLA typing and neoantigen prediction, the ten-module agent-based tumour&ndash;immune engine, the literature-sourced parameter library, the OpenUSD and Omniverse layers &mdash; built by one founder working AI-first",
        "<b>With the discipline to match the speed:</b> 3,841 automated tests; optimisations verified bit-identical before shipping; scaling measured and re-measured rather than asserted; every parameter sourced to a PMID or flagged ESTIMATE",
        "Authored and published Bio-USD, the draft open OpenUSD schema for biological data, under Apache 2.0 with a citable DOI, engaged directly by Pixar's OpenUSD team",
-       FILL("prior background in one line — the credential that explains the judgement behind this")])}
+       "<b>38 years in eyecare technology and supply chain</b> before this: Essilor of America 1989&ndash;2017; VP, AcuityLogic at Eyefinity 2019&ndash;2026, leading its first AI capabilities. Harvard Extension School ALM from September 2026, ALB expected 2027",
+       "Cognisom is a <b>Harvard Innovation Labs</b> venture; Eyentelligence is an <b>NVIDIA Inception</b> member. <b>No formal scientific advisor is in place</b> &mdash; early conversations with a Harvard faculty member, nothing signed"])}
  </div>
  <div class="side">
   {card("What we are adding, and why", "<p>AI-first development moved the bottleneck. The engineering is ahead of the domain review, so <b>our open questions are now scientific rather than technical.</b> We are actively seeking research-level immunology, tumour-biology and translational collaborators to validate direction and tell us which mechanisms and which unmeasured constants deserve priority.</p>", "#d9731f")}
@@ -251,7 +255,7 @@ S.append(slide("10 · Team: AI-led, and deliberately adding science",
     "Run the pre-registered peptide assay and publish the result either way",
     "Convene scientific reviewers on direction &mdash; the introductions matter as much as the credits",
     "Feed measured binding back into the library, replacing estimates with measurements"]), "#76b900")}
-  {card("Contact", f"<p>{FILL('email · phone · cognisom.com')}</p><p style='color:#5b6373;font-size:9.5pt'>Research use only. Not for clinical use. No confidential information and no patient data in this deck.</p>")}
+  {card("Contact", f"<p><b>David Walker</b><br>david@eyentelligence.com<br>cognisom.com<br>214-208-5261</p><p style='color:#5b6373;font-size:9.5pt'>Research use only. Not for clinical use. No confidential information and no patient data in this deck.</p>")}
  </div>
 </div>'''))
 
@@ -262,7 +266,7 @@ CSS = '''
 *{box-sizing:border-box}
 @page{size:13.333in 7.5in;margin:0}
 html,body{margin:0;padding:0;background:#777;font-family:'IBM Plex Sans',Arial,sans-serif;color:var(--ink)}
-.slide{width:13.333in;height:7.5in;padding:0.55in 0.7in 0.5in;background:var(--paper);position:relative;overflow:hidden;page-break-after:always;break-after:page;display:flex;flex-direction:column;gap:0.18in;margin:0 auto}
+.slide{width:13.333in;height:7.5in;padding:0.55in 0.7in 0.5in;background:var(--paper);position:relative;overflow:hidden;page-break-after:always;break-after:page;display:flex;flex-direction:column;gap:0.26in;margin:0 auto}
 @media screen{.slide{margin:12px auto;box-shadow:0 2px 12px rgba(0,0,0,.35)}}
 .eyebrow{display:flex;justify-content:space-between;font-size:10.5pt;letter-spacing:.08em;text-transform:uppercase;color:var(--orange);font-weight:600}
 h1,h2,h3{font-family:'Source Serif 4',Georgia,serif;margin:0;text-wrap:balance}
