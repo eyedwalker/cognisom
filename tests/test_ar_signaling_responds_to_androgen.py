@@ -232,3 +232,62 @@ def test_the_system_declares_itself_stiff(builder):
     ode = builder.build_ar_signaling().to_ode_system()
 
     assert ode.stiff is True
+
+
+def test_the_jacobian_sparsity_is_the_matrix_block_diag_would_have_built():
+    """The hand-built pattern must BE scipy's, not merely resemble it.
+
+    ``ARSignalingModule._sparsity_for`` constructs the block-diagonal
+    Jacobian pattern by index arithmetic instead of handing
+    ``scipy.sparse.block_diag`` a Python list of n small matrices, which
+    was 44% of the module's runtime at 6,120 cells. That matrix is not
+    cosmetic: BDF derives its finite-difference column grouping from it,
+    so a pattern that differs anywhere changes the Jacobian and with it
+    every number the AR pathway produces. Equality is therefore the
+    thing to assert, element for element and dtype for dtype -- not that
+    the shape is right, and not that the solver still runs.
+
+    If this fails, do NOT re-pin it: rebuild the pattern so it matches,
+    or go back to block_diag and accept the cost.
+    """
+    import numpy as np
+    from scipy.sparse import block_diag, csr_matrix
+
+    from cognisom.modules.ar_signaling_module import ARSignalingModule
+
+    module = ARSignalingModule()
+    for n, k in ((1, 6), (2, 6), (3, 1), (5, 2), (7, 6), (120, 6)):
+        module.species = ['s%d' % i for i in range(k)]
+        module._sparsity_n = None
+        built = module._sparsity_for(n)
+        reference = block_diag([csr_matrix(np.ones((k, k)))] * n, format='csr')
+        built.sort_indices()
+        reference.sort_indices()
+
+        assert built.shape == reference.shape
+        assert np.array_equal(built.indptr, reference.indptr)
+        assert np.array_equal(built.indices, reference.indices)
+        assert np.array_equal(built.data, reference.data)
+        assert built.data.dtype == reference.data.dtype
+        assert (built != reference).nnz == 0
+
+
+def test_the_sparsity_cache_rebuilds_when_the_population_changes():
+    """A cached pattern for the wrong n would mis-shape the Jacobian.
+
+    The row count changes whenever a cell divides or dies, so the cache
+    key has to be n itself. Pinning this because the fast builder makes
+    a rebuild cheap enough to be tempting to skip.
+    """
+    from cognisom.modules.ar_signaling_module import ARSignalingModule
+
+    module = ARSignalingModule()
+    module.species = ['a', 'b', 'c']
+    first = module._sparsity_for(4)
+    again = module._sparsity_for(4)
+    grown = module._sparsity_for(5)
+
+    assert again is first, 'same n must not rebuild'
+    assert grown is not first
+    assert grown.shape == (15, 15)
+    assert first.shape == (12, 12)
