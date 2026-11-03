@@ -675,6 +675,7 @@ class ImmuneModule(SimulationModule):
         # cellular module fills and the vascular module perfuses.
         self.seeding = str(self.config.get('seeding', 'window'))
         self.slab_overrides = dict(self.config.get('slab', {}) or {})
+        self.section_overrides = dict(self.config.get('section', {}) or {})
 
         # Reference to cellular module (for target cells)
         self.cellular_module = None
@@ -747,26 +748,46 @@ class ImmuneModule(SimulationModule):
         self._announce_nk_licensing()
     
     def _slab_scatter(self):
-        """Seed positions spread through the TissueSlab, or None.
+        """Seed positions spread through the tissue volume, or None.
 
         Returns an (N, 3) array covering all three lineages in seeding
-        order when ``seeding == 'slab'``, and None for the historical
-        window scatter.
+        order when ``seeding`` is 'slab' or 'section', and None for the
+        historical window scatter. Both volume layouts scatter the same
+        way -- uniformly in the tissue's box, inset from its faces --
+        because the infiltrate's ARRANGEMENT is not something either
+        layout measures. The section measures where the tissue is, not
+        where its leukocytes are, so inferring an immune arrangement
+        from it would be a claim the data does not carry.
         """
-        if self.seeding != 'slab':
+        if self.seeding == 'slab':
+            from cognisom.modules.tissue_slab import (
+                rng_from, scatter_in_box, slab_bounds, slab_spec,
+            )
+            spec = slab_spec(**self.slab_overrides)
+            lo, hi = slab_bounds(
+                spec['n_normal'], spec['n_cancer'],
+                spacing=spec['spacing'],
+                layers=spec['layers'],
+                center=spec['center'],
+            )
+        elif self.seeding == 'section':
+            from cognisom.modules.tissue_slab import scatter_in_box
+            from cognisom.modules.tissue_section import (
+                rng_from, section_bounds, section_spec,
+            )
+            spec = section_spec(**self.section_overrides)
+            lo, hi = section_bounds(
+                spec['n_normal'], spec['n_cancer'],
+                section=spec['section'],
+                window=spec['window'],
+                bin_um=spec['bin_um'],
+                spacing=spec['spacing'],
+                jitter=spec['jitter'],
+                center=spec['center'],
+            )
+        else:
             return None
 
-        from cognisom.modules.tissue_slab import (
-            rng_from, scatter_in_box, slab_bounds, slab_spec,
-        )
-
-        spec = slab_spec(**self.slab_overrides)
-        lo, hi = slab_bounds(
-            spec['n_normal'], spec['n_cancer'],
-            spacing=spec['spacing'],
-            layers=spec['layers'],
-            center=spec['center'],
-        )
         n_total = self.n_t_cells + self.n_nk_cells + self.n_macrophages
         return scatter_in_box(
             n_total, lo, hi,

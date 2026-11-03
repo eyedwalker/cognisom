@@ -8,3 +8,25 @@ https://github.com/eyedwalker/biousd) are under the same licence. OpenUSD
 itself is distributed under the Tomorrow Open Source Technology License,
 which is Apache 2.0 with a different trademark section; the two are
 compatible.
+
+THIRD-PARTY DATA
+----------------
+
+cognisom/data/sections/prostate_xenium_600um.csv contains measured human
+prostate cell positions derived from a 10x Genomics public dataset:
+
+    Xenium Prime 5K FFPE Human Prostate (adenocarcinoma), 10x Genomics,
+    published 2024-07-31.
+    https://www.10xgenomics.com/datasets/xenium-prime-ffpe-human-prostate
+
+    Copyright 10x Genomics. Licensed under the Creative Commons
+    Attribution 4.0 International Licence (CC BY 4.0),
+    https://creativecommons.org/licenses/by/4.0/
+
+CC BY 4.0 is compatible with Apache 2.0 and governs only that file, not
+the rest of this repository. The file is a transformation of the source
+cells.csv.gz: one 600 um window, four columns, re-originned coordinates,
+and an equivalent circular diameter computed per cell. Its own header
+records the source URL, the source checksum, the selection rule and the
+QC filter, so the attribution travels with the data. Anyone redistributing
+that file, or a derivative of it, must keep the 10x Genomics attribution.

@@ -504,12 +504,26 @@ class CellularModule(SimulationModule):
         # about where the tissue is. Per-parameter overrides go in a
         # 'slab' sub-dict; unknown keys there are rejected rather than
         # ignored.
+        # 'section' seeds a VOLUME whose occupancy comes from a measured
+        # human prostate section instead of being uniformly packed: see
+        # cognisom.modules.tissue_section. The lattice pitch is the
+        # slab's, because the measured packed cell diameter puts it in
+        # the right band; what the section changes is WHERE the cells
+        # are, so glands fill and lumens stay empty. The slab fills
+        # every site and real prostate fills ~60% of them, so the slab
+        # over-connects each cell by about 1.6x -- that difference is
+        # the point of the layout, not a shortfall in it.
         self.seeding = str(self.config.get('seeding', 'ring'))
         self.slab_overrides = dict(self.config.get('slab', {}) or {})
+        self.section_overrides = dict(self.config.get('section', {}) or {})
         #: Populated by _seed_slab with the geometry it used (extents,
         #: bounds, nodule centre and radius), for callers that need to
         #: frame a camera or check perfusion against it.
         self.slab_layout = None
+        #: The same, for _seed_section. Separate from slab_layout so a
+        #: consumer cannot read one layout's geometry believing it has
+        #: the other's -- their extents and occupancy differ.
+        self.section_layout = None
 
         # Patient HLA-I panel + MHC loader (Upgrade 2). Same scorer the
         # neoantigen predictor uses; auto-picks up MHCflurry when
@@ -567,6 +581,8 @@ class CellularModule(SimulationModule):
 
         if self.seeding == 'slab':
             n_normal, n_cancer = self._seed_slab(n_normal, n_cancer)
+        elif self.seeding == 'section':
+            n_normal, n_cancer = self._seed_section(n_normal, n_cancer)
         else:
             self._seed_ring(n_normal, n_cancer)
 
@@ -707,6 +723,70 @@ class CellularModule(SimulationModule):
               f"({layout['nodule_center'][0]:.0f}, "
               f"{layout['nodule_center'][1]:.0f}, "
               f"{layout['nodule_center'][2]:.0f})")
+        return len(layout['normal']), len(layout['cancer'])
+
+    def _seed_section(self, n_normal, n_cancer):
+        """A tissue volume at a measured section's density field.
+
+        Mirrors :meth:`_seed_slab` -- same spec-is-the-single-source-of-
+        truth rule, same founding mutations, same MHC-I downregulation
+        -- and differs only in where the cells go. Override ``section``
+        consistently in the cellular, vascular and immune configs to
+        change the geometry, exactly as ``slab`` is overridden.
+
+        The cells' POSITIONS here are lattice sites; what is measured is
+        which sites are occupied. The cell TYPES are not measured at all
+        -- they come from the population prior as in every other layout,
+        and the nodule is carved geometrically -- so this seeds a real
+        arrangement of tissue DENSITY and makes no claim about the
+        spatial arrangement of cell types. ``section_report`` says so on
+        every run; do not report otherwise.
+
+        Returns the (n_normal, n_cancer) actually seeded.
+        """
+        from cognisom.modules.tissue_section import (
+            rng_from, section_report, section_spec, seed_section,
+        )
+
+        spec = section_spec(**self.section_overrides)
+        if 'n_normal_cells' in self.config:
+            spec['n_normal'] = int(self.config['n_normal_cells'])
+        if 'n_cancer_cells' in self.config:
+            spec['n_cancer'] = int(self.config['n_cancer_cells'])
+
+        layout = seed_section(
+            spec['n_normal'], spec['n_cancer'],
+            section=spec['section'],
+            window=spec['window'],
+            bin_um=spec['bin_um'],
+            spacing=spec['spacing'],
+            jitter=spec['jitter'],
+            center=spec['center'],
+            nodule_offset=spec['nodule_offset'],
+            rng=rng_from(spec['seed']),
+        )
+
+        for position in layout['normal']:
+            self.add_cell(position=position, cell_type='normal')
+        for position in layout['cancer']:
+            cell_id = self.add_cell(position=position, cell_type='cancer')
+            self.cells[cell_id].mutations = self._founding_mutations()
+            self.cells[cell_id].mhc1_expression = 0.3  # Downregulated
+
+        self.section_layout = layout
+        report = section_report(layout)
+        extents = layout['extents']
+        print(f"    ✓ section {extents[0]:.0f} x {extents[1]:.0f} x "
+              f"{extents[2]:.0f} um, {layout['layers']} layers at "
+              f"{layout['spacing']:.1f} um")
+        print(f"    ✓ measured occupancy {report['layer_fill']:.2f} of a "
+              f"packed layer, {report['void_fraction_20um']:.1%} void at "
+              f"20 um")
+        print(f"    ✓ nodule r={layout['nodule_radius']:.1f} um at "
+              f"({layout['nodule_center'][0]:.0f}, "
+              f"{layout['nodule_center'][1]:.0f}, "
+              f"{layout['nodule_center'][2]:.0f})")
+        print(f"    ✓ density from {layout['attribution']}")
         return len(layout['normal']), len(layout['cancer'])
 
     def _founding_mutations(self) -> List[str]:

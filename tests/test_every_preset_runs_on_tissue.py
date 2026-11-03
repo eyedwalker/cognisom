@@ -76,9 +76,17 @@ def test_the_ring_is_still_there_when_asked_for():
 
 
 def test_an_unknown_tissue_is_refused():
+    """The inventory is pinned so a new layout has to be declared here.
+
+    'section' was added for the measured-density layout
+    (cognisom/modules/tissue_section.py, tests in
+    test_tissue_section_layout.py). Adding a layout without updating
+    this list is the thing the assertion exists to catch; the layouts
+    themselves are specified in their own files, not here.
+    """
     with pytest.raises(ValueError, match="tissue must be one of"):
         EngineRunner(tissue="sheet")
-    assert TISSUE_LAYOUTS == ("slab", "ring")
+    assert TISSUE_LAYOUTS == ("slab", "ring", "section")
 
 
 def test_tissueslab_passes_through_untouched():

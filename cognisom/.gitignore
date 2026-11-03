@@ -98,3 +98,21 @@ data/
 genomics/data/mane_select_proteins.faa.gz
 *.csv
 *.tsv
+
+# Tissue-section fixtures: packaged test input, not runtime output. A few
+# tens of KB of measured cell positions that tissue_section.py loads, so
+# they must be tracked or the section layout raises FileNotFoundError on
+# a fresh clone and every test of it errors.
+#
+# LAST IN THE FILE ON PURPOSE, for the same reason the MANE rule above is
+# placed after its negations: later rules win, and both `data/` and the
+# blanket `*.csv` would otherwise re-exclude these. Git also does not
+# descend into an excluded directory, so re-including a file inside
+# `data/` needs that directory un-excluded at EVERY level -- a lone
+# `!/data/sections/**` silently matches nothing. Anchored with a leading
+# slash so this reaches only cognisom/data/ and leaves a `data/`
+# directory at any other depth excluded as before.
+!/data/
+/data/*
+!/data/sections/
+!/data/sections/**

@@ -235,8 +235,14 @@ class VascularModule(SimulationModule):
         # that mode: the vessel count is fixed by the pitch and the
         # slab's extent, because a count that did not match them would
         # leave part of the tissue unsupplied.
+        #
+        # 'section' is the same lattice over the tissue SECTION layout's
+        # box (cognisom.modules.tissue_section). The pitch is a length,
+        # so the slab's calibration against exchange_radius carries
+        # over unchanged; only the box differs.
         self.layout = str(self.config.get('layout', 'radial'))
         self.slab_overrides = dict(self.config.get('slab', {}) or {})
+        self.section_overrides = dict(self.config.get('section', {}) or {})
 
         # The per-cell O2 demand the Krogh calibration is anchored to:
         # the largest in the cellular module (normal cells, 0.15 /h).
@@ -270,6 +276,8 @@ class VascularModule(SimulationModule):
 
         if self.layout == 'slab':
             self._initialize_slab_lattice()
+        elif self.layout == 'section':
+            self._initialize_section_lattice()
         else:
             self._initialize_radial()
 
@@ -347,6 +355,53 @@ class VascularModule(SimulationModule):
         print(f"    ✓ Slab lattice, {spec['vessel_pitch']:.0f} um pitch "
               f"along axis {spec['vessel_axis']}")
     
+    def _initialize_section_lattice(self):
+        """The same staggered lattice, over the section layout's box.
+
+        The pitch is not re-derived: ``exchange_radius`` and the
+        zonation in ``_exchange_with_tissue`` are properties of this
+        module, not of a layout, so the 22 um the slab is calibrated to
+        is the right pitch over any box. What changes is the box, which
+        for a section depends on the POPULATION -- density is measured
+        and only depth is free -- so the bounds are taken from
+        ``section_bounds`` rather than from a constant.
+
+        Note the section's box is the NOMINAL one, a superset of the
+        cells actually placed, because a lumen bin declines its sites.
+        That is the right box to perfuse: sizing the lattice to the
+        realised extent would leave the outermost cells beyond the
+        vasculature, and an unperfused rim is a silent failure.
+        """
+        from cognisom.modules.tissue_slab import capillary_lattice
+        from cognisom.modules.tissue_section import (
+            rng_from, section_bounds, section_spec,
+        )
+
+        spec = section_spec(**self.section_overrides)
+        lo, hi = section_bounds(
+            spec['n_normal'], spec['n_cancer'],
+            section=spec['section'],
+            window=spec['window'],
+            bin_um=spec['bin_um'],
+            spacing=spec['spacing'],
+            jitter=spec['jitter'],
+            center=spec['center'],
+        )
+        segments = capillary_lattice(
+            lo, hi,
+            pitch=spec['vessel_pitch'],
+            axis=spec['vessel_axis'],
+            jitter=spec['vessel_jitter'],
+            tilt=spec['vessel_tilt'],
+            rng=rng_from(spec['seed']),
+        )
+        for start, end in segments:
+            self.add_capillary(start, end)
+
+        print(f"    ✓ {len(segments)} capillaries")
+        print(f"    ✓ Section lattice, {spec['vessel_pitch']:.0f} um pitch "
+              f"along axis {spec['vessel_axis']}")
+
     def add_capillary(self, start, end):
         """Add capillary to network"""
         capillary_id = self.next_capillary_id

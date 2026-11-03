@@ -27,11 +27,33 @@ include = ["cognisom*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-# .fasta ships genomics/data/reference_proteins.fasta, the bundled
+# genomics/data/*.fasta ships reference_proteins.fasta, the bundled
 # reference proteome. Without it an installed package silently falls back
 # to a UniProt fetch per gene -- a network round trip on the neoantigen
 # path, and nothing at all when the network is unavailable.
-"*" = ["*.json", "*.yaml", "*.yml", "*.usda", "*.bngl", "*.toml", "*.fasta"]
+#
+# NOTE THE DIRECTORY IN THAT PATTERN. A bare "*.fasta" here matches only
+# files sitting DIRECTLY in a package directory: genomics/data/ holds no
+# __init__.py, so it is not a package, and the proteome was silently
+# absent from every wheel this project has built. Verified by inspecting
+# a built wheel, not by reading this table -- do the same after changing
+# it. Other declared extensions still have unshipped files under
+# non-package subdirectories (biousd schemas and plugInfo among them);
+# those were left alone because most of the rest -- helm charts, deploy
+# configs, CI workflows -- should NOT be in a wheel, and deciding which
+# biousd files should is a separate call.
+#
+# data/sections/*.csv ships the measured tissue-section fixtures that
+# modules/tissue_section.py loads by path relative to its own __file__.
+# Without them an installed package raises FileNotFoundError the moment
+# anything asks for the section layout. Scoped to that directory rather
+# than a blanket *.csv, because every other CSV under cognisom/ is
+# runtime output and has no business in a wheel.
+"*" = [
+    "*.json", "*.yaml", "*.yml", "*.usda", "*.bngl", "*.toml", "*.fasta",
+    "data/sections/*.csv",
+    "genomics/data/*.fasta",
+]
 
 # ── Plugin discovery ────────────────────────────────────────────────
 # core/registry.py's discover_plugins() reads these entry points. Without a

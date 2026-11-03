@@ -179,7 +179,7 @@ logger = logging.getLogger(__name__)
 # ── Tissue layout ────────────────────────────────────────────────────
 
 #: Accepted values for EngineRunner(tissue=...).
-TISSUE_LAYOUTS = ("slab", "ring")
+TISSUE_LAYOUTS = ("slab", "ring", "section")
 _IMMUNE_KEYS = ("n_t_cells", "n_nk_cells", "n_macrophages")
 #: The legacy Metastasis Risk ring was drawn through the margin of a
 #: ~17 um tumour: inner radius 10 um (0.6 of it), outer 60 um (43 um
@@ -283,6 +283,82 @@ def slab_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
             spacing=spec["spacing"], layers=spec["layers"],
             center=spec["center"], nodule_offset=spec["nodule_offset"],
             jitter=spec["jitter"], rng=rng_from(spec["seed"]))
+        radius = float(layout["nodule_radius"])
+        lymphatic["ring_centre_um"] = tuple(
+            float(v) for v in layout["nodule_center"])
+        lymphatic["ring_inner_um"] = round(_LYMPH_INNER_FRACTION * radius, 1)
+        lymphatic["ring_outer_um"] = round(radius + _LYMPH_OUTER_REACH_UM, 1)
+
+    return out
+
+
+def section_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
+    """Re-express a preset on the measured tissue SECTION layout.
+
+    Built on :func:`slab_variant` rather than beside it. Every
+    rescaling the slab variant performs -- the tumour anchor, the
+    per-lineage immune mapping, the vessel-pitch compensation -- is a
+    statement about POPULATION, and the section carries the slab's
+    population exactly (``SECTION_SPEC`` and ``SLAB_SPEC`` both hold
+    1,960 + 80). Duplicating that arithmetic here would create two
+    copies to drift; deriving the section from the slab guarantees the
+    two layouts stay population-matched, which is the property that
+    makes a difference between them a difference in ARRANGEMENT rather
+    than in how much tissue there is.
+
+    What this changes on top of it:
+
+    * the three modules' layout keys, so cellular seeds the section,
+      vascular perfuses its box and immune scatters inside it;
+    * any ``slab`` override sub-dict becomes a ``section`` one, since
+      the key names (``vessel_pitch`` and friends) are shared but the
+      spec they are validated against is not;
+    * the lymphatic ring, which is re-centred on the SECTION's nodule.
+      The slab variant computed it from ``seed_slab``, and the two
+      layouts put their nodules in different places, so carrying that
+      value across would ring a tumour that is not there.
+    * the spatial grid, because a section's domain is neither the
+      slab's nor a constant -- it depends on the population. Left
+      unset, the fields would cover the first 200 um of a 260 um
+      window and silently exclude every cell beyond it.
+    """
+    import copy
+
+    from cognisom.modules.tissue_section import (
+        rng_from, section_grid, section_spec, seed_section,
+    )
+
+    out = slab_variant(scenario)
+
+    cellular = out.setdefault("cellular", {})
+    cellular["seeding"] = "section"
+    out.setdefault("immune", {})["seeding"] = "section"
+    out.setdefault("vascular", {})["layout"] = "section"
+
+    overrides: Dict[str, Any] = {}
+    for module in ("cellular", "vascular", "immune"):
+        carried = out.get(module, {}).pop("slab", None)
+        if carried:
+            overrides = dict(carried)
+    if overrides:
+        for module in ("cellular", "vascular", "immune"):
+            out[module]["section"] = dict(overrides)
+
+    spec = section_spec(**overrides)
+    n_cancer = int(cellular.get("n_cancer_cells", spec["n_cancer"]))
+    n_normal = int(cellular.get("n_normal_cells", spec["n_normal"]))
+
+    layout = seed_section(
+        n_normal, n_cancer,
+        section=spec["section"], window=spec["window"],
+        bin_um=spec["bin_um"], spacing=spec["spacing"],
+        jitter=spec["jitter"], center=spec["center"],
+        nodule_offset=spec["nodule_offset"], rng=rng_from(spec["seed"]),
+    )
+    out.setdefault("spatial", {}).update(section_grid(layout["domain"]))
+
+    lymphatic = out.get("lymphatic", {})
+    if "ring_centre_um" in lymphatic:
         radius = float(layout["nodule_radius"])
         lymphatic["ring_centre_um"] = tuple(
             float(v) for v in layout["nodule_center"])
@@ -436,6 +512,15 @@ class EngineRunner:
         #: volume. 'ring': the legacy 90-cell bead necklace the module
         #: dynamics were first calibrated on, kept so the tests that pin
         #: that calibration can still say what they pin. See slab_variant.
+        #:
+        #: 'section': the same population on a volume whose OCCUPANCY
+        #: comes from a measured human prostate section, so glands pack
+        #: and lumens stay empty. The slab fills every lattice site and
+        #: real prostate fills ~60% of them, so the slab over-connects
+        #: each cell by about 1.6x; the section is the layout that does
+        #: not. It is NOT the default, because every density-downstream
+        #: pin was taken on the slab and would have to be re-measured.
+        #: See section_variant and cognisom/modules/tissue_section.py.
         self.tissue = tissue
         #: What the patient contributed, or None. Before this parameter
         #: existed every cancer cell carried KRAS_G12D on a generic HLA
@@ -463,13 +548,19 @@ class EngineRunner:
         scenario_cfg = SCENARIOS.get(scenario, SCENARIOS["Baseline"])
         if tissue == "slab":
             scenario_cfg = slab_variant(scenario_cfg)
+        elif tissue == "section":
+            scenario_cfg = section_variant(scenario_cfg)
         self.module_configs = {
             "cellular": dict(scenario_cfg.get("cellular", {})),
             "immune": dict(scenario_cfg.get("immune", {})),
             "vascular": dict(scenario_cfg.get("vascular", {})),
             "lymphatic": dict(scenario_cfg.get("lymphatic", {})),
             "molecular": {},
-            "spatial": {},
+            # Read from the scenario, not hardcoded empty: the section
+            # layout has to size the diffusion grid to its own domain,
+            # which depends on the population. No ring or slab preset
+            # sets this key, so they are unaffected.
+            "spatial": dict(scenario_cfg.get("spatial", {})),
             "epigenetic": {},
             "circadian": {},
             "morphogen": {},

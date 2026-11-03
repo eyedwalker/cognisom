@@ -450,6 +450,11 @@ If you use cognisom in your research, please cite:
 ## License
 Apache License 2.0 — Open science, open source (see LICENSE; the Bio-USD package carries the same licence)
 
+One bundled data file is third-party: `cognisom/data/sections/prostate_xenium_600um.csv`,
+measured prostate cell positions derived from a 10x Genomics public Xenium dataset under
+CC BY 4.0. It is compatible with Apache 2.0 and governs only that file; see NOTICE for the
+attribution, and the file's own header for the source, checksum and what was transformed.
+
 ## Contact
 - **Website**: https://eyentelligence.ai
 - **Email**: research@eyentelligence.ai
