@@ -1,5 +1,76 @@
-# Cognisom: open our Bio-USD run at startup. NVIDIA's docker-compose.yml is
-# left exactly as published; this only adds the startup script.
+# Cognisom: open our Bio-USD run at startup, and render it for a person
+# to look at. NVIDIA's docker-compose.yml is left exactly as published;
+# this adds the stage, the startup script and the image-quality flags.
+#
+# Copy this to <isaacsim-repo>/tools/docker/docker-compose.override.yml
+# and bring the service up with the project name the box already uses:
+#
+#   docker compose -p isim up -d --force-recreate --no-deps isaac-sim
+#
+# THIS FILE IS THE AUTHORITATIVE COPY. It used to live only on the box,
+# untracked, and a copy of this repo's then-stale version over the top
+# of it silently dropped COGNISOM_STAGE -- so the demo came back up on
+# aggressive_tumor_12h instead of the prostate run, with no error.
+# Everything else in the service's environment comes from NVIDIA's
+# docker-compose.yml and tools/docker/.env; COGNISOM_* is ours.
+#
+# Why the render flags. "It looks fuzzy" had a documented cause:
+# isaacsim.exp.base.kit ships
+#
+#     rtx.post.dlss.execMode = 0   # 0 (Performance)
+#
+# and DLSS Performance renders internally at HALF the output resolution
+# on each axis -- 960x540 for a 1920x1080 stream -- then AI-upscales.
+# That default is right for robotics throughput and wrong for a demo
+# somebody is looking at.
+#
+# aa/op=4 is DLAA: native 1920x1080, NO upscaling, the sharpest option
+# the renderer has. 3 is DLSS and 4 is DLAA -- read off NVIDIA's own
+# settings UI (omni.rtx.settings.core .../widgets/rt_widgets.py), where
+# anything else prints "Invalid AA Mode". execMode stays at 2 (Quality)
+# so that anyone who switches the panel back to DLSS lands on Quality
+# rather than back on Performance.
+#
+# MEASURED on this box (g5.2xlarge / A10G), prostate_nav_immuno_24h,
+# cells as authored, logged by the startup script itself:
+#
+#     DLSS Quality (1280x720 internal)   47.5, 47.3 fps   34% GPU
+#     DLAA         (1920x1080 native)    42.0      fps    34% GPU
+#
+# So native resolution costs about 5 fps and the GPU is not the
+# limiter at either setting -- the main loop is. Take the sharp one.
+#
+# It is NOT the network. Measured 2026-11-05 from the client side:
+# 86 Mbit/s downstream from this box, 79 ms RTT, and NVENC sitting at
+# 0% while the SM was pegged at 100%. Nothing was starving the encoder,
+# so the softness had to be in the source image.
+#
+# allowDynamicResize is NVIDIA's own default of false, restored. The
+# streaming .kit turns it on, and its own comment says it "may be
+# detrimental to overall streaming performance"; the log showed the
+# stream torn down and re-made at 1920x1080 five times in one session,
+# and each of those re-initialises the encoder.
 services:
   isaac-sim:
-    command: ["--exec", "/isaac-sim/.local/share/ov/data/cognisom/open_cognisom_stage.py"]
+    environment:
+      # The run to open. Without this the script falls back to
+      # aggressive_tumor_12h, which is a DIFFERENT, smaller scene --
+      # and nothing says so at runtime except the log line.
+      COGNISOM_STAGE: /isaac-sim/.local/share/ov/data/cognisom/prostate_nav2_immuno_24h.usdc
+      # Cell bodies are authored translucent (0.35) so the nucleus
+      # reads through them -- 2,400 mutually overlapping translucent
+      # spheres. I expected that to dominate the frame time; measured,
+      # it does not (34% GPU either way), so the authored look STAYS
+      # and nothing about how the biology reads has been changed to
+      # buy frame rate. Set COGNISOM_CELL_OPACITY=1.0 to render them
+      # opaque if a denser scene ever does need it; an empty value
+      # means "leave the stage as authored".
+    command:
+      - --/rtx/post/aa/op=4
+      - --/rtx/post/dlss/execMode=2
+      - --/exts/omni.kit.livestream.app/primaryStream/allowDynamicResize=false
+      - --/app/livestream/allowResize=false
+      - --/app/window/width=1920
+      - --/app/window/height=1080
+      - --exec
+      - /isaac-sim/.local/share/ov/data/cognisom/open_cognisom_stage.py
