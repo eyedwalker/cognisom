@@ -340,14 +340,20 @@ def test_a_configuration_with_no_tregs_is_bit_identical_to_before():
     the path this test pins.
 
     Three seeds of a 20-T-cell 6 h arena. The key ABSENT from the
-    config, the key None, and the key 0.0 all give the same 10 kills,
-    the same 49 perforin hits, the same 1,249 contacts and the same
+    config, the key None, and the key 0.0 all give the same 12 kills,
+    the same 57 perforin hits, the same 1,311 contacts and the same
     per-contact kill probability to 12 decimal places -- and so do the
     two no-op forms of the pre-exhaustion key.
+
+    The triple was (10, 49, 1249) until immune cells could patrol and
+    detection moved ahead of movement. It is a RECORDING of the arena,
+    not the invariant: what this test proves is that the three no-op
+    forms agree with each other EXACTLY, which is asserted in the loop
+    below and is independent of what the arena happens to total.
     """
     seeds = (1, 2, 3)
     base = _totals(seeds)                                  # key absent
-    assert (base['kills'], base['hits'], base['contacts']) == (10, 49, 1249)
+    assert (base['kills'], base['hits'], base['contacts']) == (12, 57, 1311)
     assert base['treg_mult'] == 1.0
 
     for label, kw in (('treg None', {'treg_fraction': None}),
@@ -441,13 +447,19 @@ def test_the_treg_term_scales_the_per_contact_kill_probability_exactly():
 def test_the_treg_term_changes_the_outcome_not_only_the_probability():
     """And it reaches the kills. 12 seeds of a 12 h arena, 20 T cells
     against 20 cancer cells, which is the smallest arena that resolves
-    the lever above the Poisson noise on 69 kills:
+    the lever above the Poisson noise on 73 kills:
 
       treg_fraction   multiplier   kills   perforin hits   contacts
-         0.0           1.000000      69         339          8,538
-         0.3           0.846939      59         316          9,275
-         0.5           0.642857      53         264          9,283
-         0.737         0.000000       0           0         10,515
+         0.0           1.000000      73         399          9,689
+         0.3           0.846939      63         343          9,978
+         0.5           0.642857      55         283         10,109
+         0.737         0.000000       0           0         10,706
+
+    RE-MEASURED after immune cells could patrol and detection moved
+    ahead of movement (it was 69/59/53/0 on 339/316/264/0 hits). Every
+    row moved by a few counts and the SHAPE is unchanged: monotone down
+    in Treg load, contacts up, and zero at the sourced endpoint. The
+    multipliers are arithmetic and did not move at all.
 
     Contacts RISE as killing falls, which is the feedback that makes
     this an outcome and not an arithmetic restatement: suppressed T
@@ -461,12 +473,12 @@ def test_the_treg_term_changes_the_outcome_not_only_the_probability():
     seeds = tuple(range(1, 13))
     rows = {f: _totals(seeds, hours=12.0, treg_fraction=f)
             for f in (0.0, 0.3, 0.5, 0.737)}
-    assert rows[0.0]['kills'] == 69
-    assert rows[0.3]['kills'] == 59
-    assert rows[0.5]['kills'] == 53
+    assert rows[0.0]['kills'] == 73
+    assert rows[0.3]['kills'] == 63
+    assert rows[0.5]['kills'] == 55
     assert rows[0.737]['kills'] == 0
     assert [rows[f]['hits'] for f in (0.0, 0.3, 0.5, 0.737)] == [
-        339, 316, 264, 0]
+        399, 343, 283, 0]
     # Monotone in the Treg load, and the contact count moves the other
     # way, so the kill fall is not just fewer tries.
     kills = [rows[f]['kills'] for f in (0.0, 0.3, 0.5, 0.737)]
@@ -485,16 +497,22 @@ def test_pre_exhaustion_reaches_a_24_hour_run_where_the_clock_cannot():
     the fraction is the patient's and the 0.1 residual cytotoxicity was
     already sourced.
 
-    3 seeds of a 20-T-cell 6 h arena: 0 exhausted contacts and 10 kills
+    3 seeds of a 20-T-cell 6 h arena: 0 exhausted contacts and 12 kills
     without it; every contact exhausted, 4 perforin hits and 0 kills
     with it, and the per-contact probability is the unsuppressed one
     times exactly EXHAUSTED_KILL_MULTIPLIER.
+
+    The unsuppressed count was 10 until immune cells could patrol and
+    detection moved ahead of movement. The CLAIM is the contrast -- 0
+    exhausted contacts and some killing without the key, every contact
+    exhausted and none with it -- and that is what the lines below
+    assert; the 12 is the arena's current total beside it.
     """
     assert EXHAUSTION_ONSET_HOURS == 240.0        # 10 days
     seeds = (1, 2, 3)
     base = [arena(seed=s) for s in seeds]
     assert sum(o['exhausted_contacts'] for o in base) == 0
-    assert sum(o['kills'] for o in base) == 10
+    assert sum(o['kills'] for o in base) == 12
 
     loaded = [arena(seed=s, t_cell_initial_exhaustion=1.0) for s in seeds]
     assert sum(o['clones_exhausted'] for o in loaded) == 600   # 200 x 3

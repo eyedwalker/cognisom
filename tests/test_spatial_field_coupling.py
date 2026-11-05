@@ -489,7 +489,13 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # pinned as a band spanning both, and a future move inside it means
     # the stream or the scorer moved, not the biology. Check the sign
     # scatter across seeds BEFORE looking for a mechanism.
-    assert 36 <= _deaths(runner, "hypoxia", "normal") <= 45
+    #
+    # RE-MEASURED to 33 (MHCflurry) / 38 (PWM) once immune cells could
+    # patrol. Same cause as every other count in this file: patrolling
+    # changes which cells die when, and the shared RNG stream shifts.
+    # The property above -- this preset starves normal cells and no
+    # other preset starves any -- is untouched.
+    assert 30 <= _deaths(runner, "hypoxia", "normal") <= 42
     # Cancer cells used to starve here too when the immune compartment
     # did not reach them first: 16 while the chase step was frozen, 0
     # while every contact killed within a step or two, 7 once a kill
@@ -530,10 +536,17 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # by well under one cell per run on a base of ~20.
     # Measured both ways: starvation 3 / immune 21 under MHCflurry,
     # starvation 1 / immune 22 under PWM. Banded over both.
+    #
+    # RE-MEASURED once immune cells could patrol: starvation 1 / immune
+    # 26 under MHCflurry, starvation 2 / immune 25 under PWM. The immune
+    # count ROSE on both, which is the expected direction -- effectors
+    # that can cross the tissue reach more of the tumour -- and it
+    # pushes the cause of cancer death further toward the immune
+    # compartment, which is exactly the property asserted above.
     assert 1 <= _deaths(runner, "hypoxia", "cancer") <= 3
-    assert 20 <= _deaths(runner, "immune_killed", "cancer") <= 23
-    assert 22 <= (_deaths(runner, "hypoxia", "cancer")
-                  + _deaths(runner, "immune_killed", "cancer")) <= 25
+    assert 23 <= _deaths(runner, "immune_killed", "cancer") <= 28
+    assert 25 <= (_deaths(runner, "hypoxia", "cancer")
+                  + _deaths(runner, "immune_killed", "cancer")) <= 30
     # Exactly the two components above (normal starved + cancer), so it
     # carries no information they do not: 63 under MHCflurry, 65 under
     # PWM. Same stream-shift and scorer caveats.
@@ -549,12 +562,14 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # shift as the death counts above, not a separate finding. This is
     # a snapshot count at 24 h, so it moves with WHEN cells died as
     # well as how many. THE PROPERTY is the line after it.
-    assert 12 <= vascular.hypoxic_regions <= 21
+    # RE-MEASURED to 24 (MHCflurry) / 17 (PWM) once immune cells could
+    # patrol -- a snapshot count, so it moves with WHEN cells died.
+    assert 14 <= vascular.hypoxic_regions <= 27
     assert vascular.hypoxic_regions > 0, "the preset must still be hypoxic"
     # The same count seen from the cells instead of the vasculature.
     # THAT THE TWO AGREE is the point of asserting both, and it is the
-    # part that is scorer-independent -- 18 and 18 under MHCflurry, 15
-    # and 15 under PWM. So assert the agreement, not the value.
+    # part that is scorer-independent -- 24 and 24 under MHCflurry, 17
+    # and 17 under PWM. So assert the agreement, not the value.
     assert sum(1 for c in alive if c.oxygen < 0.05) == vascular.hypoxic_regions
     assert min(c.oxygen for c in alive) == pytest.approx(0.0033, abs=1e-3)
 

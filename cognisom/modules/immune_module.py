@@ -1264,18 +1264,49 @@ class ImmuneModule(SimulationModule):
                     and self.macrophage_polarization_enabled):
                 self._update_polarization(immune_cell, dt)
 
-            # Patrol (random walk), but only when there is nothing in reach.
+            # Patrol (random walk), unless this cell is ENGAGED.
             #
-            # Detection is evaluated AFTER movement in this loop, so a cell
-            # that steps away from a target it was already touching never
-            # sees it. That is also wrong biologically: a lymphocyte arrests
-            # on contact -- the synapse forms and migration stops -- it does
-            # not wander off a cell it is sitting on and come back. Cells
-            # were previously frozen by a unit bug, which hid this entirely.
+            # `activated` is the engagement test and it is the whole test:
+            # it is set only where a target is RECOGNISED (see the detection
+            # pass below) and cleared only by _release, whose docstring says
+            # what it means -- "the effector disengages and patrols again".
+            # A lymphocyte does arrest on contact, but the arrest is
+            # conditional on recognition; a contact that does not recognise
+            # is transient, and the cell detaches and keeps scanning.
+            #
+            # This used to carry a second gate, `_target_within_reach`,
+            # which suppressed patrol whenever ANY cancer cell sat inside
+            # the sensing radius whether or not the cell engaged it. In a
+            # packed section that is almost always true, so the gate was a
+            # permanent latch: a cell that drifted next to a tumour cell it
+            # could not recognise never moved again. MEASURED over a 24 h
+            # Immunotherapy section run, 480 steps, 59,478 immune-cell-steps:
+            #
+            #     blocked by `activated` (engaged)   10,490   17.6%
+            #     blocked by proximity alone         47,476   79.8%
+            #     actually patrolled                  1,512    2.5%
+            #
+            # So the immune compartment was immobile 97.5% of the time, and
+            # four fifths of that was cells parked beside targets they had
+            # already declined. Every patrol that did run moved its cell
+            # (1,512 of 1,512) -- the movement code was never the problem.
+            #
+            # The gate's stated reason was real, though, and removing it
+            # alone was not enough: detection used to run AFTER the move,
+            # so a patrolling cell could step off a target it would have
+            # recognised. That showed up immediately -- killing in the
+            # controlled arenas collapsed, one of them from 13 kills to 2,
+            # because effectors walked away from the cells they had been
+            # placed on.
+            #
+            # So the order is now SCAN, THEN MOVE. The detection pass
+            # below runs from where the cell actually is at the start of
+            # the step, and the patrol at the END of this branch happens
+            # only if nothing was recognised. A cell that recognises a
+            # target arrests on it; a cell that recognises nothing walks
+            # on. The step cap in _patrol still bounds one step by the
+            # cell's own sensing radius.
             if not immune_cell.activated:
-                if not self._target_within_reach(immune_cell, cancer_cells):
-                    self._patrol(immune_cell, dt)
-
                 # ECM barrier (Upgrade 6): the stromal density at the
                 # T cell's position compresses its effective sensing
                 # radius. In a fully fibrotic region a T cell may have
@@ -1341,6 +1372,14 @@ class ImmuneModule(SimulationModule):
                             ),
                         })
                         break
+
+                # Nothing recognised -- walk on. This is the serial
+                # scanning the proximity gate used to prevent, and it is
+                # placed after the detection pass so that a cell sitting
+                # on a target it CAN see engages it instead of wandering
+                # off first.
+                if not immune_cell.activated:
+                    self._patrol(immune_cell, dt)
             
             # Attack target
             else:

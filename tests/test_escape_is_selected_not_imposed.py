@@ -205,6 +205,7 @@ from __future__ import annotations
 import contextlib
 import io
 import math
+import statistics
 import sys
 from collections import Counter
 from pathlib import Path
@@ -482,7 +483,13 @@ def test_a_t_cell_never_kills_a_cell_that_lost_mhc1_even_under_blockade():
     """The structural claim of the whole item. 20 intact and 20
     total-loss cells in one arena, 20 T cells, 6 h, seeds 1-3: the
     escaped half takes 0 kills at checkpoint_block 0.0 AND at 1.0,
-    while the intact half goes 13 -> 36.
+    while the intact half goes 13 -> 46.
+
+    The 46 was 36 before immune cells could patrol: a T cell that had
+    stopped beside a cell it declined used to be pinned there, so
+    blockade had fewer effectors free to reach the intact half. The
+    STRUCTURAL claim -- zero kills on the MHC-I-null half, at either
+    blockade -- is untouched, which is the whole point of the test.
 
     This now holds for TWO independent reasons, where it used to hold
     for one. _recognize still hard-gates below MHC-I 0.05 and has
@@ -492,7 +499,7 @@ def test_a_t_cell_never_kills_a_cell_that_lost_mhc1_even_under_blockade():
     rests entirely on the gate. Remove the gate and this test still
     passes.
     """
-    for block, expect_intact in ((0.0, 13), (1.0, 36)):
+    for block, expect_intact in ((0.0, 13), (1.0, 46)):
         escaped = intact = 0
         for seed in (1, 2, 3):
             out = arena('total_loss', n_t=20, checkpoint_block=block,
@@ -561,8 +568,13 @@ def test_a_partial_loss_is_rescued_by_blockade_and_a_total_loss_is_not():
                for s in (1, 2, 3)]
     assert (sum(o['escaped'] for o in open_),
             sum(o['intact'] for o in open_)) == (0, 7)
+    # (16, 19) before immune cells could patrol. RE-MEASURED; the claim
+    # the paragraph above makes -- that this is "not far off parity even
+    # though the per-contact penalty is 0.31" -- is if anything stronger
+    # at 17 against 20, and the per-contact numbers below are unchanged
+    # because they come from the rule, not from a run.
     assert (sum(b['escaped'] for b in blocked),
-            sum(b['intact'] for b in blocked)) == (16, 19)
+            sum(b['intact'] for b in blocked)) == (17, 20)
 
     # The per-contact numbers behind the paragraph above, so the claim
     # about what blockade does to the escape penalty is pinned to the
@@ -660,9 +672,13 @@ def test_the_t_cell_arm_selects_for_escape_and_the_innate_arm_against_it():
         return (sum(o['escaped'] for o in out),
                 sum(o['intact'] for o in out))
 
-    # Unchanged by the NK work: these two paths were not touched.
-    assert total(n_t=20, ifn_drive=0.0) == (3, 36)
-    assert total(n_t=20, ifn_drive=1.0) == (71, 101)
+    # Unchanged by the NK work, which did not touch these two paths.
+    # The drive-0 row then moved (3, 36) -> (4, 39) when immune cells
+    # started patrolling: more effectors reach targets, so both halves
+    # take a few more kills and the T-cell arm's direction is unchanged.
+    assert total(n_t=20, ifn_drive=0.0) == (4, 39)
+    # (71, 101) -> (76, 117) for the same reason as the row above.
+    assert total(n_t=20, ifn_drive=1.0) == (76, 117)
     # THE PROPERTY that replaced "total counter-selection": NK killing
     # is no longer absolute on either phenotype. An intact cell at
     # MHC-I 0.45 must still be killable -- it was NK-invisible under the
@@ -671,44 +687,65 @@ def test_the_t_cell_arm_selects_for_escape_and_the_innate_arm_against_it():
     assert esc_hi > 0 and int_hi > 0, (
         f"({esc_hi}, {int_hi}): a hard zero here is the 0.4 step coming "
         "back. Graded missing self has no MHC-I at which killing stops.")
-    assert total(n_nk=20, ifn_drive=0.0) == (173, 190)
-    assert (esc_hi, int_hi) == (134, 144)
-    # MHC-blind, so IFN-gamma changes nothing at all.
-    assert total(n_mac=20, ifn_drive=0.0) == (100, 109)
-    assert total(n_mac=20, ifn_drive=1.0) == (100, 109)
+    # (173, 190) -> (204, 211) and (134, 144) -> (150, 164) once immune
+    # cells could patrol: every arena kills more because effectors
+    # reach more targets. The SHARES barely move -- 0.477 -> 0.492 and
+    # 0.482 -> 0.478 -- which is the quantity this test is about.
+    assert total(n_nk=20, ifn_drive=0.0) == (204, 211)
+    assert (esc_hi, int_hi) == (150, 164)
+    # MHC-blind, so IFN-gamma changes nothing at all. Still exactly
+    # equal after the patrol change, which is the strongest form of
+    # that claim: the two rows are the same run.
+    assert total(n_mac=20, ifn_drive=0.0) == (115, 124)
+    assert total(n_mac=20, ifn_drive=1.0) == (115, 124)
 
-    assert _z_vs_half(3, 36) < -5.0          # T cells: selection FOR
+    assert _z_vs_half(4, 39) < -5.0          # T cells: selection FOR
     # NK + IFN was z > +13.0 on (187, 0) -- selection AGAINST, total.
     # That z was a measure of the 0.4 step, not of NK biology, and it
-    # is gone: on (134, 144) the share is not distinguishable from
+    # is gone: on (150, 164) the share is not distinguishable from
     # neutral. The per-contact rate still favours the escaped cell
     # 1.59x; see this test's docstring for why the SHARE does not show
     # it under heavy killing.
     assert abs(_z_vs_half(esc_hi, int_hi)) < 1.96
-    assert -1.0 < _z_vs_half(100, 109) < 0.0  # macrophages: neutral
+    assert -1.0 < _z_vs_half(115, 124) < 0.0  # macrophages: neutral
 
 
 @pytest.mark.timeout(300)   # 24 arenas, measured at 3.9 s under load
-def test_in_the_shipped_infiltrate_the_two_arms_cancel():
+def test_in_the_shipped_infiltrate_the_arms_do_not_fully_cancel():
     """The shipped slab ratio, 19 T / 6 NK / 35 macrophage scaled to 20,
-    over 12 seeds of the same 12 h arena. The escaped share of kills is
-    not distinguishable from neutral in either IFN-gamma regime: 64
-    against 82 (0.438, z = -1.5) without it, and 69 against 92 (0.429,
-    z = -1.8) with it.
+    over 12 seeds of the same 12 h arena.
 
-    The conclusion holds and ONE OF ITS TWO REASONS DID NOT. This read:
-    "at drive 0 the T-cell signal is merely DILUTED by two neutral
-    lineages, and at drive 1 it is also OFFSET, because NK has stopped
-    seeing the intact cell." The offset was the 0.4 step -- NK stopped
-    seeing the intact cell because IFN-gamma pushed it over a constant.
-    With graded missing self the drive-1 row moves 0.489 -> 0.429, back
-    toward the all-T-cell arm's 0.413: removing the artefact UNMASKS
-    the T-cell signal it had been cancelling. So both rows now fail for
-    the same reason, dilution, and the IFN-gamma regimes barely differ.
+    THIS TEST USED TO ASSERT THE OPPOSITE and the change of answer is
+    the finding. It read "neither regime is distinguishable from
+    neutral, which is what 'the two arms cancel' means", on 64 against
+    82 (0.438, z = -1.5) and 69 against 92 (0.429, z = -1.8).
 
-    Compare the all-T-cell arm's z = -5.3 at the SAME total number of
-    effectors: what suppresses selection is the kill mix, not the
-    escape mechanism. That is unchanged, and it is the point."""
+    Both regimes now land BELOW neutral and clear of it. MEASURED:
+
+        ifn_drive 0.0    escaped  59   intact  91   0.393   z = -2.61
+        ifn_drive 1.0    escaped  66   intact 100   0.398   z = -2.64
+
+    What changed is that immune cells can migrate. Proximity to a
+    target a cell had already DECLINED used to latch its random walk
+    off for the rest of the run, so the innate lineages sat still and
+    killed whatever they had happened to stop beside -- which is close
+    to a neutral sample of the population. Once NK cells and
+    macrophages patrol, they find the class-I-low cells their receptors
+    are actually tuned to, and the innate arm's counter-selection
+    against escape shows through instead of being diluted into noise.
+    See tests/test_immune_cells_keep_patrolling.py.
+
+    Two things that did NOT change, and both still carry the point:
+    the two IFN-gamma regimes remain almost identical (z -2.61 against
+    -2.64), which is what it looks like once the 0.4-step artefact is
+    gone; and the all-T-cell arm at the SAME effector count is still
+    far stronger at 0.093 (z = -5.3). The kill mix still suppresses
+    selection heavily -- 0.393 against 0.093 -- it just no longer
+    cancels it.
+
+    These are measurements. If one moves, RE-MEASURE and move the
+    number with its claim; do not re-pin it to whatever came out.
+    """
     mix = {'n_t': 6, 'n_nk': 2, 'n_mac': 12}
     out = [arena('allele_loss', hours=12.0, seed=s, ifn_drive=0.0, **mix)
            for s in range(1, 13)]
@@ -716,12 +753,24 @@ def test_in_the_shipped_infiltrate_the_two_arms_cancel():
           for s in range(1, 13)]
     flat = (sum(o['escaped'] for o in out), sum(o['intact'] for o in out))
     lifted = (sum(o['escaped'] for o in hi), sum(o['intact'] for o in hi))
-    # THE PROPERTY first: neither regime is distinguishable from
-    # neutral, which is what "the two arms cancel" means.
-    assert abs(_z_vs_half(*flat)) < 1.96
-    assert abs(_z_vs_half(*lifted)) < 1.96
-    assert flat == (64, 82)
-    assert lifted == (69, 92)
+    z_flat, z_lifted = _z_vs_half(*flat), _z_vs_half(*lifted)
+    # THE PROPERTIES first.
+    # 1. The innate arm selects AGAINST escape: the escaped share sits
+    #    below neutral, in both regimes, and clear of it.
+    assert z_flat < -1.96, (flat, z_flat)
+    assert z_lifted < -1.96, (lifted, z_lifted)
+    # 2. The IFN-gamma regime barely matters once the step is gone.
+    assert abs(z_flat - z_lifted) < 1.0, (z_flat, z_lifted)
+    # 3. The mix still suppresses selection against the all-T-cell arm,
+    #    which is the claim this file exists to make.
+    share_mixed = flat[0] / (flat[0] + flat[1])
+    assert 0.3 < share_mixed < 0.45, share_mixed
+    assert share_mixed > 3 * (4 / 43), (
+        "the all-T-cell arm measured 4/43 = 0.093; the mixed infiltrate "
+        "must still be far weaker than it")
+    # and the numbers beside the claims
+    assert flat == (59, 91)
+    assert lifted == (66, 100)
 
 
 # ── part 3: the population, which is where the plan's bar is ─────────────
@@ -901,6 +950,35 @@ def _scorer() -> str:
 #: assertions moved with it. The properties the test is actually about
 #: -- zero T-cell kills, zero de novo events, escaped cells never over
 #: the NK step -- hold under both and are asserted outside this table.
+#: Run-to-run scatter of the escaped-fraction move, standard deviation
+#: over 12 seeds of the shipped 'immune_on' slab arm under the PWM
+#: fallback. Two assertions lean on it -- "one seed's delta stays inside
+#: the measured scatter" and "the de novo arm's enrichment clears it" --
+#: so it lives here once rather than as a literal in each.
+#:
+#: It was 0.0253, measured when immune cells could not patrol: a cell
+#: that stopped beside a target it had declined was pinned there for the
+#: rest of the run, so the immune compartment did close to the same
+#: thing every seed. Once it migrates, the seeds genuinely diverge and
+#: the scatter is MEASURED WIDER. Re-measured 2026-11-05 over the same
+#: 12 seeds; the per-seed deltas are recorded beside it so a future
+#: reader can see the spread rather than trusting one number.
+#:
+#: The NULL SURVIVED the widening, which is the part that matters. The
+#: mean move is +0.0075 against the old +0.0043 -- both indistinguishable
+#: from zero -- and the twelve deltas split SIX POSITIVE, SIX NEGATIVE.
+#: A quantity whose sign is a coin flip across seeds is not a direction,
+#: and seed 1's +0.1013 is the extreme of the range, not a finding.
+SHIPPED_DELTA_SD = 0.04249
+SHIPPED_DELTA_SD_SEEDS = 12
+SHIPPED_DELTA_MEAN = 0.00751
+#: Every seed, in order 1..12, so the spread is auditable and nobody has
+#: to re-run twelve slab runs to see whether a new value is unusual.
+SHIPPED_DELTA_PER_SEED = (
+    0.10126, -0.02011, 0.03174, 0.02294, 0.00422, 0.04926,
+    -0.00860, -0.01236, -0.06197, -0.02877, -0.01528, 0.02778,
+)
+
 SHIPPED_24H_PINS = {
     # Re-measured when division_time_normal became 90 h. EVERY field
     # here is downstream of cell density, so all twenty-six moved;
@@ -937,41 +1015,82 @@ SHIPPED_24H_PINS = {
     #    decides nothing. Keep them -- they still say how high IFN
     #    drives class I -- but a future change to them is not a change
     #    to the model's behaviour.
+    # 3. EVERY ROW BELOW was re-measured on 2026-11-05, when immune
+    #    cells could finally patrol: proximity to a target a cell had
+    #    already DECLINED used to latch its random walk off for the rest
+    #    of the run, so the compartment was immobile 97.5% of the time.
+    #    See tests/test_immune_cells_keep_patrolling.py.
+    #
+    #    The headline is that killing roughly DOUBLED in this shipped
+    #    preset -- 19 -> 41 kills under MHCflurry, 17 -> 38 under PWM --
+    #    because effectors that can cross the tissue reach the tumour
+    #    instead of dying of old age beside the first cell they met.
+    #    The composition shifted the same way on both scorers, toward
+    #    NK (12 -> 23, 9 -> 26). The T-cell count is still a small
+    #    minority, which is the explanation this table exists to
+    #    support, and the test asserts that as a SHARE.
     'pwm': {
-        'survivors': (121, 65),
-        'delta': 0.01219,
-        'n_kills': 17,
-        'by_lineage': {'NK_cell': 9, 'macrophage': 7, 'T_cell': 1},
-        'observed': 8,
-        'expected': 8.90392,
-        'intact_mean': 0.34467,
-        'escaped_mean': 0.23227,
-        'intact_above_at_end': 0,
-        'intact_samples_above': 9,           # was 2; the step is inert now
-        'max_intact_over_run': 0.42592,
-        'cancer_divisions': 59,
-        'divisions_total': 236,
+        'survivors': (99, 62),
+        'delta': 0.10126,                    # was +0.01219; see note 3
+        'n_kills': 38,
+        'by_lineage': {'NK_cell': 26, 'macrophage': 9, 'T_cell': 3},
+        'observed': 15,
+        'expected': 21.61150,
+        'intact_mean': 0.36602,
+        'escaped_mean': 0.24102,
+        'intact_above_at_end': 2,
+        'intact_samples_above': 15,          # was 2; the step is inert now
+        'max_intact_over_run': 0.44002,
+        'cancer_divisions': 57,
+        'divisions_total': 234,
     },
     'mhcflurry': {
-        'survivors': (116, 59),
-        'delta': -0.01638,                   # was +0.01100; see note 1
-        'n_kills': 19,
-        # T cells take 0 of 19 here. An earlier pass corrected "T cells
+        'survivors': (95, 52),
+        'delta': 0.02237,                    # see notes 1 and 3
+        'n_kills': 41,
+        # T cells take 2 of 41 here. An earlier pass corrected "T cells
         # do ZERO killing" to "1 of 15"; at this sample size the T-cell
-        # count moves between 0 and 1 and neither value is a result.
+        # count moves between 0 and 3 and no single value is a result.
         # What the test asserts is the SHARE, t_share <= 0.15.
-        'by_lineage': {'NK_cell': 12, 'macrophage': 7},
-        'observed': 14,
-        'expected': 9.77156,
-        'intact_mean': 0.35582,
-        'escaped_mean': 0.23901,
-        'intact_above_at_end': 1,
-        'intact_samples_above': 14,          # was 0; see note 2
-        'max_intact_over_run': 0.40971,
-        'cancer_divisions': 56,
-        'divisions_total': 233,
+        'by_lineage': {'NK_cell': 23, 'macrophage': 16, 'T_cell': 2},
+        'observed': 22,
+        'expected': 21.89815,
+        'intact_mean': 0.37624,
+        'escaped_mean': 0.24760,
+        'intact_above_at_end': 7,
+        'intact_samples_above': 17,          # was 0; see note 2
+        'max_intact_over_run': 0.44433,
+        'cancer_divisions': 57,
+        'divisions_total': 234,
     },
 }
+
+
+def test_the_scatter_constant_agrees_with_the_seeds_it_came_from():
+    """The constant two assertions lean on, re-derived from its data.
+
+    SHIPPED_DELTA_SD is the only thing standing between "this delta is
+    noise" and "this delta is a finding", and widening it is the exact
+    move that would quietly make the null unfalsifiable. So it is
+    checked against the twelve per-seed deltas rather than trusted, and
+    the sign split is asserted too -- a quantity whose sign is a coin
+    flip across seeds is not a direction.
+    """
+    assert len(SHIPPED_DELTA_PER_SEED) == SHIPPED_DELTA_SD_SEEDS == 12
+    assert statistics.fmean(SHIPPED_DELTA_PER_SEED) == pytest.approx(
+        SHIPPED_DELTA_MEAN, abs=5e-5)
+    assert statistics.stdev(SHIPPED_DELTA_PER_SEED) == pytest.approx(
+        SHIPPED_DELTA_SD, abs=5e-5)
+    # Indistinguishable from zero: the mean is well inside one sd.
+    assert abs(SHIPPED_DELTA_MEAN) < SHIPPED_DELTA_SD
+    # And the sign is a coin flip, which is what "no direction" means.
+    positive = sum(1 for d in SHIPPED_DELTA_PER_SEED if d > 0)
+    assert 4 <= positive <= 8, (
+        f"{positive} of 12 seeds positive: if the sign stops scattering "
+        "this stopped being a null and needs reporting, not re-pinning")
+    # The scatter WIDENED when immune cells started patrolling. If this
+    # ever drops back near the old 0.0253, something has re-frozen them.
+    assert SHIPPED_DELTA_SD > 0.0253
 
 
 @pytest.mark.slow
@@ -1069,11 +1188,15 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
     # that expectation a single draw distinguishes nothing, and it is
     # recorded here so the next reader does not mistake it for a
     # counter-example to the O/E result.
-    # The delta sits inside the measured run-to-run scatter (sd 0.0253
-    # over 12 seeds), which is all one seed can say.
+    # The delta sits inside the measured run-to-run scatter, which is
+    # all one seed can say. The scatter itself was re-measured when
+    # immune cells started patrolling -- see SHIPPED_DELTA_SD, which
+    # records how many seeds are behind the current figure. Widening
+    # this bound without re-measuring the spread would be the exact
+    # move that turns a null result into an unfalsifiable one.
     p0 = out['founders_escaped'] / out['founders']
     p1 = out['survivors_escaped'] / out['survivors']
-    assert abs(p1 - p0) < 3 * 0.0253
+    assert abs(p1 - p0) < 3 * SHIPPED_DELTA_SD
 
     # ── scorer-independent: the IFN-gamma asymmetry, and whether the NK
     # step is reached. Asserted over the run, not at the end.
@@ -1414,7 +1537,15 @@ def test_de_novo_escape_arises_and_is_then_selected():
 
       arm          cancer  escaped  escaped share  de novo  kills  O/E
       no immune       313      140      0.4473        155      0     --
-      12 T cells      139       76      0.5468         85    114   0.32
+      12 T cells       95       62      0.6526         72    167   0.31
+
+    RE-MEASURED 2026-11-05, when immune cells could finally patrol. The
+    treated arm changed and the drift arm did not, which is the right
+    shape: the drift arm has no immune compartment to unfreeze. Killing
+    rose 114 -> 167, the tumour it was killing shrank 139 -> 95, and the
+    O/E ratio barely moved -- 0.3208 -> 0.3134 -- so the SAME selective
+    mechanism is now measured on half again as many kills and z goes
+    -3.5 -> -5.4. The enrichment doubled, 0.0995 -> 0.2054.
 
     Three statements, each needing the heritable route to exist:
 
@@ -1443,7 +1574,11 @@ def test_de_novo_escape_arises_and_is_then_selected():
     assert all(r['founder_cells'] == 0 for r in control + treated)
     # ...and it arose at divisions, in both arms.
     assert sum(r['de_novo'] for r in control) == 155
-    assert sum(r['de_novo'] for r in treated) == 85
+    # 85 before immune cells could patrol. De novo escape arises at
+    # DIVISIONS, so a treated arm that now kills more cancer cells gets
+    # fewer divisions to mutate at -- the count falling is consistent
+    # with the mechanism, not a weakening of the claim above it.
+    assert sum(r['de_novo'] for r in treated) == 72
 
     def share(rows):
         c = sum(r['n_cancer'] for r in rows)
@@ -1451,21 +1586,25 @@ def test_de_novo_escape_arises_and_is_then_selected():
 
     drift, n_drift = share(control)
     selected, n_selected = share(treated)
-    assert (n_drift, n_selected) == (313, 139)
+    assert (n_drift, n_selected) == (313, 95)
     assert drift == pytest.approx(0.4473, abs=5e-4)
-    assert selected == pytest.approx(0.5468, abs=5e-4)
+    assert selected == pytest.approx(0.6526, abs=5e-4)
     # The enrichment, against the shipped arm's whole 12-seed sd.
-    assert selected - drift == pytest.approx(0.0995, abs=1e-3)
-    assert selected - drift > 3 * 0.0253
+    assert selected - drift == pytest.approx(0.2054, abs=1e-3)
+    assert selected - drift > 3 * SHIPPED_DELTA_SD
 
     # And the contact mechanism, on the time-matched null.
     n_kills = sum(r['kills'] for r in treated)
     observed = sum(r['O'] for r in treated)
     expected = sum(r['E'] for r in treated)
     assert sum(r['kills'] for r in control) == 0
-    assert (n_kills, observed) == (114, 7)
-    assert expected == pytest.approx(21.8215, abs=1e-3)
-    assert observed / expected == pytest.approx(0.3208, abs=1e-3)
+    assert (n_kills, observed) == (167, 14)
+    assert expected == pytest.approx(44.6686, abs=1e-3)
+    # THE RATIO is the mechanism and it is what survived the change:
+    # 0.3208 before immune cells could patrol, 0.3134 after, on half
+    # again as many kills -- so the selective pressure per kill is the
+    # same and the test of it is stronger (z -3.5 -> -5.4).
+    assert observed / expected == pytest.approx(0.3134, abs=1e-3)
     z = (observed - expected) / math.sqrt(expected * (1 - expected / n_kills))
     assert z < -3.0
 
