@@ -126,10 +126,44 @@ HITS_PER_CONTACT = KillParameter(
                "contacts (low end: NLS leakage in 25%)")
 
 #: Per-contact kill probability of an NK cell against a solid tumour cell.
+#: This is the FLAT rate, used only by the legacy missing-self step
+#: (``nk_graded_missing_self=False``). The graded path uses the ceiling
+#: below, because a flat rate and a curve ceiling are different
+#: quantities and one constant cannot be both.
 NK_KILL_PER_CONTACT = KillParameter(
     0.15, 0.05, 0.48, 'ESTIMATE',
     "Srpan 2018 (PMID 29967280) 0.48 on opsonised lymphoma, scaled by "
     f"the solid/blood-target ratio in {_WEIGELIN}")
+
+#: Ceiling of the GRADED NK curve: the per-contact rate against a
+#: maximally stressed, class-I-null target. Not the same quantity as
+#: NK_KILL_PER_CONTACT above, which is the rate against a TYPICAL solid
+#: target -- and that difference is the whole reason this constant
+#: exists. Turning one flat rate into a curve requires choosing where on
+#: the curve that rate sits, and nothing measures that, so this is a
+#: CALIBRATION CHOICE and is labelled as one.
+#:
+#: Why 0.48. It is the top of NK_KILL_PER_CONTACT's own range -- Srpan
+#: 2018's opsonised-lymphoma figure, i.e. a maximally activated target,
+#: which is what a ceiling means. Having picked it for that reason, the
+#: curve then passes through **0.139** at the MHC-I the shipped presets
+#: actually occupy (0.356 mean, 1 mutation), which reproduces the 0.15
+#: flat rate they were calibrated against. That agreement is a
+#: coincidence worth stating rather than a derivation: it is why
+#: removing the 0.4 cliff does NOT silently re-potentiate the NK arm.
+#:
+#: Measured, 12 h slab, seeds 11/12/13, NK kills per run:
+#:     step 0.4      Baseline [9, 9, 12]    Immunotherapy [22, 17, 17]
+#:     graded @0.48  Baseline [7, 9,  9]    Immunotherapy [18, 17, 13]
+#:     graded @0.15  Baseline [1, 3,  4]    Immunotherapy [ 6,  4,  9]
+#: The last row is what anchoring the ceiling at the typical rate would
+#: have cost: a ~3x cut to the arm that does most of the killing,
+#: bundled invisibly into a correctness fix.
+NK_GRADED_CEILING = KillParameter(
+    0.48, 0.15, 0.48, 'calibration-choice',
+    "top of NK_KILL_PER_CONTACT's range (Srpan 2018 PMID 29967280, "
+    "opsonised lymphoma = maximal activation); chosen so the graded "
+    "curve reproduces the flat 0.15 at the MHC-I the presets occupy")
 
 #: Per-contact phagocytic kill probability of a macrophage.
 MACROPHAGE_KILL_PER_CONTACT = KillParameter(
@@ -192,5 +226,6 @@ def calibration_report() -> Dict[str, Dict[str, object]]:
         'tcell_damage_half_life_min': DAMAGE_HALF_LIFE_MIN.as_dict(),
         'tcell_lethal_damage': LETHAL_DAMAGE.as_dict(),
         'nk_kill_per_contact': NK_KILL_PER_CONTACT.as_dict(),
+        'nk_graded_ceiling': NK_GRADED_CEILING.as_dict(),
         'macrophage_kill_per_contact': MACROPHAGE_KILL_PER_CONTACT.as_dict(),
     }

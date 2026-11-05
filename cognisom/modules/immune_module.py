@@ -72,6 +72,7 @@ from cognisom.engine.py.immune.nk_receptor import (
     missing_self_recognized,
     nk_clone_decision,
     nk_decision,
+    untyped_missing_self_decision,
 )
 from cognisom.engine.py.immune.macrophage_phagocytosis import (
     DEFAULT_PD1_MAX_SUPPRESSION,
@@ -100,7 +101,8 @@ from cognisom.engine.py.immune.lactate import (  # noqa: E402
 )
 from cognisom.engine.py.immune.kill_calibration import (  # noqa: E402
     HITS_PER_CONTACT, LETHAL_DAMAGE, MACROPHAGE_KILL_PER_CONTACT,
-    NK_KILL_PER_CONTACT, calibration_report, contact_hits, damage_now,
+    NK_GRADED_CEILING, NK_KILL_PER_CONTACT, calibration_report,
+    contact_hits, damage_now,
 )
 from cognisom.engine.py.immune.treg_suppression import (  # noqa: E402
     TREG_MAX_CYTOLYTIC_LOSS, TREG_RATIO_FULL_SUPPRESSION,
@@ -467,6 +469,38 @@ class ImmuneModule(SimulationModule):
                 'nk_activation_threshold', DEFAULT_ACTIVATION_THRESHOLD,
             )
         )
+        # Without a patient typing the NK arm used to read class I
+        # exactly twice: a step at the unsourced 0.4 above, and then a
+        # FLAT kill rate. Measured on the shipped 12 h Baseline slab
+        # run, cancer MHC-I spanned 0.3367-0.4160 with 80 of 128 cells
+        # inside 0.05 of that step, and which side the population fell
+        # on changed with the peptide scorer. Graded missing self
+        # (Karre 1986) is now the default on that path, using the same
+        # arithmetic as the typed one. False restores the step, the way
+        # tcell_additive_cytotoxicity=False restores the old T-cell
+        # draw. NB this makes nk_kill_probability a MAXIMUM here, which
+        # is what it already meant whenever a typing was on record.
+        self.nk_graded_missing_self = bool(
+            self.config.get('nk_graded_missing_self', True)
+        )
+        # Ceiling of the graded curve: the rate against a maximally
+        # stressed, class-I-null target. A DIFFERENT quantity from
+        # nk_kill_probability, which is the flat rate against a typical
+        # target -- see NK_GRADED_CEILING for why one constant cannot
+        # be both, and for the measurement that fixes this value.
+        #
+        # An EXPLICIT nk_kill_probability still wins when no ceiling is
+        # given. Without that fallback the older knob would silently
+        # become a no-op on the graded path, and validation/calibrator.py
+        # tunes it by name -- it would have gone on optimising a number
+        # that no longer reached the kill decision.
+        if 'nk_graded_ceiling' in self.config:
+            ceiling = self.config['nk_graded_ceiling']
+        elif 'nk_kill_probability' in self.config:
+            ceiling = self.config['nk_kill_probability']
+        else:
+            ceiling = NK_GRADED_CEILING.value
+        self.nk_graded_ceiling = float(ceiling)
         # PD-1 "don't eat me" gate on phagocytosis (Gordon et al.,
         # Nature 2017). 0.0 restores the previous flat behaviour.
         self.macrophage_pd1_max_suppression = float(
@@ -1047,7 +1081,13 @@ class ImmuneModule(SimulationModule):
         kwargs = dict(
             mhc1_expression=getattr(target_cell, 'mhc1_expression', 1.0),
             n_mutations=len(getattr(target_cell, 'mutations', None) or ()),
-            max_kill_probability=self.nk_kill_probability,
+            # The CEILING, not the flat rate. This path has always been
+            # graded, so it always wanted the ceiling; passing the flat
+            # typical rate here meant that supplying a patient's HLA
+            # typing CUT NK killing about threefold against an
+            # otherwise identical run, which is the opposite of what
+            # adding a real measurement should do.
+            max_kill_probability=self.nk_graded_ceiling,
             activation_threshold=self.nk_activation_threshold,
         )
         name = getattr(immune_cell, 'kir_subset', None)
@@ -1057,9 +1097,43 @@ class ImmuneModule(SimulationModule):
             return nk_clone_decision(subset, **kwargs)
         return nk_decision(self._nk_licensing, **kwargs)
 
+    def _nk_model_name(self) -> str:
+        """Which NK rule actually ran, for a run to report.
+
+        Three distinct rules now, and a reader of a saved run must be
+        able to tell them apart: a typed patient's receptor balance, the
+        graded population-prior gradient, and the legacy step. The step
+        is no longer the default, so a run that reports it was asked
+        for it.
+        """
+        if self._nk_licensing is not None:
+            return 'kir_hla_balance'
+        if self.nk_graded_missing_self:
+            return 'graded_missing_self_prior'
+        return 'missing_self_threshold'
+
+    def _nk_untyped_decision(self, target_cell):
+        """One NK-target encounter with NO class-I typing on record.
+
+        Graded missing self over a population-prior inhibitory avidity.
+        Deliberately takes no immune cell: without a typing there are no
+        licensed subsets to draw an identity from, so every NK agent
+        reads the same prior and the decision is a function of the
+        TARGET alone. Engagement and rate come from one call, so the
+        two cannot disagree about the same encounter.
+        """
+        return untyped_missing_self_decision(
+            mhc1_expression=getattr(target_cell, 'mhc1_expression', 1.0),
+            n_mutations=len(getattr(target_cell, 'mutations', None) or ()),
+            max_kill_probability=self.nk_graded_ceiling,
+            activation_threshold=self.nk_activation_threshold,
+        )
+
     def _nk_kill_probability(self, immune_cell, target_cell) -> float:
         """Per-encounter NK kill probability for this clone and target."""
         if self._nk_licensing is None:
+            if self.nk_graded_missing_self:
+                return self._nk_untyped_decision(target_cell).kill_probability
             return self.nk_kill_probability
         return self._nk_decision(immune_cell, target_cell).kill_probability
 
@@ -1689,6 +1763,8 @@ class ImmuneModule(SimulationModule):
                 return self._nk_decision(
                     immune_cell, cancer_cell,
                 ).recognized, None
+            if self.nk_graded_missing_self:
+                return self._nk_untyped_decision(cancer_cell).recognized, None
             return missing_self_recognized(
                 cancer_cell.mhc1_expression,
                 self.nk_missing_self_threshold,
@@ -2121,10 +2197,8 @@ class ImmuneModule(SimulationModule):
         lic = self._nk_licensing
         return {
             # NK arm
-            'nk_model': (
-                'kir_hla_balance' if lic is not None
-                else 'missing_self_threshold'
-            ),
+            'nk_model': self._nk_model_name(),
+            'nk_graded_ceiling': self.nk_graded_ceiling,
             'nk_kill_probability': self.nk_kill_probability,
             'macrophage_kill_probability': self.macrophage_kill_probability,
             'tcell_additive_cytotoxicity': self.tcell_additive_cytotoxicity,

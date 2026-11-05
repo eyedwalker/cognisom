@@ -56,8 +56,19 @@ class _Tissue:
 
 
 def _nk_module(**cfg):
+    # What this file tests is the CONTACT model: one encounter, one
+    # outcome, a duration from a measured contact time, and none of it
+    # dependent on dt. Those tests set nk_kill_probability and then
+    # assert the realised per-contact rate IS that number, which needs
+    # the rate to be taken literally. The graded NK path scales it by
+    # the synapse signal (so 0.3 realises as 0.148), which is correct
+    # there and would make these tests measure the NK recognition
+    # model instead of the contact model. The step rule is asked for
+    # explicitly, and a caller can still override it.
+    base = {"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0,
+            "nk_graded_missing_self": False}
     with contextlib.redirect_stdout(io.StringIO()):
-        m = ImmuneModule({"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0, **cfg})
+        m = ImmuneModule({**base, **cfg})
     m.event_bus = EventBus()
     m.set_cellular_module(_Tissue())
     nk = m.immune_cells[m.add_immune_cell([100, 100, 50], "NK_cell")]

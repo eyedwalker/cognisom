@@ -7,11 +7,20 @@ KIR-HLA receptor balance reads ``mhc1_expression`` directly -- and the
 IFN-gamma field (see test_interferon_reaches_the_bystanders) is what
 now moves it.
 
-The receptor model is off unless a MEASURED class-I typing is on
+The LICENSING model is off unless a MEASURED class-I typing is on
 record; it refuses to invent one, because an NK prediction built on
 synthetic alleles is indistinguishable from one built on real reads.
 One measured typing exists: ``SEQC2``, from HCC1395BL matched-normal
 WXS by OptiType, 1,198 reads.
+
+What that fallback does NOT mean any more is that an untyped run is
+blind to class I. It used to: the fallback was a step at an unsourced
+0.4 followed by a flat rate, so the kill probability was identical at
+MHC-I 0.3, 0.45 and 0.9. It is now a gradient over a population-prior
+avidity (see tests/test_nk_reads_mhc1_without_a_cliff.py), so an
+untyped run reads the IFN-gamma rise too -- it just cannot say which
+of a particular patient's KIR subsets is licensed, which is the part
+that needs a real typing.
 
 What this file pins is both what is established and what is not:
 
@@ -54,12 +63,22 @@ def _module(**config):
 # ── the model is off without a real typing, on with one ───────────
 
 
-def test_without_a_measured_typing_nk_cells_cannot_see_mhc1_at_all():
+def test_without_a_typing_nk_cells_still_read_mhc1_as_a_gradient():
+    """This test used to assert the OPPOSITE, and that was the defect.
+
+    It read: ``assert len(flat) == 1, "the fallback baseline ignores
+    MHC-I, by design"`` -- one probability at MHC-I 0.3, 0.45 and 0.9
+    alike. That was true, it was not by design, and it meant an
+    untyped run could not see the IFN-gamma MHC-I rise this file is
+    about. MEASURED now: 0.1608, 0.1012, 0.0.
+    """
     module = _module()
-    assert module._nk_licensing is None
+    assert module._nk_licensing is None, "still no invented typing"
     nk = next(c for c in module.immune_cells.values() if c.cell_type == "NK_cell")
-    flat = {module._nk_kill_probability(nk, _Target(m)) for m in (0.3, 0.45, 0.9)}
-    assert len(flat) == 1, "the fallback baseline ignores MHC-I, by design"
+    ps = [module._nk_kill_probability(nk, _Target(m)) for m in (0.3, 0.45, 0.9)]
+    assert len(set(ps)) == 3, f"{ps}: the fallback must read class I"
+    assert ps[0] > ps[1] > ps[2], f"{ps}: and more class I must mean less killing"
+    assert ps[2] == 0.0, f"{ps}: near-intact class I inhibits completely"
 
 
 def test_a_measured_typing_turns_the_receptor_balance_on():

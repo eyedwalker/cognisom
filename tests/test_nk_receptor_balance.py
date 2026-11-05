@@ -550,7 +550,10 @@ class _Target:
 
 def test_nk_and_macrophage_no_longer_share_one_flat_number():
     # Both lineages used to read self.kill_probability at a single site.
-    m = _immune(nk_kill_probability=0.2, macrophage_kill_probability=0.9)
+    # The flat per-lineage rate belongs to the STEP path; the graded
+    # path scales it by the synapse signal, so this asks for the step.
+    m = _immune(nk_kill_probability=0.2, macrophage_kill_probability=0.9,
+                nk_graded_missing_self=False)
     assert m.nk_kill_probability == 0.2
     assert m.macrophage_kill_probability == 0.9
     nk = ImmuneCellStub("NK_cell")
@@ -600,7 +603,12 @@ def test_the_missing_self_threshold_is_configurable_not_a_literal():
 
 
 def test_without_a_patient_typing_the_legacy_rule_runs_and_says_so():
-    m = _immune()
+    # The step is no longer the default -- graded missing self is
+    # (tests/test_nk_reads_mhc1_without_a_cliff.py), because the 0.4
+    # threshold sat inside the MHC-I range of the population it was
+    # deciding. This test pins the LEGACY rule, so it asks for it
+    # explicitly, the way the ring-layout tests pass tissue="ring".
+    m = _immune(nk_graded_missing_self=False)
     assert m.get_nk_licensing_profile() is None
     state = m.get_state()
     assert state["nk_model"] == "missing_self_threshold"
@@ -840,11 +848,13 @@ def test_an_unlicensed_clone_is_mhc_independent_through_the_engine():
 
 
 def test_the_legacy_step_rule_still_behaves_exactly_as_measured():
-    # With no typing on record the innate arm must reproduce what was
-    # measured before this change: a hard step at 0.4.
+    # With no typing on record AND the gradient switched off, the
+    # innate arm must still reproduce what was measured before the
+    # receptor model existed: a hard step at 0.4.
     for mhc, expect_engagement in ((0.0, True), (0.39, True),
                                    (0.4, False), (1.0, False)):
-        mod, killers = _colocated_nk_run(mhc, immune_cfg={})
+        mod, killers = _colocated_nk_run(
+            mhc, immune_cfg={"nk_graded_missing_self": False})
         assert mod.get_state()["nk_model"] == "missing_self_threshold"
         if expect_engagement:
             assert len(mod.engaged_cells) == 6, mhc

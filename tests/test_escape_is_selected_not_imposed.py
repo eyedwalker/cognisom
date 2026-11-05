@@ -617,18 +617,42 @@ def test_the_t_cell_arm_selects_for_escape_and_the_innate_arm_against_it():
 
     The escaped share of kills against a neutral 0.5:
 
-      effectors          IFN drive   escaped   intact   share   z
-      20 T cells             0.0         3       36     0.077   -5.3
-      20 T cells             1.0        71      101     0.413   -2.3
-      20 NK cells            0.0       176      187     0.485   -0.6
-      20 NK cells            1.0       187        0     1.000  +13.7
-      20 macrophages       0.0 / 1.0   100      109     0.478   -0.6
+      effectors          IFN drive   escaped   intact   share
+      20 T cells             0.0         3       36     0.077
+      20 T cells             1.0        71      101     0.413
+      20 NK cells            0.0       173      190     0.477
+      20 NK cells            1.0       134      144     0.482
+      20 macrophages       0.0 / 1.0   100      109     0.478
 
-    Three different signs from three lineages on the same trait. The
-    macrophage row is identical at both IFN drives to the kill, because
-    that path reads no MHC-I; the NK row flips from exactly neutral to
-    total counter-selection as IFN-gamma carries the INTACT cell over
-    the 0.4 step.
+    THE NK ROW USED TO READ 187 / 0, share 1.000, z +13.7 -- total
+    counter-selection -- and that was an ARTEFACT OF THE 0.4 STEP.
+    This docstring previously explained it as IFN-gamma "carrying the
+    INTACT cell over the 0.4 step", which is exactly right and exactly
+    the problem: the intact cell sat at 0.45 and the escaped one at
+    0.30, so one unsourced constant between them turned a preference
+    into an absolute. Now that missing self is graded
+    (tests/test_nk_reads_mhc1_without_a_cliff.py) the same comparison
+    gives 134 / 144 -- no net preference in the kill share.
+
+    NK cells are NOT blind here, and the share is why that is worth
+    saying carefully. Per contact the graded rate still favours the
+    escaped cell by 1.59x (0.1608 at MHC-I 0.30 against 0.1012 at
+    0.45). The SHARE does not show it because both phenotypes are
+    killed heavily over 12 h, so the counts are limited by how many
+    targets exist rather than by the rate -- a kill-share metric
+    saturates toward the population ratio under heavy killing and is a
+    poor readout of selection in that regime. Read the per-contact
+    rates, or an O/E, not this share.
+
+    What survives: T cells select FOR escape (0.077 and 0.413, both
+    well under 0.5), macrophages are neutral and identical at both IFN
+    drives because that path reads no MHC-I, and NK is near-neutral in
+    share at these class-I levels. What does NOT survive is the claim
+    of three different signs from three lineages; it was two signs and
+    a threshold.
+
+    The T-cell and macrophage rows are unchanged to the kill by the NK
+    work, which is the check that it stayed on the NK path.
     """
     def total(**kw):
         out = [arena('allele_loss', hours=12.0, seed=s, **kw)
@@ -636,18 +660,31 @@ def test_the_t_cell_arm_selects_for_escape_and_the_innate_arm_against_it():
         return (sum(o['escaped'] for o in out),
                 sum(o['intact'] for o in out))
 
+    # Unchanged by the NK work: these two paths were not touched.
     assert total(n_t=20, ifn_drive=0.0) == (3, 36)
     assert total(n_t=20, ifn_drive=1.0) == (71, 101)
-    assert total(n_nk=20, ifn_drive=0.0) == (176, 187)
-    # Counter-selection, total: every intact cell is NK-invisible at
-    # 0.45 and every escaped one is still a target at 0.30.
-    assert total(n_nk=20, ifn_drive=1.0) == (187, 0)
+    # THE PROPERTY that replaced "total counter-selection": NK killing
+    # is no longer absolute on either phenotype. An intact cell at
+    # MHC-I 0.45 must still be killable -- it was NK-invisible under the
+    # step -- and an escaped one must still be killed.
+    esc_hi, int_hi = total(n_nk=20, ifn_drive=1.0)
+    assert esc_hi > 0 and int_hi > 0, (
+        f"({esc_hi}, {int_hi}): a hard zero here is the 0.4 step coming "
+        "back. Graded missing self has no MHC-I at which killing stops.")
+    assert total(n_nk=20, ifn_drive=0.0) == (173, 190)
+    assert (esc_hi, int_hi) == (134, 144)
     # MHC-blind, so IFN-gamma changes nothing at all.
     assert total(n_mac=20, ifn_drive=0.0) == (100, 109)
     assert total(n_mac=20, ifn_drive=1.0) == (100, 109)
 
     assert _z_vs_half(3, 36) < -5.0          # T cells: selection FOR
-    assert _z_vs_half(187, 0) > 13.0         # NK + IFN: selection AGAINST
+    # NK + IFN was z > +13.0 on (187, 0) -- selection AGAINST, total.
+    # That z was a measure of the 0.4 step, not of NK biology, and it
+    # is gone: on (134, 144) the share is not distinguishable from
+    # neutral. The per-contact rate still favours the escaped cell
+    # 1.59x; see this test's docstring for why the SHARE does not show
+    # it under heavy killing.
+    assert abs(_z_vs_half(esc_hi, int_hi)) < 1.96
     assert -1.0 < _z_vs_half(100, 109) < 0.0  # macrophages: neutral
 
 
@@ -655,15 +692,23 @@ def test_the_t_cell_arm_selects_for_escape_and_the_innate_arm_against_it():
 def test_in_the_shipped_infiltrate_the_two_arms_cancel():
     """The shipped slab ratio, 19 T / 6 NK / 35 macrophage scaled to 20,
     over 12 seeds of the same 12 h arena. The escaped share of kills is
-    not distinguishable from neutral in either IFN-gamma regime: 65
-    against 83 (0.439, z = -1.5) without it, and 90 against 94 (0.489,
-    z = -0.3) with it. The two rows fail for different reasons, and the
-    difference is worth keeping: at drive 0 the T-cell signal is merely
-    DILUTED by two neutral lineages, and at drive 1 it is also OFFSET,
-    because NK has stopped seeing the intact cell. Compare the
-    all-T-cell arm's z = -5.3 at the SAME total number of effectors:
-    what suppresses selection is the kill mix, not the escape
-    mechanism."""
+    not distinguishable from neutral in either IFN-gamma regime: 64
+    against 82 (0.438, z = -1.5) without it, and 69 against 92 (0.429,
+    z = -1.8) with it.
+
+    The conclusion holds and ONE OF ITS TWO REASONS DID NOT. This read:
+    "at drive 0 the T-cell signal is merely DILUTED by two neutral
+    lineages, and at drive 1 it is also OFFSET, because NK has stopped
+    seeing the intact cell." The offset was the 0.4 step -- NK stopped
+    seeing the intact cell because IFN-gamma pushed it over a constant.
+    With graded missing self the drive-1 row moves 0.489 -> 0.429, back
+    toward the all-T-cell arm's 0.413: removing the artefact UNMASKS
+    the T-cell signal it had been cancelling. So both rows now fail for
+    the same reason, dilution, and the IFN-gamma regimes barely differ.
+
+    Compare the all-T-cell arm's z = -5.3 at the SAME total number of
+    effectors: what suppresses selection is the kill mix, not the
+    escape mechanism. That is unchanged, and it is the point."""
     mix = {'n_t': 6, 'n_nk': 2, 'n_mac': 12}
     out = [arena('allele_loss', hours=12.0, seed=s, ifn_drive=0.0, **mix)
            for s in range(1, 13)]
@@ -671,10 +716,12 @@ def test_in_the_shipped_infiltrate_the_two_arms_cancel():
           for s in range(1, 13)]
     flat = (sum(o['escaped'] for o in out), sum(o['intact'] for o in out))
     lifted = (sum(o['escaped'] for o in hi), sum(o['intact'] for o in hi))
-    assert flat == (65, 83)
-    assert lifted == (90, 94)
+    # THE PROPERTY first: neither regime is distinguishable from
+    # neutral, which is what "the two arms cancel" means.
     assert abs(_z_vs_half(*flat)) < 1.96
     assert abs(_z_vs_half(*lifted)) < 1.96
+    assert flat == (64, 82)
+    assert lifted == (69, 92)
 
 
 # ── part 3: the population, which is where the plan's bar is ─────────────
@@ -864,35 +911,65 @@ SHIPPED_24H_PINS = {
     # is not the T-cell O/E 0.084 result and should not be read against
     # it. At 15-17 kills neither direction is distinguishable from
     # chance.
+    # RE-MEASURED AGAIN when NK missing self became graded in MHC-I
+    # (tests/test_nk_reads_mhc1_without_a_cliff.py). The NK arm does
+    # most of the killing here, so again every field moved, and two of
+    # them moved in ways worth reading rather than just recording.
+    #
+    # 1. `delta` under MHCflurry flips sign, +0.01100 -> -0.01638: the
+    #    shipped infiltrate now de-enriches escape slightly instead of
+    #    enriching it slightly. Do NOT report that as a finding. It is
+    #    ONE SEED against a 12-seed sd of 0.0253, so both values are
+    #    inside the noise floor, which is why the assertion on it is
+    #    `abs(delta) < 3*sd` and not a sign test. The direction is
+    #    nonetheless the one the mechanism predicts, because an NK cell
+    #    that reads class I can finally see the lesion escape consists
+    #    of.
+    #
+    # 2. `intact_samples_above` rises under BOTH scorers -- PWM 2 -> 9,
+    #    MHCflurry 0 -> 14 -- and that retires the scorer-dependence
+    #    this table was built to expose. The old note read "no longer
+    #    crosses" for MHCflurry and "still just crosses" for PWM: one
+    #    unsourced constant sat inside the measurement error of the
+    #    peptide scorer, so whether a MECHANISM existed depended on
+    #    which predictor was installed. Nothing keys on 0.4 any more,
+    #    so these two fields are now diagnostics of a constant that
+    #    decides nothing. Keep them -- they still say how high IFN
+    #    drives class I -- but a future change to them is not a change
+    #    to the model's behaviour.
     'pwm': {
         'survivors': (121, 65),
         'delta': 0.01219,
         'n_kills': 17,
-        'by_lineage': {'NK_cell': 10, 'macrophage': 6, 'T_cell': 1},
+        'by_lineage': {'NK_cell': 9, 'macrophage': 7, 'T_cell': 1},
         'observed': 8,
-        'expected': 8.96369,
-        'intact_mean': 0.35576,
-        'escaped_mean': 0.23770,
+        'expected': 8.90392,
+        'intact_mean': 0.34467,
+        'escaped_mean': 0.23227,
         'intact_above_at_end': 0,
-        'intact_samples_above': 2,          # was 4; still just crosses
-        'max_intact_over_run': 0.40926,
-        'cancer_divisions': 60,
-        'divisions_total': 237,
+        'intact_samples_above': 9,           # was 2; the step is inert now
+        'max_intact_over_run': 0.42592,
+        'cancer_divisions': 59,
+        'divisions_total': 236,
     },
     'mhcflurry': {
-        'survivors': (125, 67),
-        'delta': 0.01100,
-        'n_kills': 15,
-        'by_lineage': {'macrophage': 9, 'NK_cell': 5, 'T_cell': 1},
-        'observed': 9,
-        'expected': 7.97097,
-        'intact_mean': 0.34680,
-        'escaped_mean': 0.23296,
-        'intact_above_at_end': 0,
-        'intact_samples_above': 0,          # was 16; no longer crosses
-        'max_intact_over_run': 0.38846,
-        'cancer_divisions': 61,
-        'divisions_total': 238,
+        'survivors': (116, 59),
+        'delta': -0.01638,                   # was +0.01100; see note 1
+        'n_kills': 19,
+        # T cells take 0 of 19 here. An earlier pass corrected "T cells
+        # do ZERO killing" to "1 of 15"; at this sample size the T-cell
+        # count moves between 0 and 1 and neither value is a result.
+        # What the test asserts is the SHARE, t_share <= 0.15.
+        'by_lineage': {'NK_cell': 12, 'macrophage': 7},
+        'observed': 14,
+        'expected': 9.77156,
+        'intact_mean': 0.35582,
+        'escaped_mean': 0.23901,
+        'intact_above_at_end': 1,
+        'intact_samples_above': 14,          # was 0; see note 2
+        'max_intact_over_run': 0.40971,
+        'cancer_divisions': 56,
+        'divisions_total': 233,
     },
 }
 

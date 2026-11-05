@@ -787,9 +787,38 @@ def nk_clone_decision(
         half_max_mutations=activating_half_max_mutations,
     )
     mhc = _clamp01(mhc1_expression)
+    signal = subset_signal(subset, a, mhc)
+    return _decision_from_signal(
+        signal, activating=a, mhc=mhc,
+        activation_threshold=activation_threshold,
+        max_kill_probability=max_kill_probability,
+        label=subset.receptor.value,
+    )
+
+
+def _decision_from_signal(
+    signal: float,
+    *,
+    activating: float,
+    mhc: float,
+    activation_threshold: float,
+    max_kill_probability: float,
+    label: str,
+) -> NKDecision:
+    """Turn one integrated synapse signal into an engagement and a rate.
+
+        fires = signal > threshold
+        p     = max_kill * (signal - threshold) / (1 - threshold)
+
+    The ONE copy of this arithmetic. ``kill_probability`` and the
+    engagement decision used to be derived separately on the T-cell
+    path, where the decomposition could disagree with the probability
+    actually acted on; this exists so the same mistake cannot be made
+    twice. Every NK route -- a typed patient's clone, the compartment
+    expectation, and the untyped population prior -- goes through here.
+    """
     thr = _clamp01(activation_threshold)
     span = max(1e-9, 1.0 - thr)
-    signal = subset_signal(subset, a, mhc)
     if signal > thr:
         p = _clamp01(max_kill_probability) * _clamp01((signal - thr) / span)
         fires = True
@@ -800,9 +829,92 @@ def nk_clone_decision(
         recognized=fires,
         kill_probability=float(p),
         firing_fraction=1.0 if fires else 0.0,
-        activating=a,
-        mhc1_expression=mhc,
-        per_subset=((subset.receptor.value, float(signal), float(p)),),
+        activating=float(activating),
+        mhc1_expression=float(mhc),
+        per_subset=((label, float(signal), float(p)),),
+    )
+
+
+def population_prior_inhibitory_avidity() -> float:
+    """Generic inhibitory avidity to use when the host is NOT HLA-typed.
+
+    DERIVED from the two tables above rather than written down, so it
+    cannot drift from them: each receptor's strongest COGNATE avidity
+    (``KIR_AVIDITY`` restricted to ``KIR_COGNATE_LIGANDS``, since only a
+    cognate ligand educates), weighted by that receptor's carrier
+    frequency in ``POPULATION_PRIOR_KIR_PRESENCE`` (Bontadini 2006).
+
+    This inherits the status of its inputs and is NOT a measurement:
+    the carrier frequencies are real data, but the ``KIR_AVIDITY``
+    magnitudes are a declared parameterisation whose ordering -- not
+    whose values -- the literature supports. It is a population prior
+    and never patient-specific, which is why it is a separate function
+    from ``licensing_profile``: that one refuses to run without a real
+    typing precisely so an NK licensing PREDICTION cannot be built on
+    invented alleles. This makes no licensing claim at all. It says
+    only what Karre 1986 says -- inhibition scales with target class I.
+    """
+    num = den = 0.0
+    for kir, freq in POPULATION_PRIOR_KIR_PRESENCE.items():
+        cognate = KIR_COGNATE_LIGANDS[kir]
+        avidity = max(KIR_AVIDITY[kir].get(g, 0.0) for g in cognate)
+        num += float(freq) * float(avidity)
+        den += float(freq)
+    if den <= 0.0:
+        raise ValueError("no carrier frequencies to weight")
+    return num / den
+
+
+def untyped_missing_self_decision(
+    *,
+    mhc1_expression: float,
+    n_mutations: int = 0,
+    max_kill_probability: float,
+    inhibitory_avidity: Optional[float] = None,
+    activation_threshold: float = DEFAULT_ACTIVATION_THRESHOLD,
+    activating_baseline: float = DEFAULT_ACTIVATING_BASELINE,
+    activating_max_gain: float = DEFAULT_ACTIVATING_MAX_GAIN,
+    activating_half_max_mutations: float = DEFAULT_ACTIVATING_HALF_MAX_MUTATIONS,
+) -> NKDecision:
+    """Graded missing self for a target in a host with no class-I typing.
+
+    Replaces ``missing_self_recognized``, a step at an unsourced 0.4
+    that also left the kill rate FLAT in MHC-I -- so without a typing
+    the NK arm read class I exactly twice: once as a cliff, and never
+    again. Measured on the shipped 12 h Baseline slab run, cancer MHC-I
+    spanned 0.3367-0.4160 with **80 of 128 cells within 0.05 of that
+    cliff**, and the published consequence flipped with the peptide
+    scorer (max intact MHC-I 0.3885 under MHCflurry, 0.4093 under the
+    PWM fallback). A mechanism whose existence depends on which scorer
+    is installed is a threshold artefact, not biology.
+
+    Same arithmetic as the typed path, with the licensing term set to a
+    competent clone (``competence = 1.0``) and a population-prior
+    avidity -- see :func:`population_prior_inhibitory_avidity` for what
+    that is and is not. The result is monotone in ``mhc1_expression``,
+    which is the whole point: a target that loses class I gets more
+    NK-sensitive smoothly instead of crossing a line.
+
+    NOTE this changes what ``max_kill_probability`` MEANS on the untyped
+    path, and deliberately: it is now the rate against a maximally
+    stressed, class-I-null target, exactly as it already was whenever a
+    patient typing was on record. The two paths disagreed before.
+    """
+    a = activating_signal(
+        n_mutations,
+        baseline=activating_baseline,
+        max_gain=activating_max_gain,
+        half_max_mutations=activating_half_max_mutations,
+    )
+    mhc = _clamp01(mhc1_expression)
+    avidity = (population_prior_inhibitory_avidity()
+               if inhibitory_avidity is None else float(inhibitory_avidity))
+    signal = a - avidity * mhc
+    return _decision_from_signal(
+        signal, activating=a, mhc=mhc,
+        activation_threshold=activation_threshold,
+        max_kill_probability=max_kill_probability,
+        label="population_prior",
     )
 
 
@@ -845,22 +957,24 @@ def nk_decision(
         max_gain=activating_max_gain,
         half_max_mutations=activating_half_max_mutations,
     )
-    thr = _clamp01(activation_threshold)
-    span = max(1e-9, 1.0 - thr)
-    max_kill = _clamp01(max_kill_probability)
-
     p_total = 0.0
     firing = 0.0
     rows = []
     for s in profile.subsets:
         signal = subset_signal(s, a, mhc)
-        if signal > thr:
-            p = max_kill * _clamp01((signal - thr) / span)
+        # Through the shared helper, so the compartment readout cannot
+        # disagree with the per-clone decision the simulation acts on.
+        one = _decision_from_signal(
+            signal, activating=a, mhc=mhc,
+            activation_threshold=activation_threshold,
+            max_kill_probability=max_kill_probability,
+            label=s.receptor.value,
+        )
+        if one.recognized:
             firing += s.weight
-            p_total += s.weight * p
-        else:
-            p = 0.0
-        rows.append((s.receptor.value, float(signal), float(p)))
+            p_total += s.weight * one.kill_probability
+        rows.append((s.receptor.value, float(signal),
+                     float(one.kill_probability)))
 
     return NKDecision(
         recognized=firing > 0.0,

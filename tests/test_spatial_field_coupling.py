@@ -401,16 +401,40 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # population that grows to 90 instead of 115 over the day simply
     # consumes less. The floor rises with it, 0.0673 -> 0.0690, because
     # the cells that remain are competing for the same supply.
+    # SCORER-DEPENDENT, and that was latent until graded NK exposed it.
+    # The peptide scorer reaches this file only through the immune
+    # trajectory, but it does reach it: measured 306.78945 under the
+    # real MHCflurry predictor and 306.70346 under the PWM fallback.
+    # The old +-0.01 pin fitted whichever one happened to be run. The
+    # tolerance now spans both, because this file's subject is field
+    # coupling and it should not fail over which predictor is installed.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(306.7012, abs=0.01)
+        pytest.approx(306.75, abs=0.1)
     # The oxygen floor: no normal cell is near death -- nor even hypoxic.
-    # THE PROPERTY is the line below: the floor sits above the hypoxia
-    # flag. The exact value is a pin and rose 0.0673 -> 0.0690 with the
-    # 90 h division period, for the same reason delivery fell: fewer
-    # cells competing for the same supply.
+    # THE PROPERTY is the two lines below: the floor sits above the
+    # hypoxia flag and no cell is under it. The exact value is a pin and
+    # rose 0.0673 -> 0.0690 with the 90 h division period, for the same
+    # reason delivery fell: fewer cells competing for the same supply.
+    #
+    # 0.0690 -> 0.0656 when NK recognition became graded in MHC-I. That
+    # one is NOT a mechanism and must not be read as one. It is an RNG
+    # STREAM SHIFT: the graded path draws differently, so every
+    # downstream stochastic decision lands elsewhere. Discriminated the
+    # way the oxygen-relief claim was -- per-seed deltas SCATTER IN SIGN
+    # (-0.00551, +0.00298, 0.00000 for seeds 1/2/3), and this run has
+    # FEWER cells than the stepped one (2249 vs 2252), which is the
+    # wrong direction for a supply-competition story.
+    #
+    # Note what that implies about this pin: min() over the population
+    # is an ORDER STATISTIC, one cell's value out of ~2,250, it ranges
+    # 0.053-0.080 ACROSS SEEDS, and it is SCORER-DEPENDENT too --
+    # measured 0.073911 under MHCflurry and 0.065554 under the PWM
+    # fallback. Pinning one cell's extremum to +/-0.001 was asserting a
+    # coincidence. The property above is the claim; the band below
+    # spans both scorers and says so.
     assert min(c.oxygen for c in alive) > 0.05          # the hypoxia flag
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert min(c.oxygen for c in alive) == pytest.approx(0.0690, abs=1e-3)
+    assert 0.060 < min(c.oxygen for c in alive) < 0.080
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):
@@ -446,8 +470,26 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # and starves less. That the mechanism survives a 27% cut in deaths
     # is the point -- the preset still starves normal cells and no other
     # preset does, which is the line below.
-    assert _deaths(runner, "hypoxia", "normal") == 32
+    # THE PROPERTY, stated before the pin: this preset starves normal
+    # cells substantially, and no other preset starves any. That is what
+    # "still produces hypoxia" means and it is what must not break.
+    assert _deaths(runner, "hypoxia", "normal") > 20
     assert _deaths(runs["Baseline"], "hypoxia", "normal") == 0
+    # 32 -> 42 when NK recognition became graded in MHC-I, and that is
+    # DRIFT, not a mechanism -- NK cells kill cancer cells and cannot
+    # starve a normal one. Measured on this fixture's own layout and
+    # preset (ring, 24 h) over six seeds, the step->graded delta in this
+    # very number is [+10, -2, 0, +6, 0, -2]: it SCATTERS IN SIGN, and
+    # the fixture's seed 12345 happens to sit at the extreme end of that
+    # range. The preset sits near a starvation threshold where any shift
+    # in the shared RNG stream cascades.
+    #
+    # It is also SCORER-DEPENDENT: 39 under the real MHCflurry
+    # predictor, 42 under the PWM fallback. So the exact count is
+    # pinned as a band spanning both, and a future move inside it means
+    # the stream or the scorer moved, not the biology. Check the sign
+    # scatter across seeds BEFORE looking for a mechanism.
+    assert 36 <= _deaths(runner, "hypoxia", "normal") <= 45
     # Cancer cells used to starve here too when the immune compartment
     # did not reach them first: 16 while the chase step was frozen, 0
     # while every contact killed within a step or two, 7 once a kill
@@ -466,19 +508,54 @@ def test_the_hypoxia_preset_still_produces_hypoxia(runs):
     # 21 either way; only the CAUSE moved, from the environment to the
     # immune compartment. That invariant is the check that this change
     # did not quietly spare the tumour, so assert it directly.
-    assert _deaths(runner, "hypoxia", "cancer") == 0
-    assert _deaths(runner, "immune_killed", "cancer") == 21
-    assert (_deaths(runner, "hypoxia", "cancer")
-            + _deaths(runner, "immune_killed", "cancer")) == 21
-    assert cells.total_deaths == 53
+    # THE PROPERTY: cancer dies here by immune killing, not by
+    # starvation. Starvation takes at most a cell or two, the immune
+    # compartment takes the rest.
+    _starved = _deaths(runner, "hypoxia", "cancer")
+    _killed = _deaths(runner, "immune_killed", "cancer")
+    assert _killed >= 15
+    assert _starved < 0.25 * (_starved + _killed), (
+        f"{_starved} starved vs {_killed} killed: cancer must die here "
+        "mainly by immune killing, not by starvation")
+    #
+    # The pinned split, and a correction to how it was framed. The
+    # comment above called the total an invariant -- "21 either way;
+    # only the CAUSE moved". It is not one: measured over six seeds the
+    # total ranges 18-23 on this preset, so 21 was a single-seed pin
+    # like the two beside it. With graded NK the step->graded delta in
+    # the total is [+2, 0, 0, +1, 0, +1] -- never negative, and
+    # consistent with the graded curve CROSSING the old flat rate at
+    # MHC-I 0.356 while mean cancer MHC-I here is 0.35-0.44. So at this
+    # preset's class-I levels graded killing is marginally stronger,
+    # by well under one cell per run on a base of ~20.
+    # Measured both ways: starvation 3 / immune 21 under MHCflurry,
+    # starvation 1 / immune 22 under PWM. Banded over both.
+    assert 1 <= _deaths(runner, "hypoxia", "cancer") <= 3
+    assert 20 <= _deaths(runner, "immune_killed", "cancer") <= 23
+    assert 22 <= (_deaths(runner, "hypoxia", "cancer")
+                  + _deaths(runner, "immune_killed", "cancer")) <= 25
+    # Exactly the two components above (normal starved + cancer), so it
+    # carries no information they do not: 63 under MHCflurry, 65 under
+    # PWM. Same stream-shift and scorer caveats.
+    assert 60 <= cells.total_deaths <= 68
     # The 24 h snapshot: hypoxic cells are still there at the end now --
     # hypoxia is survivable, as Papandreou found -- and some are near anoxia.
     # 32 -> 26 since division_time_normal became 90 h, the same cause as
     # the death counts above: fewer normal cells consuming the same
     # supply leaves fewer cells below the hypoxia flag. The preset is
     # still hypoxic and still the only one that is.
-    assert vascular.hypoxic_regions == 26
-    assert sum(1 for c in alive if c.oxygen < 0.05) == 26
+    #
+    # 26 -> 18 (MHCflurry) / 15 (PWM) with graded NK: the same stream
+    # shift as the death counts above, not a separate finding. This is
+    # a snapshot count at 24 h, so it moves with WHEN cells died as
+    # well as how many. THE PROPERTY is the line after it.
+    assert 12 <= vascular.hypoxic_regions <= 21
+    assert vascular.hypoxic_regions > 0, "the preset must still be hypoxic"
+    # The same count seen from the cells instead of the vasculature.
+    # THAT THE TWO AGREE is the point of asserting both, and it is the
+    # part that is scorer-independent -- 18 and 18 under MHCflurry, 15
+    # and 15 under PWM. So assert the agreement, not the value.
+    assert sum(1 for c in alive if c.oxygen < 0.05) == vascular.hypoxic_regions
     assert min(c.oxygen for c in alive) == pytest.approx(0.0033, abs=1e-3)
 
 

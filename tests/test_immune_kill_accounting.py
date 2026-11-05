@@ -55,6 +55,14 @@ def _module(target):
     with contextlib.redirect_stdout(io.StringIO()):
         m = ImmuneModule({"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0,
                           "nk_kill_probability": 1.0, "library_params": False,
+                          # What this file tests is the ACCOUNTING -- a
+                          # target dies once -- so the kill has to be
+                          # certain. The graded NK path scales the rate
+                          # by the synapse signal, so no probability can
+                          # be 1.0 there; the legacy step rule, which
+                          # _cancer's own comment already names, takes
+                          # nk_kill_probability literally.
+                          "nk_graded_missing_self": False,
                           "lethal_contact_minutes": SHORT_CONTACT})
     m.event_bus = EventBus()
     m.set_cellular_module(_Tissue(target))

@@ -55,14 +55,29 @@ def test_every_kill_number_is_sourced_or_an_estimate_with_a_range():
     assert set(report) == {
         "tcell_hits_per_contact", "tcell_damage_half_life_min",
         "tcell_lethal_damage", "nk_kill_per_contact",
-        "macrophage_kill_per_contact"}
+        "nk_graded_ceiling", "macrophage_kill_per_contact"}
     for name, entry in report.items():
         low, high = entry["range"]
         assert low <= entry["value"] <= high, name
-        assert entry["status"] in {"sourced", "derived", "ESTIMATE"}, name
+        # 'calibration-choice' is a FOURTH and weaker category than the
+        # three above: a number with no measurement behind it at all,
+        # fixed by a modelling decision whose consequence is recorded
+        # beside it. nk_graded_ceiling is the only one, and turning a
+        # flat rate into a curve is why it has to exist -- nothing
+        # measures where on the curve the flat rate sat. Anything new
+        # claiming this status needs the same treatment, which is why
+        # it is named here rather than waved through.
+        assert entry["status"] in {
+            "sourced", "derived", "ESTIMATE", "calibration-choice"}, name
         assert entry["source"], name
     assert report["nk_kill_per_contact"]["status"] == "ESTIMATE"
     assert report["macrophage_kill_per_contact"]["status"] == "ESTIMATE"
+    assert report["nk_graded_ceiling"]["status"] == "calibration-choice"
+    choices = [n for n, e in report.items()
+               if e["status"] == "calibration-choice"]
+    assert choices == ["nk_graded_ceiling"], (
+        f"{choices}: a new unmeasured number appeared on the kill path. "
+        "Source it, or justify it the way nk_graded_ceiling does.")
 
 
 def test_the_lethal_damage_is_three_hits_fifty_minutes_apart():
