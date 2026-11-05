@@ -371,16 +371,35 @@ def test_a_transformed_cell_changes_prototype_and_size_on_its_frame(handmade):
     assert api.GetPrimvar("bio:cell:type").Get()[i] == "cancer"
     assert api.GetPrimvar("cognisom:cell:typeAtFrame").Get(0.0)[i] == "normal"
     colour = api.GetPrimvar("displayColor")
-    assert tuple(colour.Get()[i]) == pytest.approx(cancer.colour)
-    assert tuple(colour.Get()[ids.index(1)]) == pytest.approx(normal.colour)
+    # The assertions below are on HUE, not on the exact RGB triple,
+    # because brightness now carries the cell's own oxygen: the writer
+    # scales each type colour by shade_by_oxygen (see
+    # tests/test_oxygen_is_visible.py for why -- displayColor used to be
+    # byte-identical on every frame of a run while the oxygen primvar
+    # beside it changed on 94 of 96 steps). This fixture records oxygen,
+    # so the cancer cell reads 0.7675 against the type colour's 0.800 --
+    # a 0.959 shade, not a different colour. What this test is about is
+    # unchanged: the colour follows the SHAPE frame by frame.
+    def _hue(rgb):
+        v = np.asarray(tuple(rgb), dtype=float)
+        return v / np.linalg.norm(v)
+
+    def _assert_hue(got, want, msg=""):
+        assert np.allclose(_hue(got), _hue(want), atol=1e-4), (msg, tuple(got), want)
+
+    _assert_hue(colour.Get()[i], cancer.colour, "un-timed default")
+    _assert_hue(colour.Get()[ids.index(1)], normal.colour, "the normal cell")
     # and the colour follows the shape on its frame: it was the last
     # frame's colour on every frame, so this cell wore the cancer colour
     # while its shape and its appearance key said normal
     assert normal.colour != cancer.colour
+    assert _hue(normal.colour).tolist() != _hue(cancer.colour).tolist(), (
+        "this test can only distinguish the two by hue, so they must differ "
+        "in hue and not only in brightness")
     assert colour.GetTimeSamples() == [0.0, 1.0, 2.0]
     for k in (0, 1):
-        assert tuple(colour.Get(float(k))[i]) == pytest.approx(normal.colour), k
-    assert tuple(colour.Get(2.0)[i]) == pytest.approx(cancer.colour)
+        _assert_hue(colour.Get(float(k))[i], normal.colour, f"frame {k}")
+    _assert_hue(colour.Get(2.0)[i], cancer.colour, "frame 2")
 
 
 def test_a_macrophage_crossing_the_cutoff_changes_prototype_on_its_frame(handmade):

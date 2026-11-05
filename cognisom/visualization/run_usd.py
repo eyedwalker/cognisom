@@ -140,8 +140,50 @@ log = logging.getLogger(__name__)
 
 CELLS_PATH = "/World/Cells"
 IMMUNE_PATH = "/World/ImmuneCells"
+
 PROTOTYPE_ROOT = "/World/Prototypes"
 CAMERA_PATH = "/World/Cameras/EventCam"
+
+# ── oxygen as brightness ──────────────────────────────────────────
+# Oxygen, as the engine carries it, is a VOLUME FRACTION: 0.21 is air
+# (~21 kPa, ~160 mmHg) and is the value every cell is seeded at, and
+# 0.05 is the engine's own hypoxia cutoff -- vascular_module's
+# "hypoxic (< 0.05) from 25 to 50 um". Those two are the ends of the
+# ramp, so the scale is FIXED and physiological: two runs shade the
+# same way and can be compared by eye. Stretching the ramp to each
+# run's own min and max would make every run look equally hypoxic.
+OXYGEN_FULL = 0.21
+OXYGEN_HYPOXIC = 0.05
+#: What a fully hypoxic cell keeps. Not 0 -- a black cell reads as
+#: absent, and the point is to show a gradient, not to delete a cell.
+OXYGEN_SHADE_FLOOR = 0.35
+
+
+def shade_by_oxygen(rgb, oxygen, *, full: float = OXYGEN_FULL,
+                    hypoxic: float = OXYGEN_HYPOXIC,
+                    floor: float = OXYGEN_SHADE_FLOOR):
+    """Darken each cell's own colour by its own oxygen, keeping its HUE.
+
+    The type colour IS the legend -- a normal cell has to stay peach and
+    a cancer cell red -- so oxygen may not choose the hue. It scales
+    brightness instead, which leaves lineage readable by colour and
+    makes the per-cell oxygen that was always in the file, and always
+    invisible, actually show. Before this, ``displayColor`` on
+    ``/World/Cells`` was byte-identical on all 97 frames of the shipped
+    24 h run while ``cognisom:cell:oxygen`` changed on 94 of them: the
+    tissue was a still image carrying live data nobody could see.
+
+    ``rgb`` is (frames, n, 3) and ``oxygen`` is (frames, n); a cell with
+    no recorded oxygen is left at full brightness rather than blackened,
+    so a missing field never reads as suffocation.
+    """
+    o = np.asarray(oxygen, dtype="float32")
+    span = float(full) - float(hypoxic)
+    if span <= 0.0:                       # degenerate config: do nothing
+        return np.asarray(rgb, dtype="float32")
+    t = np.clip((o - float(hypoxic)) / span, 0.0, 1.0)
+    factor = float(floor) + (1.0 - float(floor)) * t
+    return (np.asarray(rgb, dtype="float32") * factor[..., None]).astype("float32")
 
 #: Above this fraction of drawn cells inside a neighbour, the report
 #: says the shapes are not legible on this lattice. The ring Baseline
@@ -647,6 +689,14 @@ def write_run(path: str, source: Any, *,
             extra["cognisom:cell:oxygen"] = (
                 Sdf.ValueTypeNames.FloatArray,
                 [Vt.FloatArray([float(v if v is not None else 0.0) for v in row])
+                 for row in cells.fields["oxygen"]])
+            # ...and the same numbers again as brightness, so the oxygen
+            # gradient is visible and not merely recorded. A cell with no
+            # value reads as OXYGEN_FULL, i.e. unshaded: an absent
+            # measurement must not look like suffocation.
+            colours = shade_by_oxygen(
+                colours,
+                [[float(v if v is not None else OXYGEN_FULL) for v in row]
                  for row in cells.fields["oxygen"]])
         applied, asserted = _author_population(
             stage, CELLS_PATH, cells, prototype_paths=proto_paths, proto_bounds=proto_bounds,
