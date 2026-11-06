@@ -59,6 +59,7 @@ if user is not None:
     pages = {
         "": [
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
+            st.Page(str(_pages_dir / "43_public_demo.py"), title="Recorded Demo", icon=":material/play_circle:"),
             st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
             st.Page(str(_pages_dir / "36_validation_demo.py"), title="Demo & Validation", icon=":material/analytics:"),
         ],
@@ -258,6 +259,25 @@ if _query.get("page") == "investors":
     # Run the investor page directly (it has its own password gate)
     _investor_page = _pages_dir / "41_investors.py"
     exec(compile(_investor_page.read_text(), str(_investor_page), "exec"))
+    st.stop()
+
+
+# ════════════════════════════════════════════════════════════════════
+# PUBLIC DEMO (no login and no password: a recorded run, explained)
+# ════════════════════════════════════════════════════════════════════
+
+if _query.get("page") == "demo":
+    st.set_page_config(
+        page_title="Cognisom | Recorded Simulation",
+        page_icon="\U0001f9ec",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+    # Read-only by construction: the page starts no simulation and
+    # touches no patient data, which is what makes it safe to serve
+    # without a gate.
+    _demo_page = _pages_dir / "43_public_demo.py"
+    exec(compile(_demo_page.read_text(), str(_demo_page), "exec"))
     st.stop()
 
 
@@ -911,17 +931,28 @@ if user is None:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Demo Video (uncomment when YouTube account is active) ────
-    # vid_col1, vid_col2, vid_col3 = st.columns([1, 3, 1])
-    # with vid_col2:
-    #     st.markdown("""
-    #     <div style="border-radius: 12px; overflow: hidden; border: 1px solid rgba(128,128,128,0.15);">
-    #         <iframe width="100%" height="400"
-    #             src="https://www.youtube.com/embed/YOUR_VIDEO_ID?rel=0"
-    #             title="Cognisom Platform Overview"
-    #             frameborder="0" allowfullscreen></iframe>
-    #     </div>
-    #     """, unsafe_allow_html=True)
+    # ── Recorded simulation (public, no account needed) ───────────
+    #
+    # This replaced a commented-out YouTube embed that never had a
+    # video behind it. The recording is generated from a real run by
+    # scripts/record_demo_run.py and served from the repo, so there is
+    # no third-party player and nothing to keep in sync by hand.
+    _demo_video = Path(__file__).resolve().parent / "assets" / "demo_run.mp4"
+    if _demo_video.exists():
+        _v1, _v2, _v3 = st.columns([1, 3, 1])
+        with _v2:
+            st.video(str(_demo_video))
+            st.markdown(
+                "<div style='text-align:center; font-size:0.85rem; opacity:0.7;'>"
+                "Twenty-four simulated hours of a tumour and its immune "
+                "infiltrate, computed cell by cell from a real patient "
+                "callset.</div>",
+                unsafe_allow_html=True,
+            )
+            st.link_button(
+                "What am I looking at? \u2192", "/?page=demo",
+                use_container_width=True,
+            )
 
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4, m5, m6 = st.columns(6)

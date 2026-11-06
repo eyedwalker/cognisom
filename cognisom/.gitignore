@@ -58,6 +58,14 @@ output/
 *.mp4
 results.json
 
+# ...except the dashboard's shipped assets. The public demo page serves
+# a recorded simulation from here, so the file has to travel with the
+# deployment; ignored, it would be absent in the container and the page
+# would quietly report that there is no recording.
+!dashboard/assets/*.mp4
+!dashboard/assets/*.png
+!dashboard/assets/*.gif
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
