@@ -19,6 +19,9 @@ from cognisom.auth.middleware import streamlit_page_gate
 user = streamlit_page_gate("3_simulation")
 
 from cognisom.dashboard.engine_runner import EngineRunner, SCENARIOS
+from cognisom.dashboard.sim_request import (
+    TISSUE_CHOICES, TISSUE_LABELS, describe_subject, patient_from_session,
+    presentation_lines, tissue_caption)
 
 # ── Page header ──────────────────────────────────────────────────────
 
@@ -78,9 +81,68 @@ modules_enabled = {
 n_enabled = sum(modules_enabled.values())
 st.sidebar.caption(f"{n_enabled} / 11 modules enabled")
 
-# ── Run button ───────────────────────────────────────────────────────
+st.sidebar.markdown("---")
+st.sidebar.subheader("Tissue geometry")
+# The default was the only option, and it is the one that is
+# geometrically wrong: the slab fills every lattice site, while a real
+# open prostate section fills about 0.60 of a close packing. The
+# section layout shipped and was tested; no page ever offered it.
+tissue = st.sidebar.selectbox(
+    "Layout",
+    list(TISSUE_CHOICES),
+    format_func=lambda t: TISSUE_LABELS[t],
+    help="Where the cells sit relative to one another. This decides how "
+         "many neighbours each cell has, so it changes every "
+         "contact-mediated effect: immune killing, ECM, local oxygen.",
+)
+st.sidebar.caption(tissue_caption(tissue))
+
+# ── Whose genome ─────────────────────────────────────────────────────
+#
+# The point of the whole join. A run with no patient loaded is not an
+# error -- it is a run about nobody, and until this panel existed
+# nothing on screen said so. The engine quietly gave every cancer cell
+# the placeholder KRAS_G12D driver on a generic HLA panel, so a result
+# screenshot could not be attributed to anyone. Stated BEFORE the
+# button, because a 24 h run costs ~15 s and being told afterwards is
+# too late to act on.
+subject = describe_subject(patient_from_session(st.session_state))
 
 st.divider()
+if subject.personalised:
+    st.success(f"**{subject.headline}**")
+else:
+    st.warning(f"**{subject.headline}**")
+for _note in subject.caveats:
+    st.caption(f"\u26a0\ufe0e {_note}")
+
+if not subject.personalised:
+    st.caption(
+        "To personalise: build a profile on **Genomic Twin**, **Real "
+        "Patient** or **Parabricks**. This page reads the same profile "
+        "those pages store, so a run started after one of them is about "
+        "that patient."
+    )
+elif subject.mutation_labels or subject.skipped:
+    with st.expander(
+            f"What crosses into the engine — "
+            f"{len(subject.mutation_labels)} carried, "
+            f"{len(subject.skipped)} left out"):
+        if subject.mutation_labels:
+            st.markdown("**Carried by every founding cancer cell**")
+            st.code("\n".join(subject.mutation_labels), language=None)
+        st.markdown(
+            "**HLA class I** — "
+            + ("typed from this patient's reads"
+               if subject.hla_measured else
+               "not read-derived, so NK licensing refuses it")
+        )
+        st.code(", ".join(subject.hla_alleles) or "none", language=None)
+        if subject.skipped:
+            st.markdown("**Left out, each with its reason**")
+            for _g, _ch, _why in subject.skipped:
+                st.caption(f"`{_g} {_ch}` — {_why}")
+
 run_btn = st.button("Run Simulation", type="primary", use_container_width=True)
 
 if run_btn or st.session_state.get("sim_engine_ran"):
@@ -89,6 +151,10 @@ if run_btn or st.session_state.get("sim_engine_ran"):
             dt=dt, duration=duration, scenario=scenario,
             modules_enabled=modules_enabled,
             record_interval=max(1, int(0.1 / dt)),  # ~every 0.1h
+            tissue=tissue,
+            # None is a legitimate value and means the generic genome.
+            # The warning above has already said so.
+            patient=subject.patient,
         )
 
         progress_bar = st.progress(0, text="Building engine...")
@@ -117,6 +183,13 @@ if run_btn or st.session_state.get("sim_engine_ran"):
         st.session_state["sim_cell_snaps"] = runner.cell_snapshots
         st.session_state["sim_final"] = runner.get_final_state()
         st.session_state["sim_scenario"] = scenario
+        # Stored with the run, not recomputed on rerun: the results
+        # below belong to the patient who was loaded when the button
+        # was pressed, which is not necessarily the one loaded now.
+        st.session_state["sim_subject"] = subject
+        st.session_state["sim_tissue"] = tissue
+        st.session_state["sim_presentation"] = presentation_lines(
+            runner.presentation_report)
         st.session_state["sim_duration"] = duration
         st.session_state["sim_dt"] = dt
         st.session_state["sim_modules"] = modules_enabled
@@ -139,6 +212,15 @@ if run_btn or st.session_state.get("sim_engine_ran"):
     # ══════════════════════════════════════════════════════════════
 
     st.subheader(f"Results — {sim_scenario}")
+
+    # Attribution for every number below. Without it a screenshot of
+    # these metrics cannot be traced to a patient or a geometry.
+    _subj = st.session_state.get("sim_subject")
+    _tis = st.session_state.get("sim_tissue", "slab")
+    if _subj is not None:
+        st.caption(f"{_subj.headline}  ·  {TISSUE_LABELS.get(_tis, _tis)}")
+    for _line in st.session_state.get("sim_presentation") or []:
+        st.caption(_line)
     m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Cancer Cells", f"{ts['n_cancer'][-1]}",
               delta=f"{ts['n_cancer'][-1] - ts['n_cancer'][0]:+d}")

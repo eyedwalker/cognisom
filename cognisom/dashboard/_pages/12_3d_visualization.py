@@ -85,6 +85,16 @@ with tab_live3d:
             mod_vascular = st.checkbox("Vascular", True, key="mod_vasc")
             mod_spatial = st.checkbox("Spatial Fields", True, key="mod_spat")
 
+            from cognisom.dashboard.sim_request import (
+                TISSUE_CHOICES, TISSUE_LABELS, tissue_caption)
+            st.markdown("**Geometry**")
+            tissue = st.selectbox(
+                "Tissue layout", list(TISSUE_CHOICES),
+                format_func=lambda t: TISSUE_LABELS[t],
+                key="viz3d_tissue",
+            )
+            st.caption(tissue_caption(tissue))
+
     # Run simulation button
     col_run1, col_run2 = st.columns([1, 3])
     with col_run1:
@@ -92,6 +102,13 @@ with tab_live3d:
 
     if run_sim:
         from cognisom.dashboard.engine_runner import EngineRunner
+        from cognisom.dashboard.sim_request import (
+            describe_subject, patient_from_session)
+
+        # Same join as the Simulation page, and the same session key, so
+        # a patient loaded anywhere reaches this run too. With no patient
+        # the engine uses a placeholder driver, which the caption says.
+        subject = describe_subject(patient_from_session(st.session_state))
 
         # Configure modules
         modules_enabled = {
@@ -112,6 +129,8 @@ with tab_live3d:
                 duration=sim_duration,
                 scenario=scenario,
                 modules_enabled=modules_enabled,
+                tissue=tissue,
+                patient=subject.patient,
             )
 
             # Progress bar
@@ -131,6 +150,17 @@ with tab_live3d:
             st.session_state["sim_cell_snapshots"] = runner.cell_snapshots
             st.session_state["sim_events"] = runner.event_log
             st.session_state["sim_final_state"] = runner.get_final_state()
+            st.session_state["sim_subject"] = subject
+            st.session_state["sim_tissue"] = tissue
+
+        if subject.personalised:
+            st.caption(f"{subject.headline}  ·  {TISSUE_LABELS[tissue]}")
+        else:
+            st.warning(
+                f"{subject.headline} — the cancer cells carry a placeholder "
+                "driver, so this run is a mechanism demonstration rather "
+                "than a twin."
+            )
 
     # Display results if available.
     #

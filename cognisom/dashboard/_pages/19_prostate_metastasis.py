@@ -1556,6 +1556,15 @@ with tab_simulation:
         with st.spinner("Running simulation..."):
             try:
                 from cognisom.dashboard.engine_runner import EngineRunner
+                from cognisom.dashboard.sim_request import (
+                    describe_subject, patient_from_session)
+
+                # This page is specifically about a prostate patient, so
+                # running it on a placeholder genome was the least
+                # defensible of the three call sites. Same session key as
+                # every page that builds a profile.
+                subject = describe_subject(
+                    patient_from_session(st.session_state))
 
                 # Configure for prostate scenario
                 runner = EngineRunner(
@@ -1570,7 +1579,20 @@ with tab_simulation:
                         "lymphatic": show_lymphatics,
                         "molecular": include_exosomes,
                     },
+                    # The measured prostate section, not the slab: this
+                    # page models prostate tissue, and the slab
+                    # over-connects every cell by about 1.6x.
+                    tissue="section",
+                    patient=subject.patient,
                 )
+                if subject.personalised:
+                    st.caption(f"{subject.headline}  ·  measured prostate section")
+                else:
+                    st.warning(
+                        f"{subject.headline} — placeholder driver, so this "
+                        "is a mechanism demonstration, not this patient's "
+                        "metastatic risk."
+                    )
 
                 progress = st.progress(0)
                 status = st.empty()
