@@ -222,12 +222,34 @@ def _nk_kills(seed, patient=None, **overrides):
     return kills.get("NK_cell", 0), runner.engine.modules["immune"]
 
 
+def _nk_module(seed, patient=None, **overrides):
+    """The immune module as BUILT, without running the simulation.
+
+    Every assertion below reads a flag that ``build()`` sets. Reaching
+    them through ``_nk_kills`` ran 240 steps twice and discarded both
+    kill counts: 62 s locally, over the suite's 120 s per-test budget on
+    a CI runner, which is what blocked the deploy lane. The assertions
+    are unchanged -- only the work nobody read is gone.
+    """
+    np.random.seed(seed)
+    kw = dict(dt=0.05, duration=12.0, scenario="Baseline", tissue="slab",
+              snapshot_interval_hours=6.0)
+    if overrides:
+        kw["overrides"] = {"immune": overrides}
+    if patient is not None:
+        kw["patient"] = patient
+    runner = EngineRunner(**kw)
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        runner.build()
+    return runner.engine.modules["immune"]
+
+
 def test_the_graded_path_is_the_default_and_the_step_is_still_reachable():
-    _, immune = _nk_kills(11)
+    immune = _nk_module(11)
     assert immune.nk_graded_missing_self is True
     assert immune._nk_licensing is None, "no patient: the untyped path"
     assert immune.nk_graded_ceiling == pytest.approx(NK_GRADED_CEILING.value)
-    _, stepped = _nk_kills(11, nk_graded_missing_self=False)
+    stepped = _nk_module(11, nk_graded_missing_self=False)
     assert stepped.nk_graded_missing_self is False
 
 

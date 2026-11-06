@@ -78,7 +78,17 @@ jobs:
         # point of `needs: test`. No `-x`: one early failure used to abort the
         # run before 8 of 18 files had executed. `-m "not slow"` defers the
         # long integration tests to nightly-tests.yml.
-        run: python -m pytest -m "not slow" --tb=short -q
+        #
+        # `not network` too. pytest.ini and test_bionumbers_curation's own
+        # docstring both say the live re-fetch checks are "deselected by
+        # default" -- nothing deselected them, so every push lane ran two
+        # tests that reach bionumbers.hms.harvard.edu and blocked the deploy
+        # whenever that host was slow. They are the checks to run after a
+        # sourcing pass, with `pytest -m network`, which still works. A test
+        # whose subject is "does the stored value still match the source"
+        # cannot be answered without the source, so not running it is honest
+        # where passing it would not be.
+        run: python -m pytest -m "not slow and not network" --tb=short -q
 
   # ── Build & Deploy ─────────────────────────────────────────
   build-and-push:
