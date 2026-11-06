@@ -91,6 +91,12 @@ def main() -> int:
     ap.add_argument("--fps", type=int, default=12)
     ap.add_argument("--out", default="cognisom/dashboard/assets")
     ap.add_argument("--name", default="demo_run")
+    ap.add_argument("--usd", default=None, metavar="PATH",
+                    help="also export this SAME run to a USD stage. The two "
+                         "outputs then show one simulation rather than two "
+                         "that happen to use the same settings -- which is "
+                         "the only honest way to put an RTX render beside "
+                         "the matplotlib recording on one page.")
     args = ap.parse_args()
 
     random.seed(SEED)
@@ -326,6 +332,29 @@ def main() -> int:
             "predictor": "mhcflurry" if not os.environ.get(
                 "COGNISOM_ALLOW_PWM_FALLBACK") else "pwm-fallback-allowed",
         }
+        if args.usd:
+            # Exported from the run already in memory, not re-simulated.
+            # A second run with the same seed would almost certainly match,
+            # but "almost certainly" is not something to put under two
+            # videos that claim to be the same run.
+            from cognisom.visualization.run_usd import write_run
+
+            usd_path = Path(args.usd)
+            usd_path.parent.mkdir(parents=True, exist_ok=True)
+            usd_report = write_run(str(usd_path), runner)
+            usd_kills = usd_report.markers["drawn"].get("kill", 0)
+            facts["usd_stage"] = usd_path.name
+            facts["usd_kill_markers"] = int(usd_kills)
+            facts["usd_duplicate_kills_suppressed"] = int(
+                usd_report.markers.get("suppressed_duplicate_kill", 0))
+            print(f"wrote {usd_path} ({usd_path.stat().st_size / 1e6:.1f} MB)")
+            print(f"  kill markers in the stage: {usd_kills}  "
+                  f"(video markers: {len(kills)}; engine: {facts['immune_kills']})")
+            if int(usd_kills) != int(facts["immune_kills"]):
+                print("  WARNING: the stage and the engine disagree on kills. "
+                      "Do not render this until they agree -- a viewer can "
+                      "count the crosses.")
+
         facts_path = outdir / f"{args.name}.json"
         facts_path.write_text(json.dumps(facts, indent=2) + "\n")
         print(f"wrote {facts_path}")
