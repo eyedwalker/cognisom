@@ -28,12 +28,43 @@ RUN apt-get update && \
 # Kept as its own RUN so a failure here fails the build. Previously this was
 # chained with `... || true`, which swallowed errors from the requirements
 # install itself, not just the optional package that followed it.
+#
+# pip is upgraded FIRST, and that line is what makes this image buildable at
+# all. python:3.11-slim bundles pip 24.0, whose resolver cannot solve this
+# file: measured 2026-11-06, it walked scikit-image backwards (0.25.2 ->
+# 0.25.1 -> 0.25.0 -> 0.24.0, ~36 min per version) and died after 2 h 26 m
+# with `resolvelib.resolvers.ResolutionTooDeep: 200000`.
+#
+# The requirement set is NOT in conflict. The CI `test` job installs this
+# same requirements.txt on the same python 3.11 / linux x86_64 in 89
+# SECONDS -- numpy 1.26.4, scikit-image 0.26.0, tensorflow-cpu 2.15.1 --
+# because actions/setup-python ships pip 26.2.2. The difference was never
+# the dependencies; it was the resolver. Every build-and-push since
+# then failed at this step, which is why no image reached ECR after
+# 2026-09-08 and `deploy-apps-server.sh --pull <sha>` had nothing to pull.
+#
+# Pinned rather than `--upgrade pip`: 26.2.2 is the version measured to
+# resolve this file, and a floating pip would make whether the image builds
+# depend on whichever pip ships the day someone builds it.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip==26.2.2 \
+ && pip install --no-cache-dir -r requirements.txt
 
-# Genuinely optional: rdkit wheels are unavailable on some platforms.
-RUN pip install --no-cache-dir rdkit-pypi \
-    || echo "WARNING: rdkit-pypi unavailable; cheminformatics features disabled"
+# NO rdkit-pypi install here, deliberately.
+#
+# requirements.txt declares the official `rdkit` distribution and says why:
+# rdkit-pypi was the unofficial build from before the RDKit project shipped
+# its own wheels, and it stopped publishing after 2022.9.5. Installing it
+# afterwards was not a harmless fallback. Its wheel ships the SAME
+# top-level `rdkit/` package -- verified 2026-11-06 against
+# rdkit_pypi-2022.9.5-cp311-cp311-manylinux_2_17_x86_64.whl, which has a
+# cp311 linux wheel and so does install -- so it would overwrite
+# site-packages/rdkit with four-year-old code while pip's own metadata went
+# on reporting rdkit 2026.9.1 as the installed version.
+#
+# It has never actually run, because the install above has never succeeded.
+# Fixing pip without deleting this would have shipped the downgrade on the
+# first green build.
 
 # Bake MHCflurry model weights into the image (~600 MB). Without this the
 # first prediction would download them at runtime, or fail closed.
