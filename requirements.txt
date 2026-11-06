@@ -89,6 +89,41 @@ gunicorn>=21.2.0
 
 # Dashboard
 streamlit>=1.30.0
+# Starlette is a TRANSITIVE dependency (streamlit requires <2,>=0.40.0) and is
+# pinned here because the newest one silently breaks the app's media endpoint.
+#
+# MEASURED 2026-11-06 against streamlit 1.60.0, by starting a real server and
+# fetching the /media/<id> URL the page emits:
+#
+#     starlette  1.4.1  1.5.0  1.6.0  1.7.0 | 1.8.0  1.9.0  1.10.0
+#     st.video     200    200    200    200 |   500    500     500
+#     st.image     200    200    200    200 |   500    500     500
+#
+# streamlit 1.60.0's MediaAwareGZipMiddleware subclasses Starlette's
+# IdentityResponder/GZipResponder and, for the audio/ and video/ content types
+# it means to exclude from compression, swallows the `http.response.start`
+# message instead of forwarding it. From starlette 1.8.0 that is fatal:
+# `RuntimeError: Expected ASGI message 'http.response.start', but got
+# 'http.response.body'` -> HTTP 500. st.download_button survives only because
+# its octet-stream type is not in the excluded set. streamlit 1.65.0 deleted
+# those subclasses and rewrote the middleware, which is the upstream fix.
+#
+# **Why not simply upgrade streamlit**: streamlit 1.61+ requires
+# protobuf>=5.26.1, and tensorflow-cpu<2.16 requires protobuf<5.0.0dev. The
+# tensorflow bound is not negotiable -- 2.16 ships Keras 3 and breaks
+# mhcflurry 2.0.6's set_session shim (see the mhcflurry note below). So the
+# chain mhcflurry -> tensorflow-cpu<2.16 -> protobuf<5 pins streamlit at
+# exactly 1.60.0, the last release compatible with protobuf 4, and this pin
+# is the only lever left.
+#
+# This reached production: cognisom.com served HTTP 500 for every st.video
+# and st.image until it was pinned. Nothing in the suite runs the app's HTTP
+# server, so no test saw it -- tests/test_media_is_actually_served.py now does.
+#
+# REMOVE THIS PIN when mhcflurry no longer holds tensorflow below 2.16, or
+# when streamlit >= 1.65 becomes installable here; then re-measure the table
+# above rather than assuming it still applies.
+starlette<1.8
 plotly>=5.18.0
 
 # Research feed
