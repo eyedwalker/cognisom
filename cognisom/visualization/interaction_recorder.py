@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass, replace
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 log = logging.getLogger(__name__)
@@ -134,8 +134,12 @@ def dedupe_kill_events(events: Iterable["VisualEvent"]) -> List["VisualEvent"]:
     this is safe to apply to a whole event list. The recorder itself
     still keeps everything -- an adaptive kill and an innate one are
     different facts, and only the DRAWING of them was ever doubled.
+
+    The surviving event carries the union of both twins' ``detail``
+    (see :func:`_merged_detail`), so collapsing the glyph does not also
+    collapse what is known about the kill.
     """
-    seen = set()
+    at: Dict[Any, int] = {}
     out: List["VisualEvent"] = []
     for event in events:
         if getattr(event, "kind", None) != KIND_KILL:
@@ -143,11 +147,44 @@ def dedupe_kill_events(events: Iterable["VisualEvent"]) -> List["VisualEvent"]:
             continue
         key = (round(float(getattr(event, "time", 0.0)), 6),
                getattr(event, "position", None))
-        if key in seen:
+        index = at.get(key)
+        if index is None:
+            at[key] = len(out)
+            out.append(event)
             continue
-        seen.add(key)
-        out.append(event)
+        out[index] = _merged_detail(out[index], event)
     return out
+
+
+def _merged_detail(kept: "VisualEvent", dropped: "VisualEvent") -> "VisualEvent":
+    """Carry the dropped twin's detail onto the event that survives.
+
+    The two events of one T-cell kill describe it from different sides
+    and their payloads are DISJOINT. Measured 2026-11-06 on a 4 h
+    Immunotherapy section run, every duplicated pair was:
+
+        cancer_killed         detail {'killer_type'}
+        cell_killed_by_tcell  detail {'affinity', 'hla_allele',
+                                      'mutation', 'peptide', 'source_gene'}
+
+    Keeping only the first therefore deleted the neoantigen that caused
+    the kill -- the very evidence this project exists to show -- from
+    anything reading the deduplicated list. Only the GLYPH was ever
+    doubled, so only the glyph should be dropped.
+
+    The surviving event's own keys win a collision: it is the record the
+    recorder saw first, and this must not rewrite it. Non-dataclass
+    stand-ins pass through untouched, so a test double with no
+    ``detail`` is still safe to deduplicate.
+    """
+    extra = getattr(dropped, "detail", None)
+    if not extra or not is_dataclass(kept):
+        return kept
+    base = getattr(kept, "detail", None) or {}
+    fresh = {k: v for k, v in extra.items() if k not in base}
+    if not fresh:
+        return kept
+    return replace(kept, detail={**base, **fresh})
 
 
 def _as_vec3(value: Any) -> Optional[Vec3]:

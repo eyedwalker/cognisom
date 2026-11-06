@@ -688,3 +688,64 @@ def test_the_stage_opens_in_openusd(tmp_path):
     assert reopened is not None
     assert reopened.GetPrimAtPath("/World/Interactions/Kill")
     assert reopened.GetPrimAtPath("/World/Fields/HypoxicCells")
+
+
+def test_a_doubled_kill_is_authored_as_one_glyph():
+    """The fix, where the RTX stage consumes it.
+
+    A T-cell kill emits both ``cancer_killed`` and
+    ``cell_killed_by_tcell``; DEFAULT_EVENT_KINDS maps both to
+    KIND_KILL. The recorder path was deduplicated on 2026-11-06 but the
+    USD writer was not, so the Isaac/RTX stage kept drawing two crosses
+    on one coordinate -- a viewer could count them and get a number the
+    engine disagrees with.
+
+    Asserted both ways round, so the flag is shown to be what does it
+    rather than the events happening to collapse on their own.
+    """
+    stage = _stage()
+    fm = FrameMap([0.0, 0.2, 0.4, 0.6])
+    pos = (5.0, 6.0, 7.0)
+    innate = _kill(0.2, pos)
+    adaptive = VisualEvent(
+        kind=KIND_KILL, event_type="cell_killed_by_tcell", time=0.2, step=0,
+        position=pos, cell_id=1, partner_id=2, partner_position=None,
+        partner_provenance="none", detail={"peptide": "SYYPTRSAY"})
+
+    report = iusd.author_interaction_markers(stage, [innate, adaptive], fm)
+    assert report["drawn"].get(KIND_KILL) == 1, (
+        "two events on one coordinate authored more than one cross")
+    assert report["suppressed_duplicate_kill"] == 1, (
+        "the report must say a glyph was suppressed, not do it silently")
+
+    loud = _stage()
+    off = iusd.author_interaction_markers(
+        loud, [innate, adaptive], FrameMap([0.0, 0.2, 0.4, 0.6]),
+        drop_duplicate_kills=False)
+    assert off["drawn"].get(KIND_KILL) == 2, (
+        "with the flag off both glyphs should still be authored, otherwise "
+        "this test proves nothing about the flag")
+    assert off["suppressed_duplicate_kill"] == 0
+
+
+def test_a_doubled_kill_draws_one_engagement_bond():
+    """The same doubling drew two identical attacker->target lines.
+
+    Two coincident curves render as one slightly heavier line, which is
+    exactly the sort of difference nobody notices and nobody can explain
+    later.
+    """
+    stage = _stage()
+    fm = FrameMap([0.0, 0.2, 0.4, 0.6])
+    pos = (5.0, 6.0, 7.0)
+    attacker = (1.0, 1.0, 1.0)
+    innate = _kill(0.2, pos, partner=attacker)
+    adaptive = VisualEvent(
+        kind=KIND_KILL, event_type="cell_killed_by_tcell", time=0.2, step=0,
+        position=pos, cell_id=1, partner_id=2, partner_position=attacker,
+        partner_provenance="live_at_emission", detail={"peptide": "SYYPTRSAY"})
+
+    report = iusd.author_engagement_bonds(stage, [innate, adaptive], fm)
+
+    assert report["drawn"] == 1, "the engagement line was drawn twice"
+    assert report["suppressed_duplicate_kill"] == 1

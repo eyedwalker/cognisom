@@ -83,6 +83,7 @@ except ImportError:  # pragma: no cover - exercised on machines without usd-core
 from .interaction_recorder import (
     IMMUNE_KILL_DEATH_CAUSES,
     KIND_ACTIVATION,
+    dedupe_kill_events,
     KIND_DEATH,
     KIND_DIVISION,
     KIND_KILL,
@@ -354,6 +355,7 @@ def author_interaction_markers(
     styles: Optional[Dict[str, MarkerStyle]] = None,
     scale: float = 1.0,
     drop_immune_kill_deaths: bool = True,
+    drop_duplicate_kills: bool = True,
 ) -> Dict[str, Any]:
     """Author one animated PointInstancer per event kind.
 
@@ -368,7 +370,22 @@ def author_interaction_markers(
     report: Dict[str, Any] = {
         "drawn": {}, "no_position": 0, "after_last_frame": 0,
         "unstyled": {}, "suppressed_duplicate_death": 0,
+        "suppressed_duplicate_kill": 0,
     }
+
+    # One kill is one cross. A T-cell kill is emitted as BOTH
+    # ``cancer_killed`` and ``cell_killed_by_tcell`` and DEFAULT_EVENT_KINDS
+    # maps both to KIND_KILL, so without this the stage draws two glyphs on
+    # one coordinate and a viewer counting crosses gets a number the engine
+    # disagrees with. Measured 2026-11-06, 4 h Immunotherapy on the section
+    # layout: 16 kill events over 12 distinct (time, position) sites, against
+    # an engine ``total_kills`` of 12 -- the deduplicated count is the engine's.
+    # The survivor carries both twins' detail, so the neoantigen that drove an
+    # adaptive kill is still on the event that gets drawn.
+    if drop_duplicate_kills:
+        deduped = dedupe_kill_events(events)
+        report["suppressed_duplicate_kill"] = len(events) - len(deduped)
+        events = deduped
 
     by_kind: Dict[str, List[Tuple[int, VisualEvent]]] = {}
     for ev in events:
@@ -455,6 +472,7 @@ def author_engagement_bonds(
     root: str = "/World/Interactions",
     hold_frames: int = 4,
     width: float = 1.6,
+    drop_duplicate_kills: bool = True,
 ) -> Dict[str, Any]:
     """A line from attacker to target, for kills where both ends are real.
 
@@ -468,7 +486,19 @@ def author_engagement_bonds(
     where the picture says it is.
     """
     _require_usd()
-    report = {"drawn": 0, "no_partner_position": 0, "after_last_frame": 0}
+    report = {"drawn": 0, "no_partner_position": 0, "after_last_frame": 0,
+              "suppressed_duplicate_kill": 0}
+
+    # The same doubling that affects the markers affects these lines, and two
+    # identical curves on one segment render as one slightly heavier line --
+    # the kind of difference nobody notices and nobody can explain later.
+    # Verified before relying on it (2026-11-06): in every duplicated pair both
+    # events carried the SAME ``partner_position`` with provenance
+    # ``live_at_emission``, so deduplicating cannot cost a bond.
+    if drop_duplicate_kills:
+        deduped = dedupe_kill_events(events)
+        report["suppressed_duplicate_kill"] = len(events) - len(deduped)
+        events = deduped
 
     segments: List[Tuple[int, VisualEvent]] = []
     for ev in events:
