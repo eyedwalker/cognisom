@@ -112,6 +112,44 @@ DEFAULT_EVENT_KINDS: Dict[str, str] = {
 IMMUNE_KILL_DEATH_CAUSES = frozenset({"immune_killed"})
 
 
+def dedupe_kill_events(events: Iterable["VisualEvent"]) -> List["VisualEvent"]:
+    """One kill, one marker.
+
+    The comment above ``DEFAULT_EVENT_KINDS`` says a kill is "drawn
+    once, not twice". It was not: a T-cell kill emits BOTH
+    ``cancer_killed`` and ``cell_killed_by_tcell``, the map sends both
+    to ``KIND_KILL``, and every writer drew two glyphs on one pixel.
+
+    MEASURED 2026-11-06, 4 h Immunotherapy run on the section layout,
+    seed 7: 28 kill-kind events = 19 ``cancer_killed`` + 9
+    ``cell_killed_by_tcell``; the 9 T-cell kills are the duplicated
+    ones. Nineteen is also what the engine itself counts
+    (``total_kills``), and the 19 distinct ``(time, position)`` pairs
+    recover it exactly -- which is why the key is that pair rather than
+    a cell id: a kill marker carries the KILLER's position and the
+    killer's id, and one killer can make two kills in different steps,
+    but not two in the same step at the same coordinate.
+
+    Non-kill events pass through untouched and order is preserved, so
+    this is safe to apply to a whole event list. The recorder itself
+    still keeps everything -- an adaptive kill and an innate one are
+    different facts, and only the DRAWING of them was ever doubled.
+    """
+    seen = set()
+    out: List["VisualEvent"] = []
+    for event in events:
+        if getattr(event, "kind", None) != KIND_KILL:
+            out.append(event)
+            continue
+        key = (round(float(getattr(event, "time", 0.0)), 6),
+               getattr(event, "position", None))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(event)
+    return out
+
+
 def _as_vec3(value: Any) -> Optional[Vec3]:
     """Coerce an event payload's position to a plain 3-tuple of floats.
 
