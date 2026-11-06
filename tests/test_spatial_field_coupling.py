@@ -408,8 +408,22 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # The old +-0.01 pin fitted whichever one happened to be run. The
     # tolerance now spans both, because this file's subject is field
     # coupling and it should not fail over which predictor is installed.
+    #
+    # 306.80 +- 0.1 since the patrol fix (6c049b5, 2026-11-05), which let
+    # an immune cell that has not engaged keep migrating. An RNG-stream
+    # shift and NOT a consumption change: _patrol and _recognize draw
+    # from one shared stream, so reordering them moves every seeded
+    # number, and the population this value is coupled to did not move
+    # at all -- 90 normal alive, 8 waiting, 10 divisions, identical
+    # either side of that commit. Re-measured under both scorers:
+    # 306.72285 (MHCflurry) and 306.88471 (PWM fallback).
+    #
+    # This pin was MISSED when the other pins in this file were
+    # re-measured for that commit, so it shipped failing on main and was
+    # found by the next full-suite run. If it moves again, re-measure it
+    # under both scorers -- do not widen the tolerance to fit.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(306.75, abs=0.1)
+        pytest.approx(306.80, abs=0.1)
     # The oxygen floor: no normal cell is near death -- nor even hypoxic.
     # THE PROPERTY is the two lines below: the floor sits above the
     # hypoxia flag and no cell is under it. The exact value is a pin and
