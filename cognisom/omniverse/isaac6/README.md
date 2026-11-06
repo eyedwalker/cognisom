@@ -59,6 +59,33 @@ browser session can be connected at a time.
 Ports, open to the viewer's address only: **8210/tcp** web viewer,
 **49100/tcp** WebRTC signalling, **47998/udp** media.
 
+## Rendering a run to a file instead of a browser
+
+The viewer above streams over WebRTC: there is no frame on disk anywhere in
+that path, so it cannot produce a video. `capture_cognisom_frames.py` +
+`docker-compose.capture.yml` open the same stage with the same lighting and
+camera, step the timeline one authored frame at a time, and write PNGs.
+
+**Stop the streaming container first** -- two Kit processes on one GPU is a
+documented way to lose an afternoon. The compose invocation and the ffmpeg
+line are in the header of `docker-compose.capture.yml`.
+
+**The capture hashes its own output and logs `DISTINCT n/m`.** This is the
+one thing not to remove. An earlier capture in this project produced a GIF
+that was a single frame repeated, and it was published before anyone
+noticed, because one still of a stuck render looks exactly like one still of
+a working one. `DISTINCT 1/241` says so immediately; a capture that reports
+nothing does not.
+
+It also turns Kit's viewport chrome off (`displayOptions = 0`). The first
+capture came back with the construction grid and the world-origin axis gizmo
+drawn through the tissue -- fine in a viewport you are navigating, a tell in
+a file on a public page.
+
+MEASURED on the A10G, 2026-11-06, 241-frame 24 h prostate run: 1.94
+frames/s, about two minutes of rendering, 1280x720, 0.58 MB encoded,
+`DISTINCT 241/241`.
+
 ## Things that cost a day each to learn
 
 - **`--network=host` is required.** NVIDIA's docs say bridge networking

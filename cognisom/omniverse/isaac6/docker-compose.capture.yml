@@ -1,0 +1,49 @@
+# One-shot RTX capture: render a Cognisom run to PNG frames and exit.
+#
+# A THIRD compose file on purpose. docker-compose.override.yml is the
+# authoritative streaming config and a stale copy of it silently swapped the
+# demo's stage once before; this never edits it. Both are layered, so the
+# capture inherits the override's image-quality flags (DLAA at native
+# resolution) and only replaces the stage, the exec script and the window.
+#
+# Stop the streaming container first. Two Kit processes on one GPU is a
+# documented way to lose an afternoon:
+#
+#   cd isaacsim-repo
+#   sudo docker compose -p isim stop isaac-sim web-viewer
+#   sudo docker compose -p isim \
+#       -f tools/docker/docker-compose.yml \
+#       -f tools/docker/docker-compose.override.yml \
+#       -f tools/docker/docker-compose.capture.yml \
+#       up --force-recreate --no-deps --abort-on-container-exit isaac-sim
+#
+# Then encode the frames (ffmpeg is not in the Isaac image; apt-get it on
+# the host). 241 frames at 24 fps is 10.0 s, which matches the matplotlib
+# recording's 121 frames at 12 fps, so the two videos of one run stay in
+# step and the same instant is the same instant in both:
+#
+#   ffmpeg -framerate 24 -i frame_%05d.png -c:v libx264 -preset slow \
+#          -crf 23 -pix_fmt yuv420p -movflags +faststart rtx_demo.mp4
+#
+# MEASURED on the A10G box, 2026-11-06: 241 frames at 1.94 frames/s, about
+# two minutes of rendering, 1280x720, 0.58 MB encoded.
+services:
+  isaac-sim:
+    environment:
+      COGNISOM_STAGE: /isaac-sim/.local/share/ov/data/cognisom/demo_run.usdc
+      COGNISOM_CAPTURE_DIR: /isaac-sim/.local/share/ov/data/cognisom/frames
+      # Updates before the FIRST capture. Shader compilation and the first
+      # RTX accumulation both land here and a frame grabbed during either
+      # is incomplete rather than merely noisy.
+      COGNISOM_CAPTURE_SETTLE: "240"
+      # Updates per frame, for RTX to accumulate and denoise. The live
+      # viewer looks cleaner than a one-update grab because it accumulates
+      # continuously on a still camera; this buys that back.
+      COGNISOM_CAPTURE_SUBFRAMES: "12"
+    command:
+      - --/rtx/post/aa/op=4
+      - --/rtx/post/dlss/execMode=2
+      - --/app/window/width=1920
+      - --/app/window/height=1080
+      - --exec
+      - /isaac-sim/.local/share/ov/data/cognisom/capture_cognisom_frames.py

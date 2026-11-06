@@ -58,5 +58,8 @@
   "last_death_hour": 15.15,
   "oxygen_min": 0.0749,
   "oxygen_max": 0.21,
-  "predictor": "mhcflurry"
+  "predictor": "mhcflurry",
+  "usd_stage": "demo_run.usdc",
+  "usd_kill_markers": 98,
+  "usd_duplicate_kills_suppressed": 53
 }

@@ -43,6 +43,7 @@ import cognisom.dashboard as _dashboard_pkg
 
 _ASSETS = Path(_dashboard_pkg.__file__).resolve().parent / "assets"
 _VIDEO = _ASSETS / "demo_run.mp4"
+_RTX_VIDEO = _ASSETS / "rtx_demo.mp4"
 _FACTS = _ASSETS / "demo_run.json"
 
 
@@ -75,11 +76,45 @@ st.divider()
 
 if _VIDEO.exists():
     st.video(str(_VIDEO))
+    st.caption(
+        "What the model computes. Every number on this page is read from "
+        "this run's own measurements file, so the text cannot drift from "
+        "the picture."
+    )
 else:
     st.warning(
         "The recording is not present in this deployment. Regenerate it "
         "with `scripts/record_demo_run.py` and redeploy."
     )
+
+# ── The same run, ray-traced ─────────────────────────────────────────
+#
+# Two videos of one simulation, labelled for what each one IS. The
+# plot above is the evidence; this is the same data rendered. Putting a
+# beautiful render next to a claim invites the reader to believe the
+# beauty is the result, so the captions say plainly which is which --
+# and the two are the SAME RUN, exported from one engine state by
+# `record_demo_run.py --usd`, not two runs that share a seed.
+if _RTX_VIDEO.exists():
+    st.subheader("The same run, ray-traced")
+    st.video(str(_RTX_VIDEO))
+    _rtx_bits = [
+        "The identical simulation, rendered in NVIDIA Isaac Sim (RTX) "
+        "from the Bio-USD stage the same run exported.",
+    ]
+    if facts and facts.get("usd_kill_markers") is not None:
+        _rtx_bits.append(
+            f"Both videos draw **{facts['usd_kill_markers']} kill markers**, "
+            f"which is the engine's own kill count — so the crosses are "
+            f"countable against the number stated below."
+        )
+    _rtx_bits.append(
+        "Cells are drawn at their authored shapes and translucency rather "
+        "than as dots, which is why the tissue reads as a packed solid. "
+        "Nothing here is added for effect: no camera move, no extra "
+        "lighting beyond what the stage authors, no post-processing."
+    )
+    st.caption(" ".join(_rtx_bits))
 
 if facts is None:
     st.error(
