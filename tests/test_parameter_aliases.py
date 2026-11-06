@@ -107,29 +107,74 @@ def test_the_radii_land_in_the_textbook_range(sized_entities):
     assert checked >= 2, f"only {checked} alias-derived cell types were checked"
 
 
+#: What the alias machinery itself writes when it converts scale_um into
+#: a radius. Identifying a conversion by this phrase, rather than by any
+#: mention of "scale_um", is the whole point -- see below.
+CONVERSION_PHRASE = "read from the legacy parameter 'scale_um'"
+
+
+def _scale_um_conversions(entities):
+    """Every radius that IS a conversion, not every one that mentions it."""
+    out = []
+    for entity in entities:
+        pv = get_parameter(entity, "radius_um")
+        if pv is None:
+            continue
+        if CONVERSION_PHRASE in (pv.rationale or "") and not pv.citation:
+            out.append((entity, pv))
+    return out
+
+
 def test_a_conversion_does_not_become_evidence(sized_entities):
     """Dividing by two does not tell you where the number came from.
 
-    Pick an entity whose radius IS a conversion rather than indexing
-    into the list. It used to take ``sized_entities[0]``, which held
-    while the library's row order held and broke the moment entities
-    were added -- position 0 became Macrophage M1, whose radius is
-    genuinely MEASURED (PMID:9400735), so the test failed on a value
-    that was right.
-    """
-    pv = None
-    for entity in sized_entities:
-        candidate = get_parameter(entity, "radius_um")
-        if candidate is not None and "scale_um" in (candidate.rationale or ""):
-            pv = candidate
-            break
-    assert pv is not None, "no entity derives a radius from scale_um any more"
+    Asserted over EVERY radius that is a conversion, rather than the
+    first one iteration happens to reach. This test has now been
+    order-dependent twice. It first took ``sized_entities[0]``, which
+    held while the library's row order held and broke the moment
+    entities were added. It then took the first entity whose rationale
+    MENTIONS "scale_um" -- and five entities carry a genuinely
+    measured, cited radius whose rationale mentions the placeholder it
+    replaced (Macrophage M2, Prostatic adenocarcinoma cell, CD8+
+    Effector T cell, NK cell). Whether the test passed therefore
+    depended on which row the store handed back first: it passed on one
+    machine and failed in CI on the same commit.
 
-    assert pv.provenance is Provenance.PLACEHOLDER
-    assert not pv.is_simulation_grade, (
-        "an unevidenced number must not pass as simulation-grade just "
-        "because it was unit-converted")
-    assert "scale_um" in pv.rationale
+    A conversion is identified by what the alias machinery writes --
+    the legacy read, carrying no citation -- so a sourced radius cannot
+    be mistaken for one. Measured 2026-11-06: 373 conversions against 5
+    cited radii that merely mention the name.
+    """
+    converted = _scale_um_conversions(sized_entities)
+    assert converted, "no entity derives a radius from scale_um any more"
+
+    for entity, pv in converted:
+        assert pv.provenance is Provenance.PLACEHOLDER, (
+            f"{entity.name}: a radius read from scale_um is a conversion, "
+            f"not evidence, but its provenance is {pv.provenance}")
+        assert not pv.is_simulation_grade, (
+            f"{entity.name}: an unevidenced number must not pass as "
+            "simulation-grade just because it was unit-converted")
+        assert "scale_um" in pv.rationale
+
+
+def test_a_sourced_radius_may_mention_the_placeholder_it_replaced(sized_entities):
+    """The distinction the test above turns on, stated directly.
+
+    A radius with a citation is evidence whatever its rationale
+    mentions. Without this, the obvious "fix" to the test above -- bar
+    any rationale that names scale_um -- would reject five correctly
+    sourced measurements.
+    """
+    cited = [(e, pv) for e in sized_entities
+             if (pv := get_parameter(e, "radius_um")) is not None
+             and "scale_um" in (pv.rationale or "") and pv.citation]
+    for entity, pv in cited:
+        assert pv.provenance is not Provenance.PLACEHOLDER, (
+            f"{entity.name} cites {pv.citation} but is still a placeholder")
+        assert CONVERSION_PHRASE not in (pv.rationale or ""), (
+            f"{entity.name} carries a citation AND the alias machinery's "
+            "own conversion phrase, so one of the two is wrong")
 
 
 def test_an_unset_size_stays_absent_rather_than_becoming_zero():
