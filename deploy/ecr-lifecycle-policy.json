@@ -1,0 +1,10 @@
+{"rules":[
+ {"rulePriority":1,
+  "description":"Keep <=3 orphaned untagged. Each push is an OCI index whose real image is an UNTAGGED child; a preview showed ECR excludes children of kept indexes from this count, so only orphans are reached.",
+  "selection":{"tagStatus":"untagged","countType":"imageCountMoreThan","countNumber":3},
+  "action":{"type":"expire"}},
+ {"rulePriority":2,
+  "description":"Keep the 20 most recent tagged images: rollback depth for deploy-apps-server.sh --pull <sha>.",
+  "selection":{"tagStatus":"tagged","tagPatternList":["*"],"countType":"imageCountMoreThan","countNumber":20},
+  "action":{"type":"expire"}}
+]}
