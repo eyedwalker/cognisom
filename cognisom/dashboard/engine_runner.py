@@ -863,12 +863,18 @@ class EngineRunner:
         """Subscribe to key events for the dashboard event log."""
         bus = self.engine.event_bus
 
+        # A type absent from this list is emitted into a void as far as a
+        # run is concerned: the module fires it, nothing records it, and
+        # the dashboard, the exporters and every test that reads
+        # `runner.event_log` see a mechanism that never happened. Adding a
+        # new EventType to the engine is therefore only half the wiring.
         important_types = [
             EventTypes.CELL_DIVIDED, EventTypes.CELL_DIED,
             EventTypes.CELL_TRANSFORMED, EventTypes.CANCER_KILLED,
             EventTypes.IMMUNE_ACTIVATED, EventTypes.IMMUNE_RECRUITED,
             EventTypes.METASTASIS_OCCURRED, EventTypes.HYPOXIA_DETECTED,
             EventTypes.EXOSOME_RELEASED, EventTypes.MUTATION_OCCURRED,
+            EventTypes.TCELL_DIVIDED,
         ]
 
         def _make_handler(etype):

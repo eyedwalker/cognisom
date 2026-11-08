@@ -109,6 +109,9 @@ from cognisom.engine.py.immune.treg_suppression import (  # noqa: E402
     calibration_report as treg_calibration_report,
     treg_cytolytic_attenuation,
 )
+from cognisom.engine.py.immune.tcell_expansion import (  # noqa: E402
+    DIVISION_HOURS, PROGRAM_DIVISIONS, divisions_due, expansion_report,
+)
 
 #: patrol_speed is quoted in um/min; the engine steps in hours.
 MINUTES_PER_HOUR = 60.0
@@ -226,6 +229,16 @@ class ImmuneCell:
     # once, when the contact begins; see ImmuneModule._engage.
     contact_ends_at: Optional[float] = None
     contact_lethal: bool = False
+
+    # Clonal expansion (T cells). `first_engaged_h` is when this cell
+    # FIRST recognised its antigen, which is the only trigger the
+    # program has: Kaech & Ahmed 2001 and van Stipdonk 2001 both measured
+    # that division continues without further antigen, so this is set
+    # once and never cleared by losing a target. `divisions_done` is
+    # inherited by daughters, because the program belongs to the clone
+    # rather than to the cell. See engine/py/immune/tcell_expansion.py.
+    first_engaged_h: Optional[float] = None
+    divisions_done: int = 0
 
     def __post_init__(self):
         if self.velocity is None:
@@ -675,6 +688,27 @@ class ImmuneModule(SimulationModule):
         )
         self._tcr_repertoire: Optional[TCRRepertoire] = None
 
+        # ── T-cell clonal expansion ───────────────────────────────
+        # OFF by default. Every pinned outcome in the suite was measured
+        # with T cells that never divided, and the numbers behind this
+        # mechanism are mouse lymph node in acute infection (see
+        # engine/py/immune/tcell_expansion.py), so switching it on is a
+        # decision to be taken against a measurement, not a default to
+        # inherit silently.
+        self.tcell_expansion_enabled = bool(
+            self.config.get('tcell_expansion_enabled', False))
+        self.tcell_division_hours = float(
+            self.config.get('tcell_division_hours', DIVISION_HOURS.value))
+        self.tcell_program_divisions = int(
+            self.config.get('tcell_program_divisions',
+                            PROGRAM_DIVISIONS.value))
+        #: Daughter placement draws from its OWN stream, so turning
+        #: expansion on cannot reorder the shared stream that every
+        #: recognition and kill roll reads. With the flag off nothing
+        #: here is drawn at all and the run is bit-identical.
+        self._expansion_rng = np.random.default_rng(
+            self.config.get('expansion_seed', 0x54434558))
+
         # Statistics
         self.total_kills = 0
         self.total_perforin_hits = 0
@@ -695,6 +729,11 @@ class ImmuneModule(SimulationModule):
         # Cumulative count of clones that have transitioned from PD-1-lo
         # precursor to PD-1-hi exhausted during this run.
         self.total_exhaustion_transitions = 0
+        #: Divisions completed by T cells, and how many distinct cells
+        #: ever started a program (the founders those divisions came
+        #: from). Both stay 0 while expansion is off.
+        self.total_tcell_divisions = 0
+        self.total_expansion_founders = 0
 
         # Where the infiltrate starts.
         #
@@ -1424,7 +1463,79 @@ class ImmuneModule(SimulationModule):
             
             # Keep in bounds
             immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
+
+        # Clonal expansion, after every cell has been stepped so that a
+        # daughter born this step is not itself stepped in the same one.
+        self._expand_tcells()
     
+    def _expand_tcells(self) -> None:
+        """Divide the T cells whose program says a division is due.
+
+        Off unless ``tcell_expansion_enabled``; with it off this returns
+        before drawing anything, so a run is bit-identical to one from
+        before the mechanism existed.
+
+        An exhausted clone does not divide (Philip 2017's fixed,
+        non-rescuable state). Suppression deliberately does NOT appear
+        here: Chen 2005, the paper the engine's Treg term comes from,
+        measured expansion unchanged while cytotoxicity fell, so a Treg
+        gate on division would contradict its own source. See
+        engine/py/immune/tcell_expansion.py.
+        """
+        if not self.tcell_expansion_enabled:
+            return
+        # list(): daughters are added to the dict inside the loop.
+        for cell in list(self.immune_cells.values()):
+            if cell.cell_type != 'T_cell' or cell.in_blood:
+                continue
+            if cell.first_engaged_h is None:
+                continue
+            due = divisions_due(
+                cell.first_engaged_h, cell.divisions_done, self.clock_h,
+                cycle_h=self.tcell_division_hours,
+                program_divisions=self.tcell_program_divisions,
+            )
+            if due <= 0:
+                continue
+            # An exhausted clone is spent, and asking the repertoire is
+            # the only way to see a transition that happened after the
+            # match was taken -- see _live_is_exhausted.
+            if (cell.active_tcr_match is not None
+                    and self._live_is_exhausted(cell.active_tcr_match)):
+                continue
+            for _ in range(due):
+                self._divide_tcell(cell)
+
+    def _divide_tcell(self, parent: ImmuneCell) -> None:
+        """One division: the daughter inherits the clone's program.
+
+        `divisions_done` advances on BOTH cells and the daughter's clock
+        restarts from now, so a lineage completes the program's rounds
+        rather than each new cell starting a fresh seven.
+        """
+        offset = self._expansion_rng.normal(0.0, 5.0, 3)
+        daughter_id = self.add_immune_cell(
+            np.asarray(parent.position, dtype=float) + offset, 'T_cell')
+        daughter = self.immune_cells[daughter_id]
+        parent.divisions_done += 1
+        daughter.divisions_done = parent.divisions_done
+        daughter.first_engaged_h = self.clock_h
+        # The daughter carries the clone's antigen experience: it is the
+        # progeny of a cell that recognised, so it is already an
+        # effector of that clone rather than a fresh naive cell.
+        daughter.active_tcr_match = parent.active_tcr_match
+        daughter.activated = False
+        daughter.target_cell_id = None
+        self.total_tcell_divisions += 1
+        # TCELL_DIVIDED, not CELL_DIVIDED: see the event's own comment.
+        self.emit_event(EventTypes.TCELL_DIVIDED, {
+            'cell_id': parent.cell_id,
+            'daughter_id': daughter_id,
+            'cell_type': 'T_cell',
+            'position': daughter.position.tolist(),
+            'divisions_done': parent.divisions_done,
+        })
+
     def _advance_clock(self, dt: float) -> None:
         """Advance the module clock contacts resolve against (hours)."""
         self.clock_h += dt
@@ -1518,6 +1629,14 @@ class ImmuneModule(SimulationModule):
                 or immune_cell.active_tcr_match is None):
             return
         match = immune_cell.active_tcr_match
+        # The first recognition, and only the first, starts this cell's
+        # proliferative program. Set here rather than in the expansion
+        # pass because this is the one place that means "this T cell has
+        # seen its antigen"; it is never cleared, because the program
+        # runs without further antigen (PMID 11323695, PMID 11323696).
+        if immune_cell.first_engaged_h is None:
+            immune_cell.first_engaged_h = self.clock_h
+            self.total_expansion_founders += 1
         tcr_id = match.tcr.tcr_id
         new_count, did_exhaust = self._tcr_repertoire.register_engagement(
             tcr_id, now_h=self.clock_h)
@@ -2359,6 +2478,16 @@ class ImmuneModule(SimulationModule):
             'patrol_speed_source': dict(self.patrol_speed_source),
             'contact_time_source': {k: dict(v) for k, v in
                                     self.contact_time_source.items()},
+            # Reported whether or not it is enabled, so a run always
+            # says whether its T cells could divide. An absent key would
+            # read as "this build has no such mechanism".
+            'tcell_expansion': expansion_report(
+                self.tcell_expansion_enabled,
+                cycle_h=self.tcell_division_hours,
+                program_divisions=self.tcell_program_divisions,
+                divided=self.total_tcell_divisions,
+                founders=self.total_expansion_founders,
+            ),
         }
     
     # Event handlers

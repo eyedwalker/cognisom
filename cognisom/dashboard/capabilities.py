@@ -242,11 +242,15 @@ LAYERS: Tuple[Layer, ...] = (
             C("Recruitment from blood", PARTIAL,
               "Immune cells are recruited as the tumour grows; there is no "
               "circulation."),
-            C("T-cell clonal expansion after recognition", ABSENT,
-              "T cells kill but never divide. Checkpoint blockade works "
-              "largely by a CD28-dependent burst of CD8 proliferation "
-              "(Kamphorst 2017), so the blockade arm models only its "
-              "effect on killing."),
+            C("T-cell clonal expansion after recognition", PARTIAL,
+              "A T cell that recognises its antigen now divides, on the "
+              "programme its first recognition starts \u2014 it continues "
+              "without further antigen, as measured. Off by default: both "
+              "numbers (6 h per division, 7 divisions) are estimates from "
+              "mouse lymph nodes in acute infection, and no per-cell rate "
+              "inside a tumour has been published.",
+              ("tests/test_a_t_cell_that_recognises_divides.py",
+               "cognisom/engine/py/immune/tcell_expansion.py")),
             C("Dendritic cells, antigen presentation and priming", ABSENT,
               "T cells start already primed, so the start of a response "
               "is not simulated."),

@@ -56,6 +56,18 @@ class EventTypes:
     # clones that have left it.
     TCELL_EXHAUSTED = 'tcell_exhausted'
 
+    # One T cell divided, running the proliferative program its first
+    # antigen recognition started (engine/py/immune/tcell_expansion.py).
+    #
+    # Deliberately NOT CELL_DIVIDED. That event means a cell in
+    # CellularModule's dict divided, and ar_signaling, cell_mechanics,
+    # circadian, epigenetic and molecular all subscribe to it to
+    # inherit a clock, fork a view or add a mechanics body for the
+    # daughter. An immune cell lives in a different dict with its own
+    # id space, so sending a T-cell division down that channel would
+    # have each of those modules look up a daughter that is not theirs.
+    TCELL_DIVIDED = 'tcell_divided'
+
     # NK licensing resolved from the patient's class-I typing
     # (engine/py/immune/nk_receptor.py). Emitted once, at immune-module
     # initialization, when a typing is on record; the data carries the
