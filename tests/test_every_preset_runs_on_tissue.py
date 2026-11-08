@@ -9,11 +9,15 @@ tumour cells in a patch the width of a hair and every run ended with the
 tumour cleared -- including the one labelled "fast-dividing tumor with
 reduced immune response".
 
-EngineRunner now defaults to tissue="slab": each preset is re-expressed
-on TissueSlab's close-packed volume by one rule anchored on Baseline, so
-each keeps its character RELATIVE to Baseline rather than its toy-sized
-absolute counts. tissue="ring" keeps the legacy layout for the tests
-that pin what was calibrated on it; they now say so explicitly.
+Each preset is re-expressed on a tissue volume by one rule anchored on
+Baseline, so each keeps its character RELATIVE to Baseline rather than
+its toy-sized absolute counts. tissue="ring" keeps the legacy layout for
+the tests that pin what was calibrated on it; they say so explicitly.
+
+The default was the close-packed slab until 2026-11-07 and is now the
+measured prostate SECTION: same population, but occupancy taken from a
+real section, so each cell has ~5.0 neighbours instead of the slab's
+~7.8. Every test here that is about a layout names it.
 
 Measured on the 2 h slab runs (seed 1):
 
@@ -22,7 +26,10 @@ Measured on the 2 h slab runs (seed 1):
     Aggressive Tumor     240    14/9/7         1.4%          240 -> 224
     Immunotherapy        120   69/35/23        5.9%          120 -> 40
 
-The aggressive tumour now persists. Baseline is still cleared fast: the
+The aggressive tumour now persists. (Re-measured 2026-11-07, after the
+90 h normal division time, kill calibration and immune patrolling: it
+no longer even shrinks in 2 h -- 240 -> 253/248/248 on the slab, seeds
+1-3, and 240 -> 247/251/246 on the section.) Baseline is still cleared fast: the
 innate arm kills on 80% of contacts with no source for that number,
 which is item 2 of the realism plan, not this one. (Since done: the
 infiltrate is now split as prostate tumours are and every per-contact
@@ -60,8 +67,17 @@ def _immune_share(cfg):
 # ── the default ───────────────────────────────────────────────────
 
 
-def test_the_default_tissue_is_the_slab():
+def test_the_default_tissue_is_the_section():
+    """The measured layout, not the one that over-connects every cell."""
     runner = EngineRunner()
+    assert runner.tissue == "section"
+    assert runner.module_configs["cellular"]["seeding"] == "section"
+    assert runner.module_configs["immune"]["seeding"] == "section"
+    assert runner.module_configs["vascular"]["layout"] == "section"
+
+
+def test_the_slab_is_still_there_when_asked_for():
+    runner = EngineRunner(tissue="slab")
     assert runner.tissue == "slab"
     assert runner.module_configs["cellular"]["seeding"] == "slab"
     assert runner.module_configs["immune"]["seeding"] == "slab"
@@ -202,13 +218,16 @@ def test_androgen_deprivation_keeps_its_castrate_serum():
 # ── it is tissue ──────────────────────────────────────────────────
 
 
-def test_the_seeded_cells_touch_their_neighbours():
-    """The ring's normal cells sat on one circle with a 100 um hole. In
-    the slab every cell is in contact: median nearest neighbour inside
-    the 10-12 um contact-to-adhesion band, measured 9.2 um."""
+@pytest.mark.parametrize("tissue", ["slab", "section"])
+def test_the_seeded_cells_touch_their_neighbours(tissue):
+    """The ring's normal cells sat on one circle with a 100 um hole. On
+    both tissue layouts cells are in contact: median nearest neighbour
+    9.19 um on the slab, 9.51 um on the section (measured 2026-11-07).
+    The section leaves lumens empty, so it has FEWER neighbours per cell,
+    not more distant ones; z extent 65.9 um slab, 56.9 um section."""
     from cognisom.modules.tissue_slab import nearest_neighbour_distances
 
-    runner = EngineRunner(scenario="Baseline")
+    runner = EngineRunner(scenario="Baseline", tissue=tissue)
     with redirect_stdout(io.StringIO()):
         runner.build()
     cells = runner.engine.modules["cellular"].cells
@@ -221,11 +240,12 @@ def test_the_seeded_cells_touch_their_neighbours():
 
 @pytest.mark.slow
 @pytest.mark.timeout(400)
+@pytest.mark.parametrize("tissue", ["slab", "section"])
 @pytest.mark.parametrize("name", list(SCENARIOS))
-def test_every_preset_runs_on_the_slab(name):
+def test_every_preset_runs_on_both_tissues(name, tissue):
     np.random.seed(1)
     runner = EngineRunner(dt=0.05, duration=0.5, scenario=name,
-                          snapshot_interval_hours=0.25)
+                          tissue=tissue, snapshot_interval_hours=0.25)
     with redirect_stdout(io.StringIO()):
         runner.build()
         runner.run()
@@ -234,13 +254,16 @@ def test_every_preset_runs_on_the_slab(name):
 
 @pytest.mark.slow
 @pytest.mark.timeout(400)
-def test_the_aggressive_tumour_is_no_longer_wiped_out():
+@pytest.mark.parametrize("tissue", ["slab", "section"])
+def test_the_aggressive_tumour_is_no_longer_wiped_out(tissue):
     """On the ring, 13 immune cells cleared all 30 cancer cells within 12 h.
-    On the slab, with a tissue-fraction infiltrate, most of the tumour is
-    still there after 2 h (measured 240 -> 224)."""
+    On tissue, with a tissue-fraction infiltrate, most of the tumour is
+    still there after 2 h. Measured 2026-11-07, seed 1: 240 -> 253 on the
+    slab, 240 -> 247 on the section (the 240 -> 224 this once recorded
+    predates the 90 h normal division time and immune patrolling)."""
     np.random.seed(1)
     runner = EngineRunner(dt=0.05, duration=2.0, scenario="Aggressive Tumor",
-                          snapshot_interval_hours=0.5)
+                          tissue=tissue, snapshot_interval_hours=0.5)
     with redirect_stdout(io.StringIO()):
         runner.build()
         runner.run()

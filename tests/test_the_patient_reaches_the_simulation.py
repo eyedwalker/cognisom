@@ -63,6 +63,9 @@ HCC_LIKE = _patient([_variant("ARID1A", "p.N218T"), _variant("NOTCH1", "p.L2065Q
 
 def _build(**kwargs):
     np.random.seed(1)
+    # The slab by name: the counts below were measured on it, and the
+    # default became the section on 2026-11-07.
+    kwargs.setdefault("tissue", "slab")
     runner = EngineRunner(dt=0.05, duration=0.5, scenario="Baseline", **kwargs)
     with contextlib.redirect_stdout(io.StringIO()), \
             contextlib.redirect_stderr(io.StringIO()):
@@ -366,6 +369,7 @@ def test_the_genome_decides_whether_t_cells_can_kill():
         np.random.seed(1)
         runner = EngineRunner(
             dt=0.05, duration=6.0, scenario="Baseline", patient=patient,
+            tissue="slab",  # the kill counts pinned here are slab counts
             overrides={"immune": {"n_nk_cells": 0, "n_macrophages": 0}},
             snapshot_interval_hours=1.0)
         with contextlib.redirect_stdout(io.StringIO()), \

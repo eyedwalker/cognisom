@@ -235,7 +235,10 @@ def _twelve_hours(preset, **immune):
     from cognisom.core.event_bus import EventTypes
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(1)
+    # Named, not defaulted: every count this file pins was measured on the
+    # slab, and the default became the section on 2026-11-07.
     runner = EngineRunner(scenario=preset, duration=12.0, dt=0.05,
+                          tissue="slab",
                           record_interval=1000, snapshot_interval_hours=None,
                           overrides={"immune": immune} if immune else None)
     runner.build()

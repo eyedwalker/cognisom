@@ -204,7 +204,7 @@ def test_the_default_offered_is_the_engine_default():
     sig = inspect.signature(
         __import__("cognisom.dashboard.engine_runner",
                    fromlist=["EngineRunner"]).EngineRunner.__init__)
-    assert TISSUE_CHOICES[0] == sig.parameters["tissue"].default == "slab"
+    assert TISSUE_CHOICES[0] == sig.parameters["tissue"].default == "section"
 
 
 @pytest.mark.parametrize("name", TISSUE_CHOICES)
@@ -215,8 +215,8 @@ def test_every_layout_has_a_label_and_a_caption(name):
 
 
 def test_the_slab_caption_admits_it_over_connects():
-    """The default is the geometry that is wrong. A caption that does
-    not say so turns the measurement into a secret."""
+    """The slab is the geometry that is wrong, and it is still offered.
+    A caption that does not say so turns the measurement into a secret."""
     caption = tissue_caption("slab")
     assert "1.6x" in caption
     assert "7.8" in caption and "5.0" in caption

@@ -55,7 +55,7 @@ GENERIC_CAVEAT = (
 )
 
 #: ``EngineRunner(tissue=...)`` accepts these. The first is its default.
-TISSUE_CHOICES = ("slab", "section", "ring")
+TISSUE_CHOICES = ("section", "slab", "ring")
 
 TISSUE_LABELS = {
     "slab": "Close-packed slab",
@@ -63,25 +63,25 @@ TISSUE_LABELS = {
     "ring": "Legacy calibration ring",
 }
 
-#: Each caption says what the geometry IS and what it costs, because the
-#: default is the one that is geometrically wrong. The slab fills every
-#: site of its lattice; a real open prostate section fills about 0.60 of
-#: a close packing, so the slab hands each cell ~7.8 neighbours where the
-#: section gives 5.0 -- it over-connects every cell by roughly 1.6x.
+#: Each caption says what the geometry IS and what it costs. The slab
+#: fills every site of its lattice; a real open prostate section fills
+#: about 0.60 of a close packing, so the slab hands each cell ~7.8
+#: neighbours where the section gives 5.0 -- it over-connects every cell
+#: by roughly 1.6x. That is why the section became the default on
+#: 2026-11-07, and why the slab's caption still has to say so.
 #: Measured from a 10x Xenium prostate section; see project memory
 #: "Real section geometry 2026-11-03".
 TISSUE_CAPTIONS = {
     "slab": (
         "Every lattice site filled. Over-connects each cell by ~1.6x "
         "against real prostate (7.8 neighbours vs 5.0), so contact-"
-        "mediated effects are stronger than in tissue. Default, and the "
-        "geometry every pinned number was measured on."
+        "mediated effects are stronger than in tissue. Kept because the "
+        "longest-running pinned outcomes were measured on it."
     ),
     "section": (
         "Occupancy taken from a measured human prostate section (10x "
         "Xenium): glands pack, lumens stay empty. ~5.0 neighbours per "
-        "cell, which is the honest figure. Not the default only because "
-        "the pinned numbers were taken on the slab."
+        "cell, which is the honest figure. The default."
     ),
     "ring": (
         "The 90-cell necklace the module dynamics were first calibrated "

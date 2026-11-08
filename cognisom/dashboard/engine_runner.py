@@ -499,7 +499,7 @@ class EngineRunner:
         overrides: Optional[Dict[str, Dict]] = None,
         record_interval: int = 10,
         snapshot_interval_hours: Optional[float] = 0.1,
-        tissue: str = "slab",
+        tissue: str = "section",
         patient: Optional[Any] = None,
     ):
         if tissue not in TISSUE_LAYOUTS:
@@ -508,19 +508,22 @@ class EngineRunner:
         self.dt = dt
         self.duration = duration
         self.scenario_name = scenario
-        #: 'slab' (default): every preset runs on a close-packed tissue
-        #: volume. 'ring': the legacy 90-cell bead necklace the module
-        #: dynamics were first calibrated on, kept so the tests that pin
-        #: that calibration can still say what they pin. See slab_variant.
-        #:
-        #: 'section': the same population on a volume whose OCCUPANCY
-        #: comes from a measured human prostate section, so glands pack
-        #: and lumens stay empty. The slab fills every lattice site and
-        #: real prostate fills ~60% of them, so the slab over-connects
-        #: each cell by about 1.6x; the section is the layout that does
-        #: not. It is NOT the default, because every density-downstream
-        #: pin was taken on the slab and would have to be re-measured.
+        #: 'section' (default since 2026-11-07): every preset runs on a
+        #: volume whose OCCUPANCY comes from a measured human prostate
+        #: section, so glands pack and lumens stay empty. Real prostate
+        #: fills ~60% of a close packing; each cell gets ~5.0 neighbours.
         #: See section_variant and cognisom/modules/tissue_section.py.
+        #:
+        #: 'slab': the same population filling EVERY site of a close-packed
+        #: lattice, which over-connects each cell by about 1.6x (7.8
+        #: neighbours). Kept, by name, because the longest-running pinned
+        #: outcomes were measured on it -- those tests pass tissue="slab"
+        #: explicitly, which is why flipping this default moved none of
+        #: them. See slab_variant.
+        #:
+        #: 'ring': the legacy 90-cell bead necklace the module dynamics
+        #: were first calibrated on, kept so the tests that pin that
+        #: calibration can still say what they pin.
         self.tissue = tissue
         #: What the patient contributed, or None. Before this parameter
         #: existed every cancer cell carried KRAS_G12D on a generic HLA
