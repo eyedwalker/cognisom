@@ -189,13 +189,23 @@ LAYERS: Tuple[Layer, ...] = (
             C("Chemokine gradients guiding immune cells", BUILT, "",
               ("tests/test_a_secreted_gradient_pulls_immune_cells.py",)),
             C("Extracellular matrix", PARTIAL,
-              "Cancer cells deposit it and it slows immune cells down, "
-              "but no fibroblast makes it \u2014 in real tissue the "
-              "stroma does. The deposition rate is unsourced and "
-              "saturates within a day of simulated time, so by then the "
-              "barrier is at its maximum everywhere rather than varying "
-              "with the tissue.",
-              ("tests/test_ecm_barrier.py",)),
+              "It slows immune cells down, and how much is an unsourced "
+              "tuning constant: a tenfold slowdown, where the nearest "
+              "published measurement is threefold and measures a "
+              "different quantity. Cancer cells deposit it, which is a "
+              "pancreatic-cancer behaviour \u2014 in prostate, stroma is "
+              "no greater in tumour than in normal tissue (p = 0.3).",
+              ("tests/test_ecm_barrier.py",
+               "tests/test_prostate_is_mostly_stroma_and_the_engine_has_none.py")),
+            C("Stroma: fibroblasts, smooth muscle, the matrix they make",
+              ABSENT,
+              "Measured on human prostatectomy sections, stroma is "
+              "54.8% of normal prostate tissue and epithelium only "
+              "31.4%. The engine models the epithelium and the immune "
+              "infiltrate, so slightly over half of real prostate is "
+              "absent \u2014 and it is the half that decides whether "
+              "immune cells and drugs can reach a tumour at all.",
+              ("tests/test_prostate_is_mostly_stroma_and_the_engine_has_none.py",)),
             C("Oxygen and glucose diffusion fields", PARTIAL,
               "Solved, but nothing reads them: per-cell values come from "
               "the vessels instead.",
@@ -207,7 +217,9 @@ LAYERS: Tuple[Layer, ...] = (
             C("Lymphatic drainage", PARTIAL,
               "Runs, changes no outcome yet; its rates are estimates.",
               ("tests/test_a_cell_that_enters_a_lymphatic_leaves_the_tissue.py",)),
-            C("Fibroblasts and cancer-associated fibroblasts", ABSENT, ""),
+            C("Cancer-associated fibroblasts", ABSENT,
+              "A distinct activated state of the absent stromal "
+              "compartment above."),
             C("New blood vessels (angiogenesis)", ABSENT, ""),
             C("Whole-tissue composition (stroma versus epithelium)", ABSENT,
               "Single-cell RNA atlases cannot supply it; it needs imaging.",

@@ -80,6 +80,69 @@ import numpy as np
 # So there is no published density-to-speed curve to calibrate against,
 # and the nearest measured anchor is a factor of 3 between two
 # compartments, which is not the same quantity.
+# ── What prostate tissue is actually made of ────────────────────────
+#
+# Selnaes KM et al., Front Oncol 2016;6:146, **PMID 27379208**, CC BY,
+# open access, read in full. Whole-mount H&E from prostatectomy, colour
+# segmented by the method of Langer 2010 (whose own numbers are behind a
+# paywall; this paper applies the same segmentation and reports it
+# openly). Percentage AREA, mean +- SE:
+#
+#                   lumen        stroma       nuclei      n
+#     non-cancer  13.8 +- 1.6  54.8 +- 1.9  23.3 +- 1.9  14
+#     cancer       7.5 +- 0.9  50.7 +- 1.2  30.3 +- 1.0  38
+#
+# Those three do NOT sum to 100% (91.9% and 88.5%), and the remainder is
+# epithelial CYTOPLASM, which the paper does not tabulate on its own.
+# Its segmentation gives stroma and (cytoplasm + nuclei) as the two
+# halves of one setting, with lumen the rest of the section, so
+# epithelium = 100% - stroma - lumen: 31.4% non-cancer and 41.8% cancer,
+# of which nuclei are 23.3% and 30.3%. The epithelial figures below are
+# DERIVED that way, not quoted.
+#
+# TWO THINGS FOLLOW, AND BOTH MATTER HERE.
+#
+# 1. **Stroma is the MAJORITY compartment of prostate tissue, and this
+#    engine has none of it.** Its "normal" cell is epithelial -- it
+#    carries AR and PSA -- so a simulated prostate is epithelium plus an
+#    immune infiltrate, with roughly 55% of the real tissue absent. That
+#    is a capability gap, not a parameter, and it is quantified here so
+#    it can be stated rather than estimated.
+#
+# 2. **Cancer does not raise the stromal fraction in prostate**: 50.7%
+#    against 54.8%, "not significantly different ... (p = 0.3)", and if
+#    anything lower. So modelling cancer cells as net matrix DEPOSITORS
+#    reproduces a PDAC phenomenon -- which is what this module's own
+#    docstring cites, "paradigmatically PDAC: 80% of tumor mass" -- and
+#    not a prostate one. `cellular_module.ecm_deposition_rate` is
+#    therefore kept small enough to leave the stromal fraction unchanged
+#    over a run, which is what this measurement requires of it; a
+#    PDAC-like configuration is where a large rate belongs.
+#
+# NOT a conversion factor. These are area fractions of a histological
+# section. `local_ecm_density` is a dimensionless 0..1 blocking term, and
+# equating 0.548 with a density of 0.548 would be the same unit confusion
+# this codebase has caught before (a field rate read as a pool rate, a
+# diameter read as a radius). Nothing here maps one to the other, and the
+# mapping remains unsourced.
+PROSTATE_AREA_FRACTION_NON_CANCER = {
+    'lumen': 0.138, 'stroma': 0.548, 'nuclei': 0.233}
+PROSTATE_AREA_FRACTION_CANCER = {
+    'lumen': 0.075, 'stroma': 0.507, 'nuclei': 0.303}
+#: Epithelium as a share of section area, derived as 1 - stroma - lumen
+#: (see the arithmetic above). This is the compartment the engine's
+#: "normal" cell actually represents.
+PROSTATE_EPITHELIUM_FRACTION_NON_CANCER: float = round(
+    1.0 - PROSTATE_AREA_FRACTION_NON_CANCER['stroma']
+        - PROSTATE_AREA_FRACTION_NON_CANCER['lumen'], 3)
+PROSTATE_EPITHELIUM_FRACTION_CANCER: float = round(
+    1.0 - PROSTATE_AREA_FRACTION_CANCER['stroma']
+        - PROSTATE_AREA_FRACTION_CANCER['lumen'], 3)
+PROSTATE_COMPOSITION_SOURCE: str = (
+    "Selnaes 2016 PMID 27379208 (CC BY), whole-mount H&E percentage area "
+    "by the Langer 2010 segmentation; n=14 non-cancer, n=38 cancer; "
+    "stroma not significantly different between them, p=0.3")
+
 MEASURED_COMPARTMENT_MOTILITY_RATIO: float = 3.0
 MEASURED_COMPARTMENT_SOURCE: str = (
     "Salmon 2012 PMID 22293174 Fig 1E (text-stated): motility coefficient "
