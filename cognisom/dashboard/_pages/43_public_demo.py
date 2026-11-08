@@ -345,8 +345,23 @@ with st.expander("Reproduce this recording"):
 st.divider()
 st.markdown(
     "### See the rest\n"
-    "This is one page of the platform. The full environment — genome "
-    "ingestion, neoantigen prediction, the treatment simulator and the "
-    "3D viewer — needs an account."
+    "This run shows what the model does. What it leaves out matters as "
+    "much: the roadmap lists, layer by layer, what is built, what is "
+    "partial and what is not modelled yet, each built row linked to the "
+    "test that holds it. The cells in both videos are stored in Bio-USD, "
+    "an open format for biological cells in OpenUSD."
 )
-st.link_button("Open Cognisom", "/", type="primary")
+_r1, _r2, _r3 = st.columns(3)
+with _r1:
+    st.link_button("What it simulates, and what it doesn't yet",
+                   "/?page=roadmap", use_container_width=True)
+with _r2:
+    st.link_button("Bio-USD: the standard and its code", "/?page=biousd",
+                   use_container_width=True)
+with _r3:
+    st.link_button("Open Cognisom", "/", type="primary",
+                   use_container_width=True)
+st.caption(
+    "The full environment — genome ingestion, neoantigen prediction, the "
+    "treatment simulator and the 3D viewer — needs an account."
+)

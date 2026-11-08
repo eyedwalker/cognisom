@@ -60,6 +60,8 @@ if user is not None:
         "": [
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
             st.Page(str(_pages_dir / "43_public_demo.py"), title="Recorded Demo", icon=":material/play_circle:"),
+            st.Page(str(_pages_dir / "44_roadmap.py"), title="What It Simulates", icon=":material/checklist:"),
+            st.Page(str(_pages_dir / "45_biousd.py"), title="Bio-USD Standard", icon=":material/deployed_code:"),
             st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
             st.Page(str(_pages_dir / "36_validation_demo.py"), title="Demo & Validation", icon=":material/analytics:"),
         ],
@@ -278,6 +280,32 @@ if _query.get("page") == "demo":
     # without a gate.
     _demo_page = _pages_dir / "43_public_demo.py"
     exec(compile(_demo_page.read_text(), str(_demo_page), "exec"))
+    st.stop()
+
+
+# ════════════════════════════════════════════════════════════════════
+# PUBLIC ROADMAP and BIO-USD (no login: what is built, and the standard)
+# ════════════════════════════════════════════════════════════════════
+#
+# Both are read-only by construction, like the demo: the roadmap reads a
+# data module and two video files, and the Bio-USD page writes only its
+# own example file into a temporary directory it deletes at once.
+
+_PUBLIC_PAGES = {
+    "roadmap": ("44_roadmap.py", "Cognisom | What it simulates"),
+    "biousd": ("45_biousd.py", "Cognisom | Bio-USD"),
+}
+
+if _query.get("page") == "roadmap" or _query.get("page") == "biousd":
+    _file, _title = _PUBLIC_PAGES[_query.get("page")]
+    st.set_page_config(
+        page_title=_title,
+        page_icon="\U0001f9ec",
+        layout="wide",
+        initial_sidebar_state="collapsed",
+    )
+    _public_page = _pages_dir / _file
+    exec(compile(_public_page.read_text(), str(_public_page), "exec"))
     st.stop()
 
 
@@ -953,6 +981,17 @@ if user is None:
                 "What am I looking at? \u2192", "/?page=demo",
                 use_container_width=True,
             )
+            _l1, _l2 = st.columns(2)
+            with _l1:
+                st.link_button(
+                    "What it simulates, and what it doesn't yet",
+                    "/?page=roadmap", use_container_width=True,
+                )
+            with _l2:
+                st.link_button(
+                    "Bio-USD: the open cell standard",
+                    "/?page=biousd", use_container_width=True,
+                )
 
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4, m5, m6 = st.columns(6)
