@@ -55,12 +55,53 @@ from typing import Iterable
 import numpy as np
 
 
-# Default tuning. These constants are exposed so the cellular and
-# immune modules can override them per simulation regime (e.g.,
-# PDAC vs melanoma have different stromal densities).
+# ── What is measured here, and what is not ──────────────────────────
+#
+# Salmon et al., J Clin Invest 2012;122(3):899-910, PMID 22293174, is the
+# paper behind the exclusion mechanism, and its full text was read to see
+# which of these numbers it supports. It supports FEWER than this module
+# once implied, so the gap is written down rather than papered over:
+#
+#   * its motility metric is a motility COEFFICIENT in um^2/min, not a
+#     speed in um/min, and it reports no speed at all;
+#   * the only motility ratio stated in its text is between COMPARTMENTS:
+#     "the motility coefficient ... was on average 3 times higher in the
+#     stroma than in the tumor epithelial compartment" (Fig 1E, slices
+#     from 7 human lung tumours);
+#   * its dense-versus-loose matrix comparison -- the one this module's
+#     blocking factor is really about -- appears ONLY inside Figure 4F.
+#     The text says just "the motility of T cells was greatly reduced in
+#     dense matrix regions", with no number;
+#   * promigratory regions above 10 um^2/min covered "on average 20% of
+#     the surface of the tumor stroma", and collagenase gave "a 2-fold
+#     increase in the number of T cells in stromal regions immediately
+#     adjacent to tumor islets".
+#
+# So there is no published density-to-speed curve to calibrate against,
+# and the nearest measured anchor is a factor of 3 between two
+# compartments, which is not the same quantity.
+MEASURED_COMPARTMENT_MOTILITY_RATIO: float = 3.0
+MEASURED_COMPARTMENT_SOURCE: str = (
+    "Salmon 2012 PMID 22293174 Fig 1E (text-stated): motility coefficient "
+    "3x higher in stroma than tumour epithelium, 7 human lung tumours")
+
 DEFAULT_SAMPLE_RADIUS_UM: float = 30.0
-DEFAULT_MOTILITY_BLOCK: float = 0.9    # 1.0 ECM -> 10% speed
-DEFAULT_DETECTION_BLOCK: float = 0.8   # 1.0 ECM -> 20% radius
+
+#: Fraction of speed that maximum ECM takes away.
+#:
+#: 0.9 means a 10x slowdown at full density. **This exceeds the nearest
+#: measured anchor above (3x) and no retrievable number supports it**, so
+#: it is an UNSOURCED tuning constant and is labelled as one. It is left
+#: at its shipped value deliberately: lowering it to 1 - 1/3 would be
+#: calibrating a density curve against a compartment ratio, a different
+#: quantity, and would move every immune outcome in the suite. Changing
+#: it is a calibration decision to be taken against a measurement.
+DEFAULT_MOTILITY_BLOCK: float = 0.9
+DEFAULT_MOTILITY_BLOCK_STATUS: str = 'ESTIMATE'
+
+#: Same shape, same standing: no measurement of a sensing radius against
+#: matrix density was found.
+DEFAULT_DETECTION_BLOCK: float = 0.8
 MIN_RETAINED_FRACTION: float = 0.05    # speeds / radii never drop below 5%
 
 

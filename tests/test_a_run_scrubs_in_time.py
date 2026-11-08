@@ -158,7 +158,20 @@ def test_every_positioned_event_inside_the_run_is_drawn(run):
     runner, _, report, _ = run
     fm = FrameMap([s.time for s in runner.cell_snapshots])
     expected = {}
-    for ev in runner.recorder.events:
+    # Deduplicated the way the writer deduplicates, because a single kill
+    # can arrive as TWO recorder events: the map sends both
+    # `cancer_killed` and `cell_killed_by_tcell` to KIND_KILL, so every
+    # T-CELL kill is reported twice at one position and time, and the
+    # writer draws it once (interaction_recorder.dedupe_kill_events).
+    #
+    # Counting raw events here made this test pass only while the run
+    # happened to contain no T-cell kills. It did until the ECM
+    # deposition rate was fixed; the freed infiltrate then took one
+    # T-cell kill and the test failed with 6 markers against 7 events,
+    # reporting a drawing bug where there was none. The same reasoning
+    # already applied to `death`/`immune_killed` two lines down.
+    from cognisom.visualization.interaction_recorder import dedupe_kill_events
+    for ev in dedupe_kill_events(list(runner.recorder.events)):
         if ev.position is None or fm.frame_of(ev.time) is None:
             continue
         if ev.kind == "death" and (ev.detail or {}).get("cause") == "immune_killed":
@@ -187,7 +200,13 @@ def test_a_kill_is_on_its_frame_and_not_the_frame_before(run):
 
 def test_engagement_lines_need_both_ends(run):
     _, _, report, _ = run
-    assert report.bonds["drawn"] == report.events_by_kind["kill"]
+    # `events_by_kind["kill"]` counts RAW kill-kind events, and a T-cell
+    # kill is reported twice (see the note in the markers test above), so
+    # the bond count is the raw count less the duplicates the writer
+    # suppressed. Asserting against the raw count made this test depend
+    # on the run containing no T-cell kills.
+    assert report.bonds["drawn"] == (report.events_by_kind["kill"]
+                                     - report.bonds["suppressed_duplicate_kill"])
     assert report.bonds["no_partner_position"] == 0
 
 

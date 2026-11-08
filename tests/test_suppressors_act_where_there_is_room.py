@@ -346,14 +346,17 @@ def test_a_configuration_with_no_tregs_is_bit_identical_to_before():
     two no-op forms of the pre-exhaustion key.
 
     The triple was (10, 49, 1249) until immune cells could patrol and
-    detection moved ahead of movement. It is a RECORDING of the arena,
+    detection moved ahead of movement, and (12, 57, 1311) until the ECM
+    deposition rate was fixed -- it saturated within a day and slowed
+    the infiltrate tenfold, so a freed arena reaches more targets. It is
+    a RECORDING of the arena,
     not the invariant: what this test proves is that the three no-op
     forms agree with each other EXACTLY, which is asserted in the loop
     below and is independent of what the arena happens to total.
     """
     seeds = (1, 2, 3)
     base = _totals(seeds)                                  # key absent
-    assert (base['kills'], base['hits'], base['contacts']) == (12, 57, 1311)
+    assert (base['kills'], base['hits'], base['contacts']) == (12, 54, 1321)
     assert base['treg_mult'] == 1.0
 
     for label, kw in (('treg None', {'treg_fraction': None}),
@@ -449,17 +452,30 @@ def test_the_treg_term_changes_the_outcome_not_only_the_probability():
     against 20 cancer cells, which is the smallest arena that resolves
     the lever above the Poisson noise on 73 kills:
 
-      treg_fraction   multiplier   kills   perforin hits   contacts
-         0.0           1.000000      73         399          9,689
-         0.3           0.846939      63         343          9,978
-         0.5           0.642857      55         283         10,109
-         0.737         0.000000       0           0         10,706
+      treg_fraction   multiplier   kills   perforin hits
+         0.0           1.000000      89         418
+         0.3           0.846939      90         397
+         0.5           0.642857      49         289
+         0.737         0.000000       0           0
 
-    RE-MEASURED after immune cells could patrol and detection moved
-    ahead of movement (it was 69/59/53/0 on 339/316/264/0 hits). Every
-    row moved by a few counts and the SHAPE is unchanged: monotone down
-    in Treg load, contacts up, and zero at the sourced endpoint. The
-    multipliers are arithmetic and did not move at all.
+    RE-MEASURED twice: after immune cells could patrol (69/59/53/0 on
+    339/316/264/0 hits), then at 73/63/55/0 on 399/343/283/0, and now
+    after the ECM deposition rate was fixed -- it saturated within a day
+    and slowed the whole infiltrate tenfold, so a freed arena kills
+    more. The multipliers are arithmetic and have never moved.
+
+    THE SHAPE CHANGED IN ONE RESPECT AND IT IS NOT A RE-PIN. Killing is
+    no longer monotone across the first step: 0.0 gives 89 kills and 0.3
+    gives 90. That is ONE kill on a count of ninety, against a Poisson
+    standard deviation of about 9.5, so the two lightest Treg loads are
+    no longer distinguishable from each other in this arena -- the
+    docstring's own claim that this is "the smallest arena that resolves
+    the lever" no longer holds for the 0.0 -> 0.3 step at the higher
+    kill counts the fix produced. What survives, and what is asserted
+    below, is the lever itself: a clear fall by 0.5 (90 -> 49) and zero
+    at Chen's sourced endpoint. Asserting strict ordering over four
+    rows, two of which sit inside each other's noise, would be pinning
+    an order statistic -- so it is not asserted.
 
     Contacts RISE as killing falls, which is the feedback that makes
     this an outcome and not an arithmetic restatement: suppressed T
@@ -473,18 +489,27 @@ def test_the_treg_term_changes_the_outcome_not_only_the_probability():
     seeds = tuple(range(1, 13))
     rows = {f: _totals(seeds, hours=12.0, treg_fraction=f)
             for f in (0.0, 0.3, 0.5, 0.737)}
-    assert rows[0.0]['kills'] == 73
-    assert rows[0.3]['kills'] == 63
-    assert rows[0.5]['kills'] == 55
+    assert rows[0.0]['kills'] == 89
+    assert rows[0.3]['kills'] == 90
+    assert rows[0.5]['kills'] == 49
     assert rows[0.737]['kills'] == 0
     assert [rows[f]['hits'] for f in (0.0, 0.3, 0.5, 0.737)] == [
-        399, 343, 283, 0]
-    # Monotone in the Treg load, and the contact count moves the other
-    # way, so the kill fall is not just fewer tries.
+        418, 397, 289, 0]
+    # THE LEVER, stated so it cannot be satisfied by noise. Perforin
+    # hits -- the quantity the multiplier acts on directly -- are still
+    # monotone down across all four loads, which is the mechanism.
+    hits = [rows[f]['hits'] for f in (0.0, 0.3, 0.5, 0.737)]
+    assert hits == sorted(hits, reverse=True), hits
+    # Kills fall CLEARLY by the half load and vanish at the endpoint.
+    # The 0.0 -> 0.3 step is inside Poisson noise (see the docstring) so
+    # no ordering is asserted between those two.
     kills = [rows[f]['kills'] for f in (0.0, 0.3, 0.5, 0.737)]
-    assert kills == sorted(kills, reverse=True)
+    assert kills[2] < 0.75 * max(kills[0], kills[1]), kills
+    assert kills[3] == 0, kills
+    # And the contact count moves the other way, so the kill fall is not
+    # just fewer tries.
     contacts = [rows[f]['contacts'] for f in (0.0, 0.3, 0.5, 0.737)]
-    assert contacts == sorted(contacts)
+    assert contacts == sorted(contacts), contacts
 
 
 @pytest.mark.timeout(300)
@@ -800,10 +825,10 @@ def test_the_outcome_moves_with_each_constant_over_its_bracket():
     for row in rows.values():
         assert row['mean_p'] == pytest.approx(
             unsuppressed * row['treg_mult'], abs=1e-9)
-    assert rows['ratio_low']['hits'] == 53
-    assert rows['default']['hits'] == 51
-    assert rows['ratio_high']['hits'] == 50
-    assert rows['loss_low']['hits'] == 50
+    assert rows['ratio_low']['hits'] == 44
+    assert rows['default']['hits'] == 52
+    assert rows['ratio_high']['hits'] == 51
+    assert rows['loss_low']['hits'] == 51
 
 
 def test_the_quoted_size_of_the_treg_lever_is_the_multiplier_itself():

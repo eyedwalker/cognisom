@@ -189,8 +189,12 @@ LAYERS: Tuple[Layer, ...] = (
             C("Chemokine gradients guiding immune cells", BUILT, "",
               ("tests/test_a_secreted_gradient_pulls_immune_cells.py",)),
             C("Extracellular matrix", PARTIAL,
-              "A density field that can exclude immune cells; no cell "
-              "produces or remodels it.",
+              "Cancer cells deposit it and it slows immune cells down, "
+              "but no fibroblast makes it \u2014 in real tissue the "
+              "stroma does. The deposition rate is unsourced and "
+              "saturates within a day of simulated time, so by then the "
+              "barrier is at its maximum everywhere rather than varying "
+              "with the tissue.",
               ("tests/test_ecm_barrier.py",)),
             C("Oxygen and glucose diffusion fields", PARTIAL,
               "Solved, but nothing reads them: per-cell values come from "

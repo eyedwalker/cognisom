@@ -558,9 +558,19 @@ def test_a_section_run_is_less_connected_than_a_slab_run():
         means[tissue] = _neighbour_counts(positions).mean()
         counts[tissue] = len(alive)
 
-    assert counts["slab"] == counts["section"], (
-        "the two runs seeded %d and %d cells, so their connectivity is not "
-        "comparable" % (counts["slab"], counts["section"]))
+    # The two layouts are population-matched AT SEEDING by construction
+    # (section_variant is built on slab_variant, both specs 1,960 + 80),
+    # so a difference here is differential death during the half hour
+    # stepped. This demanded exact equality and became 2043 against 2042
+    # when the ECM deposition rate was fixed and the infiltrate killed
+    # slightly differently on the two layouts. One cell in two thousand
+    # cannot move a mean neighbour count, so the guard is a tolerance on
+    # what it was always guarding against -- a population difference big
+    # enough to confound the ratio -- rather than an equality.
+    assert abs(counts["slab"] - counts["section"]) <= 2, (
+        "the two runs ended with %d and %d cells, too far apart for their "
+        "connectivity to be comparable"
+        % (counts["slab"], counts["section"]))
     assert means["section"] < means["slab"]
     ratio = means["section"] / means["slab"]
     assert 0.5 < ratio < 0.85, (

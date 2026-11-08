@@ -974,12 +974,18 @@ def test_a_pinned_24h_run_is_identical_with_escape_on_and_off():
     35 divisions, 10 cancer deaths, 115 normal cells alive, and zero de
     novo escape events -- the same with escape on and off.
 
-    WHAT THIS DOES NOT SHOW. Not one of those 35 divisions is a cancer
-    cell's, and ``_maybe_escape`` returns None for every other cell
-    type, so this run never reaches the draw: the identity here is
-    identity on a code path that was not entered, and the expectation is
-    0 events rather than the 5.4e-5 that using 35 total divisions gave.
-    That is asserted below so the limitation cannot be read past. The
+    WHAT THIS DOES NOT SHOW, UPDATED 2026-11-08. It used to be that not
+    one division here was a cancer cell's, so this run never reached the
+    draw at all and the identity was identity on an unentered code path.
+    Since the ECM deposition rate was fixed -- it saturated within a day
+    and slowed the infiltrate tenfold, so the tumour is now reached
+    later and gets one division in before it is cleared -- the run takes
+    exactly ONE cancer division, and so one draw. The limitation is
+    therefore weaker than it was but has not gone: one draw at 1.55e-6
+    expects 1.5e-6 events, which is still indistinguishable from none,
+    so the identity below is near-vacuous rather than wholly vacuous.
+    It is asserted as ONE division, not as zero, so that the next
+    reader is not told something untrue. The
     draw itself is pinned by
     test_at_the_literature_rate_a_short_run_changes_nothing_at_all (200
     cancer divisions through the module) and by the 6 h slab run that
@@ -1017,14 +1023,19 @@ def test_a_pinned_24h_run_is_identical_with_escape_on_and_off():
     # ring preset divides no cancer cells (asserted below), so every
     # division here is a normal one and the count falls with the period.
     # Verified identical under both scorers.
-    assert out[True][2] == 10, f"the pinned division count moved: {out[True]}"
-    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 10 divisions"
-    # The limitation, measured rather than assumed.
-    assert cancer_divisions[True] == 0, (
-        'the ring preset now divides cancer cells, so this run DOES '
-        f'reach the escape draw ({cancer_divisions[True]} divisions) -- '
-        'update the docstring, which says it does not')
-    assert ev.expected_events(cancer_divisions[True]) == 0.0
+    # 10 -> 11 with the ECM fix: 10 normal divisions and ONE cancer.
+    assert out[True][2] == 11, f"the pinned division count moved: {out[True]}"
+    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 11 divisions"
+    # The limitation, measured rather than assumed. The docstring above
+    # was updated when this moved from 0 to 1, as its own message said to.
+    assert cancer_divisions[True] == 1, (
+        f'cancer divisions here moved to {cancer_divisions[True]}; this '
+        'run reaches the escape draw that many times, and the docstring '
+        'above states the count -- update it rather than re-pinning')
+    # One draw expects 1.5e-6 events: still indistinguishable from none,
+    # which is what keeps the on/off identity above near-vacuous.
+    assert ev.expected_events(cancer_divisions[True]) == pytest.approx(
+        1.5497584e-06, rel=1e-4)
 
 
 @pytest.mark.slow
@@ -1079,7 +1090,13 @@ def test_a_six_hour_slab_run_is_identical_with_escape_on_and_off():
     # MHC-I because fewer kills means less IFN-gamma. Cancer divisions
     # went 12 -> 13, which is RNG stream drift -- the cancer period did
     # not move. Verified identical under both scorers.
-    assert out[True][:7] == (2099, 86, 66, 6, 0, 13, 0.346884065), out[True]
+    # RE-MEASURED 2026-11-08 when the ECM deposition rate was fixed:
+    # (2099, 86, 66, 6, 0, 13, 0.346884065) -> this. The freed infiltrate
+    # kills more (deaths 6 -> 13), so the tumour is smaller (86 -> 77)
+    # and fewer cells remain to divide (cancer divisions 13 -> 11); mean
+    # MHC-I rose (0.3469 -> 0.3545) because more kills means more
+    # IFN-gamma. Every move is in the direction the mechanism predicts.
+    assert out[True][:7] == (2090, 77, 64, 13, 0, 11, 0.35446766), out[True]
     # The point of this test: the draw WAS reached.
     assert out[True][5] > 0
-    assert ev.expected_events(out[True][5]) == pytest.approx(2.0e-5, rel=0.05)
+    assert ev.expected_events(out[True][5]) == pytest.approx(1.7047e-5, rel=0.01)

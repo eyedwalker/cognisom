@@ -469,10 +469,40 @@ class CellularModule(SimulationModule):
         # local stromal ECM proportional to ``ecm_deposition_rate``
         # (units: per-hour fraction). Anti-fibrotic therapy degrades
         # ECM at ``ecm_degradation_rate`` when ``anti_fibrotic_active``
-        # is True. Defaults model a moderately fibrotic tumor; PDAC-
-        # like configs can set the rate ~5-10x higher.
+        # is True.
+        #
+        # THE RATE WAS 0.05/h, AND THAT IS A ONE-DAY SATURATION.
+        # 0.05 per hour fills the whole 0..1 range in 20 h, so measured
+        # over a shipped 24 h Baseline run every cancer cell went:
+        #
+        #     hour   0    4    8   12   16   20
+        #     ECM  0.00 0.21 0.41 0.61 0.81 1.00
+        #
+        # and because ECM attenuates immune motility (ecm_barrier), the
+        # infiltrate's speed fell 5.00 -> 0.50 um/min across the same
+        # run. That leaves the 2-12 um/min band measured for lymphocyte
+        # migration at about hour 13 and ends four times below its
+        # floor, so the engine's own migration-speed result held only in
+        # the first half of every run. Worse, a 24 h run traversed the
+        # entire range of the mechanism, which makes any ECM-dependent
+        # outcome a function of WHEN it was read.
+        #
+        # A stromal reaction is a matter of weeks, not of one day.
+        # Taking desmoplasia as developing to ~0.8 over ~6 weeks
+        # (0.8 / 1008 h) gives ~8e-4 per hour, which moves ECM by ~0.02
+        # over a 24 h run -- i.e. ECM is effectively STATIC on the
+        # timescale this engine simulates, and is therefore a property
+        # of the tissue a run starts from rather than something that
+        # grows during it. ESTIMATE: no measured per-hour collagen
+        # deposition rate for prostate adenocarcinoma was found, and the
+        # 6-week figure is the order of magnitude of a stromal reaction,
+        # not a measurement.
+        #
+        # Set ``cancer_baseline_ecm`` to give a run a fibrotic tissue;
+        # that is the knob desmoplasia belongs on now. It still defaults
+        # to 0.0 because no sourced ECM density for prostate exists.
         self.ecm_deposition_rate = float(
-            self.config.get('ecm_deposition_rate', 0.05)
+            self.config.get('ecm_deposition_rate', 8.0e-4)
         )
         self.ecm_degradation_rate = float(
             self.config.get('ecm_degradation_rate', 0.10)
@@ -1658,6 +1688,54 @@ class CellularModule(SimulationModule):
             # how many events the run has supplied, and the provenance
             # of every rate behind them. See escape_distribution.
             'escape': self.escape_distribution(),
+            # The stromal barrier. Reported because it was INVISIBLE: ECM
+            # attenuates immune motility on every step and no state
+            # output mentioned it, so a run whose infiltrate had been
+            # slowed tenfold said nothing about why. `max` is the field
+            # that matters -- it saturated at 1.0 within a day under the
+            # old deposition rate.
+            'ecm': self.ecm_distribution(),
+        }
+
+    def ecm_distribution(self) -> Dict[str, Any]:
+        """The stromal barrier across living cancer cells, and its basis.
+
+        ECM gates immune motility and sensing through
+        engine/py/spatial/ecm_barrier, whose blocking factor is an
+        unsourced tuning constant exceeding the nearest measured anchor
+        -- so a run has to be able to say what its own barrier was.
+        """
+        from cognisom.engine.py.spatial.ecm_barrier import (
+            DEFAULT_MOTILITY_BLOCK, DEFAULT_MOTILITY_BLOCK_STATUS,
+            MEASURED_COMPARTMENT_MOTILITY_RATIO, MEASURED_COMPARTMENT_SOURCE,
+        )
+        values = [float(c.local_ecm_density)
+                  for c in self.cells.values()
+                  if c.alive and c.cell_type == 'cancer']
+        return {
+            'n_cancer_cells': len(values),
+            'min': min(values) if values else None,
+            'mean': float(np.mean(values)) if values else None,
+            'max': max(values) if values else None,
+            'saturated_fraction': (
+                sum(1 for v in values if v >= 0.999) / len(values)
+                if values else None),
+            'deposition_rate_per_h': self.ecm_deposition_rate,
+            'degradation_rate_per_h': self.ecm_degradation_rate,
+            'anti_fibrotic_active': self.anti_fibrotic_active,
+            'baseline_at_spawn': self.cancer_baseline_ecm,
+            'motility_block': {
+                'value': DEFAULT_MOTILITY_BLOCK,
+                'status': DEFAULT_MOTILITY_BLOCK_STATUS,
+                'max_slowdown': (1.0 / (1.0 - DEFAULT_MOTILITY_BLOCK)
+                                 if DEFAULT_MOTILITY_BLOCK < 1.0 else None),
+                'measured_anchor': MEASURED_COMPARTMENT_MOTILITY_RATIO,
+                'measured_anchor_source': MEASURED_COMPARTMENT_SOURCE,
+            },
+            # Only cancer cells carry ECM, so normal prostate stroma has
+            # none -- which is backwards for a gland that is largely
+            # stroma. No fibroblast exists to make it; see the roadmap.
+            'produced_by': 'cancer cells only (no fibroblast lineage exists)',
         }
     
     def set_molecular_module(self, molecular_module):
