@@ -14,6 +14,28 @@ different page from the one doing the work.
 
 ``hla_is_patient_specific`` and ``hla_typing_method`` were on
 PatientProfile the whole time. Nothing read them.
+
+WHAT THIS FILE PINS, AND WHAT IT NO LONGER CLAIMS (2026-11-09). The
+subject here is ``seqc2_precomputed.json``, a STORED artifact that
+``app.py`` and the MAD-agent page read; its own fields still say
+population_default, and that is still a true description of that file,
+so the assertions below stand.
+
+What changed is the LIVE path. ``record_demo_run.py`` builds a profile
+from the VCF, and it was getting the population default for a reason
+nobody had looked for: the measured typing is registered under "SEQC2"
+and the demo asked for "HCC1395", so the lookup missed and fell through.
+Same VCF, same code, only the id differing:
+
+    patient_id=HCC1395   population-default   A*02:01 A*03:01 B*07:02 ...
+    patient_id=SEQC2     optitype             A*29:02 B*45:01 C*06:02
+
+So the honest caveat on the page was describing a dictionary-key
+mismatch as a limitation of the data. ``MEASURED_TYPING_ALIASES`` fixes
+it for every caller, and ``test_the_live_path_resolves_the_measured_
+typing_under_either_name`` below is what stops it coming back. A
+disclosure is evidence about the output, never evidence that the input
+was absent.
 """
 from __future__ import annotations
 
@@ -58,6 +80,49 @@ def test_the_displayed_alleles_really_do_share_none_with_the_measured(demo):
     displayed = set(demo["hla_alleles"])
     assert not (measured & displayed), (
         f"the demo now overlaps the measured typing: {measured & displayed}")
+
+
+def test_the_live_path_resolves_the_measured_typing_under_either_name():
+    """The key mismatch, as a test. HCC1395 is the tumour line and SEQC2
+    the consortium; the typing came from one set of reads carrying both
+    names, so a lookup under either must find it. A sample that has no
+    typing must still resolve to nothing -- the point is not to hand out
+    somebody else's alleles."""
+    from cognisom.genomics.hla_typer import measured_typing_for
+
+    canonical = measured_typing_for("SEQC2")
+    assert canonical is not None
+    for alias in ("HCC1395", "hcc1395", "HCC1395BL", "SEQC2_HCC1395"):
+        got = measured_typing_for(alias)
+        assert got is not None, (
+            f"{alias!r} does not resolve to a measured typing, so a "
+            "profile built under that name silently gets the population "
+            "default -- which is the bug this guards")
+        assert got.alleles == canonical.alleles, alias
+    for absent in ("unknown-sample", "", None, "SEQC3"):
+        assert measured_typing_for(absent) is None, absent
+
+
+def test_a_profile_built_as_hcc1395_is_read_derived():
+    """End to end on the real demo VCF, because the registry resolving is
+    only half the claim: the profile has to carry the method through, and
+    `hla_is_read_derived` is what gates the NK licensing model."""
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
+
+    from cognisom.genomics.hla_typer import hla_is_read_derived
+    from cognisom.genomics.patient_profile import PatientProfileBuilder
+
+    vcf = REPO_ROOT / "cognisom" / "genomics" / "seqc2_demo.vep.vcf"
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        profile = PatientProfileBuilder(cancer_type="breast").from_vcf_file(
+            str(vcf), patient_id="HCC1395")
+    assert profile.hla_typing_method == "optitype", (
+        f"method is {profile.hla_typing_method!r}; the demo is back on a "
+        "population default")
+    assert hla_is_read_derived(profile) is True
+    assert set(profile.hla_alleles) == {
+        "HLA-A*29:02", "HLA-B*45:01", "HLA-C*06:02"}
 
 
 def test_the_profile_is_built_with_the_flag(demo):

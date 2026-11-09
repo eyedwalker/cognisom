@@ -194,11 +194,25 @@ st.markdown(
 for line in facts.get("presentation") or []:
     st.markdown(f"- {line}")
 
+# Whether the typing is THIS patient's is the difference between a
+# personalised run and a demonstration, so the page states which it is
+# from the recording's own flag rather than leaving a reader to assume.
+# It read as a population default until 2026-11-09, not because the
+# typing was missing -- it was in the repository all along -- but because
+# the lookup was keyed "SEQC2" and the run asked for "HCC1395". The
+# caveat printed below was describing a dictionary-key mismatch as a
+# limitation of the data.
+_hla_line = (
+    "measured from this patient's own sequencing reads (OptiType on the "
+    "matched normal), homozygous at all three loci"
+    if facts.get("hla_measured") else
+    "a population-frequency default, NOT this patient's genotype"
+)
 st.markdown(
-    f"**HLA class I.** `{', '.join(facts['hla_alleles'])}` — the "
-    "molecules that decide which of those mutations a T cell can "
-    "actually see. Peptide binding is predicted with MHCflurry, not "
-    "assumed."
+    f"**HLA class I.** `{', '.join(facts['hla_alleles'])}` — "
+    f"{_hla_line}. These are the molecules that decide which of those "
+    "mutations a T cell can actually see, and peptide binding to them is "
+    "predicted with MHCflurry, not assumed."
 )
 
 # Printed from the recording's own file, not written out here. These are

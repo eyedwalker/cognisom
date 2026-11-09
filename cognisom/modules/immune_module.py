@@ -1030,8 +1030,13 @@ class ImmuneModule(SimulationModule):
             if patient_id:
                 # Lazy import: the modules layer may depend on genomics,
                 # but engine/py must not, and nk_receptor lives there.
-                from cognisom.genomics.hla_typer import MEASURED_HLA_TYPINGS
-                typing = MEASURED_HLA_TYPINGS.get(str(patient_id))
+                from cognisom.genomics.hla_typer import (
+                    measured_typing_for,
+                )
+                # Through the helper, not a bare dict .get(): the same
+                # sample is known as HCC1395 and as SEQC2, and a bare get
+                # left the NK receptor balance off for one of its names.
+                typing = measured_typing_for(patient_id)
                 if typing is None:
                     logger.info(
                         "no measured HLA typing for patient_id %r; the NK "

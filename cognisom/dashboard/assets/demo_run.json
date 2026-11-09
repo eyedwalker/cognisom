@@ -2,16 +2,16 @@
   "generated_by": "scripts/record_demo_run.py",
   "seed": 7,
   "video": "demo_run.mp4",
-  "video_mb": 0.27,
+  "video_mb": 0.28,
   "fps": 12,
   "frames": 121,
   "snapshot_stride": 2,
   "scenario": "Immunotherapy",
   "tissue": "section",
-  "tissue_caption": "Occupancy taken from a measured human prostate section (10x Xenium): glands pack, lumens stay empty. ~5.0 neighbours per cell, which is the honest figure. Not the default only because the pinned numbers were taken on the slab.",
+  "tissue_caption": "Occupancy taken from a measured human prostate section (10x Xenium): glands pack, lumens stay empty. ~5.0 neighbours per cell, which is the honest figure. The default.",
   "duration_hours": 24.0,
   "dt_hours": 0.05,
-  "patient_headline": "Patient HCC1395 \u2014 2 missense mutations on 6 HLA class-I alleles",
+  "patient_headline": "Patient HCC1395 \u2014 2 missense mutations on 3 HLA class-I alleles",
   "personalised": true,
   "patient_id": "HCC1395",
   "mutations_carried": [
@@ -19,47 +19,43 @@
     "NOTCH1_L2065Q"
   ],
   "hla_alleles": [
-    "HLA-A*02:01",
-    "HLA-A*03:01",
-    "HLA-B*07:02",
-    "HLA-B*08:01",
-    "HLA-C*07:01",
-    "HLA-C*07:02"
+    "HLA-A*29:02",
+    "HLA-B*45:01",
+    "HLA-C*06:02"
   ],
-  "hla_measured": false,
-  "caveats": [
-    "HLA typing method is 'population-default', which is not derived from this patient's reads. The NK licensing model refuses an unmeasured typing on purpose."
-  ],
+  "hla_measured": true,
+  "caveats": [],
   "presentation": [
     "Presented on MHC-I: ARID1A_N218T, NOTCH1_L2065Q \u2014 displayed by 120 of 120 founding cancer cells."
   ],
   "cells_start": 2040,
-  "cells_end": 2172,
+  "cells_end": 2155,
   "cancer_start": 120,
-  "cancer_end": 79,
+  "cancer_end": 62,
   "normal_start": 1920,
   "normal_end": 2093,
-  "immune_end": 127,
-  "immune_kills": 98,
+  "immune_end": 122,
+  "immune_kills": 115,
   "divisions": 230,
-  "deaths": 98,
+  "deaths": 115,
   "metastases": 0,
   "hypoxic_end": 0,
   "event_kinds": [
     "activation",
     "death",
     "division",
-    "kill"
+    "kill",
+    "recruitment"
   ],
-  "kill_markers": 98,
-  "duplicate_kill_markers_dropped": 53,
-  "last_kill_hour": 15.15,
+  "kill_markers": 115,
+  "duplicate_kill_markers_dropped": 67,
+  "last_kill_hour": 20.55,
   "last_division_hour": 13.55,
-  "last_death_hour": 15.15,
-  "oxygen_min": 0.0749,
+  "last_death_hour": 20.55,
+  "oxygen_min": 0.0832,
   "oxygen_max": 0.21,
   "predictor": "mhcflurry",
   "usd_stage": "demo_run.usdc",
-  "usd_kill_markers": 98,
-  "usd_duplicate_kills_suppressed": 53
+  "usd_kill_markers": 115,
+  "usd_duplicate_kills_suppressed": 67
 }

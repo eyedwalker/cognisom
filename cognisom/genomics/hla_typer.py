@@ -112,6 +112,56 @@ MEASURED_HLA_TYPINGS: Dict[str, MeasuredTyping] = {
     ),
 }
 
+#: Other identifiers the samples above are known by, mapped to their
+#: canonical key.
+#:
+#: WHY THIS EXISTS. The lookup was a plain `MEASURED_HLA_TYPINGS.get(
+#: patient_id)`, and the public demo builds its profile as "HCC1395" --
+#: the cell line -- while the typing is registered under "SEQC2", the
+#: consortium that sequenced it. Same reads, two names. So the lookup
+#: missed, typing fell through to the population-frequency panel, and the
+#: demo page honestly printed "population-default, not derived from this
+#: patient's reads" -- which reads as a limitation of the DATA when it was
+#: a mismatch in a dictionary key. Measured, on one VCF through one code
+#: path, with only the id differing:
+#:
+#:     patient_id=HCC1395   population-default   A*02:01 A*03:01 B*07:02 ...
+#:     patient_id=SEQC2     optitype             A*29:02 B*45:01 C*06:02
+#:
+#: A fallback that announces itself is not evidence that the primary path
+#: was unreachable, which is the part that hid this for as long as it did.
+MEASURED_TYPING_ALIASES: Dict[str, str] = {
+    # HCC1395 is the tumour line, HCC1395BL its matched normal, and SEQC2
+    # the consortium; the typing came from one set of reads carrying all
+    # of these names.
+    "HCC1395": "SEQC2",
+    "HCC1395BL": "SEQC2",
+    "SEQC2_HCC1395": "SEQC2",
+}
+
+
+def measured_typing_for(patient_id) -> Optional[MeasuredTyping]:
+    """The measured typing for ``patient_id``, by canonical name or alias.
+
+    Every lookup of MEASURED_HLA_TYPINGS goes through here, so a sample
+    cannot be typed under one of its names and silently untyped under
+    another. Matching is case-insensitive because sample ids arrive from
+    filenames and spreadsheets as often as from code.
+    """
+    if not patient_id:
+        return None
+    key = str(patient_id).strip()
+    direct = MEASURED_HLA_TYPINGS.get(key)
+    if direct is not None:
+        return direct
+    folded = {k.lower(): v for k, v in MEASURED_HLA_TYPINGS.items()}
+    aliases = {k.lower(): v for k, v in MEASURED_TYPING_ALIASES.items()}
+    canonical = aliases.get(key.lower())
+    if canonical is not None:
+        return MEASURED_HLA_TYPINGS.get(canonical)
+    return folded.get(key.lower())
+
+
 #: Typing methods that read THIS patient's own sequencing reads.
 #:
 #: Narrower than HLATyper.PATIENT_SPECIFIC_METHODS, on purpose. That set
@@ -258,8 +308,10 @@ class HLATyper:
         Returns:
             List of HLA allele strings, e.g. ["HLA-A*02:01", "HLA-A*24:02", ...]
         """
-        # A real typing for this sample beats anything invented.
-        measured = MEASURED_HLA_TYPINGS.get(patient_id)
+        # A real typing for this sample beats anything invented. Via
+        # measured_typing_for, so an alias of the sample's name resolves
+        # too -- see MEASURED_TYPING_ALIASES for what that cost.
+        measured = measured_typing_for(patient_id)
         if measured is not None:
             logger.info(
                 "Using measured HLA type for %s from %s (%d reads): %s",
