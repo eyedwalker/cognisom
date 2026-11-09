@@ -22,7 +22,14 @@ set -euo pipefail
 #      AWS_DEFAULT_REGION -- so both are set. Launching without these vars
 #      disables Cognito entirely and silently falls back to local file auth.
 #
-#   3. The root volume is 40 G and SHARED with every other app on this box.
+#   3. nginx serves /audit.html, /robots.txt and /sitemap.xml from
+#      /opt/cognisom/static, NOT from the app: Streamlit renders in the
+#      browser, so those three are useless if proxied. Step 6 regenerates
+#      them from the image being served. If nginx loses those location
+#      blocks, the paths fall through to the app and silently become the
+#      JavaScript shell again.
+#
+#   4. The root volume is 40 G and SHARED with every other app on this box.
 #      Each deploy leaves a ~4.3 G image behind and nothing ever removed one,
 #      so on 2026-11-06 a pull died mid-extract with "no space left on device"
 #      at 95% full (2.4 G free); the same pull succeeded at 12 G free. The
@@ -60,6 +67,9 @@ CONTAINER="cognisom-dashboard"
 IMAGE="cognisom:latest"
 DATA_DIR="/opt/cognisom/data"
 EXPORTS_DIR="/opt/cognisom/exports"
+# Crawlable copies of the audit, written by the image and served by
+# nginx directly. See step 6.
+STATIC_DIR="/opt/cognisom/static"
 RUNTIME_UID=999
 RUNTIME_GID=999
 
@@ -291,6 +301,34 @@ echo "Previous container retained as ${CONTAINER}-prev for rollback."
 # unreferenced. Removing it here keeps the steady state at two cognisom images
 # (live + rollback) instead of one more per deploy. A failure here does not
 # fail a deploy that has already succeeded.
+# ─── 6. The crawlable copy of the audit ──────────────────────
+# Streamlit renders in the browser, so a plain fetch of /?page=roadmap
+# returns ~10 KB whose whole content is <title>Streamlit</title> and a
+# <noscript> tag: the capability audit is invisible to search engines, to
+# anything without JavaScript, and to an archive. For a page whose
+# purpose is to be cited, that is an own goal.
+#
+# The image writes a standalone copy, generated from the same module the
+# live page reads, so the two cannot drift. It runs AFTER the swap and
+# from the IMAGE NOW SERVING, so the commit stamped on the page is the
+# commit behind it. nginx serves these three paths from $STATIC_DIR
+# ahead of the proxy; a failure here must not fail a healthy deploy.
+echo
+info "Writing the crawlable audit copy to ${STATIC_DIR}..."
+mkdir -p "$STATIC_DIR"
+if docker run --rm -v "$STATIC_DIR:/out" \
+     -e COGNISOM_GIT_SHA="$(docker inspect "$CONTAINER" --format \
+        '{{range .Config.Env}}{{println .}}{{end}}' \
+        | sed -n 's/^COGNISOM_GIT_SHA=//p')" \
+     --entrypoint python "$IMAGE" scripts/build_static_snapshot.py \
+     --out /out >/dev/null 2>&1; then
+  chmod 644 "$STATIC_DIR"/* 2>/dev/null || true
+  ok "Static audit written ($(ls -1 "$STATIC_DIR" | wc -l | tr -d ' ') files)"
+else
+  warn "could not write the static audit; the app is fine, but "\
+"/audit.html will be stale until the next deploy"
+fi
+
 echo
 info "Removing superseded cognisom images..."
 prune_superseded false || warn "prune failed; the deploy is fine, the disk was not reclaimed"

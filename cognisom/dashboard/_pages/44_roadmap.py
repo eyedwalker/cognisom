@@ -20,13 +20,15 @@ Like the demo page it calls no gate, so it must stay read-only: it
 starts no simulation and reads no patient data.
 """
 
+import os
 from pathlib import Path
 
 import streamlit as st
 
 import cognisom.dashboard as _dashboard_pkg
 from cognisom.dashboard.capabilities import (
-    ABSENT, BUILT, LAYERS, PARTIAL, STATUS_MEANING, TARGETS, counts,
+    ABSENT, BUILT, LAYERS, OUTCOME_MODEL_NOTE, PARTIAL, SCALE_NOTE,
+    STATUS_MEANING, TARGETS, counts,
 )
 from cognisom.dashboard.page_config import safe_set_page_config
 
@@ -49,7 +51,7 @@ _BADGE = {
 
 # ── Header ───────────────────────────────────────────────────────────
 
-st.title("What Cognisom simulates — and what it doesn't yet")
+st.title("What Cognisom simulates, and what it can't yet")
 st.markdown(
     "The goal is a simulation of human tissue that responds to cancer and "
     "to immunotherapy the way a real patient's tumour does: built from "
@@ -84,24 +86,39 @@ st.divider()
 # ── Summary ──────────────────────────────────────────────────────────
 
 n = counts()
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Built", n[BUILT])
-m2.metric("Partial", n[PARTIAL])
-m3.metric("Not yet", n[ABSENT])
-m4.metric("External tests passed", 1)
+# Deliberately NOT four bare numbers side by side. "Built 35" next to
+# "External tests passed 1" invites a comparison between two quantities
+# that are not on the same scale -- one counts mechanisms, the other
+# counts falsifiable predictions tested against outside data -- so each
+# count is stated together with what it means.
 st.markdown(
-    "**Built is not validated.** A built row is wired into runs, has a "
-    "measured or published basis, and is held by a test. Whether the "
-    "simulation *predicts* anything is a separate question, answered in "
-    "the Validation section: one falsifiable prediction has held against "
-    "human tumours so far, and one pre-specified outcome test did not."
+    "- **" + str(n[BUILT]) + " built** \u2014 wired into runs, with a "
+    "measured or published basis, and held by a test named in the "
+    "Evidence column below.\n"
+    "- **" + str(n[PARTIAL]) + " partial** \u2014 present but limited: an "
+    "estimate, an optional feature, or a mechanism that exists and does "
+    "not yet change outcomes.\n"
+    "- **" + str(n[ABSENT]) + " not yet** \u2014 not modelled.\n\n"
+    "**Built is not validated, and these are not comparable counts.** "
+    "Whether the simulation *predicts* anything is a separate question, "
+    "answered in the Validation section below: **one** falsifiable "
+    "prediction has held against outside human data, and one "
+    "pre-specified outcome test was null."
 )
 
 # ── Where it is going ────────────────────────────────────────────────
 
+st.info(OUTCOME_MODEL_NOTE)
+
 st.subheader("What we are building toward")
+st.caption(
+    "In order, with what each one needs first. The sequencing is the "
+    "plan; the tables below are the inventory it is drawn from."
+)
 for i, (title, body) in enumerate(TARGETS, 1):
     st.markdown(f"**{i}. {title}.** {body}")
+
+st.markdown(SCALE_NOTE)
 
 st.divider()
 
@@ -131,11 +148,14 @@ def _cell(text: str) -> str:
 for layer in LAYERS:
     st.markdown(f"#### {layer.title}")
     st.caption(layer.question)
-    lines = ["| | Capability | What it does, and its limits | Evidence |",
-             "|---|---|---|---|"]
+    # Three columns rather than four, with the badge above the name in
+    # the same cell: a four-column table of prose is unreadable at phone
+    # width, and the status is what a reader scans for first.
+    lines = ["| Capability | What it does, and its limits | Evidence |",
+             "|---|---|---|"]
     for row in layer.rows:
         lines.append(
-            f"| {_BADGE[row.status]} | {_cell(row.name)} | "
+            f"| {_BADGE[row.status]}<br>**{_cell(row.name)}** | "
             f"{_cell(row.note)} | {_evidence(row.evidence)} |")
     st.markdown("\n".join(lines))
 
@@ -145,8 +165,21 @@ st.markdown(
     "convention for putting biological cells in OpenUSD files. "
     "[Read the standard and its code examples →](/?page=biousd)"
 )
+# Dated by COMMIT, not by a build date: the image's build date falls back
+# to today's date when nothing passes one, so it cannot prove freshness.
+# The commit is baked in and can be checked against the public repository,
+# which is what lets a reader watch this audit move over time.
+_sha = os.environ.get("COGNISOM_GIT_SHA", "")
+if _sha and _sha != "dev":
+    _stamp = ("as of commit [`" + _sha[:7] + "`]"
+              "(https://github.com/eyedwalker/cognisom/commit/" + _sha + ")")
+else:
+    _stamp = "running from a working tree rather than a tagged commit"
 st.caption(
-    "Source of this page: `cognisom/dashboard/capabilities.py` in "
-    "[github.com/eyedwalker/cognisom](https://github.com/eyedwalker/cognisom). "
-    "Apache 2.0."
+    "This audit is generated from `cognisom/dashboard/capabilities.py`, "
+    + _stamp + ", in [github.com/eyedwalker/cognisom]"
+    "(https://github.com/eyedwalker/cognisom) (Apache 2.0). Every Built "
+    "row's Evidence column links to the test that holds it at that "
+    "commit, so the audit can be re-checked, and its movement over time "
+    "can be read from the repository's history."
 )

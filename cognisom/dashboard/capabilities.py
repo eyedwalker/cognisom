@@ -388,28 +388,82 @@ LAYERS: Tuple[Layer, ...] = (
     ),
 )
 
-#: The largest distances between the platform and the aspiration, in the
-#: order they would change what the simulation can say.
+#: The largest distances between the platform and the aspiration. ORDERED,
+#: with what each one needs before it can start, because a list of five
+#: goals with no sequencing is an inventory and not a plan.
 TARGETS: Tuple[Tuple[str, str], ...] = (
-    ("The start and growth of an immune response",
-     "T cells that multiply when they recognise their target, and the "
-     "dendritic cells and lymph-node priming that start a response. "
-     "Without them a run cannot show a response beginning or growing, "
-     "which is what vaccines and checkpoint blockade act on."),
-    ("The tumour's surroundings",
-     "Fibroblasts, matrix that cells produce, oxygen and glucose fields "
-     "that cells actually consume, and new blood vessels. In real tumours "
-     "these decide whether immune cells and drugs get in at all."),
     ("Treatments, cell by cell",
-     "Chemotherapy, radiation, cell therapy and vaccines, with drug "
-     "delivery into tissue, in the same simulation that already runs "
-     "checkpoint blockade and androgen deprivation."),
+     "Chemotherapy, radiation, cell therapy and vaccines, and above all a "
+     "drug concentration: today a treatment is a dimensionless 0-1 knob, "
+     "so the engine cannot answer a question about dose or schedule. "
+     "NEEDS NOTHING NEW \u2014 the label half-lives are already sourced and "
+     "tested, and the vessel geometry a drug would diffuse from already "
+     "exists. This is first because it is unblocked."),
+    ("The tumour's surroundings",
+     "A stromal compartment: fibroblasts, smooth muscle and the matrix "
+     "they make. Measured on human sections, stroma is 54.8% of prostate "
+     "tissue and the engine has none of it, which is the largest single "
+     "piece of missing biology. Independent of everything else here, and "
+     "second because it changes every contact-mediated number in the "
+     "model, so it is better done before more numbers are pinned."),
+    ("The start and growth of an immune response",
+     "T cells that multiply when they recognise their target (now built, "
+     "off by default), and the dendritic cells and lymph-node priming "
+     "that start a response at all. NEEDS A NEW COMPARTMENT outside the "
+     "tissue, plus trafficking into and out of it, which is why it is "
+     "third despite being the deepest gap: vaccines act on exactly this."),
     ("Scale and time",
-     "From thousands of cells over a day to millions over months, and one "
-     "path from the cell-level simulation to a patient-level outcome."),
+     "From thousands of cells over a day to millions over months. This is "
+     "an ALGORITHM problem before it is a hardware one: the engine is "
+     "already near-linear in cell count, the one super-linear term is the "
+     "immune target scan, and a spatial index for it exists in the "
+     "codebase with no callers. The oxygen grid is a separate, genuinely "
+     "hard problem \u2014 a capillary is one voxel wide, so a coarser grid "
+     "is not the fix. Cuts across the three above."),
     ("Validation",
-     "Predictions tested against held-out patient data, not only against "
-     "the literature the model was built from."),
+     "Predictions tested against held-out patient data rather than the "
+     "literature the model was built from. Gated on the others: there is "
+     "little point testing an outcome prediction while half the tissue "
+     "and all of the drug pharmacology are missing."),
+)
+
+#: Answering "is scale a GPU problem, an algorithm problem or a biology
+#: problem?" with measurements rather than an impression, because it is
+#: the first question a technical reader asks and the page used to state
+#: only the gap.
+SCALE_NOTE = (
+    "**Where the scale problem actually is.** Measured, not estimated: the "
+    "engine costs about 2.1 seconds per simulated hour at 2,000 cells and "
+    "grows very nearly linearly with cell count, so the arithmetic to a "
+    "million cells is not the obstacle. Two specific things are. The "
+    "immune system's search for targets is the one part that grows faster "
+    "than linearly, and a spatial index that would fix it already exists "
+    "in this codebase with nothing calling it. And the oxygen diffusion "
+    "grid is a genuinely hard problem rather than a slow one \u2014 a "
+    "capillary is a single voxel wide, so a coarser grid does not "
+    "approximate it, it deletes it. Neither is a question of buying a "
+    "bigger GPU. Time is the harder half: a clinical response takes "
+    "months, and nothing in the model yet argues that a month of "
+    "simulated tissue behaves like a month of a patient."
+)
+
+#: The patient-outcome model is shaped like a product and is NOT the
+#: cell-level engine, so it gets its own statement rather than one row in
+#: a table where it reads as if the two were one thing.
+OUTCOME_MODEL_NOTE = (
+    "**A second, separate model \u2014 read this before quoting any survival "
+    "number.** Alongside the cell-by-cell simulation there is a "
+    "patient-level outcome model covering nine treatment regimens. It is "
+    "a tumour-size equation calibrated to a single published control arm "
+    "(PROfound, 3.6 months median radiographic progression-free "
+    "survival), it carries each drug's label half-life so a stopped "
+    "course washes out, and it handles combinations. It **does not call "
+    "the cell-level engine at all.** Nothing a simulated tumour does "
+    "reaches it, and nothing it predicts is derived from this patient's "
+    "genome beyond the regimen choice. Connecting the two is the point of "
+    "the treatment work above; until then they are two models under one "
+    "name, and only the cell-level one is what the rest of this page "
+    "describes."
 )
 
 

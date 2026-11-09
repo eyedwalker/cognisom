@@ -136,3 +136,76 @@ def test_the_biousd_page_shows_the_spec_the_validator_uses():
     assert spec in _all_markdown(at), (
         "the page must render the generated specification verbatim, not a "
         "copy that can drift from vocabulary.py")
+
+
+# ── the citation has to be worth something ───────────────────────────
+#
+# The checks above establish that a Built row names a file and that the
+# file is there. That is weaker than it looks, and an outside reviewer
+# spotted the shape of the gap: nothing stopped a row's evidence column
+# from pointing at something that does not test anything. The build does
+# refuse a Built row with no citation at all -- so a Partial cannot
+# quietly become a Built -- but "cites a path that exists" is not the
+# same as "is held by a test".
+#
+# What can be checked mechanically is checked here. What cannot is said
+# plainly: no test can confirm that a named test actually exercises the
+# capability its row describes. That remains a matter of review.
+
+def _evidence_paths():
+    return sorted({p for _, row in all_rows() for p in row.evidence})
+
+
+@pytest.mark.parametrize("rel", _evidence_paths())
+def test_a_cited_test_file_actually_defines_tests(rel):
+    """A row may cite a test file or an analysis script, and the two have
+    different obligations. A file under tests/ must define at least one
+    test function; anything else must be real code, not a stub."""
+    import ast
+
+    path = REPO / rel
+    tree = ast.parse(path.read_text())
+    if rel.startswith("tests/"):
+        tests = [n.name for n in ast.walk(tree)
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and n.name.startswith("test")]
+        assert tests, (
+            f"{rel} is cited as evidence but defines no test function, so "
+            "it holds nothing")
+    else:
+        defined = [n for n in ast.walk(tree)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                     ast.ClassDef))]
+        assert defined, f"{rel} is cited as evidence but defines nothing"
+        assert ast.get_docstring(tree), (
+            f"{rel} is cited as evidence and is not a test, so it must at "
+            "least say what it establishes")
+
+
+def test_every_cited_test_is_collectable_by_pytest():
+    """A row cannot cite a file the suite cannot even collect -- a syntax
+    error or a bad import would otherwise leave the page claiming
+    evidence from a test that never runs."""
+    import subprocess
+    import sys
+
+    paths = [p for p in _evidence_paths() if p.startswith("tests/")]
+    assert paths, "no row cites a test at all"
+    out = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q",
+         "-p", "no:cacheprovider", *paths],
+        cwd=REPO, capture_output=True, text=True, timeout=600)
+    assert out.returncode == 0, (
+        "pytest cannot collect every cited test:\n"
+        + (out.stdout or "")[-2000:] + (out.stderr or "")[-2000:])
+
+
+def test_the_page_says_how_the_audit_can_be_dated():
+    """An audit nobody can date cannot be re-checked, and a build date is
+    not a date: the image's falls back to today when none is passed. The
+    page therefore stamps the COMMIT, which is baked in and verifiable
+    against the public repository."""
+    page = ROADMAP.read_text()
+    assert "COGNISOM_GIT_SHA" in page, (
+        "the page does not stamp the commit it was generated from")
+    assert "/commit/" in page, "the commit is not linked to the repository"
