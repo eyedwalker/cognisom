@@ -105,6 +105,17 @@ def test_enzalutamide_blocks_a_wild_type_receptor_and_feeds_an_f876l_one(store):
     assert "k_bind" not in fed.get("ode", {})
     assert "division_time_cancer" not in fed.get("cellular", {})
     assert len(bridge.last_notes) == 1 and "AGONIST" in bridge.last_notes[0] and "F876L" in bridge.last_notes[0]
+    # "fed" is now literal. This test used to stop at the three
+    # assertions above -- that the blockade was NOT applied -- which was
+    # all the bridge did: it skipped the drug, so an F876L patient on
+    # enzalutamide was simulated as an untreated man. Safe and wrong. The
+    # drug activates the receptor it was prescribed to block, at a
+    # measured 3.05x the untreated baseline (Balbas 2013, PMID 23580326);
+    # see tests/test_an_agonist_is_applied_as_activation.py.
+    assert (fed["ar_signaling"]["ar_transcriptional_activity"]
+            == pb.AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY > 1.0)
+    assert "ar_transcriptional_block" not in fed["ar_signaling"], (
+        "activation and blockade in the same config would cancel")
 
 
 # ── and the engine does what the bridge says ──────────────────────

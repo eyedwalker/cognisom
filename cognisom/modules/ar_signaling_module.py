@@ -94,6 +94,42 @@ class ARSignalingModule(SimulationModule):
         self.transcriptional_block = float(
             self.config.get('ar_transcriptional_block', 0.0))
 
+        # ── when the drug is an AGONIST on this patient's receptor ──
+        #
+        # A blockade is one case of a general quantity: what the drug does
+        # to the transcription the AR-DHT complex drives. For most
+        # patients that is suppression, and `ar_transcriptional_block`
+        # expresses it as 1 - activity. But an AR variant can instead
+        # make the same drug an ACTIVATOR, and then the factor is above 1
+        # and no amount of "block" can express it.
+        #
+        # MEASURED, Balbas et al., eLife 2013;2:e00499, PMID 23580326
+        # (open access, read in full). One AR-dependent EGFP reporter in
+        # LNCaP-Pb.PSE.EGFP, geometric-mean fluorescence, with vehicle
+        # baselines that match each other to within 1% so the two rows
+        # are directly comparable:
+        #
+        #     AR          vehicle   enzalutamide   DHT
+        #     wild type     348         66.4       1554
+        #     F876L         345       1,051        1699
+        #
+        # So on wild-type AR enzalutamide suppresses to 66.4/348 = 0.191
+        # of baseline, and on F876L it ACTIVATES to 1051/345 = 3.05 of
+        # baseline -- which is 1051/1699 = 62% of what DHT itself
+        # achieves, so it is a PARTIAL agonist and not a full one. A
+        # separate CV1 luciferase assay in the same paper gives ~50-fold
+        # induction; the reporter figures are used here because they
+        # carry a matched untreated baseline, which is what this ratio
+        # has to be measured against.
+        #
+        # The factor is set directly rather than derived from the block,
+        # and defaults to exactly 1 - block so every existing run is
+        # bit-identical.
+        activity = self.config.get('ar_transcriptional_activity', None)
+        self.transcriptional_activity = (
+            (1.0 - self.transcriptional_block) if activity is None
+            else float(activity))
+
         self.system = None
         self.rhs = None
         self.params: Dict[str, float] = {}
@@ -189,14 +225,20 @@ class ARSignalingModule(SimulationModule):
 
     def signalling_fraction(self, cell_id: int) -> Optional[float]:
         """The cell's ACTIVE AR signalling as a fraction of the untreated
-        eugonadal steady state, clamped to [0, 1]; None if the cell is not
-        mapped. This is the one number the cellular module reads.
+        eugonadal steady state; None if the cell is not mapped. This is
+        the one number the cellular module reads.
+
+        Clamped to [0, activity], which is [0, 1] for every untreated or
+        suppressed cell and the whole point for an agonist-driven one.
+        The docstring used to say [0, 1] unconditionally, which was true
+        only while suppression was the only thing a drug could do.
 
         Two things reduce it, and they are different: less androgen
         reaching the receptor (castration, which lowers the complex) and
         an anti-androgen blocking what the complex does (which does not
         lower the complex at all). A tumour under both is suppressed by
-        the product.
+        the product. And one thing RAISES it above 1: a drug that is an
+        agonist on this patient's receptor variant.
         """
         value = self.species_of(cell_id, "AR_DHT")
         if value is None or self.eugonadal_state is None:
@@ -204,8 +246,19 @@ class ARSignalingModule(SimulationModule):
         ref = float(self.eugonadal_state[self._i["AR_DHT"]])
         if ref <= 0:
             return None
-        active = (value / ref) * (1.0 - self.transcriptional_block)
-        return float(min(1.0, max(0.0, active)))
+        active = (value / ref) * self.transcriptional_activity
+        # The ceiling is the activity factor, not 1.0. It was 1.0 because
+        # only suppression could happen, and a hard 1.0 would silently
+        # discard the entire agonist effect: an F876L cell under
+        # enzalutamide is MORE AR-driven than an untreated patient, which
+        # is the whole point, and clamping it to "normal" would report a
+        # treated patient as untreated. Downstream this is already
+        # handled correctly -- cellular_module divides by the fraction, so
+        # 3.05 makes the cancer cycle about three times faster, and the
+        # androgen-withdrawal hazard only fires below a threshold, so an
+        # agonist-driven cell correctly does not die of deprivation.
+        ceiling = max(1.0, self.transcriptional_activity)
+        return float(min(ceiling, max(0.0, active)))
 
     # ── stepping ──────────────────────────────────────────────────
 
@@ -272,14 +325,17 @@ class ARSignalingModule(SimulationModule):
         k = len(self.species)
         params = dict(self.params)
         params['DHT_input'] = np.array([self.dht_input_for(v) for v in dht])
-        if self.transcriptional_block > 0.0:
+        if self.transcriptional_activity != 1.0:
             # The drug acts on what the complex DOES, so it scales the
             # transcription the complex drives, not the complex itself.
             # self.params stays the pristine library system, and
             # eugonadal_state stays the UNTREATED reference, so a treated
-            # cell reads below 1.0 against an untreated patient.
+            # cell reads below 1.0 against an untreated patient -- or
+            # ABOVE 1.0 when the drug is an agonist on this receptor.
+            # Keyed on the activity, not on the block, so an agonist
+            # (activity > 1) is applied and not skipped.
             params['k_psa_tx'] = (self.params['k_psa_tx']
-                                  * (1.0 - self.transcriptional_block))
+                                  * self.transcriptional_activity)
 
         def f(t, yf):
             return self.rhs(t, yf.reshape(n, k), params).ravel()

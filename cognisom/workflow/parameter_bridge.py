@@ -354,6 +354,24 @@ CASTRATION_APOPTOSIS_BLOCKERS = frozenset({"TP53", "BCL2", "MYC"})
 #   (PMID 1540595).
 #   F876L (F877L): enzalutamide and ARN-509 (apalutamide) become
 #   agonists -- Joseph et al. 2013 (PMID 23779130).
+#
+# WHAT IS DELIBERATELY ABSENT from the F876L set is as load-bearing as
+# what is in it. Darolutamide (ODM-201) is NOT an agonist on this
+# receptor: Moilanen et al. 2015, Sci Rep 5:12007 (PMID 26137992, open
+# access) ran all of them side by side in U2-OS transactivation assays
+# and found that "the F876L substitution in AR switched enzalutamide and
+# ARN-509 from antagonists to agonists", while "only ODM-201 and its
+# main metabolite ORM-15341 functioned as full antagonists for all
+# tested mutant ARs". The switch is a property of the bisaryl-
+# thiohydantoins, not of AR blockade, so darolutamide keeps the class
+# blockade on an F876L patient -- and that is the one clinically useful
+# thing this path says: there is a drug this patient can still be given.
+#
+# Moilanen also reports an agonism this table does NOT yet carry:
+# bicalutamide is agonistic on AR W741L. Neither bicalutamide nor W741L
+# is anywhere else in this codebase, and an entry whose drug the library
+# does not hold is an unreachable key -- the exact silent no-op that hid
+# the inert anti-androgen class. So it is recorded here and not added.
 AR_AGONIST_ON_VARIANT: Dict[str, frozenset] = {
     "T877A": frozenset({"flutamide", "hydroxyflutamide", "nilutamide",
                         "cyproterone", "cyproterone acetate"}),
@@ -361,6 +379,30 @@ AR_AGONIST_ON_VARIANT: Dict[str, frozenset] = {
 }
 AR_AGONIST_ON_VARIANT["T878A"] = AR_AGONIST_ON_VARIANT["T877A"]
 AR_AGONIST_ON_VARIANT["F877L"] = AR_AGONIST_ON_VARIANT["F876L"]
+
+#: What the drug does to AR transcription when it is an AGONIST on this
+#: patient's receptor, as a multiple of the untreated baseline.
+#:
+#: 3.05 is MEASURED: Balbas et al., eLife 2013;2:e00499, PMID 23580326,
+#: open access. One AR-dependent reporter, geometric-mean fluorescence,
+#: vehicle baselines matching within 1% so the rows compare directly --
+#: wild-type AR under enzalutamide 66.4/348 = 0.191 of baseline, F876L
+#: under enzalutamide 1051/345 = 3.05. It is PARTIAL agonism: 1051/1699
+#: is 62% of what DHT achieves in the same assay, so this must not be
+#: modelled as "enzalutamide becomes androgen".
+#:
+#: Carried as one number because the engine's AR module takes one factor;
+#: the suppressed case keeps its own ESTIMATE (block 0.9 -> activity 0.1)
+#: rather than adopting Balbas's 0.191, because changing it would move
+#: every pinned castration number and is a separate decision. The two
+#: therefore come from different sources, which is why the agonist figure
+#: is expressed against the UNTREATED baseline -- a quantity Balbas
+#: measures directly -- and not as a ratio to the suppressed case.
+AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY: float = 3.05
+AR_AGONIST_ACTIVITY_SOURCE: str = (
+    "Balbas 2013 PMID 23580326 (eLife, open access), AR-dependent EGFP "
+    "reporter: F876L + enzalutamide 1051 vs vehicle 345 = 3.05x baseline, "
+    "62% of the DHT maximum (partial agonist)")
 
 
 def anti_androgen_is_agonist(drug_name: str, variant_labels: List[str]) -> Optional[str]:
@@ -524,10 +566,29 @@ class ParameterBridge:
                           if (drug_class == "anti_androgen" or "AR" in
                               [str(x).upper() for x in (entity.targets or [])]) else None)
             if agonist_on:
-                note = (f"{drug_name} is an AGONIST on this patient's AR {agonist_on}: "
-                        f"the anti-androgen blockade was not applied")
+                # It USED TO stop here: the blockade was skipped and the
+                # patient simulated as untreated. That was safe but
+                # wrong in a way that mattered -- the drug does not do
+                # nothing to this patient, it drives the receptor it was
+                # meant to block, so an untreated simulation understates
+                # the harm. The agonist is now APPLIED, at the measured
+                # activity, which cellular_module turns into a faster
+                # cancer cycle because it divides the division time by
+                # the AR fraction.
+                note = (f"{drug_name} is an AGONIST on this patient's AR "
+                        f"{agonist_on}: applied as AR activation at "
+                        f"{AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY:.2f}x the "
+                        f"untreated baseline, NOT as a blockade "
+                        f"({AR_AGONIST_ACTIVITY_SOURCE})")
                 self.last_notes.append(note)
                 log.warning("ParameterBridge: %s", note)
+                configs.setdefault("ar_signaling", {}).update({
+                    "ar_transcriptional_activity":
+                        AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY,
+                })
+                # The class blockade and the target mapping must still NOT
+                # be applied -- they would reimpose suppression on top of
+                # the activation and the two would cancel.
                 continue
             # Strategy 1: Target-based mapping (highest specificity)
             for target in (entity.targets or []):
