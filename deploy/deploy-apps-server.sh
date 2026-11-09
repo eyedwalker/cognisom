@@ -213,7 +213,13 @@ fi
 info "Preparing data volumes for uid ${RUNTIME_UID}..."
 mkdir -p "$DATA_DIR"/{auth,scrna,research_cache,subscriptions,flywheel,feedback,agent_interactions,model_registry,distilled_models,calibration}
 mkdir -p "$EXPORTS_DIR"
-chown -R "${RUNTIME_UID}:${RUNTIME_GID}" "$DATA_DIR" "$EXPORTS_DIR"
+# STATIC_DIR belongs here too, and it was left out when step 6 was added:
+# the generator runs as the image's unprivileged user and a root-owned
+# bind mount gives PermissionError on /out/audit.html. That is the exact
+# hazard invariant 1 above describes, applied to a third directory.
+mkdir -p "$STATIC_DIR"
+chown -R "${RUNTIME_UID}:${RUNTIME_GID}" "$DATA_DIR" "$EXPORTS_DIR" \
+    "$STATIC_DIR"
 ok "Volumes owned by ${RUNTIME_UID}:${RUNTIME_GID}"
 
 # ─── 2. Image ────────────────────────────────────────────────
@@ -315,7 +321,6 @@ echo "Previous container retained as ${CONTAINER}-prev for rollback."
 # ahead of the proxy; a failure here must not fail a healthy deploy.
 echo
 info "Writing the crawlable audit copy to ${STATIC_DIR}..."
-mkdir -p "$STATIC_DIR"
 if docker run --rm -v "$STATIC_DIR:/out" \
      -e COGNISOM_GIT_SHA="$(docker inspect "$CONTAINER" --format \
         '{{range .Config.Env}}{{println .}}{{end}}' \
