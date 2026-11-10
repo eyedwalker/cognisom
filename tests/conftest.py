@@ -18,6 +18,38 @@ from __future__ import annotations
 
 import os
 
+# One BLAS thread per test process.
+#
+# OpenBLAS starts a thread per core. This suite is run under xdist, so on
+# an 18-core laptop four workers started 72 spinning threads; measured on
+# one slow file, 3,990 s of SYSTEM time against 11 s capped, and the run
+# was a quarter slower even alone. Under the full suite the load average
+# reached 60-77 and tests that take 40 s died at the 120 s timeout with
+# nothing wrong with them. The engine's arrays are small enough that the
+# threads only contend.
+#
+# setdefault, so a caller can still ask for more.
+#
+# The environment variable alone is NOT enough. It is read when the BLAS
+# library loads, and the zarr pytest plugin imports numpy before this
+# file runs -- so it reaches xdist workers (they inherit the environment)
+# and silently misses a plain single-process run. The pool that is
+# already loaded is therefore capped at runtime as well.
+# test_the_suite_does_not_oversubscribe_the_machine checks the pool
+# itself, in whichever kind of process it runs in.
+_BLAS_THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS",
+                     "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS",
+                     "NUMEXPR_NUM_THREADS")
+_caller_chose_threads = any(v in os.environ for v in _BLAS_THREAD_VARS)
+for _var in _BLAS_THREAD_VARS:
+    os.environ.setdefault(_var, "1")
+if not _caller_chose_threads:
+    try:
+        from threadpoolctl import threadpool_limits
+        threadpool_limits(limits=1, user_api="blas")
+    except ImportError:
+        pass
+
 
 def _mhcflurry_usable() -> bool:
     """Whether MHCflurry can actually predict, not merely be imported.
