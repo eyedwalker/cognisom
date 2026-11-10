@@ -189,6 +189,16 @@ def describe_subject(patient: Optional[Any]) -> RunSubject:
             "does not match the reference). Each is listed with its reason."
         )
 
+    # Disclosures the profile carries about its own provenance -- biopsy
+    # site, prior treatment, genome build. These cannot be derived from
+    # the callset, so they are declared where the cohort is declared
+    # (``genomics/demo_patients.py``) and surfaced here beside the ones
+    # computed above. They go LAST because the computed caveats describe
+    # what this run did, and these describe what it is a run OF.
+    caveats.extend(
+        str(c) for c in (getattr(patient, "provenance_caveats", None) or [])
+    )
+
     return RunSubject(
         patient=patient,
         patient_id=inputs.patient_id,

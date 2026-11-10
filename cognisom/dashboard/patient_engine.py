@@ -48,39 +48,16 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from cognisom.genomics.hla_typer import READ_DERIVED_HLA_METHODS  # noqa: E402
 
-#: Three-letter amino-acid codes, as VEP's HGVSp writes them.
-_AA3 = {
-    "Ala": "A", "Arg": "R", "Asn": "N", "Asp": "D", "Cys": "C",
-    "Gln": "Q", "Glu": "E", "Gly": "G", "His": "H", "Ile": "I",
-    "Leu": "L", "Lys": "K", "Met": "M", "Phe": "F", "Pro": "P",
-    "Ser": "S", "Thr": "T", "Trp": "W", "Tyr": "Y", "Val": "V",
-    "Ter": "*", "Sec": "U",
-}
-_AA = r"(?:[A-Z][a-z]{2}|[A-Z*])"
-_CHANGE = re.compile(rf"^(?:p\.)?\(?({_AA})(\d+)({_AA})\)?$")
-
-
-def _one_letter(token: str) -> str:
-    return _AA3.get(token, token) if len(token) == 3 else token
-
-
-def parse_missense(protein_change: Optional[str]) -> Optional[Tuple[str, int, str]]:
-    """``"p.N218T"`` or ``"p.Asn218Thr"`` -> ``("N", 218, "T")``.
-
-    Returns None for anything that is not a single-residue missense
-    substitution: nonsense (``*``), frameshift, in-frame indel,
-    synonymous (same residue both sides) or unparseable.
-    """
-    if not protein_change:
-        return None
-    match = _CHANGE.match(protein_change.strip())
-    if not match:
-        return None
-    wild, position, mutant = (_one_letter(match.group(1)), int(match.group(2)),
-                              _one_letter(match.group(3)))
-    if "*" in (wild, mutant) or wild == mutant or position < 1:
-        return None
-    return wild, position, mutant
+# The HGVS protein-change parser lives in ``genomics.protein_change``
+# and is re-exported here, where callers and tests already import it
+# from. It used to be DEFINED here, and that was the problem: the
+# neoantigen predictor had its own copy whose regex was unanchored at
+# the end, so this function refused ``p.A1679Pfs*38`` as a frameshift
+# while the predictor cut peptides from it as a missense A1679P. The two
+# halves of one demo disagreed about what the tumour presents. One
+# definition now, in the package where variants live.
+from cognisom.genomics.protein_change import (             # noqa: E402,F401
+    AA3_TO_ONE, PROTEIN_CHANGE, one_letter, parse_missense)
 
 
 @dataclass
@@ -183,6 +160,27 @@ def engine_inputs(profile: Any) -> PatientEngineInputs:
             out.skipped.append((gene, change, f"position {position} is past the "
                                               f"protein's {len(sequence)} residues"))
             continue
+        # DELIBERATELY the canonical numbering only, NOT
+        # ``resolve_for_wildtype``. This function differs from the
+        # neoantigen predictor on purpose, and the difference is not an
+        # inconsistency to tidy up:
+        #
+        #   * the predictor emits a PEPTIDE. All that matters is cutting
+        #     the window at the residue the call means, so it resolves a
+        #     call in either AR numbering convention -- see
+        #     ProteinInfo.resolve_for_wildtype.
+        #   * this emits an IDENTITY LABEL ("AR_T877A") that other code
+        #     string-matches. Accepting a historically numbered call here
+        #     would mean either labelling it 877 while the residue is
+        #     878, or relabelling it and breaking every match. Both are
+        #     fabrication, so a historically numbered AR call is REPORTED
+        #     as a skip instead -- see
+        #     test_the_ar_hotspot_is_reported_not_silently_renumbered.
+        #
+        # I changed this to the shared resolution and that test caught
+        # it. The canonical-numbering call this demo actually needs
+        # (SU2C's AR F877L) already matches at offset 0 and crosses here
+        # unchanged; it was only the PREDICTOR that refused it.
         if sequence[position - 1] != wild:
             out.skipped.append((
                 gene, change,

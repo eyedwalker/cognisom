@@ -29,6 +29,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLA_BINDING_PROPERTIES
 from .vcf_parser import Variant
+from .protein_change import PROTEIN_CHANGE, one_letter
 
 logger = logging.getLogger(__name__)
 
@@ -448,7 +449,19 @@ class NeoantigenPredictor:
 
             # Parse mutation
             clean_mut = mutation_str.replace("p.", "").strip()
-            match = re.match(r"([A-Z])(\d+)([A-Z])", clean_mut)
+            # Through the SHARED parser. This was
+            # ``re.match(r"([A-Z])(\d+)([A-Z])", clean_mut)`` -- not
+            # anchored at the end -- so every ``fs``, ``del``, ``ins``
+            # and ``dup`` suffix was silently discarded and the variant
+            # was mistaken for a substitution. On the SU2C prostate
+            # patient that cut peptides from three frameshifts, two of
+            # which scored among the six strongest binders in the whole
+            # profile: 9-mers built as if a frameshift at residue 1679
+            # replaced one residue instead of everything after it. A
+            # frameshift is a real and often rich neoantigen source, but
+            # it needs the novel downstream frame, which this repository
+            # does not derive -- so the honest result is this refusal.
+            match = PROTEIN_CHANGE.match(clean_mut)
             if not match:
                 # Frameshift, nonsense, splice, complex. These can be real
                 # neoantigen sources -- frameshifts especially -- but the
@@ -457,9 +470,16 @@ class NeoantigenPredictor:
                 diag.skipped_not_missense += 1
                 continue
 
-            wt_aa = match.group(1)
+            # ``one_letter`` because the shared pattern also admits VEP's
+            # three-letter codes (``p.Asn218Thr``). The old local regex
+            # could not match those at all -- ``([A-Z])(\d+)`` needs a
+            # digit straight after the first letter -- so they were
+            # silently counted as "not missense". They now resolve, which
+            # is a gain and not a behaviour change for either demo
+            # callset: both write one-letter HGVSp.
+            wt_aa = one_letter(match.group(1))
             pos = int(match.group(2))  # 1-indexed
-            mut_aa = match.group(3)
+            mut_aa = one_letter(match.group(3))
 
             # `[A-Z]` matches more than the twenty residues. `X` (unknown or
             # frameshifted product) and `B`/`Z`/`J`/`U`/`O` (ambiguity and
@@ -493,27 +513,39 @@ class NeoantigenPredictor:
             # and every peptide built here would carry a substitution at a
             # residue the protein does not have.
             #
-            # `residue_at` applies the gene's numbering offset, so a call
-            # reported in a different isoform's numbering (AR is the live
-            # case) resolves instead of being refused.
-            observed = protein.residue_at(pos)
-            if observed is None or observed != wt_aa:
+            # `resolve_for_wildtype` tries the gene's curated numbering
+            # offset and then the canonical numbering, so a call reported
+            # in either convention resolves instead of being refused. AR
+            # is the live case and it is not hypothetical: the literature
+            # hotspot is F876L and the SU2C cohort reports the same
+            # residue as F877L. A single fixed offset refuses one of them.
+            resolved = protein.resolve_for_wildtype(pos, wt_aa)
+            if resolved is None:
                 diag.skipped_wildtype_mismatch += 1
                 detail = (
-                    f"{gene} {clean_mut}: reference has {observed} at "
-                    f"position {pos}, not {wt_aa}"
+                    f"{gene} {clean_mut}: reference has "
+                    f"{protein.residue_at(pos)} at position {pos}, not "
+                    f"{wt_aa} (tried both the curated numbering offset "
+                    f"{protein.numbering_offset:+d} and the canonical "
+                    f"numbering)"
                 )
                 diag.mismatch_details.append(detail)
                 logger.warning("%s. No peptides generated.", detail)
                 continue
+            resolved_index, _offset_used = resolved
 
             # Generate mutant and WT peptides around the mutation site.
             # Nothing is scored yet: every peptide in the whole run is
             # collected first so the binding predictions can be made in a
             # single batched call -- see _warm_binding_cache.
+            # The index the wild-type residue was actually FOUND at, not
+            # the one the curated offset predicts: for a call in the
+            # canonical numbering those differ, and cutting the window at
+            # the predicted index would centre every peptide one residue
+            # away from the substitution.
             windows = [
                 (pep_len, self._generate_peptides(
-                    protein.sequence, protein.resolve_position(pos),
+                    protein.sequence, resolved_index,
                     wt_aa, mut_aa, pep_len))
                 for pep_len in peptide_lengths
             ]

@@ -30,3 +30,32 @@ and an equivalent circular diameter computed per cell. Its own header
 records the source URL, the source checksum, the selection rule and the
 QC filter, so the attribution travels with the data. Anyone redistributing
 that file, or a derivative of it, must keep the 10x Genomics attribution.
+
+cognisom/genomics/su2c_prostate_demo.vcf contains the somatic callset of
+one patient (sample SC_9184_T, patient 97115558) extracted from a public
+prostate cancer cohort:
+
+    Abida et al., "Genomic correlates of clinical outcome in advanced
+    prostate cancer", PNAS 2019, PMID 31061129. SU2C/PCF Dream Team:
+    Precision Therapy for Advanced Prostate Cancer. Obtained via
+    cBioPortal study prad_su2c_2019.
+    https://www.cbioportal.org/study/summary?id=prad_su2c_2019
+
+    Licensed under the Open Data Commons Open Database License (ODbL)
+    1.0, http://opendatacommons.org/licenses/odbl/1.0/
+
+ODbL is a share-alike licence for databases and governs only that file,
+not the rest of this repository. It requires that public use of the
+database, or of works produced from it, be attributed; that resulting
+data-sets stay open; and that a shared or adapted version be offered
+under ODbL. Anyone redistributing that VCF, or a derivative of it, must
+keep the SU2C/PCF attribution and the ODbL terms.
+
+The file is a transformation of the cohort's data_mutations.txt: one
+patient's 93 somatic rows, converted to VCF by scripts/su2c_to_vcf.py.
+Its own header records the source study, the PMID, the licence, the
+genome build, and — the part a reader most needs — that the normal
+column's 0/0 genotype asserts the consortium's somatic determination
+rather than carrying normal read evidence, because the source publishes
+none. The cohort MAF itself is NOT redistributed here; data/ is
+gitignored.

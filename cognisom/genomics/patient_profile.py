@@ -82,6 +82,21 @@ class PatientProfile:
     #: this is how a reader tells that apart from a quiet tumour.
     vep_annotation: Dict[str, Any] = field(default_factory=dict)
 
+    #: Disclosures about where this callset CAME FROM that weaken a
+    #: result and that no amount of reading the VCF would reveal: which
+    #: tissue the biopsy was taken from, what the patient had already
+    #: been treated with, which genome build the coordinates are on.
+    #:
+    #: Everything the builder can derive for itself -- unmeasured HLA, no
+    #: matched normal, variants that cannot cross into the engine -- is
+    #: computed in ``sim_request.describe_subject`` and must NOT be
+    #: duplicated here, or a page would print it twice and a change to
+    #: one copy would silently disagree with the other. Populated by
+    #: ``demo_patients.DemoPatient.load`` for the demo cohort; empty for
+    #: a profile built straight from a VCF, which is correct, because
+    #: nothing then knows the provenance.
+    provenance_caveats: List[str] = field(default_factory=list)
+
     # Why variants produced no neoantigens, and which scorer ran.
     # An empty neoantigen list is otherwise ambiguous between "this
     # tumor presents nothing" and "we could not evaluate it".

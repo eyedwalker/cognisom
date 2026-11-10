@@ -42,6 +42,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from cognisom.genomics.demo_patients import (        # noqa: E402
+    DEFAULT_DEMO_PATIENT, DEMO_PATIENTS)
+
 #: Fixed so the recording can be regenerated frame for frame. The engine
 #: draws from one shared RNG stream, so this seeds the whole run.
 SEED = 7
@@ -57,14 +60,21 @@ KILL_MARKER_HOURS = 1.0   # how long a kill cross stays on screen
 
 
 def _load_patient(which: str):
-    """The demo callset, or None for the generic genome."""
+    """The demo callset, or None for the generic genome.
+
+    Goes through ``genomics.demo_patients`` rather than naming a VCF and
+    a patient id here. That module owns the cohort, so the id this script
+    builds under is the id the HLA registry is consulted with -- the two
+    drifting apart is exactly what put the demo on a population-default
+    panel while the measured typing sat in the repository -- and the
+    patient's provenance disclosures (biopsy site, prior treatment,
+    genome build) ride along on the profile instead of having to be
+    remembered by each caller.
+    """
     if which == "none":
         return None
-    from cognisom.genomics.patient_profile import PatientProfileBuilder
-    root = Path(__file__).resolve().parent.parent
-    vcf = root / "cognisom" / "genomics" / "seqc2_demo.vep.vcf"
-    return PatientProfileBuilder(cancer_type="breast").from_vcf_file(
-        str(vcf), patient_id="HCC1395")
+    from cognisom.genomics.demo_patients import load_demo_patient
+    return load_demo_patient(which)
 
 
 def _appearance_cache():
@@ -85,7 +95,11 @@ def main() -> int:
     ap.add_argument("--dt", type=float, default=0.05)
     ap.add_argument("--scenario", default="Immunotherapy")
     ap.add_argument("--tissue", default="section")
-    ap.add_argument("--patient", default="hcc1395", choices=["hcc1395", "none"])
+    # Prostate by default: the tissue geometry, the AR pathway and most
+    # of the drug library are prostate, so a breast cell line was the
+    # odd one out. "none" still runs the generic genome.
+    ap.add_argument("--patient", default=DEFAULT_DEMO_PATIENT,
+                    choices=sorted(DEMO_PATIENTS) + ["none"])
     ap.add_argument("--stride", type=int, default=2,
                     help="use every Nth snapshot as a video frame")
     ap.add_argument("--fps", type=int, default=12)

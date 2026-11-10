@@ -11,7 +11,7 @@ import gzip
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
@@ -80,6 +80,55 @@ class ProteinInfo:
         if not self.covers_position(pos):
             return None
         return self.sequence[self.resolve_position(pos) - 1]
+
+    def resolve_for_wildtype(self, pos: int,
+                             wt_aa: str) -> Optional[Tuple[int, int]]:
+        """``(index, offset_used)`` for a call whose wild-type residue is
+        ``wt_aa``, or None when neither convention fits.
+
+        WHY TWO CONVENTIONS. ``numbering_offset`` exists because AR calls
+        in the literature use a 919-aa reference while the canonical
+        sequence is 920 aa. But a call can arrive in EITHER convention,
+        and the same gene's offset cannot be right for both: the SU2C
+        cohort's MAF reports this patient's receptor mutation as
+        ``F877L`` (canonical numbering, offset 0) while the hotspot the
+        offset was calibrated on is the same residue called ``F876L``
+        (literature numbering, offset +1). Measured on the bundled AR
+        sequence, which has Q876 F877 T878:
+
+            claim    offset 0   offset +1
+            F876L    Q (no)     F (yes)
+            F877L    F (yes)    T (no)
+
+        So a single fixed offset necessarily refuses one of the two, and
+        it refused the real patient's own AR variant -- the one mutation
+        in this demo that the simulator has a mechanism for.
+
+        The curated offset is tried FIRST, so every call that resolved
+        before resolves identically now and no existing result moves.
+        Only a call the curated offset REFUSES gets a second attempt
+        against the canonical numbering.
+
+        This is not the "search for an offset that fits" that
+        NUMBERING_OFFSETS warns against. The candidate set is two
+        documented conventions for this one gene, not an open search, and
+        the wild-type residue discriminates between them at every hotspot
+        that matters: F876/F877 and T877/T878 each match exactly one. Two
+        of the eight calibration mutations (L701, M895) match at both,
+        because the residue is the same either way -- which is also why
+        the curated offset must win, so those keep the window they have
+        always had.
+        """
+        if not wt_aa:
+            return None
+        for offset in (self.numbering_offset, 0):
+            resolved = pos + offset
+            if 1 <= pos and 1 <= resolved <= len(self.sequence):
+                if self.sequence[resolved - 1] == wt_aa:
+                    return resolved, offset
+            if offset == 0:
+                break
+        return None
 
 
 # ── Reference proteome ───────────────────────────────────────────────

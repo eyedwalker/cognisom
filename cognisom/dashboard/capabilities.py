@@ -98,9 +98,19 @@ LAYERS: Tuple[Layer, ...] = (
             C("Cell state from expression data", PARTIAL,
               "A marker-based classifier. No foundation model runs."),
             C("A prostate patient on prostate tissue", PARTIAL,
-              "The public demo puts a breast-cancer callset (HCC1395) on "
-              "prostate tissue. 338 prostate genomes (SU2C) are available "
-              "but carry no HLA typing."),
+              "A real metastatic prostate callset now runs by default "
+              "(SU2C SC_9184_T, Abida 2019): 93 somatic variants, 36 "
+              "reaching the engine, carrying AR F877L after "
+              "abiraterone/enzalutamide exposure — so the resistance "
+              "mechanism the engine models is this patient's own. Still "
+              "partial for two reasons that cannot be fixed from this "
+              "data: SU2C publishes no HLA typing, so presentation runs "
+              "on a population panel; and the biopsy is a LIVER "
+              "metastasis laid out on prostate geometry. The published "
+              "recording still shows the earlier breast callset, which "
+              "its own sidecar states.",
+              ("tests/test_the_demo_patient_is_a_real_prostate_patient.py",
+               "tests/test_an_agonist_is_applied_as_activation.py")),
         ),
     ),
     Layer(
