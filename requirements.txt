@@ -3,6 +3,10 @@
 # Scientific computing
 numpy>=1.24.0
 scipy>=1.10.0
+# Caps BLAS at one thread for the length of an engine run
+# (dashboard/engine_runner.py). Without it the cap is skipped with a
+# warning, not an error, so it has to be declared to be relied on.
+threadpoolctl>=3.1.0
 # Reads the hand-fetched papers that tests pin library values against
 # (library/literature.py). It was installed by hand in ./venv and missing
 # from every fresh environment, which failed 14 paper-reading tests in the

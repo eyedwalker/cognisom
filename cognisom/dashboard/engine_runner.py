@@ -370,6 +370,46 @@ def section_variant(scenario: Dict[str, Any]) -> Dict[str, Any]:
 
 # ── Data collection ──────────────────────────────────────────────────
 
+
+#: BLAS threads the engine runs on. The engine's arrays are small, so a
+#: thread per core only contends: measured 2026-11-10 on the demo's own
+#: run (section, 8 h, Immunotherapy, 18 cores), one thread gave the SAME
+#: time series bit for bit in 32.6 s against 38.8 s, on 71 s of CPU
+#: against 619 s. Four threads were no faster than one. Re-measure, do
+#: not re-pin. ``COGNISOM_ENGINE_BLAS_THREADS=0`` leaves the pool alone.
+ENGINE_BLAS_THREADS_ENV = "COGNISOM_ENGINE_BLAS_THREADS"
+ENGINE_BLAS_THREADS_DEFAULT = 1
+
+
+def engine_blas_threads():
+    """Context manager: cap BLAS for the length of a run, then restore.
+
+    Scoped to the run rather than set process-wide, because the same
+    process also does work (the predictor, large solves) that this
+    measurement says nothing about.
+    """
+    import contextlib
+    import os
+
+    raw = os.environ.get(ENGINE_BLAS_THREADS_ENV, "")
+    try:
+        n = int(raw) if raw.strip() else ENGINE_BLAS_THREADS_DEFAULT
+    except ValueError:
+        raise ValueError(
+            f"{ENGINE_BLAS_THREADS_ENV}={raw!r} is not a whole number")
+    if n <= 0:
+        return contextlib.nullcontext()
+    try:
+        from threadpoolctl import threadpool_limits
+    except ImportError:
+        log.warning(
+            "threadpoolctl is not installed, so the engine runs on the "
+            "BLAS default (a thread per core); results are unaffected, "
+            "the run is slower")
+        return contextlib.nullcontext()
+    return threadpool_limits(limits=n, user_api="blas")
+
+
 @dataclass
 class SimulationSnapshot:
     """One time-point of simulation data (for time-series plots)."""
@@ -944,7 +984,7 @@ class EngineRunner:
         self.record_cell_snapshot()
 
         buf = io.StringIO()
-        with redirect_stdout(buf):
+        with redirect_stdout(buf), engine_blas_threads():
             for step_i in range(total_steps):
                 self.engine.step()
 
