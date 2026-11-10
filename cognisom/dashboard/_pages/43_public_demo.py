@@ -249,14 +249,23 @@ m[2].metric("Cell divisions", f"{facts['divisions']:,}")
 m[3].metric("Immune cells", f"{facts['immune_end']:,}")
 m[4].metric("Hypoxic cells", f"{facts['hypoxic_end']:,}")
 
-st.markdown(
-    f"The tumour **shrank**, from {facts['cancer_start']:,} cancer cells "
-    f"to {facts['cancer_end']:,}, while the surrounding normal tissue grew "
-    f"from {facts['normal_start']:,} to {facts['normal_end']:,}. Cancer "
-    "cells divide faster than normal ones here, so that fall is the "
-    "immune infiltrate outpacing the tumour's own division rate — not an "
-    "absence of growth."
-)
+# Said only if the recording says it: a re-record with another patient or
+# drug must not inherit a sentence about a tumour that shrank.
+if facts["cancer_end"] < facts["cancer_start"]:
+    st.markdown(
+        f"The tumour **shrank**, from {facts['cancer_start']:,} cancer "
+        f"cells to {facts['cancer_end']:,}, while the surrounding normal "
+        f"tissue went from {facts['normal_start']:,} to "
+        f"{facts['normal_end']:,}. Cancer cells divide faster than normal "
+        "ones here, so that fall is the immune infiltrate outpacing the "
+        "tumour's own division rate — not an absence of growth."
+    )
+else:
+    st.markdown(
+        f"The tumour went from {facts['cancer_start']:,} cancer cells to "
+        f"{facts['cancer_end']:,}; the surrounding normal tissue from "
+        f"{facts['normal_start']:,} to {facts['normal_end']:,}."
+    )
 
 # Stated only when the run's two independent counters say it. The
 # cellular module counts every death; the immune module counts its own
@@ -279,9 +288,81 @@ st.markdown(
     "cells still moving across a settled tissue — that plateau is the "
     "model reaching a steady state, not the recording freezing. It is "
     "also a limitation worth stating plainly: a tumour that stops "
-    "changing after 15 hours is a property of this configuration, not "
-    "a prediction about tumours."
+    f"changing after {facts['last_kill_hour']:.0f} hours is a property of "
+    "this configuration, not a prediction about tumours."
 )
+
+# ── The drug ─────────────────────────────────────────────────────────
+#
+# Shown only when the recording was made with a drug, and written from
+# the recording's own arms. The video is ONE run; the other arms are the
+# same patient, seed and tissue with a different drug choice, and appear
+# in the video only as lines in the PSA panel.
+_arms = facts.get("treatment_arms") or []
+_recorded = next((a for a in _arms if a.get("recorded")), None)
+if _recorded:
+    st.divider()
+    st.subheader("The drug, and this patient's own receptor")
+    _none = next((a for a in _arms if not a["drugs"]), None)
+    st.markdown(
+        f"In this run the patient is given "
+        f"**{' + '.join(_recorded['drugs'])}**. What a drug does here is "
+        "resolved against this patient's own androgen receptor (AR), and "
+        "the bottom-right panel of the video plots the AR pathway's "
+        "output — PSA, the protein AR switches on and the one a clinic "
+        "follows — for this run beside the same patient, seed and tissue "
+        "under each other choice."
+    )
+    for _note in _recorded.get("notes") or []:
+        st.markdown(f"- {_note}")
+
+    st.table([
+        {"Arm": a["label"] + (" (the video)" if a["recorded"] else ""),
+         "PSA per cell, start": f"{a['psa_start']:.1f}",
+         "PSA per cell, end": f"{a['psa_end']:.1f}",
+         "Cancer cells at the end": a["cancer_end"],
+         "Immune kills": a["immune_kills"]}
+        for a in _arms
+    ])
+
+    if _none and _none["psa_end"] > 0:
+        _ratio = _recorded["psa_end"] / _none["psa_end"]
+        if _ratio > 1.5:
+            st.markdown(
+                f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
+                f"ends at **{_ratio:.1f}x** the no-drug arm: the drug is "
+                "driving the receptor it was designed to block. "
+                + ("The tumour itself ends at the same size as with no "
+                   "drug — which is what the source measured (Balbas "
+                   "2013: resistant tumours on enzalutamide grew like "
+                   "untreated ones, not faster). "
+                   if _recorded["cancer_end"] == _none["cancer_end"] else "")
+                + "Rising PSA on treatment, with no benefit, is the "
+                "clinical picture of this resistance."
+            )
+        elif _ratio < 0.67:
+            st.markdown(
+                f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
+                f"ends at **{_ratio:.2f}x** the no-drug arm: the drug "
+                "blocks the receptor."
+            )
+        for a in _arms:
+            if a is _recorded or not a["drugs"]:
+                continue
+            _r = a["psa_end"] / _none["psa_end"]
+            if _r < 0.67:
+                st.markdown(
+                    f"**{a['label']}** still blocks this receptor in the "
+                    f"model: PSA ends at {_r:.2f}x the no-drug arm and "
+                    f"the tumour at {a['cancer_end']:,} cells against "
+                    f"{_none['cancer_end']:,}. That drug-specific "
+                    "difference is sourced (Moilanen 2015, PMID 26137992)."
+                )
+    st.caption(
+        "A mechanism demonstration, not a treatment recommendation. The "
+        "activation factor is one published reporter measurement; the "
+        "blockade strength is an estimate; one run per arm, one seed."
+    )
 
 st.markdown(
     f"Oxygen across the run spans **{facts['oxygen_min']:.3f} to "
@@ -311,12 +392,14 @@ limits = [
     "no confidence interval is attached to any number above. Run-to-run "
     "scatter in this model is real and has been measured elsewhere.",
 
-    "**The genome and the tissue are not matched.** The callset is "
-    "HCC1395, a breast-cancer cell line with a matched normal — the "
-    "best-characterised public tumour/normal pair available. The tissue "
-    "geometry is from a human *prostate* section. The combination "
-    "demonstrates the pipeline; it does not model a real breast tumour "
-    "in real breast tissue.",
+    # Not written out here: which genome is playing is a fact about the
+    # recording, and this paragraph named a breast cell line for as long
+    # as it was typed by hand.
+    "**The genome and the tissue are not one biopsy.** The callset and "
+    "the tissue geometry come from different sources, and the lines "
+    "under *What weakens this run* above are this recording's own "
+    "account of how they differ. The combination demonstrates the "
+    "pipeline; it does not reconstruct this patient's tumour.",
 
     "**Several parameters are estimates, not measurements.** Where a "
     "number in this engine comes from a published measurement it is "
@@ -344,7 +427,12 @@ with st.expander("Reproduce this recording"):
         f"python scripts/record_demo_run.py \\\n"
         f"    --duration {facts['duration_hours']:.0f} "
         f"--scenario {facts['scenario']} --tissue {facts['tissue']} \\\n"
-        f"    --stride {facts['snapshot_stride']} --fps {facts['fps']}",
+        f"    --stride {facts['snapshot_stride']} --fps {facts['fps']}"
+        + "".join(f" \\\n    --drug {d}"
+                  for d in ((facts.get("treatment") or {}).get("drugs") or []))
+        + "".join(f" \\\n    --compare-drug {a['label']}"
+                  for a in (facts.get("treatment_arms") or [])
+                  if a["drugs"] and not a["recorded"]),
         language="bash",
     )
     st.caption(

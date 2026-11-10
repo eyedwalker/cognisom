@@ -501,6 +501,7 @@ class EngineRunner:
         snapshot_interval_hours: Optional[float] = 0.1,
         tissue: str = "section",
         patient: Optional[Any] = None,
+        drugs: Optional[Any] = None,
     ):
         if tissue not in TISSUE_LAYOUTS:
             raise ValueError(
@@ -577,6 +578,29 @@ class EngineRunner:
             self.patient_inputs = engine_inputs(patient)
             for mod, params in self.patient_inputs.module_configs().items():
                 self.module_configs[mod].update(params)
+        # The treatment goes in after the patient, because what a drug does
+        # can depend on the patient's receptor (enzalutamide is an AGONIST
+        # on AR F876L/F877L), and before the caller's overrides. Before
+        # this parameter existed the only route to ParameterBridge's drug
+        # mapping was from_scenario, which takes no patient -- so the
+        # patient-specific drug response could not run on a patient.
+        #: What the drugs resolved to, or None. See workflow/treatment.py.
+        self.treatment = None
+        if drugs:
+            from cognisom.workflow.treatment import resolve_treatment
+            self.treatment = resolve_treatment(drugs, patient=patient)
+            for mod, params in self.treatment.module_configs.items():
+                if mod in self.module_configs:
+                    self.module_configs[mod].update(params)
+                else:
+                    # e.g. the bridge's 'ode' config: no preset registers
+                    # that module. Said, not swallowed.
+                    self.treatment.unapplied_modules.append(mod)
+            if self.treatment.unapplied_modules:
+                log.warning(
+                    "treatment %s configures %s, which this runner does "
+                    "not carry; those parameters are not applied",
+                    self.treatment.drugs, self.treatment.unapplied_modules)
         if overrides:
             for mod, params in overrides.items():
                 if mod in self.module_configs:

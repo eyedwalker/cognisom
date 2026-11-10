@@ -100,6 +100,20 @@ def main() -> int:
     # odd one out. "none" still runs the generic genome.
     ap.add_argument("--patient", default=DEFAULT_DEMO_PATIENT,
                     choices=sorted(DEMO_PATIENTS) + ["none"])
+    # Off by default: the published recording is an untreated-by-drug
+    # run and adding a drug changes what it shows.
+    ap.add_argument("--drug", action="append", default=[], metavar="NAME",
+                    help="give the patient this library drug (repeatable). "
+                         "Resolved against the patient's own receptor, so "
+                         "enzalutamide on AR F877L is applied as the "
+                         "agonist it is.")
+    ap.add_argument("--compare-drug", action="append", default=[],
+                    metavar="NAME",
+                    help="with --drug: also run this drug on the same "
+                         "patient, seed and tissue, and plot its AR-pathway "
+                         "output (PSA) beside the recorded run and a no-drug "
+                         "arm. The video still shows ONE run; the others "
+                         "appear only as lines in the pathway panel.")
     ap.add_argument("--stride", type=int, default=2,
                     help="use every Nth snapshot as a video frame")
     ap.add_argument("--fps", type=int, default=12)
@@ -113,9 +127,6 @@ def main() -> int:
                          "the matplotlib recording on one page.")
     args = ap.parse_args()
 
-    random.seed(SEED)
-    np.random.seed(SEED)
-
     from cognisom.dashboard.engine_runner import EngineRunner
     from cognisom.dashboard.sim_request import (
         describe_subject, presentation_lines, tissue_caption)
@@ -125,9 +136,25 @@ def main() -> int:
     subject = describe_subject(patient)
     print(f"subject: {subject.headline}")
 
-    runner = EngineRunner(dt=args.dt, duration=args.duration,
-                          scenario=args.scenario, tissue=args.tissue,
-                          patient=patient)
+    def seeded_runner(drugs):
+        # Seeded HERE, immediately before construction, for every arm:
+        # the arms are only comparable if each starts from the same
+        # stream, and loading the patient must not be able to shift it.
+        random.seed(SEED)
+        np.random.seed(SEED)
+        return EngineRunner(dt=args.dt, duration=args.duration,
+                            scenario=args.scenario, tissue=args.tissue,
+                            patient=patient, drugs=drugs or None)
+
+    if args.compare_drug and not args.drug:
+        ap.error("--compare-drug needs --drug: there is no recorded "
+                 "treatment to compare against")
+
+    runner = seeded_runner(args.drug)
+    if runner.treatment is not None:
+        print(f"treatment: {', '.join(runner.treatment.drugs)}")
+        for note in runner.treatment.notes:
+            print(f"  note: {note}")
     runner.build()
 
     def progress(cur, total):
@@ -139,6 +166,48 @@ def main() -> int:
 
     snaps = runner.cell_snapshots[::max(1, args.stride)]
     ts = runner.get_time_series()
+
+    # ── The drug pathway: the same patient, other choices ────────────
+    #
+    # One run cannot show what a drug did, only what happened. So when a
+    # drug is given the same patient is also run with no drug and with
+    # each --compare-drug, from the same seed, and the AR pathway's
+    # output (PSA) is plotted for all of them. PSA is the right readout
+    # because it is what the pathway transcribes and what a clinic
+    # follows -- and for enzalutamide on AR F877L the cell counts do NOT
+    # separate from no drug (Balbas 2013: growth equivalent to vehicle)
+    # while PSA triples, so a cell-count panel alone would show nothing.
+    def arm_record(label, r, recorded):
+        series = r.get_time_series()
+        return {
+            "label": label,
+            "drugs": list(r.treatment.drugs) if r.treatment else [],
+            "recorded": recorded,
+            "notes": list(r.treatment.notes) if r.treatment else [],
+            "time": [float(v) for v in series["time"]],
+            "psa": [float(v) for v in series["avg_psa"]],
+            "cancer_end": int(series["n_cancer"][-1]),
+            "immune_kills": int(series["total_kills"][-1]),
+        }
+
+    arms = []
+    if runner.treatment is not None:
+        arms.append(arm_record(" + ".join(runner.treatment.drugs),
+                               runner, True))
+        for label, drugs in ([("No drug", None)]
+                             + [(d, [d]) for d in args.compare_drug]):
+            print(f"comparison arm: {label} ...", flush=True)
+            other = seeded_runner(drugs)
+            other.build()
+            other.run()
+            arms.append(arm_record(
+                " + ".join(other.treatment.drugs) if other.treatment
+                else label, other, False))
+            a = arms[-1]
+            print(f"  cancer {a['cancer_end']}, kills {a['immune_kills']}, "
+                  f"PSA {a['psa'][0]:.1f} -> {a['psa'][-1]:.1f}")
+    #: recorded run bright; no drug grey; alternatives in teal/amber.
+    arm_colours = ["#f5c542", "#8b8f9e", "#4dd0c8", "#c792ea", "#7fb069"]
     from cognisom.visualization.interaction_recorder import dedupe_kill_events
 
     raw_events = list(getattr(runner.recorder, "events", []) or [])
@@ -181,9 +250,11 @@ def main() -> int:
         for i, snap in enumerate(snaps):
             t = float(snap.time)
             fig = plt.figure(figsize=(12.8, 6.4), dpi=100, facecolor=BG)
-            gs = gridspec.GridSpec(2, 2, width_ratios=[2.05, 1.0],
-                                   height_ratios=[1, 1], figure=fig,
-                                   wspace=0.14, hspace=0.34,
+            n_rows = 3 if arms else 2
+            gs = gridspec.GridSpec(n_rows, 2, width_ratios=[2.05, 1.0],
+                                   height_ratios=[1] * n_rows, figure=fig,
+                                   wspace=0.14,
+                                   hspace=0.62 if arms else 0.34,
                                    left=0.00, right=0.965,
                                    top=0.835, bottom=0.095)
 
@@ -223,11 +294,13 @@ def main() -> int:
             ax.view_init(elev=24, azim=-55)   # fixed, see above
 
             # ── populations ──────────────────────────────────────────
-            def strip(cell, series, title, log=False):
+            def strip(cell, series, title, log=False, lines=None):
                 a = fig.add_subplot(cell)
                 a.set_facecolor(PANEL)
                 for key, label, col in series:
                     a.plot(time_arr, ts[key], color=col, lw=1.8, label=label)
+                for x, y, label, col, lw in (lines or []):
+                    a.plot(x, y, color=col, lw=lw, label=label)
                 if log:
                     # ~1,950 normal cells against ~120 cancer: on a
                     # linear axis the two populations that actually move
@@ -254,12 +327,30 @@ def main() -> int:
                   "Cell populations (log scale)", log=True)
             a2 = strip(gs[1, 1], [("total_kills", "Cumulative immune kills",
                                    "#ff4d6d")], "Immune killing")
-            a2.set_xlabel("simulated hours", color=MUTED, fontsize=9)
+            if arms:
+                a3 = strip(
+                    gs[2, 1], [],
+                    "AR pathway output: PSA per cell (log scale)", log=True,
+                    lines=[(arm["time"], arm["psa"],
+                            arm["label"] + (" (this video)"
+                                            if arm["recorded"] else ""),
+                            arm_colours[j % len(arm_colours)],
+                            2.4 if arm["recorded"] else 1.6)
+                           for j, arm in enumerate(arms)])
+                a3.set_xlabel("simulated hours", color=MUTED, fontsize=9)
+            else:
+                a2.set_xlabel("simulated hours", color=MUTED, fontsize=9)
 
             fig.suptitle(
-                f"{subject.headline}   ·   {args.scenario} on the "
-                f"{args.tissue} geometry   ·   t = {t:5.2f} h",
-                color=INK, fontsize=13, x=0.02, ha="left", y=0.955)
+                f"{subject.headline}   ·   {args.scenario}"
+                + (f" + {' + '.join(runner.treatment.drugs)}"
+                   if runner.treatment is not None else "")
+                + f" on the {args.tissue} geometry",
+                color=INK, fontsize=11, x=0.02, ha="left", y=0.955)
+            # The clock is its own right-aligned text: appended to the
+            # title it was the first thing clipped when the title grew.
+            fig.text(0.965, 0.955, f"t = {t:5.2f} h", color=INK,
+                     fontsize=12, ha="right", va="center")
             fig.text(0.02, 0.018,
                      "Tissue-cell brightness is that cell's own oxygen.  "
                      "Red crosses: a cancer cell killed by an immune cell "
@@ -309,6 +400,19 @@ def main() -> int:
             "hla_alleles": subject.hla_alleles,
             "hla_measured": subject.hla_measured,
             "caveats": subject.caveats,
+            "treatment": (runner.treatment.summary()
+                          if runner.treatment is not None else None),
+            # Every arm of the pathway panel, so the page states the
+            # comparison from this file and not from memory. The first
+            # is the run the video shows.
+            "treatment_arms": [
+                {"label": a["label"], "drugs": a["drugs"],
+                 "recorded": a["recorded"], "notes": a["notes"],
+                 "cancer_end": a["cancer_end"],
+                 "immune_kills": a["immune_kills"],
+                 "psa_start": round(a["psa"][0], 3),
+                 "psa_end": round(a["psa"][-1], 3)}
+                for a in arms],
             "presentation": presentation_lines(runner.presentation_report),
             "cells_start": int(n_cancer[0] + n_normal[0]),
             "cells_end": int(n_cancer[-1] + n_normal[-1]),
