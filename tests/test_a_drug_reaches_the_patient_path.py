@@ -226,3 +226,44 @@ def test_the_measured_numbers_have_not_drifted(arms):
             f"{drug}: re-measure, do not re-pin", got)
         assert got["cancer"] == pytest.approx(want["cancer"], rel=0.25, abs=3), (
             f"{drug}: re-measure, do not re-pin", got)
+
+
+# ── and the record of it survives a checkpoint ────────────────────
+
+
+def test_a_resumed_run_still_says_which_drug_was_given(tmp_path):
+    """The drug's effect rides in module_configs and always survived.
+    The record that a drug was given did not: a treated run came back
+    with ``treatment is None``."""
+    from cognisom.core.checkpoint import load_checkpoint, save_checkpoint
+    from cognisom.dashboard.engine_runner import EngineRunner
+
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=0.2,
+                          patient=F877L, drugs=["Enzalutamide"])
+    path = str(tmp_path / "treated.ckpt")
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner.build()
+        runner.run()
+        save_checkpoint(runner, path)
+        resumed = load_checkpoint(path)
+
+    assert resumed.treatment is not None, (
+        "a treated run was resumed under an untreated label")
+    assert resumed.treatment.summary() == runner.treatment.summary()
+    assert any("AGONIST" in n for n in resumed.treatment.notes)
+    # The label and the physics must describe the same run.
+    assert (resumed.module_configs["ar_signaling"]
+            == runner.module_configs["ar_signaling"])
+
+
+def test_an_untreated_run_resumes_untreated(tmp_path):
+    from cognisom.core.checkpoint import load_checkpoint, save_checkpoint
+    from cognisom.dashboard.engine_runner import EngineRunner
+
+    runner = EngineRunner(tissue="ring", dt=0.05, duration=0.2)
+    path = str(tmp_path / "plain.ckpt")
+    with contextlib.redirect_stdout(io.StringIO()):
+        runner.build()
+        runner.run()
+        save_checkpoint(runner, path)
+        assert load_checkpoint(path).treatment is None

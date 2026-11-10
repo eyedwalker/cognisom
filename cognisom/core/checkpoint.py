@@ -106,8 +106,16 @@ _RUNNER_ARGS: Tuple[str, ...] = (
 #: available and the more faithful thing to store: it captures the
 #: effective configuration however it was arrived at, including a
 #: patient's contribution.
+#:
+#: `treatment` is here for a different reason. Its EFFECT already
+#: travels inside `module_configs`; what it adds is the record of which
+#: drugs were given and why one was applied against its class. Without
+#: it a resumed run of a treated patient kept the drug's physics and
+#: reported `treatment is None` -- a treated run under an untreated
+#: label. A checkpoint written before this field existed simply lacks
+#: it and loads as it always did.
 _RUNNER_MERGED: Tuple[str, ...] = (
-    'module_configs', 'modules_enabled', 'patient_inputs',
+    'module_configs', 'modules_enabled', 'patient_inputs', 'treatment',
 )
 
 #: Attributes expected to refuse pickling, i.e. the wiring and caches
