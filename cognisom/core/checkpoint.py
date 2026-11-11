@@ -116,6 +116,7 @@ _RUNNER_ARGS: Tuple[str, ...] = (
 #: it and loads as it always did.
 _RUNNER_MERGED: Tuple[str, ...] = (
     'module_configs', 'modules_enabled', 'patient_inputs', 'treatment',
+    'clonal_fractions',
 )
 
 #: Attributes expected to refuse pickling, i.e. the wiring and caches

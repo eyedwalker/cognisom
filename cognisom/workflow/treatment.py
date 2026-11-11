@@ -62,6 +62,7 @@ def resolve_treatment(
     drugs: Sequence[str],
     patient: Optional[Any] = None,
     store: Optional[Any] = None,
+    clonal_fractions: Optional[Dict[str, float]] = None,
 ) -> Treatment:
     """Resolve ``drugs`` for ``patient`` through ``ParameterBridge``.
 
@@ -99,9 +100,70 @@ def resolve_treatment(
 
     bridge = ParameterBridge(store)
     resolved = bridge.resolve_scenario(scenario, include_defaults=False)
-    return Treatment(
+    treatment = Treatment(
         drugs=[e.name for e in entities],
         variant_labels=labels,
         module_configs={m: dict(p) for m, p in resolved.items() if p},
         notes=list(bridge.last_notes),
     )
+    _split_for_a_subclone(treatment, entities, labels, clonal_fractions,
+                          store)
+    return treatment
+
+
+def _split_for_a_subclone(treatment, entities, labels, clonal_fractions,
+                          store) -> None:
+    """When the variant that makes a drug an agonist is in only SOME
+    cells, the drug does two things in one tumour.
+
+    The bridge answers for a patient: "enzalutamide is an agonist on his
+    AR F877L", one activity for the whole tumour. That is the right
+    answer when every cell carries the variant. When a fraction do, the
+    cells without it have the wild-type receptor and are BLOCKED, as the
+    drug class says. So the tumour-wide config becomes the class effect
+    -- resolved by the same bridge, shown the patient without that
+    variant -- and the agonist activity moves to a per-cell rule keyed on
+    the mutation label.
+    """
+    from cognisom.library.models import SimulationScenario
+    from cognisom.workflow import parameter_bridge as pb
+
+    if not clonal_fractions:
+        return
+    for entity in entities:
+        change = pb.anti_androgen_is_agonist(entity.name, labels)
+        if change is None:
+            continue
+        engine_label = f"AR_{change}"
+        fraction = clonal_fractions.get(engine_label)
+        if fraction is None or float(fraction) >= 1.0:
+            continue
+        others = [label for label in labels
+                  if label.upper() != f"AR:{change}"]
+        scenario = SimulationScenario(
+            name="treatment", display_name="treatment",
+            scenario_type="drug_response",
+            drug_ids=[e.entity_id for e in entities],
+            tags=["drug_response"] + [f"variant:{label}" for label in others])
+        class_effect = pb.ParameterBridge(store).resolve_scenario(
+            scenario, include_defaults=False)
+        ar = dict(class_effect.get("ar_signaling") or {})
+        ar["ar_variant_activity"] = {
+            "label": engine_label,
+            "activity": pb.AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY,
+        }
+        treatment.module_configs["ar_signaling"] = ar
+        # The bridge's note speaks for the whole tumour ("applied as
+        # activation, NOT as a blockade"), which is now false for most
+        # of it. Replaced, not appended to.
+        treatment.notes = [n for n in treatment.notes
+                           if not (entity.name in n and "AGONIST" in n)]
+        treatment.notes.append(
+            f"{entity.name} is an AGONIST on AR {change}, and that variant "
+            f"is in {float(fraction):.0%} of the founding cancer cells, not "
+            f"all of them. Those cells are driven at "
+            f"{pb.AR_AGONIST_TRANSCRIPTIONAL_ACTIVITY:.2f}x the untreated "
+            f"baseline ({pb.AR_AGONIST_ACTIVITY_SOURCE}); every other cell "
+            f"has the wild-type receptor and is blocked as the drug class "
+            f"says")
+        return

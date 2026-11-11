@@ -13,6 +13,7 @@ Features:
 - Cell migration
 """
 
+import math
 import sys
 sys.path.insert(0, '..')
 
@@ -576,6 +577,32 @@ class CellularModule(SimulationModule):
         #: Conflating the two made a "nothing presentable" control quietly
         #: present KRAS.
         self.patient_given = self.config.get('patient_mutations') is not None
+        #: label -> the fraction of FOUNDING cancer cells that carry that
+        #: mutation. A label that is absent is in every cell, which is
+        #: what every run before this did, so an empty mapping changes
+        #: nothing. This exists because a tumour is not one genotype: a
+        #: resistance mutation is usually in some cells and not others,
+        #: and a drug then SELECTS rather than merely failing. Daughters
+        #: copy their parent's mutations, so the fraction is free to move
+        #: during the run -- that movement is the result.
+        self.clonal_fractions: Dict[str, float] = {}
+        _known = {m['label'] for m in self.patient_mutations}
+        for _label, _fraction in (self.config.get('clonal_fractions') or {}).items():
+            _fraction = float(_fraction)
+            if _label not in _known:
+                raise ValueError(
+                    f"clonal fraction given for {_label!r}, which is not one "
+                    f"of this patient's engine mutations {sorted(_known)}; "
+                    f"refusing to run a subclone of a mutation the tumour "
+                    f"does not carry")
+            if not 0.0 < _fraction <= 1.0:
+                raise ValueError(
+                    f"clonal fraction for {_label} must be in (0, 1], got "
+                    f"{_fraction}")
+            self.clonal_fractions[_label] = _fraction
+        #: How many founding cancer cells have been given their mutations;
+        #: decides which of them carry a subclonal label.
+        self._founding_rank = 0
         #: One record per (gene, mutation) whose peptides bound nothing on
         #: this patient's HLA panel: the best IC50 reached, on which
         #: allele, and which scorer said so. See on_mutation_occurred.
@@ -826,12 +853,59 @@ class CellularModule(SimulationModule):
         KRAS_G12D every run used to carry whoever the patient was.
         """
         if self.patient_given:
-            return [m['label'] for m in self.patient_mutations]
+            labels = [m['label'] for m in self.patient_mutations]
+            if not self.clonal_fractions:
+                return labels
+            rank = self._founding_rank
+            self._founding_rank += 1
+            return [label for label in labels
+                    if self._founder_carries(label, rank)]
         return ['KRAS_G12D']
+
+    def _founder_carries(self, label: str, rank: int) -> bool:
+        """Whether the ``rank``-th founding cancer cell carries ``label``.
+
+        Deterministic and evenly spread through the founding order, NOT
+        drawn: a draw would consume the shared random stream and move
+        every later event in the run, and it would make the founding
+        count itself a random variable. Of N founders exactly
+        floor(N * fraction) carry the label.
+
+        Evenly spread is a simplification. A real subclone is a
+        contiguous patch, because its cells share an ancestor; this
+        scatters them. It is right about HOW MANY and wrong about WHERE.
+        """
+        fraction = self.clonal_fractions.get(label, 1.0)
+        if fraction >= 1.0:
+            return True
+        eps = 1e-9
+        return (math.floor((rank + 1) * fraction + eps)
+                > math.floor(rank * fraction + eps))
+
+    def clone_counts(self) -> Dict[str, Dict[str, int]]:
+        """For each subclonal label: live cancer cells with and without it."""
+        out: Dict[str, Dict[str, int]] = {}
+        for label in self.clonal_fractions:
+            with_it = without = 0
+            for cell in self.cells.values():
+                if cell.cell_type != 'cancer' or not cell.alive:
+                    continue
+                if label in (cell.mutations or []):
+                    with_it += 1
+                else:
+                    without += 1
+            out[label] = {'carriers': with_it, 'non_carriers': without}
+        return out
 
     def _present_patient_mutations_on(self, cell_id: int) -> None:
         """Run the patient's mutations through presentation on one cell."""
+        carried = self.cells[cell_id].mutations or []
         for mutation in self.patient_mutations:
+            # A cell outside the subclone does not make the mutant
+            # protein, so it has no mutant peptide to display and a
+            # T cell specific for it has nothing to see there.
+            if self.clonal_fractions and mutation['label'] not in carried:
+                continue
             self.on_mutation_occurred({
                 'cell_id': cell_id,
                 'gene': mutation['gene'],

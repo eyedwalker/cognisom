@@ -130,6 +130,24 @@ class ARSignalingModule(SimulationModule):
             (1.0 - self.transcriptional_block) if activity is None
             else float(activity))
 
+        # ── when only SOME cells carry the receptor variant ─────────
+        #
+        # `transcriptional_activity` is one number for the whole tumour,
+        # which is right when every cell has the same receptor. When a
+        # resistance variant is subclonal the same drug does two opposite
+        # things in one tissue: it blocks the wild-type cells and drives
+        # the carriers. {'label': 'AR_F877L', 'activity': 3.05} says
+        # which cells are carriers (by the mutation label the cellular
+        # module put on them, inherited at division) and what the drug
+        # does to them; every other cell keeps `transcriptional_activity`.
+        # Absent, nothing below is consulted and every run is unchanged.
+        variant = self.config.get('ar_variant_activity') or None
+        self.variant_label: Optional[str] = None
+        self.variant_activity: Optional[float] = None
+        if variant:
+            self.variant_label = str(variant['label'])
+            self.variant_activity = float(variant['activity'])
+
         self.system = None
         self.rhs = None
         self.params: Dict[str, float] = {}
@@ -246,7 +264,8 @@ class ARSignalingModule(SimulationModule):
         ref = float(self.eugonadal_state[self._i["AR_DHT"]])
         if ref <= 0:
             return None
-        active = (value / ref) * self.transcriptional_activity
+        activity = self.activity_of(cell_id)
+        active = (value / ref) * activity
         # The ceiling is the activity factor, not 1.0. It was 1.0 because
         # only suppression could happen, and a hard 1.0 would silently
         # discard the entire agonist effect: an F876L cell under
@@ -257,8 +276,19 @@ class ARSignalingModule(SimulationModule):
         # 3.05 makes the cancer cycle about three times faster, and the
         # androgen-withdrawal hazard only fires below a threshold, so an
         # agonist-driven cell correctly does not die of deprivation.
-        ceiling = max(1.0, self.transcriptional_activity)
+        ceiling = max(1.0, activity)
         return float(min(ceiling, max(0.0, active)))
+
+    def activity_of(self, cell_id: int) -> float:
+        """What the drug does to THIS cell's AR-driven transcription."""
+        if self.variant_label is None:
+            return self.transcriptional_activity
+        cells = getattr(self.cellular_module, 'cells', None) or {}
+        cell = cells.get(cell_id)
+        if cell is not None and self.variant_label in (
+                getattr(cell, 'mutations', None) or []):
+            return float(self.variant_activity)
+        return self.transcriptional_activity
 
     # ── stepping ──────────────────────────────────────────────────
 
@@ -325,7 +355,12 @@ class ARSignalingModule(SimulationModule):
         k = len(self.species)
         params = dict(self.params)
         params['DHT_input'] = np.array([self.dht_input_for(v) for v in dht])
-        if self.transcriptional_activity != 1.0:
+        if self.variant_label is not None:
+            # One factor per cell, in `ids` order: the carriers are
+            # driven and the rest are blocked, in the same solve.
+            params['k_psa_tx'] = self.params['k_psa_tx'] * np.array(
+                [self.activity_of(c) for c in self.ids], dtype=float)
+        elif self.transcriptional_activity != 1.0:
             # The drug acts on what the complex DOES, so it scales the
             # transcription the complex drives, not the complex itself.
             # self.params stays the pristine library system, and

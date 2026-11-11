@@ -158,6 +158,48 @@ SEQC2_BREAST = DemoPatient(
     ],
 )
 
+#: How much of SC_9184_T's tumour carries AR F877L -- what the cohort's
+#: own files allow, and no more. Computed by scripts/su2c_ar_clonality.py
+#: (``data/`` is gitignored, so it runs once locally), 2026-11-11.
+#:
+#: The call was read at an allele fraction of 0.233, which looks like "a
+#: 23% subclone" and is not: this sample's AR is AMPLIFIED (discrete call
+#: 2; segment log2 1.934, about 5.3 copies per tumour cell at the purity
+#: below), so the allele fraction counts gene copies, not cells. With
+#: purity p, C copies per tumour cell, a fraction f of tumour cells
+#: carrying it on m of their copies:
+#:
+#:     VAF = p * f * m / (p * C + 1 - p)
+#:
+#: Only the product f * m follows, 1.37 mutant copies per tumour cell.
+#: So f is somewhere between "every cell, on one or two of its copies"
+#: and "a quarter of the cells, on all of their copies". The data cannot
+#: say which, and a run that starts the variant at one value is choosing,
+#: not reading.
+#:
+#: Two further limits. The AR segment has 3 markers, so the copy number
+#: is the weakest input. And the biopsy was taken AFTER abiraterone/
+#: enzalutamide exposure: whatever the fraction is, it is the fraction
+#: after selection, and says nothing about how rare the variant was
+#: before treatment. A starting fraction below this band is a scenario.
+SU2C_AR_F877L_CLONALITY: Dict[str, object] = {
+    "label": "AR_F877L",
+    "vaf": 0.233,                       # 190 of 817 reads
+    "vaf_ci95": (0.204, 0.262),
+    # Agreeing estimates from independent mutations: three clonal SNVs on
+    # the single X at normal copy number (VAF = purity) and 26 clonal
+    # heterozygous autosomal SNVs (VAF = purity / 2).
+    "purity": 0.65,
+    "purity_from_autosomes": 0.63,
+    "ar_copies_per_tumour_cell": 5.34,
+    "mutant_copies_per_tumour_cell": 1.37,
+    # mutant_copies / ar_copies, and the same across the VAF interval.
+    "carrier_fraction_min": 0.26,
+    "carrier_fraction_min_ci95": (0.22, 0.29),
+    "carrier_fraction_max": 1.0,
+    "measured_after_treatment": True,
+}
+
 DEMO_PATIENTS: Dict[str, DemoPatient] = {
     SU2C_PROSTATE.key: SU2C_PROSTATE,
     SEQC2_BREAST.key: SEQC2_BREAST,

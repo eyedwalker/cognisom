@@ -429,6 +429,11 @@ class SimulationSnapshot:
     avg_psa: float = 0.0
     psa_total: float = 0.0
     psa_cancer_total: float = 0.0
+    # A subclonal mutation (EngineRunner(clonal_fractions=...)): live
+    # cancer cells that carry it and that do not. Their ratio moving
+    # under a drug IS selection; both stay 0 when no subclone was given.
+    n_subclone_carriers: int = 0
+    n_subclone_others: int = 0
     # Heritable immune escape. The ratio n_escaped / n_cancer rising over
     # a run IS the selection signal -- recording only the end state would
     # make selection and mutation supply indistinguishable.
@@ -542,6 +547,7 @@ class EngineRunner:
         tissue: str = "section",
         patient: Optional[Any] = None,
         drugs: Optional[Any] = None,
+        clonal_fractions: Optional[Dict[str, float]] = None,
     ):
         if tissue not in TISSUE_LAYOUTS:
             raise ValueError(
@@ -618,6 +624,18 @@ class EngineRunner:
             self.patient_inputs = engine_inputs(patient)
             for mod, params in self.patient_inputs.module_configs().items():
                 self.module_configs[mod].update(params)
+        # Which of the patient's mutations are in only part of the tumour
+        # (label -> fraction of founding cancer cells). The cellular
+        # module validates the labels against the patient's own.
+        #: label -> founding fraction, or {} when every cell is alike.
+        self.clonal_fractions: Dict[str, float] = dict(clonal_fractions or {})
+        if self.clonal_fractions:
+            if patient is None:
+                raise ValueError(
+                    "clonal_fractions describes a patient's mutations, and "
+                    "no patient was given")
+            self.module_configs["cellular"]["clonal_fractions"] = dict(
+                self.clonal_fractions)
         # The treatment goes in after the patient, because what a drug does
         # can depend on the patient's receptor (enzalutamide is an AGONIST
         # on AR F876L/F877L), and before the caller's overrides. Before
@@ -628,7 +646,9 @@ class EngineRunner:
         self.treatment = None
         if drugs:
             from cognisom.workflow.treatment import resolve_treatment
-            self.treatment = resolve_treatment(drugs, patient=patient)
+            self.treatment = resolve_treatment(
+                drugs, patient=patient,
+                clonal_fractions=self.clonal_fractions or None)
             for mod, params in self.treatment.module_configs.items():
                 if mod in self.module_configs:
                     self.module_configs[mod].update(params)
@@ -1028,6 +1048,16 @@ class EngineRunner:
         snap.psa_total = state.get("ar_signaling", {}).get("psa_total", 0.0)
         snap.psa_cancer_total = state.get("ar_signaling", {}).get("psa_cancer_total", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
+        if self.clonal_fractions:
+            cellular = self.engine.modules.get("cellular")
+            counts = cellular.clone_counts() if cellular is not None else {}
+            # One subclonal label is what a treatment can act on today;
+            # with several, this reports the first and the full table is
+            # cellular.clone_counts().
+            first = next(iter(counts.values()), None)
+            if first:
+                snap.n_subclone_carriers = first["carriers"]
+                snap.n_subclone_others = first["non_carriers"]
         esc = cs.get("escape", {})
         snap.n_escaped = esc.get("n_escaped", 0)
         snap.mean_mhc1 = esc.get("mean_mhc1", 0.0)
@@ -1332,6 +1362,7 @@ class EngineRunner:
             "n_cells", "n_cancer", "n_normal",
             "total_divisions", "total_deaths", "total_transformations",
             "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa", "psa_total", "psa_cancer_total",
+            "n_subclone_carriers", "n_subclone_others",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",
             # Heritable immune escape. These were recorded on the
