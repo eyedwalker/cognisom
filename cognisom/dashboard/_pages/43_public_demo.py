@@ -297,17 +297,39 @@ if facts["deaths"] == facts["immune_kills"]:
         "comparison worth making."
     )
 
-st.markdown(
-    f"**The run settles.** The last cell division is at hour "
-    f"{facts['last_division_hour']:.1f} and the last kill at hour "
-    f"{facts['last_kill_hour']:.1f}. After that the populations stop "
-    "changing, and the final third of the video shows oxygen and immune "
-    "cells still moving across a settled tissue — that plateau is the "
-    "model reaching a steady state, not the recording freezing. It is "
-    "also a limitation worth stating plainly: a tumour that stops "
-    f"changing after {facts['last_kill_hour']:.0f} hours is a property of "
-    "this configuration, not a prediction about tumours."
-)
+_confined = facts.get("immune_confined_to_box")
+if _confined:
+    # A viewer noticed the recording going quiet and asked whether that
+    # was right. It was not. This paragraph used to call the plateau "the
+    # model reaching a steady state"; it was a defect, and the recording
+    # is kept as recorded, so the page has to say so.
+    _cleared = _confined["corrected_cleared_by_hour"]
+    st.warning(
+        f"**Why the action stops after hour "
+        f"{facts['last_kill_hour']:.0f}: a defect in this recording, "
+        "since fixed.** When this was recorded the engine kept immune "
+        "cells inside a fixed 160 µm box, and this tissue is 260 µm "
+        "across. Once the cancer cells inside the box were dead, every "
+        "immune cell sat at the box's edge, locked on a cancer cell just "
+        "beyond its reach, and killed nothing for the rest of the run. "
+        "The cancer cells that survive and regrow in this video are the "
+        "ones no immune cell could get to.\n\n"
+        "On the corrected engine the same run, same seed, ends "
+        "differently: the immune infiltrate clears the tumour in every "
+        f"arm (by about hour {min(_cleared.values())} on either drug, "
+        f"hour {max(_cleared.values())} on none). So the response-then-"
+        "progression shown here is what the drug mechanism does to a "
+        "tumour the immune system cannot reach, not a prediction for "
+        "this configuration. The recording has not been remade."
+    )
+else:
+    st.markdown(
+        f"**The run settles.** The last cell division is at hour "
+        f"{facts['last_division_hour']:.1f} and the last kill at hour "
+        f"{facts['last_kill_hour']:.1f}. After that the populations stop "
+        "changing — a property of this configuration, not a prediction "
+        "about tumours."
+    )
 
 # ── The drug ─────────────────────────────────────────────────────────
 #

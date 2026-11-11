@@ -183,5 +183,42 @@
   "predictor": "mhcflurry",
   "usd_stage": "demo_run.usdc",
   "usd_kill_markers": 92,
-  "usd_duplicate_kills_suppressed": 60
+  "usd_duplicate_kills_suppressed": 60,
+  "immune_confined_to_box": {
+    "box_um": [
+      [
+        20,
+        20,
+        20
+      ],
+      [
+        180,
+        180,
+        80
+      ]
+    ],
+    "tissue_um": [
+      [
+        0,
+        0,
+        -4
+      ],
+      [
+        260,
+        260,
+        79
+      ]
+    ],
+    "fixed_in": "e215558",
+    "corrected_cancer_end": {
+      "Enzalutamide": 0,
+      "No drug": 0,
+      "Darolutamide": 0
+    },
+    "corrected_cleared_by_hour": {
+      "Enzalutamide": 15,
+      "No drug": 24,
+      "Darolutamide": 15
+    }
+  }
 }
