@@ -114,6 +114,16 @@ def main() -> int:
                          "output (PSA) beside the recorded run and a no-drug "
                          "arm. The video still shows ONE run; the others "
                          "appear only as lines in the pathway panel.")
+    ap.add_argument("--subclone", action="append", default=[],
+                    metavar="LABEL=FRACTION",
+                    help="put this patient mutation in only FRACTION of the "
+                         "founding cancer cells (e.g. AR_F877L=0.1), in "
+                         "every arm. With a drug that is an agonist on that "
+                         "variant, the carriers are driven and the rest are "
+                         "blocked, and the run shows selection. The fraction "
+                         "is a SCENARIO: see "
+                         "demo_patients.SU2C_AR_F877L_CLONALITY for what the "
+                         "patient's data does and does not say.")
     ap.add_argument("--stride", type=int, default=2,
                     help="use every Nth snapshot as a video frame")
     ap.add_argument("--fps", type=int, default=12)
@@ -136,6 +146,14 @@ def main() -> int:
     subject = describe_subject(patient)
     print(f"subject: {subject.headline}")
 
+    clonal = {}
+    for item in args.subclone:
+        label, sep, fraction = item.partition("=")
+        if not sep:
+            ap.error(f"--subclone wants LABEL=FRACTION, got {item!r}")
+        clonal[label.strip()] = float(fraction)
+    subclone_label = next(iter(clonal), None)
+
     def seeded_runner(drugs):
         # Seeded HERE, immediately before construction, for every arm:
         # the arms are only comparable if each starts from the same
@@ -144,7 +162,8 @@ def main() -> int:
         np.random.seed(SEED)
         return EngineRunner(dt=args.dt, duration=args.duration,
                             scenario=args.scenario, tissue=args.tissue,
-                            patient=patient, drugs=drugs or None)
+                            patient=patient, drugs=drugs or None,
+                            clonal_fractions=clonal or None)
 
     if args.compare_drug and not args.drug:
         ap.error("--compare-drug needs --drug: there is no recorded "
@@ -186,6 +205,14 @@ def main() -> int:
             "notes": list(r.treatment.notes) if r.treatment else [],
             "time": [float(v) for v in series["time"]],
             "psa": [float(v) for v in series["avg_psa"]],
+            # What the whole tumour puts out. Per-cell PSA cannot show a
+            # response followed by progression, because that is a story
+            # about how many cells there are of each kind.
+            "psa_tumour": [float(v) for v in series["psa_cancer_total"]],
+            "carrier_share": [
+                (c / (c + o) if (c + o) else 0.0)
+                for c, o in zip(series["n_subclone_carriers"],
+                                series["n_subclone_others"])],
             "cancer_end": int(series["n_cancer"][-1]),
             "immune_kills": int(series["total_kills"][-1]),
         }
@@ -249,12 +276,15 @@ def main() -> int:
     try:
         for i, snap in enumerate(snaps):
             t = float(snap.time)
-            fig = plt.figure(figsize=(12.8, 6.4), dpi=100, facecolor=BG)
-            n_rows = 3 if arms else 2
+            show_clone = bool(arms and subclone_label)
+            n_rows = 4 if show_clone else (3 if arms else 2)
+            fig = plt.figure(figsize=(12.8, 7.2 if show_clone else 6.4),
+                             dpi=100, facecolor=BG)
             gs = gridspec.GridSpec(n_rows, 2, width_ratios=[2.05, 1.0],
                                    height_ratios=[1] * n_rows, figure=fig,
                                    wspace=0.14,
-                                   hspace=0.62 if arms else 0.34,
+                                   hspace=(0.95 if show_clone
+                                           else 0.62 if arms else 0.34),
                                    left=0.00, right=0.965,
                                    top=0.835, bottom=0.095)
 
@@ -272,6 +302,15 @@ def main() -> int:
                 rgb = shade_by_oxygen(base, oxy)
                 ax.scatter(pos[:, 0], pos[:, 1], pos[:, 2], c=np.clip(rgb, 0, 1),
                            s=9, alpha=0.88, linewidths=0, depthshade=False)
+
+            # The resistant cells, ringed: selection is a statement
+            # about WHICH cells are left, and a count cannot show that.
+            flags = list(getattr(snap, "cell_subclone", None) or [])
+            if len(pos) and len(flags) == len(pos) and any(flags):
+                cp = pos[np.asarray(flags, dtype=bool)]
+                ax.scatter(cp[:, 0], cp[:, 1], cp[:, 2], s=70,
+                           facecolors="none", edgecolors="#f5c542",
+                           linewidths=1.4, depthshade=False)
 
             ipos = np.asarray(snap.immune_positions, dtype="float64") \
                 if snap.immune_positions is not None else np.zeros((0, 3))
@@ -308,7 +347,11 @@ def main() -> int:
                     a.set_yscale("log")
                 a.axvline(t, color=INK, lw=1.0, alpha=0.55)
                 a.set_title(title, color=INK, fontsize=11, loc="left", pad=22)
-                a.tick_params(colors=MUTED, labelsize=8)
+                # which="both": a log axis spanning under a decade labels
+                # its MINOR ticks, and those were drawn in the default
+                # black, half outside the panel.
+                a.tick_params(colors=MUTED, labelsize=8, which="both")
+                a.tick_params(labelsize=7, which="minor")
                 for s in a.spines.values():
                     s.set_color("#2b2f3a")
                 a.grid(color="#262a34", lw=0.6)
@@ -328,16 +371,32 @@ def main() -> int:
             a2 = strip(gs[1, 1], [("total_kills", "Cumulative immune kills",
                                    "#ff4d6d")], "Immune killing")
             if arms:
+                psa_key = "psa_tumour" if show_clone else "psa"
                 a3 = strip(
                     gs[2, 1], [],
-                    "AR pathway output: PSA per cell (log scale)", log=True,
-                    lines=[(arm["time"], arm["psa"],
+                    ("Tumour PSA output (log scale)" if show_clone else
+                     "AR pathway output: PSA per cell (log scale)"), log=True,
+                    lines=[(arm["time"], arm[psa_key],
                             arm["label"] + (" (this video)"
                                             if arm["recorded"] else ""),
                             arm_colours[j % len(arm_colours)],
                             2.4 if arm["recorded"] else 1.6)
                            for j, arm in enumerate(arms)])
-                a3.set_xlabel("simulated hours", color=MUTED, fontsize=9)
+                if show_clone:
+                    a4 = strip(
+                        gs[3, 1], [],
+                        f"Share of cancer cells carrying "
+                        f"{subclone_label.replace('_', ' ')}",
+                        lines=[(arm["time"],
+                                [100.0 * v for v in arm["carrier_share"]],
+                                arm["label"], arm_colours[j % len(arm_colours)],
+                                2.4 if arm["recorded"] else 1.6)
+                               for j, arm in enumerate(arms)])
+                    a4.set_ylim(0, 100)
+                    a4.set_ylabel("%", color=MUTED, fontsize=8)
+                    a4.set_xlabel("simulated hours", color=MUTED, fontsize=9)
+                else:
+                    a3.set_xlabel("simulated hours", color=MUTED, fontsize=9)
             else:
                 a2.set_xlabel("simulated hours", color=MUTED, fontsize=9)
 
@@ -354,8 +413,11 @@ def main() -> int:
             fig.text(0.02, 0.018,
                      "Tissue-cell brightness is that cell's own oxygen.  "
                      "Red crosses: a cancer cell killed by an immune cell "
-                     "within the last hour.  Research use only.",
-                     color=MUTED, fontsize=9, ha="left")
+                     "within the last hour.  "
+                     + ("Yellow rings: cancer cells carrying the resistance "
+                        "variant.  " if show_clone else "")
+                     + "Research use only.",
+                     color=MUTED, fontsize=8 if show_clone else 9, ha="left")
 
             fig.savefig(tmp / f"f{i:05d}.png", facecolor=BG)
             plt.close(fig)
@@ -411,8 +473,20 @@ def main() -> int:
                  "cancer_end": a["cancer_end"],
                  "immune_kills": a["immune_kills"],
                  "psa_start": round(a["psa"][0], 3),
-                 "psa_end": round(a["psa"][-1], 3)}
+                 "psa_end": round(a["psa"][-1], 3),
+                 "psa_tumour_start": round(a["psa_tumour"][0], 1),
+                 "psa_tumour_low": round(min(a["psa_tumour"]), 1),
+                 "psa_tumour_low_hour": round(
+                     a["time"][a["psa_tumour"].index(min(a["psa_tumour"]))], 1),
+                 "psa_tumour_end": round(a["psa_tumour"][-1], 1),
+                 "carrier_share_start": round(a["carrier_share"][0], 4),
+                 "carrier_share_end": round(a["carrier_share"][-1], 4)}
                 for a in arms],
+            # Which mutation was put in only part of the tumour, and how
+            # much of it. A scenario, not a reading -- see the page.
+            "subclone": ({"label": subclone_label,
+                          "founding_fraction": clonal[subclone_label]}
+                         if subclone_label else None),
             "presentation": presentation_lines(runner.presentation_report),
             "cells_start": int(n_cancer[0] + n_normal[0]),
             "cells_end": int(n_cancer[-1] + n_normal[-1]),

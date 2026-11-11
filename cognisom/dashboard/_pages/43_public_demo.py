@@ -108,6 +108,14 @@ if _RTX_VIDEO.exists():
             f"which is the engine's own kill count — so the crosses are "
             f"countable against the number stated below."
         )
+    if facts and facts.get("subclone"):
+        # The stage draws cells by type, and a carrier is the same type
+        # as its neighbour. Said, so nobody looks for rings here.
+        _rtx_bits.append(
+            "This view draws cells by type, so it does not mark which "
+            "cancer cells carry the resistance variant; the yellow rings "
+            "are in the first video only."
+        )
     _rtx_bits.append(
         "Cells are drawn at their authored shapes and translucency rather "
         "than as dots, which is why the tissue reads as a packed solid. "
@@ -239,7 +247,7 @@ st.divider()
 
 # ── What happened ────────────────────────────────────────────────────
 
-st.subheader("What happened in these 24 hours")
+st.subheader(f"What happened in these {facts['duration_hours']:.0f} hours")
 
 m = st.columns(5)
 m[0].metric("Cancer cells", f"{facts['cancer_end']:,}",
@@ -256,9 +264,18 @@ if facts["cancer_end"] < facts["cancer_start"]:
         f"The tumour **shrank**, from {facts['cancer_start']:,} cancer "
         f"cells to {facts['cancer_end']:,}, while the surrounding normal "
         f"tissue went from {facts['normal_start']:,} to "
-        f"{facts['normal_end']:,}. Cancer cells divide faster than normal "
-        "ones here, so that fall is the immune infiltrate outpacing the "
-        "tumour's own division rate — not an absence of growth."
+        f"{facts['normal_end']:,}. "
+        # With a subclone on a drug, most cancer cells are blocked and
+        # barely dividing, so "outpacing the division rate" would credit
+        # the immune system with what the drug is doing.
+        + ("The deaths are immune kills; the drug is what keeps most of "
+           "the tumour from replacing them, by blocking the cells with "
+           "the ordinary receptor. The carriers are not blocked, which is "
+           "the section below."
+           if facts.get("subclone") else
+           "Cancer cells divide faster than normal ones here, so that "
+           "fall is the immune infiltrate outpacing the tumour's own "
+           "division rate — not an absence of growth.")
     )
 else:
     st.markdown(
@@ -303,66 +320,176 @@ _recorded = next((a for a in _arms if a.get("recorded")), None)
 if _recorded:
     st.divider()
     st.subheader("The drug, and this patient's own receptor")
-    _none = next((a for a in _arms if not a["drugs"]), None)
-    st.markdown(
-        f"In this run the patient is given "
-        f"**{' + '.join(_recorded['drugs'])}**. What a drug does here is "
-        "resolved against this patient's own androgen receptor (AR), and "
-        "the bottom-right panel of the video plots the AR pathway's "
-        "output — PSA, the protein AR switches on and the one a clinic "
-        "follows — for this run beside the same patient, seed and tissue "
-        "under each other choice."
-    )
-    for _note in _recorded.get("notes") or []:
-        st.markdown(f"- {_note}")
+    _sub = facts.get("subclone")
+    if _sub:
+        # ── a resistant subclone, and a drug that selects for it ─────
+        from cognisom.genomics.demo_patients import (
+            SU2C_AR_F877L_CLONALITY as _clonality)
+        _variant = _sub["label"].replace("_", " ")
+        _none = next((a for a in _arms if not a["drugs"]), None)
+        st.markdown(
+            f"In this run the patient is given "
+            f"**{' + '.join(_recorded['drugs'])}**, and the resistance "
+            f"variant **{_variant}** starts in "
+            f"**{_sub['founding_fraction']:.0%}** of the cancer cells "
+            "rather than all of them. The drug then does two opposite "
+            "things in one tumour: it blocks the cells with the ordinary "
+            "receptor and drives the ones carrying the variant. The video "
+            "rings the carriers in yellow; the two lower panels plot what "
+            "the whole tumour puts out (PSA, the protein a clinic follows) "
+            "and what share of it the carriers have become."
+        )
+        for _note in _recorded.get("notes") or []:
+            st.markdown(f"- {_note}")
 
-    st.table([
-        {"Arm": a["label"] + (" (the video)" if a["recorded"] else ""),
-         "PSA per cell, start": f"{a['psa_start']:.1f}",
-         "PSA per cell, end": f"{a['psa_end']:.1f}",
-         "Cancer cells at the end": a["cancer_end"],
-         "Immune kills": a["immune_kills"]}
-        for a in _arms
-    ])
+        st.table([
+            {"Arm": a["label"] + (" (the video)" if a["recorded"] else ""),
+             "Tumour PSA, start": f"{a['psa_tumour_start']:,.0f}",
+             "Lowest (at hour)": (f"{a['psa_tumour_low']:,.0f} "
+                                  f"({a['psa_tumour_low_hour']:.0f} h)"),
+             "End": f"{a['psa_tumour_end']:,.0f}",
+             "Carriers, start": f"{a['carrier_share_start']:.0%}",
+             "Carriers, end": f"{a['carrier_share_end']:.0%}",
+             "Cancer cells at the end": a["cancer_end"]}
+            for a in _arms
+        ])
 
-    if _none and _none["psa_end"] > 0:
-        _ratio = _recorded["psa_end"] / _none["psa_end"]
-        if _ratio > 1.5:
+        _start = _recorded["psa_tumour_start"]
+        _low = _recorded["psa_tumour_low"]
+        _end = _recorded["psa_tumour_end"]
+        if _start > 0 and _low < 0.9 * _start and _end > 1.5 * _low:
             st.markdown(
-                f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
-                f"ends at **{_ratio:.1f}x** the no-drug arm: the drug is "
-                "driving the receptor it was designed to block. "
-                + ("The tumour itself ends at the same size as with no "
-                   "drug — which is what the source measured (Balbas "
-                   "2013: resistant tumours on enzalutamide grew like "
-                   "untreated ones, not faster). "
-                   if _recorded["cancer_end"] == _none["cancer_end"] else "")
-                + "Rising PSA on treatment, with no benefit, is the "
-                "clinical picture of this resistance."
-            )
-        elif _ratio < 0.67:
-            st.markdown(
-                f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
-                f"ends at **{_ratio:.2f}x** the no-drug arm: the drug "
-                "blocks the receptor."
+                f"On {' + '.join(_recorded['drugs'])} the tumour's PSA "
+                f"**falls {1 - _low / _start:.0%}** by hour "
+                f"{_recorded['psa_tumour_low_hour']:.0f} and then **climbs "
+                f"to {_end / _low:.1f}x its lowest point**"
+                + (", past where it started" if _end > _start else
+                   f", {_end / _start:.0%} of where it started and still "
+                   "rising when the run ends")
+                + f", while the carriers go from "
+                f"{_recorded['carrier_share_start']:.0%} to "
+                f"{_recorded['carrier_share_end']:.0%} of the tumour. A "
+                "response, then progression on the same drug: the drug has "
+                "not stopped working on the cells it worked on, the tumour "
+                "has become a different population."
             )
         for a in _arms:
             if a is _recorded or not a["drugs"]:
                 continue
-            _r = a["psa_end"] / _none["psa_end"]
-            if _r < 0.67:
+            if (a["psa_tumour_end"] < 0.5 * a["psa_tumour_start"]
+                    and abs(a["carrier_share_end"]
+                            - a["carrier_share_start"]) < 0.15):
                 st.markdown(
-                    f"**{a['label']}** still blocks this receptor in the "
-                    f"model: PSA ends at {_r:.2f}x the no-drug arm and "
-                    f"the tumour at {a['cancer_end']:,} cells against "
-                    f"{_none['cancer_end']:,}. That drug-specific "
-                    "difference is sourced (Moilanen 2015, PMID 26137992)."
+                    f"**{a['label']}** blocks both kinds of cell in the "
+                    f"model: tumour PSA ends at "
+                    f"{a['psa_tumour_end'] / a['psa_tumour_start']:.0%} of "
+                    f"its start and the carriers stay near "
+                    f"{a['carrier_share_end']:.0%}, so nothing is selected. "
+                    "That drug-specific difference is sourced (Moilanen "
+                    "2015, PMID 26137992)."
                 )
-    st.caption(
-        "A mechanism demonstration, not a treatment recommendation. The "
-        "activation factor is one published reporter measurement; the "
-        "blockade strength is an estimate; one run per arm, one seed."
-    )
+        if _none is not None:
+            st.markdown(
+                f"With no drug the carriers end at "
+                f"{_none['carrier_share_end']:.0%}. Both kinds of cell grow "
+                "alike untreated, so any movement there is the chance of "
+                "which few cells the immune system happened to kill, not "
+                "selection."
+            )
+
+        st.markdown("**Where the starting share comes from: it is a "
+                    "scenario, not a reading.**")
+        st.markdown(
+            f"This patient's biopsy read the variant at an allele fraction "
+            f"of {_clonality['vaf']:.3f}. That is not a "
+            f"{_clonality['vaf']:.0%} subclone: his AR gene is amplified, "
+            f"about {_clonality['ar_copies_per_tumour_cell']:.1f} copies "
+            f"per tumour cell at a sample purity of "
+            f"{_clonality['purity']:.2f}, so the fraction counts gene "
+            f"copies, not cells. What follows from his data is only that "
+            f"between **{_clonality['carrier_fraction_min']:.0%} and "
+            f"{_clonality['carrier_fraction_max']:.0%}** of his tumour "
+            "cells carried it — and the biopsy was taken *after* he had "
+            "received this drug class, so that is the share after "
+            "selection. How rare the variant was before treatment is not "
+            "in the data. "
+            f"The {_sub['founding_fraction']:.0%} this run starts from is "
+            "chosen to show the mechanism; the run ends at "
+            f"{_recorded['carrier_share_end']:.0%}, "
+            + ("inside" if _recorded["carrier_share_end"]
+               >= _clonality["carrier_fraction_min"] else "below")
+            + " the range his biopsy allows."
+        )
+        st.caption(
+            "A mechanism demonstration, not a treatment recommendation. "
+            "The carriers are spread evenly through the tumour at the "
+            "start, where a real subclone is one contiguous patch. The "
+            "activation factor is one published reporter measurement and "
+            "the blockade strength is an estimate. The engine's clock is "
+            "compressed by design, so these hours stand for a much longer "
+            "clinical course. One run per arm, one seed."
+        )
+    else:
+        _none = next((a for a in _arms if not a["drugs"]), None)
+        st.markdown(
+            f"In this run the patient is given "
+            f"**{' + '.join(_recorded['drugs'])}**. What a drug does here is "
+            "resolved against this patient's own androgen receptor (AR), and "
+            "the bottom-right panel of the video plots the AR pathway's "
+            "output — PSA, the protein AR switches on and the one a clinic "
+            "follows — for this run beside the same patient, seed and tissue "
+            "under each other choice."
+        )
+        for _note in _recorded.get("notes") or []:
+            st.markdown(f"- {_note}")
+
+        st.table([
+            {"Arm": a["label"] + (" (the video)" if a["recorded"] else ""),
+             "PSA per cell, start": f"{a['psa_start']:.1f}",
+             "PSA per cell, end": f"{a['psa_end']:.1f}",
+             "Cancer cells at the end": a["cancer_end"],
+             "Immune kills": a["immune_kills"]}
+            for a in _arms
+        ])
+
+        if _none and _none["psa_end"] > 0:
+            _ratio = _recorded["psa_end"] / _none["psa_end"]
+            if _ratio > 1.5:
+                st.markdown(
+                    f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
+                    f"ends at **{_ratio:.1f}x** the no-drug arm: the drug is "
+                    "driving the receptor it was designed to block. "
+                    + ("The tumour itself ends at the same size as with no "
+                       "drug — which is what the source measured (Balbas "
+                       "2013: resistant tumours on enzalutamide grew like "
+                       "untreated ones, not faster). "
+                       if _recorded["cancer_end"] == _none["cancer_end"] else "")
+                    + "Rising PSA on treatment, with no benefit, is the "
+                    "clinical picture of this resistance."
+                )
+            elif _ratio < 0.67:
+                st.markdown(
+                    f"On {' + '.join(_recorded['drugs'])} this patient's PSA "
+                    f"ends at **{_ratio:.2f}x** the no-drug arm: the drug "
+                    "blocks the receptor."
+                )
+            for a in _arms:
+                if a is _recorded or not a["drugs"]:
+                    continue
+                _r = a["psa_end"] / _none["psa_end"]
+                if _r < 0.67:
+                    st.markdown(
+                        f"**{a['label']}** still blocks this receptor in the "
+                        f"model: PSA ends at {_r:.2f}x the no-drug arm and "
+                        f"the tumour at {a['cancer_end']:,} cells against "
+                        f"{_none['cancer_end']:,}. That drug-specific "
+                        "difference is sourced (Moilanen 2015, PMID 26137992)."
+                    )
+        st.caption(
+            "A mechanism demonstration, not a treatment recommendation. The "
+            "activation factor is one published reporter measurement; the "
+            "blockade strength is an estimate; one run per arm, one seed."
+        )
 
 st.markdown(
     f"Oxygen across the run spans **{facts['oxygen_min']:.3f} to "
@@ -432,7 +559,10 @@ with st.expander("Reproduce this recording"):
                   for d in ((facts.get("treatment") or {}).get("drugs") or []))
         + "".join(f" \\\n    --compare-drug {a['label']}"
                   for a in (facts.get("treatment_arms") or [])
-                  if a["drugs"] and not a["recorded"]),
+                  if a["drugs"] and not a["recorded"])
+        + (f" \\\n    --subclone {facts['subclone']['label']}="
+           f"{facts['subclone']['founding_fraction']:g}"
+           if facts.get("subclone") else ""),
         language="bash",
     )
     st.caption(

@@ -290,3 +290,43 @@ def test_the_measured_numbers_have_not_drifted(arms):
         assert min(got["psa"]) == pytest.approx(low, rel=0.25)
         assert got["psa"][-1] == pytest.approx(end, rel=0.35), (
             f"{drug}: re-measure, do not re-pin", got["psa"][-1])
+
+
+# ── and the public recording can show it ──────────────────────────
+
+
+def test_the_recorder_passes_the_subclone_to_every_arm():
+    """The comparison arms are only a comparison if they start from the
+    same tumour, and the page reads the scenario from the sidecar."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent
+           / "scripts" / "record_demo_run.py").read_text()
+    assert '"--subclone"' in src
+    assert "clonal_fractions=clonal or None" in src
+    assert '"subclone"' in src and '"carrier_share_end"' in src
+    assert '"psa_tumour_low"' in src
+
+
+def test_a_snapshot_says_which_cells_are_carriers():
+    runner = _run("Enzalutamide", 0.1, 0.1)
+    snap = runner.cell_snapshots[-1]
+    assert len(snap.cell_subclone) == len(snap.cell_ids)
+    assert sum(snap.cell_subclone) == 1
+
+
+def test_the_committed_recording_matches_its_own_claims():
+    """The page says response-then-progression only from these fields."""
+    import json
+    from pathlib import Path
+    facts = json.loads((Path(__file__).resolve().parent.parent / "cognisom"
+                        / "dashboard" / "assets" / "demo_run.json").read_text())
+    if not facts.get("subclone"):
+        pytest.skip("the committed recording has no subclone")
+    arm = next(a for a in facts["treatment_arms"] if a["recorded"])
+    assert arm["carrier_share_start"] == pytest.approx(
+        facts["subclone"]["founding_fraction"], abs=0.02)
+    assert arm["psa_tumour_low"] <= min(arm["psa_tumour_start"],
+                                        arm["psa_tumour_end"])
+    assert arm["carrier_share_end"] >= CLONALITY["carrier_fraction_min"], (
+        "the page says the run ends inside the range the biopsy allows")
+    assert facts["usd_kill_markers"] == facts["immune_kills"]

@@ -497,6 +497,11 @@ class CellSnapshot:
     cell_oxygen: list = field(default_factory=list)
     cell_mhc1: list = field(default_factory=list)
     cell_ids: list = field(default_factory=list)
+    #: Per cell, whether it carries the subclonal mutation -- only filled
+    #: when the run has one (EngineRunner(clonal_fractions=...)), so a
+    #: recording can show WHERE the resistant cells are, not just how
+    #: many. Empty for every other run.
+    cell_subclone: list = field(default_factory=list)
     # Metabolic and age state. These live on CellState and were simply
     # not being recorded, which is why the frame-by-frame inspector
     # fabricated them instead of reading a run.
@@ -1167,6 +1172,10 @@ class EngineRunner:
                 snap.cell_oxygen = [float(c.oxygen) for c in alive]
                 snap.cell_mhc1 = [float(c.mhc1_expression) for c in alive]
                 snap.cell_ids = [c.cell_id for c in alive]
+                if self.clonal_fractions:
+                    label = next(iter(self.clonal_fractions))
+                    snap.cell_subclone = [
+                        label in (c.mutations or []) for c in alive]
                 snap.cell_glucose = [float(c.glucose) for c in alive]
                 snap.cell_atp = [float(c.atp) for c in alive]
                 snap.cell_age = [float(c.age) for c in alive]
