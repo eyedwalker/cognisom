@@ -296,6 +296,12 @@ class _CellIndex:
                 # the full scan rather than fail the step.
                 self._tree = None
 
+    def extent(self):
+        """``(lo, hi)`` over every indexed cell, or None without a tree."""
+        if self._pos is None or len(self._pos) == 0:
+            return None
+        return self._pos.min(axis=0), self._pos.max(axis=0)
+
     def candidates_within(self, position, radius: float):
         """Ids plausibly within ``radius``, in dict insertion order.
 
@@ -832,10 +838,32 @@ class ImmuneModule(SimulationModule):
         where its leukocytes are, so inferring an immune arrangement
         from it would be a claim the data does not carry.
         """
+        layout = self._layout_box()
+        if layout is None:
+            return None
+        lo, hi, spec = layout
         if self.seeding == 'slab':
-            from cognisom.modules.tissue_slab import (
-                rng_from, scatter_in_box, slab_bounds, slab_spec,
-            )
+            from cognisom.modules.tissue_slab import rng_from, scatter_in_box
+        else:
+            from cognisom.modules.tissue_slab import scatter_in_box
+            from cognisom.modules.tissue_section import rng_from
+
+        n_total = self.n_t_cells + self.n_nk_cells + self.n_macrophages
+        return scatter_in_box(
+            n_total, lo, hi,
+            inset=spec['immune_inset'],
+            rng=rng_from(spec['seed']),
+        )
+
+    def _layout_box(self):
+        """``(lo, hi, spec)`` of the volume layout being run, else None.
+
+        The nominal box the cellular module fills, derived from the
+        shared spec because the modules are initialised independently.
+        None for the historical 'window' seeding, which has no layout.
+        """
+        if self.seeding == 'slab':
+            from cognisom.modules.tissue_slab import slab_bounds, slab_spec
             spec = slab_spec(**self.slab_overrides)
             lo, hi = slab_bounds(
                 spec['n_normal'], spec['n_cancer'],
@@ -844,9 +872,8 @@ class ImmuneModule(SimulationModule):
                 center=spec['center'],
             )
         elif self.seeding == 'section':
-            from cognisom.modules.tissue_slab import scatter_in_box
             from cognisom.modules.tissue_section import (
-                rng_from, section_bounds, section_spec,
+                section_bounds, section_spec,
             )
             spec = section_spec(**self.section_overrides)
             lo, hi = section_bounds(
@@ -860,13 +887,44 @@ class ImmuneModule(SimulationModule):
             )
         else:
             return None
+        return np.asarray(lo, dtype=float), np.asarray(hi, dtype=float), spec
 
-        n_total = self.n_t_cells + self.n_nk_cells + self.n_macrophages
-        return scatter_in_box(
-            n_total, lo, hi,
-            inset=spec['immune_inset'],
-            rng=rng_from(spec['seed']),
-        )
+    #: Where an immune cell may be when no volume layout is being run:
+    #: the box the ring presets have always used, kept so they do not move.
+    WINDOW_ROAMING_BOX = (np.array([20.0, 20.0, 20.0]),
+                          np.array([180.0, 180.0, 80.0]))
+
+    def _roaming_box(self):
+        """``(lo, hi)`` an immune cell is kept inside this step.
+
+        This was one hard-coded box, 20-180 x 20-180 x 20-80 um, sized
+        for the ring. The section layout is 243 um wide and its cells
+        reach 0-260 um once jittered and grown, so on that layout the
+        infiltrate could not enter the outer 38% of the area. Measured on
+        the public demo (section, seed 7, 72 h): by hour 15 all 120
+        immune cells were pinned against the box wall, each locked on one
+        of five cancer cells 5.1 um away against a 5.0 um kill radius --
+        never in contact, so never released -- and not one kill was made
+        in the remaining 57 hours.
+
+        So a volume layout is roamed over its whole extent: the nominal
+        box, widened to wherever cells actually are, because jitter and
+        division put cells outside the nominal box and a cell the
+        infiltrate cannot reach is exactly the defect.
+        """
+        nominal = getattr(self, '_nominal_box', False)
+        if nominal is False:
+            layout = self._layout_box()
+            nominal = None if layout is None else (layout[0], layout[1])
+            self._nominal_box = nominal
+        if nominal is None:
+            return self.WINDOW_ROAMING_BOX
+        lo, hi = nominal
+        extent = self._cell_index.extent()
+        if extent is not None:
+            lo = np.minimum(lo, extent[0])
+            hi = np.maximum(hi, extent[1])
+        return lo, hi
 
     _POLARIZATION_ENDPOINT = {'M1': -1.0, 'M0': 0.0, 'M2': 1.0}
 
@@ -1291,6 +1349,7 @@ class ImmuneModule(SimulationModule):
         # tree-ordered scan would pick a different cell and move every
         # pinned number in the suite. See _targets_near.
         self._cell_index = _CellIndex(self.cellular_module.cells)
+        roam_lo, roam_hi = self._roaming_box()
 
         for immune_id, immune_cell in list(self.immune_cells.items()):
             if immune_cell.in_blood:
@@ -1467,7 +1526,7 @@ class ImmuneModule(SimulationModule):
                     self._release(immune_cell)
             
             # Keep in bounds
-            immune_cell.position = np.clip(immune_cell.position, [20, 20, 20], [180, 180, 80])
+            immune_cell.position = np.clip(immune_cell.position, roam_lo, roam_hi)
 
         # Clonal expansion, after every cell has been stepped so that a
         # daughter born this step is not itself stepped in the same one.

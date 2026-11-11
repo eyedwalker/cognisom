@@ -1096,7 +1096,20 @@ def test_a_six_hour_slab_run_is_identical_with_escape_on_and_off():
     # and fewer cells remain to divide (cancer divisions 13 -> 11); mean
     # MHC-I rose (0.3469 -> 0.3545) because more kills means more
     # IFN-gamma. Every move is in the direction the mechanism predicts.
-    assert out[True][:7] == (2090, 77, 64, 13, 0, 11, 0.35446766), out[True]
+    # RE-MEASURED 2026-11-11 when immune cells stopped being confined to
+    # the ring's 20-180 um box (the slab reaches 17.5-182.5 um in x; see
+    # test_the_infiltrate_can_reach_the_whole_tissue.py). Was
+    # (2090, 77, 64, 13, 0, 11, 0.35446766) under both scorers. It is no
+    # longer the same under both, so the earlier "identical under both
+    # scorers" stopped being true here and each is pinned on its own.
+    # Cancer divisions stayed 11 under both, which is what the
+    # expectation below is computed from.
+    from cognisom.genomics.mhcflurry_binding import is_mhcflurry_available
+    measured = {
+        True: (2094, 81, 64, 10, 0, 11, 0.359673066),    # MHCflurry
+        False: (2092, 79, 64, 12, 0, 11, 0.359102551),   # PWM fallback
+    }[bool(is_mhcflurry_available())]
+    assert out[True][:7] == measured, out[True]
     # The point of this test: the draw WAS reached.
     assert out[True][5] > 0
     assert ev.expected_events(out[True][5]) == pytest.approx(1.7047e-5, rel=0.01)

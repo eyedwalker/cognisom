@@ -1073,41 +1073,49 @@ SHIPPED_24H_PINS = {
     #    now 16 on BOTH scorers, where it was 15 and 17: the figure that
     #    once made the NK regime scorer-dependent no longer separates
     #    them at all.
+    # RE-MEASURED 2026-11-11, both scorers, when immune cells stopped being
+    # confined to the ring's 20-180 um box (see
+    # test_the_infiltrate_can_reach_the_whole_tissue.py). The slab reaches
+    # 17.5-182.5 um in x, so its outermost 2.5 um became reachable. That
+    # is a small change and the moves are small and of no single sign:
+    # PWM survivors (76, 41) -> (80, 48), kills 50 -> 48, delta +0.014 ->
+    # +0.075; MHCflurry (73, 37) -> (70, 36), kills 49 -> 57, delta
+    # -0.018 -> -0.011. Both deltas stay inside the 3-sd band of 0.1275.
+    # SHIPPED_DELTA_SD's twelve seeds were NOT re-run for this change.
     'pwm': {
-        'survivors': (76, 41),
-        'delta': 0.01447,                    # +0.10126 before the ECM fix
-        'n_kills': 50,
-        'by_lineage': {'NK_cell': 33, 'macrophage': 14, 'T_cell': 3},
-        'observed': 28,
-        'expected': 25.74745,
-        'intact_mean': 0.38438,
-        'escaped_mean': 0.25244,
-        'intact_above_at_end': 4,
+        'survivors': (80, 48),
+        'delta': 0.075,
+        'n_kills': 48,
+        'by_lineage': {'NK_cell': 36, 'macrophage': 8, 'T_cell': 4},
+        'observed': 25,
+        'expected': 27.69871,
+        'intact_mean': 0.39609,
+        'escaped_mean': 0.25856,
+        'intact_above_at_end': 13,
         'intact_samples_above': 16,          # was 2, then 15; see note 4
-        'max_intact_over_run': 0.43332,
-        'cancer_divisions': 46,
-        'divisions_total': 223,
+        'max_intact_over_run': 0.43741,
+        'cancer_divisions': 48,
+        'divisions_total': 225,
     },
     'mhcflurry': {
-        'survivors': (73, 37),
-        'delta': -0.01815,                   # see notes 1, 3 and 4
-        'n_kills': 49,
-        # T cells take 8 of 49 here, 16%. An earlier pass corrected "T
-        # cells do ZERO killing" to "1 of 15", then to 2 of 41; freeing
-        # the infiltrate from the saturated matrix took it to 8 of 49.
-        # No single value is a result at this sample size -- over 12
-        # seeds the share is 0.139 +- 0.060 -- and what the test asserts
-        # is the SHARE against that measured spread, t_share <= 0.35.
-        'by_lineage': {'NK_cell': 30, 'macrophage': 11, 'T_cell': 8},
-        'observed': 26,
-        'expected': 23.91988,
-        'intact_mean': 0.39431,
-        'escaped_mean': 0.26403,
-        'intact_above_at_end': 12,
+        'survivors': (70, 36),
+        'delta': -0.01071,                   # see notes 1, 3 and 4
+        'n_kills': 57,
+        # T cells take 3 of 57 here, 5%; it was 8 of 49 before the
+        # roaming box was fixed, and 2 of 41 before that. No single
+        # value is a result at this sample size -- over 12 seeds the
+        # share is 0.139 +- 0.060 -- and what the test asserts is the
+        # SHARE against that measured spread, t_share <= 0.35.
+        'by_lineage': {'NK_cell': 38, 'macrophage': 16, 'T_cell': 3},
+        'observed': 35,
+        'expected': 30.36022,
+        'intact_mean': 0.39761,
+        'escaped_mean': 0.26502,
+        'intact_above_at_end': 15,
         'intact_samples_above': 16,          # was 0, then 17; see note 4
-        'max_intact_over_run': 0.44262,
-        'cancer_divisions': 44,
-        'divisions_total': 221,
+        'max_intact_over_run': 0.44066,
+        'cancer_divisions': 48,
+        'divisions_total': 225,
     },
 }
 
