@@ -75,6 +75,30 @@ NAME_IS_NOT_IDENTITY = frozenset({
 })
 
 
+#: library_meta key recording which seed content this library last
+#: caught up with.
+SEED_META_KEY = "seeded_entities_digest"
+
+#: The modules whose content decides what a freshly seeded library holds.
+_SEED_MODULES = (
+    "seed_data.py", "seed_immunology.py", "seed_checkpoints.py",
+    "seed_cytotoxic_effectors.py", "seed_marker_molecules.py",
+    "seed_malignant_compartment.py", "marker_molecules.json",
+)
+
+
+def _seed_digest() -> str:
+    """A hash of the seed modules: changes exactly when a seed does."""
+    import hashlib
+    here = Path(__file__).resolve().parent
+    digest = hashlib.sha256()
+    for name in _SEED_MODULES:
+        path = here / name
+        digest.update(name.encode())
+        digest.update(path.read_bytes() if path.exists() else b"absent")
+    return digest.hexdigest()
+
+
 def get_database_url() -> Optional[str]:
     """Get PostgreSQL connection URL from environment or AWS Secrets Manager."""
     # Direct environment variable
@@ -110,14 +134,19 @@ class EntityStore:
     Uses PostgreSQL in production (AWS RDS) or SQLite for local development.
     """
 
-    def __init__(self, db_path: Optional[str] = None, database_url: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, database_url: Optional[str] = None,
+                 _reference: bool = False):
         self._conn: Any = None
         self._use_postgres = False
         self._db_path: Optional[str] = None
         self._database_url: Optional[str] = None
+        #: A scratch library built only to be compared against; see
+        #: _add_missing_seeded_entities. Always a local SQLite file, and
+        #: never itself caught up (that would recurse).
+        self._reference = _reference
 
         # Check for PostgreSQL connection
-        pg_url = database_url or get_database_url()
+        pg_url = None if _reference else (database_url or get_database_url())
         if pg_url:
             self._database_url = pg_url
             self._use_postgres = True
@@ -143,6 +172,7 @@ class EntityStore:
         with self._init_lock():
             self._init_db()
             self._auto_seed_if_empty()
+            self._add_missing_seeded_entities()
             self._apply_curated_parameters()
             self._apply_structures()
 
@@ -268,6 +298,11 @@ class EntityStore:
                 except Exception as e:
                     log.warning("Ultrastructure seed failed (non-fatal): %s", e)
 
+                # Just built from the seeds, so there is nothing to catch
+                # up with; say so, or the next step builds a scratch copy
+                # of this library only to find it identical.
+                self.set_meta(SEED_META_KEY, _seed_digest())
+
                 final = self.stats()
                 log.info(
                     "Auto-seeded entity library: %d entities, %d relationships",
@@ -276,6 +311,119 @@ class EntityStore:
                 )
         except Exception as e:
             log.warning("Auto-seed failed (non-fatal): %s", e)
+
+    def _add_missing_seeded_entities(self) -> int:
+        """Give an EXISTING library the seeded entities it has never had.
+
+        _auto_seed_if_empty runs only on an empty database, and a deployed
+        library is never empty. So every entity a seed module gained after
+        that library was created skipped it for good, and the curated
+        values for those entities -- which apply_curated can only write
+        onto an entity that exists -- landed nowhere. Development and CI
+        build a fresh library each time and never see it.
+
+        Found on production 2026-11-12: the prostate cancer cell had no
+        entry there, so the public cells page headed its section "None"
+        and everything drawn from the library drew cancer as a default
+        sphere. A count afterwards showed 108 entities named by the
+        curated file that production did not hold.
+
+        What this does, and the three things it deliberately does not:
+
+        * builds a scratch library from the seeds, and copies in every
+          entity whose (name, type) this library has NO row for, with the
+          relationships that touch one;
+        * does NOT modify, re-enrich or overwrite any entity already here
+          -- a curated or hand-edited row is left exactly as it is;
+        * does NOT bring back an entity that exists in any status, so one
+          that was archived on purpose stays archived;
+        * does NOT touch the types whose name is not an identity (runs,
+          scenarios, projects, parameter sets).
+
+        It runs when the seed modules' content changes, keyed like the
+        curated pass, so a start with nothing new costs one hash.
+        Returns the number of entities added.
+        """
+        if self._reference:
+            return 0
+        try:
+            digest = _seed_digest()
+            if self.get_meta(SEED_META_KEY) == digest:
+                return 0
+            import tempfile
+            with tempfile.TemporaryDirectory() as scratch:
+                reference = EntityStore(
+                    db_path=os.path.join(scratch, "reference.db"),
+                    _reference=True)
+                try:
+                    added = self._copy_missing_from(reference)
+                finally:
+                    reference.close()
+            self.set_meta(SEED_META_KEY, digest)
+            if added:
+                log.info("Added %d seeded entities this library lacked", added)
+                # The curated values for them have been waiting; the
+                # ordinary pass is keyed on the FILE and would skip.
+                from .curated import apply_curated
+                apply_curated(self, force=True)
+            return added
+        except Exception as e:                   # noqa: BLE001
+            log.warning("Adding missing seeded entities failed (non-fatal): %s", e)
+            return 0
+
+    def _has_any_row_named(self, name: str, entity_type: str) -> bool:
+        """Like entity_exists, but in ANY status: archived counts as held."""
+        cursor = self._execute(
+            "SELECT 1 FROM entities WHERE lower(name) = ? AND entity_type = ? "
+            "LIMIT 1", (name.strip().lower(), entity_type))
+        return cursor.fetchone() is not None
+
+    def _id_of(self, name: str, entity_type: str) -> Optional[str]:
+        cursor = self._execute(
+            "SELECT entity_id FROM entities WHERE lower(name) = ? AND "
+            "entity_type = ? LIMIT 1", (name.strip().lower(), entity_type))
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return row["entity_id"] if isinstance(row, dict) else row[0]
+
+    def _copy_missing_from(self, reference: "EntityStore") -> int:
+        from .curated import _all_entities
+        added_ids: Dict[str, Tuple[str, str]] = {}
+        identity: Dict[str, Tuple[str, str]] = {}
+        for entity in _all_entities(reference):
+            key = (entity.name, entity.entity_type.value)
+            identity[entity.entity_id] = key
+            if entity.entity_type in NAME_IS_NOT_IDENTITY:
+                continue
+            if self._has_any_row_named(*key):
+                continue
+            if self.add_entity(entity):
+                added_ids[entity.entity_id] = key
+        # Relationships that touch a new entity, re-pointed at THIS
+        # library's ids: an entity both libraries hold has a different id
+        # in each.
+        seen = set()
+        for ref_id in added_ids:
+            for rel in reference.get_relationships(ref_id):
+                if rel.rel_id in seen:
+                    continue
+                seen.add(rel.rel_id)
+                ends = []
+                for end in (rel.source_id, rel.target_id):
+                    key = identity.get(end)
+                    ends.append(None if key is None else self._id_of(*key))
+                if None in ends:
+                    continue
+                rel.source_id, rel.target_id = ends
+                self.add_relationship(rel)
+        # Recorded, so what an unattended catch-up added to a deployed
+        # library can be read back afterwards rather than inferred.
+        if added_ids:
+            import json as _json
+            self.set_meta("seeded_entities_last_added", _json.dumps(
+                sorted(f"{name} ({kind})" for name, kind in added_ids.values())))
+        return len(added_ids)
 
     @contextlib.contextmanager
     def _init_lock(self):
