@@ -917,6 +917,10 @@ class EngineRunner:
         if ar_signaling and cellular:
             ar_signaling.set_cellular_module(cellular)
             cellular.set_ar_module(ar_signaling)
+        if ar_signaling and vascular:
+            # Only used when a run limits drug penetration; without this
+            # link the AR module has no geometry and exposure is uniform.
+            ar_signaling.set_vascular_module(vascular)
         if mechanics and cellular:
             mechanics.set_cellular_module(cellular)
             if spatial:

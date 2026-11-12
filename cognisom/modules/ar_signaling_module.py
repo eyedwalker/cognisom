@@ -50,6 +50,11 @@ import numpy as np
 
 from cognisom.core.event_bus import EventTypes
 from cognisom.core.module_base import SimulationModule
+from cognisom.engine.py.pharmacology.exposure import (
+    exposure_fraction,
+    penetration_report,
+    scale_activity,
+)
 from cognisom.modules.cellular_module import TISSUE_DHT_REFERENCE_NM
 
 log = logging.getLogger(__name__)
@@ -148,6 +153,27 @@ class ARSignalingModule(SimulationModule):
             self.variant_label = str(variant['label'])
             self.variant_activity = float(variant['activity'])
 
+        # ── how much of the drug this cell actually sees ─────────────
+        #
+        # One number for the whole tumour says every cancer cell sees
+        # the same drug, whether it is against a capillary or 200 um
+        # into a nodule. That was not a modelling choice, it was the
+        # absence of one. `drug_half_distance_um` is the distance over
+        # which the drug halves, measured from the nearest capillary by
+        # the same geometry the oxygen path uses; None keeps the uniform
+        # behaviour exactly, to the bit, and is the default because
+        # enzalutamide's own PK supports it (see
+        # engine/py/pharmacology/exposure.py for both halves of that
+        # argument and what is NOT known).
+        half = self.config.get('drug_half_distance_um', None)
+        self.drug_half_distance_um = None if half is None else float(half)
+        if (self.drug_half_distance_um is not None
+                and self.drug_half_distance_um <= 0.0):
+            raise ValueError(
+                "drug_half_distance_um must be positive; None means the "
+                "drug reaches every cell equally")
+        self.vascular_module = None
+
         self.system = None
         self.rhs = None
         self.params: Dict[str, float] = {}
@@ -191,6 +217,32 @@ class ARSignalingModule(SimulationModule):
 
     def set_cellular_module(self, cellular_module):
         self.cellular_module = cellular_module
+
+    def set_vascular_module(self, vascular_module):
+        """Needed only to limit drug penetration; absent, exposure is
+        uniform and this module behaves exactly as it did."""
+        self.vascular_module = vascular_module
+
+    def drug_exposure_of(self, cell_id: int) -> float:
+        """Fraction of the plasma drug level this cell sees, in [0, 1].
+
+        Exactly 1.0 when no half-distance is configured, so every run
+        that does not ask for penetration limits is unchanged. Also 1.0
+        when no vascular module is linked: a run with no vessels at all
+        has no geometry to answer with, and inventing a gradient from
+        nothing would be worse than the uniform assumption it replaces.
+        """
+        if self.drug_half_distance_um is None:
+            return 1.0
+        if self.vascular_module is None:
+            return 1.0
+        cells = getattr(self.cellular_module, 'cells', None) or {}
+        cell = cells.get(cell_id)
+        if cell is None:
+            return 1.0
+        _cap, distance = self.vascular_module._nearest_capillary(
+            cell.position)
+        return exposure_fraction(distance, self.drug_half_distance_um)
 
     def dht_input_for(self, dht_nM: float) -> float:
         """The supply rate whose complex bound is this tissue DHT."""
@@ -280,15 +332,26 @@ class ARSignalingModule(SimulationModule):
         return float(min(ceiling, max(0.0, active)))
 
     def activity_of(self, cell_id: int) -> float:
-        """What the drug does to THIS cell's AR-driven transcription."""
-        if self.variant_label is None:
-            return self.transcriptional_activity
-        cells = getattr(self.cellular_module, 'cells', None) or {}
-        cell = cells.get(cell_id)
-        if cell is not None and self.variant_label in (
-                getattr(cell, 'mutations', None) or []):
-            return float(self.variant_activity)
-        return self.transcriptional_activity
+        """What the drug does to THIS cell's AR-driven transcription.
+
+        Two things decide it: which receptor this cell carries, and how
+        much of the drug reaches where it sits. The receptor part is the
+        variant lookup below. The exposure part scales the DEPARTURE
+        from untreated, so it works the same way on a blockade and on
+        the agonist a receptor variant can turn one into -- a carrier
+        far from a vessel gets less agonist drive, exactly as a
+        wild-type cell there gets less blockade.
+        """
+        activity = self.transcriptional_activity
+        if self.variant_label is not None:
+            cells = getattr(self.cellular_module, 'cells', None) or {}
+            cell = cells.get(cell_id)
+            if cell is not None and self.variant_label in (
+                    getattr(cell, 'mutations', None) or []):
+                activity = float(self.variant_activity)
+        if self.drug_half_distance_um is None:
+            return activity
+        return scale_activity(activity, self.drug_exposure_of(cell_id))
 
     # ── stepping ──────────────────────────────────────────────────
 
@@ -416,7 +479,21 @@ class ARSignalingModule(SimulationModule):
             'eugonadal_psa': (float(self.eugonadal_state[self._i["PSA"]])
                               if self.eugonadal_state is not None else 0.0),
             'K_psa_nM': float(self.params.get('K_psa', 0.0)),
+            # Whether the drug reached every cell equally, and what
+            # that rested on. Uniform is a CLAIM here, not a silence.
+            'drug_half_distance_um': self.drug_half_distance_um,
+            'drug_exposure_uniform': self.drug_half_distance_um is None,
+            'drug_penetration_sources': penetration_report(),
         }
+        if self.drug_half_distance_um is not None and self.ids:
+            seen = [self.drug_exposure_of(cid) for cid in self.ids]
+            state['drug_exposure_mean'] = float(sum(seen) / len(seen))
+            state['drug_exposure_min'] = float(min(seen))
+            state['drug_exposure_max'] = float(max(seen))
+            # The cells the drug effectively missed, at Primeau's own
+            # "not exposed to detectable concentrations" reading of it.
+            state['n_cells_below_10pct_exposure'] = int(
+                sum(1 for e in seen if e < 0.1))
         if n:
             for name in ("AR", "AR_DHT", "PSA"):
                 col = self.Y[:, self._i[name]]
