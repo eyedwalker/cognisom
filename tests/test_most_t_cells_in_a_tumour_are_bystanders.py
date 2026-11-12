@@ -104,3 +104,14 @@ def test_the_number_says_it_is_an_estimate_from_other_tumours():
     assert row["status"] == "ESTIMATE"
     assert "30510250" in row["source"] and "not prostate" in row["source"]
     assert row["range"][0] == 0.0, "two of four patients had none"
+
+
+def test_which_cells_are_reactive_follows_the_runs_seed():
+    """A fixed stream made every seed pick the same cells: four seeds of
+    the week-long configuration each had exactly 1 reactive T cell of 19."""
+    def draws(seed):
+        np.random.seed(seed)
+        module = _module(tcell_tumour_reactive_fraction=0.3)
+        return [_t(module).tumour_reactive for _ in range(40)]
+    assert draws(1) == draws(1), "the same seed must give the same cells"
+    assert len({tuple(draws(s)) for s in range(1, 7)}) > 1

@@ -769,8 +769,16 @@ class ImmuneModule(SimulationModule):
                 f"must be between 0 and 1, not {fraction!r}")
         self.tcell_tumour_reactive_fraction = (
             None if fraction is None else float(fraction))
-        self._tcell_reactive_rng = np.random.default_rng(
-            self.config.get('tcell_reactive_seed', 0x544352))
+        # Seeded FROM the run's seed without consuming it. A fixed seed
+        # here made the same T cells reactive in every run: four seeds of
+        # the week-long demo configuration each had exactly 1 reactive T
+        # cell of 19, so the seeds were not sampling the one thing this
+        # setting adds. Reading the global generator's state draws
+        # nothing from it, so recognition and contact times are unmoved.
+        reactive_seed = self.config.get('tcell_reactive_seed')
+        if reactive_seed is None:
+            reactive_seed = int(np.random.get_state()[1][:4].sum()) ^ 0x544352
+        self._tcell_reactive_rng = np.random.default_rng(reactive_seed)
         self.total_tcell_kills = 0
         self.total_activations = 0
         self.total_recruited = 0
