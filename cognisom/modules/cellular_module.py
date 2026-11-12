@@ -192,6 +192,11 @@ class CellState:
     # Interstitial IFN-gamma at the cell, in [0, 1], from the spatial
     # field (None = no field). Raises MHC-I toward mhc1_ceiling.
     ifn_gamma_level: Optional[float] = None
+    # Local level of every DECLARED signal (modules/signalling.py), by
+    # name, written by the spatial module after each solve. Empty unless a
+    # run declares one; the three attributes above are the hand-wired
+    # signals that predate that path.
+    signals: Dict[str, float] = field(default_factory=dict)
     dht_nM: float = TISSUE_DHT_REFERENCE_NM
     # Whether this cancer cell dies when androgen signalling is withdrawn.
     # Westin 1995 (PMID 7778676; 18 patients, biopsies the day before and

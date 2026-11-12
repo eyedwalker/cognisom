@@ -171,3 +171,17 @@ def test_the_seed_script_for_an_existing_library_runs_to_the_end(tmp_path):
         capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
     assert done.returncode == 0, done.stderr[-800:]
     assert "aliases attached" in done.stdout
+
+
+def test_the_page_lists_the_signals_from_the_inventory_and_says_which_are_idle():
+    from streamlit.testing.v1 import AppTest
+    from cognisom.modules import signalling
+    at = AppTest.from_file(str(PAGE), default_timeout=180).run()
+    assert not at.exception, [e.value for e in at.exception]
+    text = "\n".join(m.value for m in at.markdown)
+    assert "How the cells talk to each other" in "\n".join(
+        h.value for h in at.subheader)
+    rows = signalling.inventory()
+    idle = sum(1 for r in rows if not r.wired)
+    assert idle > 0, "the guard is vacuous once every signal is read"
+    assert f"**{len(rows)} of these**" in text

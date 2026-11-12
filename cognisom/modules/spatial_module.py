@@ -797,6 +797,13 @@ class SpatialModule(SimulationModule):
         # field name -> callables returning [(position, rate), ...]; see
         # register_secretion.
         self._secretion_providers: Dict[str, list] = {}
+        # Signals declared rather than hand-wired; see modules/signalling.py
+        # and register_signal. Empty by default, so this path changes no
+        # run that does not ask for it.
+        self.immune_module = None
+        self._signals: Dict[str, Any] = {}
+        for declared in (self.config.get('signals') or ()):
+            self.register_signal(declared)
 
         # Cell radius used to turn a per-cell demand into a volumetric
         # uptake density. 5.0 um is this project's own default --
@@ -836,6 +843,11 @@ class SpatialModule(SimulationModule):
         self._create_field('ifn_gamma',
                            diffusion_coeff=IFN_GAMMA_DIFFUSION_UM2_S)
         
+        for declared in self._signals.values():
+            self._create_field(declared.name,
+                               diffusion_coeff=declared.diffusion_um2_s,
+                               decay_rate=declared.decay_per_hour)
+
         # Subscribe to events
         self.subscribe(EventTypes.CELL_DIVIDED, self.on_cell_divided)
         self.subscribe(EventTypes.CELL_DIED, self.on_cell_died)
@@ -864,6 +876,37 @@ class SpatialModule(SimulationModule):
         """
         self._secretion_providers.setdefault(field_name, []).append(provider)
     
+    def register_signal(self, signal) -> None:
+        """Add a declared signal: a field, its sources, its uptake, and a
+        level every tissue cell can read as ``cell.signals[name]``.
+
+        Refuses a name that is already a field. The six built-in fields
+        are wired by hand and a declaration that reused one of their
+        names would silently stack a second set of sources on it.
+        """
+        from cognisom.modules.signalling import SecretedSignal
+        if not isinstance(signal, SecretedSignal):
+            raise TypeError(
+                "register_signal takes a signalling.SecretedSignal, not "
+                f"{type(signal).__name__}")
+        if signal.name in self.BUILT_IN_FIELDS or signal.name in self._signals:
+            raise ValueError(
+                f"there is already a signal named {signal.name!r}")
+        self._signals[signal.name] = signal
+        if self.fields:                     # declared after initialize()
+            self._create_field(signal.name,
+                               diffusion_coeff=signal.diffusion_um2_s,
+                               decay_rate=signal.decay_per_hour)
+
+    def set_immune_module(self, immune_module):
+        """Link the infiltrate, so a declared signal can be secreted by
+        immune cells as well as tissue cells."""
+        self.immune_module = immune_module
+
+    #: The fields initialize() creates and this module wires by hand.
+    BUILT_IN_FIELDS = ('oxygen', 'glucose', 'cytokine', 'testosterone',
+                       'lactate', 'ifn_gamma')
+
     #: Per-cell O2 demand in field units per hour, matched to
     #: CellularModule._update_metabolism, which hard-codes them (0.1 /h
     #: for cancer, 0.15 /h otherwise). Glucose is read off the cellular
@@ -894,7 +937,7 @@ class SpatialModule(SimulationModule):
         would be wrong for a population that moves and dies.
         """
         if (self.cellular_module is None and self.vascular_module is None
-                and not self._secretion_providers):
+                and not self._secretion_providers and not self._signals):
             return
 
         for field in self.fields.values():
@@ -908,6 +951,28 @@ class SpatialModule(SimulationModule):
                     if rate > 0.0:
                         target.add_source(np.asarray(position, dtype=float),
                                           float(rate))
+
+        # Declared signals: sourced from whichever cells the declaration
+        # names, and taken up by every live tissue cell at its own voxel,
+        # scaled by the cell's share of that voxel like every uptake here.
+        if self._signals:
+            v_cell = (4.0 / 3.0) * np.pi * self.cell_radius_um ** 3
+            v_voxel = self.resolution ** 3
+            share = v_cell / v_voxel if v_voxel > 0 else 0.0
+            tissue = [c for c in (getattr(self.cellular_module, 'cells', None)
+                                  or {}).values() if getattr(c, 'alive', False)]
+            for declared in self._signals.values():
+                target = self.fields.get(declared.name)
+                if target is None:
+                    continue
+                for position, rate in declared.sources(
+                        self.cellular_module, self.immune_module):
+                    target.add_source(np.asarray(position, dtype=float),
+                                      float(rate))
+                if declared.uptake_per_hour > 0.0:
+                    for cell in tissue:
+                        target.add_uptake(cell.position,
+                                          declared.uptake_per_hour * share)
 
         oxygen = self.fields.get('oxygen')
         glucose = self.fields.get('glucose')
@@ -1100,6 +1165,14 @@ class SpatialModule(SimulationModule):
             for cell in cells.values():
                 if getattr(cell, 'alive', False):
                     setattr(cell, attr, float(field.get_concentration_at(cell.position)))
+        for name in self._signals:
+            field = self.fields.get(name)
+            if field is None:
+                continue
+            for cell in cells.values():
+                if getattr(cell, 'alive', False):
+                    cell.signals[name] = float(
+                        field.get_concentration_at(cell.position))
 
     def get_concentration(self, field_name: str, position: np.ndarray) -> float:
         """Get concentration at position"""

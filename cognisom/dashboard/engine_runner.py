@@ -938,6 +938,8 @@ class EngineRunner:
             # fired 720 times describing the transport of nothing.
             # Cells are the sinks.
             spatial.set_cellular_module(cellular)
+            if immune is not None and hasattr(spatial, "set_immune_module"):
+                spatial.set_immune_module(immune)
         if spatial and vascular:
             # Capillaries are the sources, held at the plasma level they
             # carry (Krogh-Erlang vessel wall). This does NOT replace

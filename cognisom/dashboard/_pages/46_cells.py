@@ -18,6 +18,7 @@ from cognisom.dashboard.cell_catalog import (
     NOT_CELLS, STATUS_MEANING, STATUS_ORDER, build_catalog, status_counts,
 )
 from cognisom.dashboard.page_config import safe_set_page_config
+from cognisom.modules import signalling
 
 safe_set_page_config(page_title="Cognisom | The cells",
                      page_icon="\U0001f9ec", layout="wide")
@@ -136,6 +137,31 @@ for e in entries:
 
     st.markdown("**What is missing or weak**")
     st.markdown("\n".join(f"- {item}" for item in e.missing))
+
+# ── How cells talk to each other ─────────────────────────────────────
+
+st.divider()
+st.subheader("How the cells talk to each other")
+signals = signalling.inventory()
+in_use = sum(1 for entry in signals if entry.wired)
+st.markdown(
+    f"Cells influence each other through molecules that spread through "
+    f"the tissue. The simulation carries **{len(signals)} of these**, and "
+    f"{in_use} of them change what a cell does in a default run. The "
+    "others are calculated and currently read by nothing, which is said "
+    "here rather than left out."
+)
+st.table(
+    [{"Signal": entry.molecule,
+      "Made by": entry.made_by,
+      "Read by": entry.read_by,
+      "What it changes": entry.effect,
+      "In use": "Yes" if entry.wired else "No"}
+     for entry in signals])
+st.markdown("**Signals a real tumour uses that are not simulated yet**")
+st.table(
+    [{"Signal": name, "What it does, and what stands in for it today": what}
+     for name, what in signalling.NOT_YET])
 
 # ── What is not a cell ───────────────────────────────────────────────
 
