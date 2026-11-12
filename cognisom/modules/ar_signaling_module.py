@@ -240,8 +240,14 @@ class ARSignalingModule(SimulationModule):
         cell = cells.get(cell_id)
         if cell is None:
             return 1.0
-        _cap, distance = self.vascular_module._nearest_capillary(
-            cell.position)
+        # _serving_capillary, NOT _nearest_capillary: the cached one.
+        # The assignment is a fact about geometry and the vascular
+        # module already solves it once per cell per position -- its own
+        # docstring measures the uncached path at 17.9 s of that
+        # module's 18.8 s on a 6,120-cell slab. This is called per cell
+        # per step, so taking the raw loop here would have put that cost
+        # back, twice over.
+        _cap, distance = self.vascular_module._serving_capillary(cell)
         return exposure_fraction(distance, self.drug_half_distance_um)
 
     def dht_input_for(self, dht_nM: float) -> float:
