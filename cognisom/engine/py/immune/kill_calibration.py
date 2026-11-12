@@ -231,6 +231,26 @@ def draw_serial_kill_capacity(rng_poisson,
     return int(min(most, 1 + rng_poisson(max(0.0, mean - 1.0))))
 
 
+#: Share of CD8 T cells inside a tumour whose receptor recognises it.
+#:
+#: The engine let every T cell consult the whole repertoire and take its
+#: best clone, so every T cell in every run was tumour-specific. Scheper
+#: 2019 (PMID 30510250; abstract read, full text not open) tested the
+#: receptors of intratumoral CD8 T cells against autologous tumour in
+#: ovarian and colorectal cancer: "a capacity to recognize autologous
+#: tumor is limited to approximately 10% of intratumoral CD8+ T cells",
+#: and in two of four patients none were found. Simoni 2018 (PMID
+#: 29769722) reports the same picture as abundant bystanders.
+#:
+#: Not prostate, four patients, and the range runs to zero -- so this is
+#: an estimate with a measured centre, and it is OPT-IN: no preset uses
+#: it until the run it is for has been measured with it.
+TCELL_TUMOUR_REACTIVE_FRACTION = KillParameter(
+    0.10, 0.0, 0.10, 'ESTIMATE',
+    "Scheper 2019, PMID 30510250 (abstract): ~10% of intratumoral CD8 T "
+    "cells recognise autologous tumour, ovarian and colorectal, none in "
+    "2 of 4 patients; not prostate")
+
 #: Per-contact phagocytic kill probability of a macrophage.
 MACROPHAGE_KILL_PER_CONTACT = KillParameter(
     0.05, 0.0, 0.2, 'ESTIMATE',
@@ -296,4 +316,5 @@ def calibration_report() -> Dict[str, Dict[str, object]]:
         'macrophage_kill_per_contact': MACROPHAGE_KILL_PER_CONTACT.as_dict(),
         'nk_serial_kills_mean': NK_SERIAL_KILLS_MEAN.as_dict(),
         'nk_recovery_hours': NK_RECOVERY_HOURS.as_dict(),
+        'tcell_tumour_reactive_fraction': TCELL_TUMOUR_REACTIVE_FRACTION.as_dict(),
     }

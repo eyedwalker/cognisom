@@ -351,6 +351,9 @@ def build_catalog() -> List[CellEntry]:
                  "Half-life of sublethal damage", "{:.1f} min"),
             kill("tcell_lethal_damage",
                  "Damage that kills (about three hits in 50 min)"),
+            kill("tcell_tumour_reactive_fraction",
+                 "Share that recognises the tumour, in the realistic "
+                 "setting (every T cell does by default)"),
             Parameter("Exhaustion after first engagement",
                       f"{immune.tcell_exhaustion_onset_hours:g} h",
                       "estimate",
@@ -364,6 +367,9 @@ def build_catalog() -> List[CellEntry]:
             mix_note,
             "The receptor repertoire is generated, not sequenced from "
             "the patient.",
+            "By default every T cell recognises the tumour. In human "
+            "tumours about one in ten does; that setting exists and is "
+            "off unless a run asks for it.",
             "No helper (CD4) T cells, and no priming in a lymph node: "
             "T cells arrive already able to kill.",
         ]))

@@ -241,6 +241,11 @@ class ImmuneCell:
     #: Module clock (hours) at which a spent cell can kill again, or None.
     spent_until: Optional[float] = None
 
+    #: Whether this T cell's receptor recognises the tumour at all. False
+    #: is a bystander: present, moving, and blind to every cancer cell.
+    #: True for every cell unless tcell_tumour_reactive_fraction is set.
+    tumour_reactive: bool = True
+
     # Clonal expansion (T cells). `first_engaged_h` is when this cell
     # FIRST recognised its antigen, which is the only trigger the
     # program has: Kaech & Ahmed 2001 and van Stipdonk 2001 both measured
@@ -754,6 +759,18 @@ class ImmuneModule(SimulationModule):
             self.config.get('nk_capacity_seed', 0x4E4B))
         #: Times an NK cell ran out and went quiet.
         self.total_nk_spent = 0
+        # What share of T cells recognise the tumour. None (the default)
+        # is the historical behaviour: all of them. See
+        # kill_calibration.TCELL_TUMOUR_REACTIVE_FRACTION.
+        fraction = self.config.get('tcell_tumour_reactive_fraction')
+        if fraction is not None and not 0.0 <= float(fraction) <= 1.0:
+            raise ValueError(
+                "tcell_tumour_reactive_fraction is a share of T cells and "
+                f"must be between 0 and 1, not {fraction!r}")
+        self.tcell_tumour_reactive_fraction = (
+            None if fraction is None else float(fraction))
+        self._tcell_reactive_rng = np.random.default_rng(
+            self.config.get('tcell_reactive_seed', 0x544352))
         self.total_tcell_kills = 0
         self.total_activations = 0
         self.total_recruited = 0
@@ -999,6 +1016,11 @@ class ImmuneModule(SimulationModule):
 
         if cell_type == 'NK_cell' and self.nk_serial_kill_limit:
             cell.serial_kill_capacity = self._draw_nk_capacity()
+        if (cell_type == 'T_cell'
+                and self.tcell_tumour_reactive_fraction is not None):
+            cell.tumour_reactive = bool(
+                self._tcell_reactive_rng.random()
+                < self.tcell_tumour_reactive_fraction)
 
         self._patrol_speed_for(cell_type)
         # The granules it is loaded with, from the library. None where
@@ -1614,6 +1636,8 @@ class ImmuneModule(SimulationModule):
         daughter = self.immune_cells[daughter_id]
         parent.divisions_done += 1
         daughter.divisions_done = parent.divisions_done
+        # Reactivity belongs to the clone, so it is inherited, not redrawn.
+        daughter.tumour_reactive = parent.tumour_reactive
         daughter.first_engaged_h = self.clock_h
         # The daughter carries the clone's antigen experience: it is the
         # progeny of a cell that recognised, so it is already an
@@ -1985,6 +2009,8 @@ class ImmuneModule(SimulationModule):
             presentations: List[MHCPresentation] = getattr(
                 cancer_cell, 'mhc1_displayed_peptides', []
             )
+            if not immune_cell.tumour_reactive:
+                return False, None            # a bystander sees nothing
             if not presentations or self._tcr_repertoire is None:
                 return False, None
             # MHC-I downregulation gates display visibility too: a
@@ -2535,6 +2561,10 @@ class ImmuneModule(SimulationModule):
             'total_kills': self.total_kills,
             'total_granules_released': self.total_granules_released,
             'nk_serial_kill_limit': self.nk_serial_kill_limit,
+            'tcell_tumour_reactive_fraction': self.tcell_tumour_reactive_fraction,
+            'n_tcells_tumour_reactive': sum(
+                1 for c in self.immune_cells.values()
+                if c.cell_type == 'T_cell' and c.tumour_reactive),
             'total_nk_spent': self.total_nk_spent,
             'n_nk_spent': sum(
                 1 for c in self.immune_cells.values()
