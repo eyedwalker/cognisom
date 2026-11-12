@@ -99,6 +99,30 @@ NOT_CELLS: List[Tuple[str, str]] = [
 ]
 
 
+#: What a cell is called when the entity library has no entry for it.
+PLAIN_NAMES: Dict[str, str] = {
+    "normal": "Normal prostate cell",
+    "cancer": "Prostate cancer cell",
+    "T_cell": "CD8 T cell",
+    "NK_cell": "NK cell",
+    "macrophage": "Macrophage",
+}
+
+NO_ENTITY_NOTE = (
+    "The entity library on this server has no entry for this cell, so "
+    "the size and shape shown are the engine's defaults, not sourced "
+    "values.")
+
+
+def _name(looks: Dict[str, Dict[str, object]], key: str) -> str:
+    return str(looks[key].get("entity") or PLAIN_NAMES[key])
+
+
+def _without_entity(entry: "CellEntry") -> "CellEntry":
+    from dataclasses import replace
+    return replace(entry, missing=[NO_ENTITY_NOTE, *entry.missing])
+
+
 def _pmid(note: str) -> str:
     """'radius_um PMID:123' or 'x: measured:PMID:123' -> 'PMID 123'."""
     if "PMID:" not in note:
@@ -223,7 +247,7 @@ def build_catalog() -> List[CellEntry]:
     # ── Normal prostate epithelium ───────────────────────────────────
     d, ds, dsrc = _size(looks["normal"])
     entries.append(CellEntry(
-        key="normal", name=str(looks["normal"]["entity"]),
+        key="normal", name=_name(looks, "normal"),
         diameter_um=d, diameter_status=ds, diameter_source=dsrc,
         shape=str(looks["normal"]["mesh_type"]),
         colour=tuple(looks["normal"]["colour"]), count=n_normal,
@@ -252,7 +276,7 @@ def build_catalog() -> List[CellEntry]:
     # ── Cancer ───────────────────────────────────────────────────────
     d, ds, dsrc = _size(looks["cancer"])
     entries.append(CellEntry(
-        key="cancer", name=str(looks["cancer"]["entity"]),
+        key="cancer", name=_name(looks, "cancer"),
         diameter_um=d, diameter_status=ds, diameter_source=dsrc,
         shape=str(looks["cancer"]["mesh_type"]),
         colour=tuple(looks["cancer"]["colour"]), count=n_cancer,
@@ -298,7 +322,7 @@ def build_catalog() -> List[CellEntry]:
     # ── CD8 T cell ───────────────────────────────────────────────────
     d, ds, dsrc = _size(looks["T_cell"])
     entries.append(CellEntry(
-        key="T_cell", name=str(looks["T_cell"]["entity"]),
+        key="T_cell", name=_name(looks, "T_cell"),
         diameter_um=d, diameter_status=ds, diameter_source=dsrc,
         shape=str(looks["T_cell"]["mesh_type"]),
         colour=tuple(looks["T_cell"]["colour"]), count=n_t,
@@ -349,7 +373,7 @@ def build_catalog() -> List[CellEntry]:
     low, high = immune.GRANULES_PER_KILL
     reserve = immune._lytic_reserve("NK_cell")
     entries.append(CellEntry(
-        key="NK_cell", name=str(looks["NK_cell"]["entity"]),
+        key="NK_cell", name=_name(looks, "NK_cell"),
         diameter_um=d, diameter_status=ds, diameter_source=dsrc,
         shape=str(looks["NK_cell"]["mesh_type"]),
         colour=tuple(looks["NK_cell"]["colour"]), count=n_nk,
@@ -405,7 +429,7 @@ def build_catalog() -> List[CellEntry]:
     d, ds, dsrc = _size(looks["macrophage"])
     pol = kc.PRAD_MACROPHAGE_POLARIZATION
     entries.append(CellEntry(
-        key="macrophage", name=str(looks["macrophage"]["entity"]),
+        key="macrophage", name=_name(looks, "macrophage"),
         diameter_um=d, diameter_status=ds, diameter_source=dsrc,
         shape=(f"{looks['macrophage_M1']['mesh_type']} (M1) / "
                f"{looks['macrophage_M2']['mesh_type']} (M2)"),
@@ -442,7 +466,15 @@ def build_catalog() -> List[CellEntry]:
             mix_note,
         ]))
 
-    return entries
+    # A cell the library on THIS machine has no entry for still runs --
+    # the engine falls back to defaults -- so it is still listed, under a
+    # plain name, and says so. Found on production the day this page went
+    # live: the cancer cell's entry had never been seeded there, and the
+    # section was headed "None".
+    return [
+        entry if looks[entry.key].get("entity") else _without_entity(entry)
+        for entry in entries
+    ]
 
 
 def status_counts(entries: Optional[List[CellEntry]] = None) -> Dict[str, int]:

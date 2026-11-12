@@ -132,3 +132,23 @@ def test_the_page_is_served_without_a_login():
     assert '"cells": ("46_cells.py"' in src
     assert '_query.get("page") in _PUBLIC_PAGES' in src
     assert '"/?page=cells"' in src
+
+
+def test_a_cell_the_library_does_not_hold_is_named_and_says_so(monkeypatch):
+    """Found on production the day the page went live: the cancer cell's
+    entity had never been seeded there, the resolver fell back, and the
+    section was headed "None" with a default size shown as if sourced."""
+    from cognisom.visualization import lineage_appearance as la
+    real = la.appearance_table()
+    broken = {k: dict(v) for k, v in real.items()}
+    broken["cancer"].update(entity=None, cited=False, diameter_um=10.0,
+                            mesh_type="unresolved_sphere")
+    monkeypatch.setattr(la, "appearance_table", lambda *a, **k: broken)
+
+    entry = _by_key(cc.build_catalog())["cancer"]
+    assert entry.name == cc.PLAIN_NAMES["cancer"]
+    assert "None" not in entry.name
+    assert entry.diameter_status == "placeholder"
+    assert entry.missing[0] == cc.NO_ENTITY_NOTE
+    # and a cell the library does hold is untouched
+    assert cc.NO_ENTITY_NOTE not in _by_key(cc.build_catalog())["T_cell"].missing
