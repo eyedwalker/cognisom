@@ -61,6 +61,7 @@ if user is not None:
             st.Page(str(_pages_dir / "0_home.py"), title="Home", icon=":material/home:", default=True),
             st.Page(str(_pages_dir / "43_public_demo.py"), title="Recorded Demo", icon=":material/play_circle:"),
             st.Page(str(_pages_dir / "44_roadmap.py"), title="What It Simulates", icon=":material/checklist:"),
+            st.Page(str(_pages_dir / "46_cells.py"), title="The Cells", icon=":material/bubble_chart:"),
             st.Page(str(_pages_dir / "45_biousd.py"), title="Bio-USD Standard", icon=":material/deployed_code:"),
             st.Page(str(_pages_dir / "35_orchestrator.py"), title="Orchestrator", icon=":material/smart_toy:"),
             st.Page(str(_pages_dir / "36_validation_demo.py"), title="Demo & Validation", icon=":material/analytics:"),
@@ -294,9 +295,11 @@ if _query.get("page") == "demo":
 _PUBLIC_PAGES = {
     "roadmap": ("44_roadmap.py", "Cognisom | What it simulates"),
     "biousd": ("45_biousd.py", "Cognisom | Bio-USD"),
+    # Reads the cell models' own parameters; starts no simulation.
+    "cells": ("46_cells.py", "Cognisom | The cells"),
 }
 
-if _query.get("page") == "roadmap" or _query.get("page") == "biousd":
+if _query.get("page") in _PUBLIC_PAGES:
     _file, _title = _PUBLIC_PAGES[_query.get("page")]
     st.set_page_config(
         page_title=_title,
@@ -992,6 +995,10 @@ if user is None:
                     "Bio-USD: the open cell standard",
                     "/?page=biousd", use_container_width=True,
                 )
+            st.link_button(
+                "The cells: sizes, roles and how each is simulated",
+                "/?page=cells", use_container_width=True,
+            )
 
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4, m5, m6 = st.columns(6)
