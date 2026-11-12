@@ -84,9 +84,11 @@ def test_there_are_targets_and_each_says_why_it_matters():
 
 def test_both_pages_are_reachable_without_an_account():
     app = (REPO / "cognisom" / "dashboard" / "app.py").read_text()
+    # The public routes are one table, served by one membership test
+    # (it was an == chain per route until the cells page made three).
+    assert '_query.get("page") in _PUBLIC_PAGES' in app
     for route, page in (("roadmap", ROADMAP), ("biousd", BIOUSD)):
-        assert f'_query.get("page") == "{route}"' in app, route
-        assert page.name in app, page.name
+        assert f'"{route}": ("{page.name}"' in app, route
         assert "streamlit_page_gate" not in page.read_text(), (
             f"{page.name} is public; it must not call the login gate")
 
