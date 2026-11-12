@@ -267,8 +267,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":                                  # pragma: no cover
-    raise SystemExit(main())
 
 
 #: Name forms to attach to entities that already exist, where adding a
@@ -309,3 +307,13 @@ def seed_aliases(store) -> int:
         store.update_entity(entity, changed_by="seed_malignant_compartment")
         attached += len(new)
     return attached
+
+
+# At the very end, on purpose. This guard used to sit above ALIASES and
+# seed_aliases, so `python -m cognisom.library.seed_malignant_compartment`
+# -- the documented way to seed a database that already exists -- ran
+# main() before seed_aliases was defined, added the cells, and then died
+# with a NameError before attaching aliases or synonyms. Found the first
+# time it was run on production, 2026-11-12.
+if __name__ == "__main__":                                  # pragma: no cover
+    raise SystemExit(main())

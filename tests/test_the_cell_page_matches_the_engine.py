@@ -152,3 +152,22 @@ def test_a_cell_the_library_does_not_hold_is_named_and_says_so(monkeypatch):
     assert entry.missing[0] == cc.NO_ENTITY_NOTE
     # and a cell the library does hold is untouched
     assert cc.NO_ENTITY_NOTE not in _by_key(cc.build_catalog())["T_cell"].missing
+
+
+def test_the_seed_script_for_an_existing_library_runs_to_the_end(tmp_path):
+    """`python -m cognisom.library.seed_malignant_compartment` is how a
+    library that already exists gets the cancer cell (the automatic pass
+    only seeds an EMPTY one, and production is never empty). Its
+    __main__ guard sat above a function main() calls, so on production it
+    added the cells and then raised NameError before the aliases."""
+    import os
+    import subprocess
+    import sys
+    env = dict(os.environ, COGNISOM_DATA_DIR=str(tmp_path), PYTHONPATH=str(ROOT))
+    for key in ("DATABASE_URL", "DB_SECRET_ARN"):   # never a real database
+        env.pop(key, None)
+    done = subprocess.run(
+        [sys.executable, "-m", "cognisom.library.seed_malignant_compartment"],
+        capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
+    assert done.returncode == 0, done.stderr[-800:]
+    assert "aliases attached" in done.stdout
