@@ -55,14 +55,36 @@ Mitchison 2013 (PMID 23576740) and Vanherberghen 2013 (PMID 23287857)
 report serial-killing kinetics and per-NK-cell kill counts, not a
 per-contact fraction.
 
-Macrophages (ESTIMATE)
-----------------------
+Macrophages (ESTIMATE, behind a sourced gate)
+---------------------------------------------
 Tumour cells display CD47, which engages SIRP-alpha on macrophages and
 blocks phagocytosis unless an antibody opsonises the target or blocks
-CD47 (Majeti 2009, PMID 19632179; Willingham 2012, PMID 22451913). The
-control-arm phagocytosis those papers measured is shown only in figures,
-so the magnitude is not sourced here: 0.05 per contact, range 0-0.2.
-The PD-1 gate (Gordon 2017) and polarization factor still compose on top.
+CD47 (Majeti 2009, PMID 19632179; Willingham 2012, PMID 22451913:
+"blockade of CD47 signaling ... enabled macrophage phagocytosis of tumor
+cells that were otherwise protected"). The control-arm phagocytosis those
+papers measured is shown only in figures, so the per-contact magnitude is
+not sourced: 0.05, range 0-0.2.
+
+That 0.05 used to apply to every contact, and the engine has no CD47 and
+no antibody, so its macrophages ate an unmarked, CD47-intact tumour at
+about half a cell per macrophage per day -- most of the kills in a
+week-long run, enough to make an untreated tumour shrink. Dooling 2023
+(PMID 37095318, PMC10791169, full text read; mouse B16 tumouroids with
+bone-marrow macrophages) measured the opposite: "Growth of WT tumouroids
+is likewise unaffected by anti-Tyrp1 with or without added macrophages",
+and "only for the maximal phagocytosis condition of CD47 KO and
+anti-Tyrp1 opsonization is the exponential growth of tumouroids reversed
+and tumouroids eradicated". Both an eat-me signal and the loss of the
+don't-eat-me signal are needed.
+
+So the per-contact number is now the rate against a target that is BOTH
+opsonised and stripped of CD47 protection, and it is multiplied by a
+licence (macrophage_phagocytosis.phagocytic_licence) that is
+MACROPHAGE_UNPROMPTED_FRACTION -- zero -- when a run supplies neither.
+The paper's sentence is "unaffected", not a number: zero is the value it
+supports and the upper edge of the range is ours. Not prostate, not
+human, in vitro. The PD-1 gate (Gordon 2017) and polarization factor
+still compose on top.
 
 Immune composition (population prior)
 -------------------------------------
@@ -251,12 +273,23 @@ TCELL_TUMOUR_REACTIVE_FRACTION = KillParameter(
     "cells recognise autologous tumour, ovarian and colorectal, none in "
     "2 of 4 patients; not prostate")
 
-#: Per-contact phagocytic kill probability of a macrophage.
+#: Per-contact phagocytic kill probability of a macrophage, against a
+#: target that is opsonised AND has lost its CD47 protection. Against
+#: any other target it is scaled by the licence below.
 MACROPHAGE_KILL_PER_CONTACT = KillParameter(
     0.05, 0.0, 0.2, 'ESTIMATE',
-    "CD47-SIRPa blocks phagocytosis of unopsonised tumour cells "
-    "(Majeti 2009 PMID 19632179; Willingham 2012 PMID 22451913); "
-    "magnitude not sourced")
+    "Rate against an antibody-marked tumour cell with CD47 blocked; "
+    "CD47-SIRPa blocks phagocytosis otherwise (Majeti 2009 PMID "
+    "19632179; Willingham 2012 PMID 22451913); magnitude not sourced")
+
+#: Share of that rate a macrophage keeps against a tumour cell nothing
+#: has marked: CD47 intact, no antibody on it. See the module docstring.
+MACROPHAGE_UNPROMPTED_FRACTION = KillParameter(
+    0.0, 0.0, 0.1, 'ESTIMATE',
+    "Dooling 2023, PMID 37095318 (full text): growth of CD47-intact "
+    "tumouroids 'unaffected ... with or without added macrophages'; "
+    "eradication needed CD47 loss AND an opsonising antibody. Mouse "
+    "melanoma in vitro; the paper gives no upper bound, 0.1 is ours")
 
 _THORSSON = "Thorsson 2018 (PMID 29628290), TCGA PRAD CIBERSORT, n=558"
 
@@ -314,6 +347,7 @@ def calibration_report() -> Dict[str, Dict[str, object]]:
         'nk_kill_per_contact': NK_KILL_PER_CONTACT.as_dict(),
         'nk_graded_ceiling': NK_GRADED_CEILING.as_dict(),
         'macrophage_kill_per_contact': MACROPHAGE_KILL_PER_CONTACT.as_dict(),
+        'macrophage_unprompted_fraction': MACROPHAGE_UNPROMPTED_FRACTION.as_dict(),
         'nk_serial_kills_mean': NK_SERIAL_KILLS_MEAN.as_dict(),
         'nk_recovery_hours': NK_RECOVERY_HOURS.as_dict(),
         'tcell_tumour_reactive_fraction': TCELL_TUMOUR_REACTIVE_FRACTION.as_dict(),

@@ -76,6 +76,7 @@ from cognisom.engine.py.immune.nk_receptor import (
 )
 from cognisom.engine.py.immune.macrophage_phagocytosis import (
     DEFAULT_PD1_MAX_SUPPRESSION,
+    phagocytic_licence,
     phagocytosis_probability,
 )
 from cognisom.engine.py.immune.macrophage_polarization import (
@@ -101,6 +102,7 @@ from cognisom.engine.py.immune.lactate import (  # noqa: E402
 )
 from cognisom.engine.py.immune.kill_calibration import (  # noqa: E402
     HITS_PER_CONTACT, LETHAL_DAMAGE, MACROPHAGE_KILL_PER_CONTACT,
+    MACROPHAGE_UNPROMPTED_FRACTION,
     NK_GRADED_CEILING, NK_KILL_PER_CONTACT, NK_RECOVERY_HOURS,
     NK_SERIAL_KILLS_MEAN, calibration_report, contact_hits, damage_now,
     draw_serial_kill_capacity,
@@ -479,6 +481,27 @@ class ImmuneModule(SimulationModule):
             'macrophage_kill_probability',
             shared if shared is not None
             else MACROPHAGE_KILL_PER_CONTACT.value))
+        # What licenses a macrophage to eat a tumour cell at all. The
+        # per-contact number above is the rate against a cell that an
+        # antibody has marked AND whose CD47 signal is blocked; a run
+        # that supplies neither leaves the macrophage the unprompted
+        # fraction of it, which the measurement puts at zero (Dooling
+        # 2023, PMID 37095318). Both are run-level, like
+        # checkpoint_block: 'tumour_opsonisation' stands for a
+        # tumour-targeting antibody's coverage, 'cd47_block' for an
+        # anti-CD47 / anti-SIRPa agent.
+        self.tumour_opsonisation = float(
+            self.config.get('tumour_opsonisation', 0.0))
+        self.cd47_block = float(self.config.get('cd47_block', 0.0))
+        self.macrophage_unprompted_fraction = float(self.config.get(
+            'macrophage_unprompted_fraction',
+            MACROPHAGE_UNPROMPTED_FRACTION.value))
+        for _name in ('tumour_opsonisation', 'cd47_block',
+                      'macrophage_unprompted_fraction'):
+            if not 0.0 <= getattr(self, _name) <= 1.0:
+                raise ValueError(
+                    f"{_name} is a fraction between 0 and 1, "
+                    f"not {getattr(self, _name)!r}")
         # T-cell kills integrate sublethal perforin hits (Weigelin 2021).
         # False restores one Bernoulli draw of the Hill rule per contact.
         self.tcell_additive_cytotoxicity = bool(
@@ -1298,6 +1321,14 @@ class ImmuneModule(SimulationModule):
             return self.nk_kill_probability
         return self._nk_decision(immune_cell, target_cell).kill_probability
 
+    def macrophage_licence(self) -> float:
+        """Share of the phagocytic rate this run's macrophages may use."""
+        return phagocytic_licence(
+            opsonisation=self.tumour_opsonisation,
+            cd47_block=self.cd47_block,
+            unprompted=self.macrophage_unprompted_fraction,
+        )
+
     def _macrophage_kill_probability(
         self, target_cell, immune_cell: Optional[ImmuneCell] = None,
     ) -> float:
@@ -1326,7 +1357,8 @@ class ImmuneModule(SimulationModule):
         a target in hand still gets the target-side gate.
         """
         p = phagocytosis_probability(
-            baseline=self.macrophage_kill_probability,
+            baseline=(self.macrophage_kill_probability
+                      * self.macrophage_licence()),
             pdl1_expression=getattr(target_cell, 'pdl1_expression', 0.0),
             checkpoint_block=self.checkpoint_block,
             max_suppression=self.macrophage_pd1_max_suppression,
@@ -2537,6 +2569,9 @@ class ImmuneModule(SimulationModule):
             ),
             # Macrophage arm
             'macrophage_kill_probability': self.macrophage_kill_probability,
+            'tumour_opsonisation': self.tumour_opsonisation,
+            'cd47_block': self.cd47_block,
+            'macrophage_licence': self.macrophage_licence(),
             'n_macrophages_in_tissue': len(macrophages),
             'mean_macrophage_polarization': (
                 float(sum(pols) / len(pols)) if pols else None
@@ -2626,6 +2661,13 @@ class ImmuneModule(SimulationModule):
             # tissue -- absent, not zero, the shape twin_config now
             # uses. The full readout with provenance is
             # get_macrophage_state().
+            # What licenses phagocytosis at all in this run: a
+            # macrophage does not eat a CD47-intact, unmarked tumour
+            # cell (Dooling 2023, PMID 37095318), so a run has to say
+            # whether anything marked one.
+            'tumour_opsonisation': self.tumour_opsonisation,
+            'cd47_block': self.cd47_block,
+            'macrophage_licence': self.macrophage_licence(),
             'mean_macrophage_polarization': (
                 float(sum(getattr(ic, 'polarization', 0.0)
                           for ic in macrophages)

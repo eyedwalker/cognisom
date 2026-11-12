@@ -401,14 +401,22 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # RE-MEASURED 2026-11-12, both scorers, when NK cells stopped being
     # unlimited serial killers (an NK cell is now spent after a few
     # kills; tests/test_an_nk_cell_is_spent_after_a_few_kills.py). The
-    # run is no longer the same under both: 11 deaths, 11 divisions and
+    # run was no longer the same under both: 11 deaths, 11 divisions and
     # 308.79773 delivered under MHCflurry; 12, 12 and 308.33831 under the
-    # PWM fallback, where the last cancer cell survives long enough to
-    # divide once more. THE CLAIM holds under both and is asserted for
-    # both: every death is an immune kill, and no cancer cell is left.
-    from cognisom.genomics.mhcflurry_binding import is_mhcflurry_available
-    n_dead, o2_delivered = ((11, 308.80) if is_mhcflurry_available()
-                            else (12, 308.34))
+    # PWM fallback, where the last cancer cell survived long enough to
+    # divide once more.
+    #
+    # RE-MEASURED AGAIN the same day, both scorers, when macrophages
+    # stopped eating tumour cells that nothing had marked (Dooling 2023;
+    # tests/test_a_macrophage_needs_the_target_marked.py). 10 deaths, 10
+    # divisions and 306.56550 delivered, IDENTICAL under both scorers --
+    # the run is scorer-independent again, because the kills that
+    # differed were the ones whose timing depended on the T-cell arm's
+    # affinities. Do not read that identity as an invariant: both
+    # scorers draw from one RNG stream, and it is a measurement like the
+    # others here. THE CLAIM holds throughout and is what is asserted:
+    # every death is an immune kill, and no cancer cell is left.
+    n_dead, o2_delivered = 10, 306.57
     assert cells.total_deaths == _deaths(runner, "immune_killed", "cancer")
     assert cells.total_deaths == n_dead
     # 80 normal divisions -- each normal cell divides once, at a time

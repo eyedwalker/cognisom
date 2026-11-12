@@ -974,22 +974,33 @@ def test_a_pinned_24h_run_is_identical_with_escape_on_and_off():
     35 divisions, 10 cancer deaths, 115 normal cells alive, and zero de
     novo escape events -- the same with escape on and off.
 
-    WHAT THIS DOES NOT SHOW, UPDATED 2026-11-08. It used to be that not
-    one division here was a cancer cell's, so this run never reached the
-    draw at all and the identity was identity on an unentered code path.
-    Since the ECM deposition rate was fixed -- it saturated within a day
-    and slowed the infiltrate tenfold, so the tumour is now reached
-    later and gets one division in before it is cleared -- the run takes
-    exactly ONE cancer division, and so one draw. The limitation is
-    therefore weaker than it was but has not gone: one draw at 1.55e-6
-    expects 1.5e-6 events, which is still indistinguishable from none,
-    so the identity below is near-vacuous rather than wholly vacuous.
-    It is asserted as ONE division, not as zero, so that the next
-    reader is not told something untrue. The
-    draw itself is pinned by
+    WHAT THIS DOES NOT SHOW, UPDATED 2026-11-12 -- and it has gone back
+    and forth, so read the history rather than the latest line. Until
+    2026-11-08 not one division here was a cancer cell's, so this run
+    never reached the draw and the identity held on an unentered code
+    path. Fixing the ECM deposition rate slowed the infiltrate's arrival
+    enough for the tumour to get one division in first, which made the
+    identity near-vacuous instead of wholly vacuous: one draw at
+    1.55e-6 expects 1.5e-6 events, indistinguishable from none.
+
+    It is back to ZERO cancer divisions as of the macrophage phagocytic
+    licence (Dooling 2023; see
+    tests/test_a_macrophage_needs_the_target_marked.py), and not for the
+    reason one would guess. Macrophages now kill nothing in this preset,
+    so one would expect the tumour to last LONGER and divide more. The
+    run instead clears all ten cancer cells in ten kills with none
+    dividing, where before it took eleven kills and one division. The
+    cause is the shared RNG stream, not a faster infiltrate: removing
+    the macrophage draws reorders every subsequent random number, and
+    this preset's outcome sits on that knife edge. So THE IDENTITY
+    BELOW IS WHOLLY VACUOUS AGAIN -- it is identity on a code path this
+    run does not enter -- and it is asserted as zero, with the division
+    count stated, so no reader is told otherwise. The draw itself is
+    pinned by
     test_at_the_literature_rate_a_short_run_changes_nothing_at_all (200
     cancer divisions through the module) and by the 6 h slab run that
-    follows (12 cancer divisions through the real preset path).
+    follows (12 cancer divisions through the real preset path), which is
+    where the non-vacuous version of this claim lives.
     """
     from cognisom.dashboard.engine_runner import EngineRunner
     from cognisom.core.event_bus import EventTypes
@@ -1024,18 +1035,21 @@ def test_a_pinned_24h_run_is_identical_with_escape_on_and_off():
     # division here is a normal one and the count falls with the period.
     # Verified identical under both scorers.
     # 10 -> 11 with the ECM fix: 10 normal divisions and ONE cancer.
-    assert out[True][2] == 11, f"the pinned division count moved: {out[True]}"
-    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 11 divisions"
+    # 11 -> 10 with the macrophage licence, both scorers: ten normal
+    # divisions and no cancer one, because the tumour is cleared in ten
+    # kills with nothing dividing. See the docstring.
+    assert out[True][2] == 10, f"the pinned division count moved: {out[True]}"
+    assert out[True][4] == 0, "a de novo event at 1.55e-6 over 10 divisions"
     # The limitation, measured rather than assumed. The docstring above
-    # was updated when this moved from 0 to 1, as its own message said to.
-    assert cancer_divisions[True] == 1, (
+    # was rewritten when this moved 0 -> 1 and again when it moved back,
+    # as its own message says to.
+    assert cancer_divisions[True] == 0, (
         f'cancer divisions here moved to {cancer_divisions[True]}; this '
         'run reaches the escape draw that many times, and the docstring '
         'above states the count -- update it rather than re-pinning')
-    # One draw expects 1.5e-6 events: still indistinguishable from none,
-    # which is what keeps the on/off identity above near-vacuous.
-    assert ev.expected_events(cancer_divisions[True]) == pytest.approx(
-        1.5497584e-06, rel=1e-4)
+    # Zero draws expect zero events, which is what makes the on/off
+    # identity above vacuous rather than evidence.
+    assert ev.expected_events(cancer_divisions[True]) == 0.0
 
 
 @pytest.mark.slow
@@ -1110,10 +1124,23 @@ def test_a_six_hour_slab_run_is_identical_with_escape_on_and_off():
     # (2094, 81, 64, 10, 0, 11, 0.359673066) and
     # (2092, 79, 64, 12, 0, 11, 0.359102551). Cancer divisions went 11 ->
     # 12 under both, so the expectation below moved with them.
+    #
+    # RE-MEASURED AGAIN the same day with the macrophage phagocytic
+    # licence (Dooling 2023; tests/test_a_macrophage_needs_the_target
+    # _marked.py), was (2094, 81, 65, 11, 0, 12, 0.356417534) and
+    # (2090, 77, 65, 15, 0, 12, 0.355733008). Deaths fell on both --
+    # 11 -> 8 and 15 -> 8 -- which is the licence doing exactly what it
+    # was measured to do, and the tumour left standing grew with it
+    # (81 -> 83, 77 -> 83). SIX OF THE SEVEN FIELDS ARE NOW THE SAME
+    # UNDER BOTH SCORERS and only the mean MHC-I separates them, where
+    # before the licence four fields differed: the kills that differed
+    # between scorers were the ones whose timing ran through the T-cell
+    # arm's affinities, and there are fewer of them left. Cancer
+    # divisions stayed 12, so the expectation below did not move.
     from cognisom.genomics.mhcflurry_binding import is_mhcflurry_available
     measured = {
-        True: (2094, 81, 65, 11, 0, 12, 0.356417534),    # MHCflurry
-        False: (2090, 77, 65, 15, 0, 12, 0.355733008),   # PWM fallback
+        True: (2096, 83, 65, 8, 0, 12, 0.355237414),     # MHCflurry
+        False: (2096, 83, 65, 8, 0, 12, 0.354799857),    # PWM fallback
     }[bool(is_mhcflurry_available())]
     assert out[True][:7] == measured, out[True]
     # The point of this test: the draw WAS reached.

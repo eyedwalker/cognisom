@@ -95,6 +95,36 @@ def pd1_attenuation(
     return 1.0 - p * (1.0 - b) * m
 
 
+def phagocytic_licence(
+    opsonisation: float = 0.0,
+    cd47_block: float = 0.0,
+    unprompted: float = 0.0,
+) -> float:
+    """Share of its phagocytic rate a macrophage may use on a target.
+
+    A macrophage eats a tumour cell when two things are true together:
+    something marks the cell for eating (an antibody on its surface,
+    ``opsonisation``) and the cell's CD47 "don't eat me" signal is not
+    getting through (``cd47_block``). Dooling 2023 (PMID 37095318)
+    measured both halves: macrophages left CD47-intact tumouroids'
+    growth unaffected with or without an opsonising antibody, and only
+    CD47 loss PLUS opsonisation eradicated them. Hence a product, not a
+    sum::
+
+        licence = unprompted + (1 - unprompted) * opsonisation * cd47_block
+
+    ``unprompted`` is what is left with neither, and the measurement
+    supports zero (kill_calibration.MACROPHAGE_UNPROMPTED_FRACTION).
+    All three are fractions in [0, 1]. The engine has no CD47 state per
+    cell and no antibody field, so both are run-level settings, the way
+    ``checkpoint_block`` is.
+    """
+    o = _clamp01(opsonisation)
+    b = _clamp01(cd47_block)
+    u = _clamp01(unprompted)
+    return u + (1.0 - u) * o * b
+
+
 def phagocytosis_probability(
     baseline: float,
     pdl1_expression: float,

@@ -194,7 +194,15 @@ def test_local_signal_is_exactly_zero_with_nothing_nearby():
     assert local_signal(3, saturation_count=3.0) == 1.0
     assert local_signal(99, saturation_count=3.0) == 1.0
 def _immune(**config):
-    cfg = {'n_t_cells': 0, 'n_nk_cells': 0, 'n_macrophages': 0}
+    # A macrophage eats nothing unless the target is marked and its
+    # CD47 signal blocked (Dooling 2023, PMID 37095318; see
+    # tests/test_a_macrophage_needs_the_target_marked.py). Every
+    # macrophage test in this file is about a mechanism that composes ON
+    # TOP of that licence, so the licence is granted here and the tests
+    # below keep measuring what they were written to measure. A test
+    # that wants it withheld passes its own value.
+    cfg = {'n_t_cells': 0, 'n_nk_cells': 0, 'n_macrophages': 0,
+           'tumour_opsonisation': 1.0, 'cd47_block': 1.0}
     cfg.update(config)
     module = ImmuneModule(cfg)
     module.initialize()

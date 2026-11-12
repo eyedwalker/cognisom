@@ -297,10 +297,24 @@ def test_the_field_is_driven_and_the_patrol_followed_it(biased):
 def test_chemotaxis_finds_the_tumour_sooner(biased, unbiased):
     """The Phase 6 bar: attached, it changes state, in the right direction.
 
-    Measured over five seeds: with the bias every one of Baseline's ten
-    cancer cells is dead by 2 h; without it 2-7 are still alive at 2 h
-    and 0-4 at 4 h. Baseline's tumour is a compact cluster (position
-    std 5.5 um), which is what a chemokine gradient is good at.
+    RE-MEASURED 2026-11-12, when macrophages stopped eating tumour
+    cells that nothing had marked (Dooling 2023; see
+    tests/test_a_macrophage_needs_the_target_marked.py). The infiltrate
+    now kills with its NK and T cells alone, so the same clearance takes
+    longer and the old 2 h comparison point sits before the arms
+    separate. The EFFECT ITSELF GREW. Cancer cells alive, five seeds,
+    biased against unbiased:
+
+        hour    1h      2h      3h      4h      5h      6h
+        bias    7-9     3-8     2-6     0-4     0-5     0-2
+        none    9-10    7-11    6-11    5-11    6-11    6-10
+
+    At 4 h and at 6 h the bias is ahead on every one of the five seeds,
+    which is a stronger statement than the one this test used to make.
+    At 2 h it is ahead on four of five -- seed 3, the fixture's seed, is
+    the laggard (8 against 7) -- so 2 h is no longer asserted. Baseline's
+    tumour is a compact cluster (position std 5.5 um), which is what a
+    chemokine gradient is good at.
     """
-    assert _cancer_alive_at(biased, 2.0) < _cancer_alive_at(unbiased, 2.0)
-    assert _cancer_alive_at(biased, 4.0) <= _cancer_alive_at(unbiased, 4.0)
+    assert _cancer_alive_at(biased, 4.0) < _cancer_alive_at(unbiased, 4.0)
+    assert _cancer_alive_at(biased, 6.0) < _cancer_alive_at(unbiased, 6.0)

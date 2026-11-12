@@ -445,17 +445,25 @@ def build_catalog() -> List[CellEntry]:
               "M2, which suppresses T cells and helps the tumour. Most "
               "macrophages in prostate tumours lean M2. Cancer cells "
               "protect themselves with 'don't eat me' signals."),
-        simulated=("The most numerous immune cell in the run. It walks, "
-                   "makes contact and occasionally engulfs a cancer "
-                   "cell; a target's PD-L1 lowers that chance. Each "
-                   "macrophage has a position between M1 and M2 that "
-                   "drifts toward what its local signals favour over "
-                   "about a day. M2 macrophages weaken the T cells near "
-                   "them (arginase)."),
+        simulated=("The most numerous immune cell in the run. It walks "
+                   "and makes contact, but it does not engulf a cancer "
+                   "cell that nothing has marked: that needs both an "
+                   "antibody on the target and its 'don't eat me' "
+                   "signal blocked, which is what was measured, and "
+                   "neither happens unless a run asks for it. When they "
+                   "are asked for, the target's PD-L1 still lowers the "
+                   "chance. Each macrophage has a position between M1 "
+                   "and M2 that drifts toward what its local signals "
+                   "favour over about a day. M2 macrophages weaken the "
+                   "T cells near them (arginase)."),
         parameters=[
             contact("macrophage", True), contact("macrophage", False),
             kill("macrophage_kill_per_contact",
-                 "Chance a contact ends in engulfment"),
+                 "Chance a contact ends in engulfment, once the target "
+                 "is marked and unprotected"),
+            kill("macrophage_unprompted_fraction",
+                 "Share of that chance against a cancer cell nothing "
+                 "has marked"),
             Parameter("Starting mix, M1 / M0 / M2",
                       f"{pol['M1']:.0%} / {pol['M0']:.0%} / {pol['M2']:.0%}",
                       "derived", mix_source),
@@ -467,8 +475,12 @@ def build_catalog() -> List[CellEntry]:
             "The size is an alveolar (lung) macrophage's; no "
             "tumour-associated macrophage measurement is in use.",
             "Contact times are illustrative defaults, not measurements.",
-            "The 'don't eat me' signal CD47 is not represented; its "
-            "effect is folded into one low engulfment chance.",
+            "CD47 is not a per-cell quantity: whether the tumour is "
+            "marked for eating, and whether its 'don't eat me' signal "
+            "is blocked, are two settings for the whole run, not "
+            "properties of each cancer cell.",
+            "Nothing in the simulation produces the antibody that would "
+            "mark a tumour cell, so a run has to supply it.",
             mix_note,
         ]))
 

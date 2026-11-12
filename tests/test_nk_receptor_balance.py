@@ -534,7 +534,15 @@ def test_zero_max_suppression_restores_the_previous_flat_behaviour():
 # ── 5. The module: per-lineage parameters and the two NK rules ───────
 
 def _immune(**cfg):
-    base = {"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0}
+    # A macrophage eats nothing unless the target is marked and its
+    # CD47 signal blocked (Dooling 2023, PMID 37095318; see
+    # tests/test_a_macrophage_needs_the_target_marked.py). Every
+    # macrophage test in this file is about a mechanism that composes ON
+    # TOP of that licence, so the licence is granted here and the tests
+    # below keep measuring what they were written to measure. A test
+    # that wants it withheld passes its own value.
+    base = {"n_t_cells": 0, "n_nk_cells": 0, "n_macrophages": 0,
+            "tumour_opsonisation": 1.0, "cd47_block": 1.0}
     base.update(cfg)
     return ImmuneModule(base)
 

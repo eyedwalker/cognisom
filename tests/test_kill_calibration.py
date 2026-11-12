@@ -59,7 +59,10 @@ def test_every_kill_number_is_sourced_or_an_estimate_with_a_range():
         # Added 2026-11-12 with the NK serial-kill limit; see
         # tests/test_an_nk_cell_is_spent_after_a_few_kills.py.
         "nk_serial_kills_mean", "nk_recovery_hours",
-        "tcell_tumour_reactive_fraction"}
+        "tcell_tumour_reactive_fraction",
+        # Added 2026-11-12 with the phagocytic licence; see
+        # tests/test_a_macrophage_needs_the_target_marked.py.
+        "macrophage_unprompted_fraction"}
     for name, entry in report.items():
         low, high = entry["range"]
         assert low <= entry["value"] <= high, name
@@ -285,5 +288,11 @@ def test_the_replaced_model_still_clears_everything():
         "Immunotherapy", nk_kill_probability=0.8,
         macrophage_kill_probability=0.8, tcell_additive_cytotoxicity=False,
         tcell_exhaustion_onset_hours=None,
-        macrophage_polarization_mix={"M0": 1.0})
+        macrophage_polarization_mix={"M0": 1.0},
+        # ... including the part of it where a macrophage ate an
+        # unmarked, CD47-intact tumour cell, which Dooling 2023
+        # (PMID 37095318) measures as not happening. Restoring the old
+        # model means restoring that too, or this anchor would be
+        # measuring the new one.
+        macrophage_unprompted_fraction=1.0)
     assert end <= 5

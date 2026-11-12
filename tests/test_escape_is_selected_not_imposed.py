@@ -275,8 +275,19 @@ def _presentations(alleles):
 
 def _lineup(n_t: int = 0, n_nk: int = 0, n_mac: int = 0,
             checkpoint_block: float = 0.0, dt: float = 0.05,
-            hours: float = 6.0):
-    """An engine with no seeded population and the given effectors."""
+            hours: float = 6.0, licensed_macrophages: bool = True):
+    """An engine with no seeded population and the given effectors.
+
+    ``licensed_macrophages`` marks every target for eating and blocks
+    its CD47, which is the only condition under which a macrophage eats
+    anything (Dooling 2023, PMID 37095318; see
+    tests/test_a_macrophage_needs_the_target_marked.py). It defaults to
+    TRUE because these arenas exist to measure what each lineage's
+    targeting selects FOR, and an inert macrophage selects for nothing
+    measurable. A shipped run grants neither, so where that difference
+    is the point -- the mixed infiltrate below -- the arena is run both
+    ways.
+    """
     engine = SimulationEngine(SimulationConfig(
         dt=dt, duration=hours, use_gpu=False))
     engine.register_module('molecular', MolecularModule, {
@@ -297,7 +308,9 @@ def _lineup(n_t: int = 0, n_nk: int = 0, n_mac: int = 0,
         'checkpoint_block': checkpoint_block,
         # M0: the polarization factor is an exact identity there, so the
         # macrophage measurement is the PD-1 gate and nothing else.
-        'macrophage_polarization_enabled': False})
+        'macrophage_polarization_enabled': False,
+        'tumour_opsonisation': 1.0 if licensed_macrophages else 0.0,
+        'cd47_block': 1.0 if licensed_macrophages else 0.0})
     with contextlib.redirect_stdout(io.StringIO()):
         engine.initialize()
     cellular = engine.modules['cellular']
@@ -336,7 +349,8 @@ def _dress(cellular: CellularModule, cell, phenotype: str,
 def arena(escaped_phenotype: str, n_t: int = 0, n_nk: int = 0,
           n_mac: int = 0, checkpoint_block: float = 0.0, seed: int = 1,
           n_each: int = 20, hours: float = 6.0,
-          ifn_drive: float = 0.0) -> Dict[str, object]:
+          ifn_drive: float = 0.0,
+          licensed_macrophages: bool = True) -> Dict[str, object]:
     """Kills on ``n_each`` intact and ``n_each`` escaped cells, mixed.
 
     Returns the kills by (lineage, phenotype) plus the two totals. The
@@ -346,7 +360,8 @@ def arena(escaped_phenotype: str, n_t: int = 0, n_nk: int = 0,
     np.random.seed(seed)
     engine, cellular, immune = _lineup(
         n_t=n_t, n_nk=n_nk, n_mac=n_mac,
-        checkpoint_block=checkpoint_block, hours=hours)
+        checkpoint_block=checkpoint_block, hours=hours,
+        licensed_macrophages=licensed_macrophages)
     rng = np.random.default_rng(seed)
     centre = np.array([100.0, 100.0, 50.0])
     phenotype_of: Dict[int, str] = {}
@@ -801,6 +816,28 @@ def test_in_the_shipped_infiltrate_the_arms_do_not_fully_cancel():
     # two regimes are no longer "almost identical". They differ by about
     # one z at 48 seeds, so property 2 below is now a looser statement
     # than it was. Scorer-independent (same counts under both).
+    #
+    # MEASURED AGAIN 2026-11-12, both scorers, when macrophages stopped
+    # eating tumour cells that nothing had marked (Dooling 2023, PMID
+    # 37095318; tests/test_a_macrophage_needs_the_target_marked.py).
+    # The arena LICENSES its macrophages, so every number below is
+    # unchanged -- that is the point of licensing it, and it is checked
+    # at the end of this test. But the twelve macrophages of this mix
+    # are inert in a SHIPPED run, which makes the licensed arena a
+    # statement about a treated patient and not about the default one.
+    # So the same mix is now measured both ways, 48 seeds, both
+    # scorers, identical under each:
+    #
+    #     licensed     drive 0.0   escaped 239  intact 308  0.437  z -2.95
+    #                  drive 1.0   escaped 257  intact 358  0.418  z -4.07
+    #     as shipped   drive 0.0   escaped  89  intact 153  0.368  z -4.11
+    #                  drive 1.0   escaped 147  intact 226  0.394  z -4.09
+    #
+    # Two things to read from that. The infiltrate kills far less -- 242
+    # of 547 contacts' worth of kills, under half -- and selection
+    # against escape is STRONGER, not weaker, because what is left is
+    # the NK arm, which is the arm that reads MHC-I at all. The z no
+    # longer sits near the bar in either regime.
     mix = {'n_t': 6, 'n_nk': 2, 'n_mac': 12}
     out = [arena('allele_loss', hours=12.0, seed=s, ifn_drive=0.0, **mix)
            for s in range(1, 49)]
@@ -829,6 +866,25 @@ def test_in_the_shipped_infiltrate_the_arms_do_not_fully_cancel():
     # and the numbers beside the claims
     assert flat == (239, 308)
     assert lifted == (257, 358)
+
+    # 4. THE SAME MIX AS A SHIPPED RUN HAS IT, with nothing marking the
+    #    tumour, so the twelve macrophages eat nothing. The direction is
+    #    the one that matters and it survives: the escaped share stays
+    #    below neutral and clear of it, in both regimes.
+    as_shipped = {}
+    for drive in (0.0, 1.0):
+        runs = [arena('allele_loss', hours=12.0, seed=s, ifn_drive=drive,
+                      licensed_macrophages=False, **mix)
+                for s in range(1, 49)]
+        as_shipped[drive] = (sum(r['escaped'] for r in runs),
+                             sum(r['intact'] for r in runs))
+        assert _z_vs_half(*as_shipped[drive]) < -1.96, as_shipped[drive]
+    # The infiltrate that eats nothing unprompted kills less than half
+    # as much, which is the whole reason the licence exists.
+    assert sum(as_shipped[0.0]) < 0.5 * sum(flat)
+    # and the numbers beside that claim
+    assert as_shipped[0.0] == (89, 153)
+    assert as_shipped[1.0] == (147, 226)
 
 
 # ── part 3: the population, which is where the plan's bar is ─────────────
@@ -1121,39 +1177,61 @@ SHIPPED_24H_PINS = {
     # cells still make the most kills (16 of 29) but no longer two
     # thirds of them. Deltas +0.069 and -0.001, both inside the 3-sd
     # band of 0.1275. SHIPPED_DELTA_SD's twelve seeds were NOT re-run.
+    # RE-MEASURED AGAIN 2026-11-12, both scorers, when macrophages
+    # stopped eating tumour cells that nothing had marked (Dooling 2023,
+    # PMID 37095318; tests/test_a_macrophage_needs_the_target_marked.py).
+    # THE MACROPHAGE ROW IS GONE FROM `by_lineage` ENTIRELY -- it was 8
+    # of 29 under PWM and 10 of 29 under MHCflurry -- because this
+    # shipped preset marks nothing, so there is nothing left for them to
+    # do. Kills 29 -> 16 (PWM) and 29 -> 17 (MHCflurry); survivors
+    # (101, 60) -> (120, 67) and (103, 54) -> (124, 68).
+    #
+    # Two things to read rather than record. First, this test's own
+    # explanation of the population null keeps its shape but changes
+    # its content: the diluting lineage is now NK alone (13-14 of 16-17
+    # kills), and NK cells DO read class I, so the dilution is no longer
+    # "most killers cannot see the trait" but "most killers see a
+    # different part of it". The share assertion below still passes, at
+    # 0.12 (PWM) and 0.24 (MHCflurry), and the 12-seed spread behind
+    # that bound was NOT re-run with the licence -- it is the older
+    # engine's spread. Second, the deltas are +0.033 and +0.023: both
+    # far inside the 3-sd band of 0.1275, and for the first time in
+    # several re-measurements they agree in SIGN, which is still not a
+    # finding at one seed.
     'pwm': {
-        'survivors': (101, 60),
-        'delta': 0.06906,
-        'n_kills': 29,
-        'by_lineage': {'NK_cell': 16, 'macrophage': 8, 'T_cell': 5},
-        'observed': 13,
-        'expected': 16.01794,
-        'intact_mean': 0.36999,
-        'escaped_mean': 0.24391,
-        'intact_above_at_end': 3,
-        'intact_samples_above': 14,
-        'max_intact_over_run': 0.42491,
-        'cancer_divisions': 51,
-        'divisions_total': 228,
+        'survivors': (120, 67),
+        'delta': 0.03333,
+        'n_kills': 16,
+        'by_lineage': {'NK_cell': 14, 'T_cell': 2},
+        'observed': 8,
+        'expected': 8.38061,
+        'intact_mean': 0.36547,
+        'escaped_mean': 0.24453,
+        'intact_above_at_end': 4,
+        'intact_samples_above': 16,
+        'max_intact_over_run': 0.43768,
+        'cancer_divisions': 56,
+        'divisions_total': 233,
     },
     'mhcflurry': {
-        'survivors': (103, 54),
-        'delta': -0.00073,                   # see notes 1, 3 and 4
-        'n_kills': 29,
-        # T cells take 3 of 29 here, 10%. No single value is a result at
+        'survivors': (124, 68),
+        'delta': 0.02339,                    # see notes 1, 3 and 4
+        'n_kills': 17,
+        # T cells take 4 of 17 here, 24%. No single value is a result at
         # this sample size -- over 12 seeds the share was 0.139 +- 0.060
-        # before the NK limit -- and what the test asserts is the SHARE
-        # against that spread, t_share <= 0.35.
-        'by_lineage': {'NK_cell': 16, 'macrophage': 10, 'T_cell': 3},
-        'observed': 17,
-        'expected': 15.16062,
-        'intact_mean': 0.38049,
-        'escaped_mean': 0.25636,
-        'intact_above_at_end': 12,
+        # before the NK limit, and those seeds predate the phagocytic
+        # licence too -- and what the test asserts is the SHARE against
+        # that spread, t_share <= 0.35.
+        'by_lineage': {'NK_cell': 13, 'T_cell': 4},
+        'observed': 10,
+        'expected': 9.11598,
+        'intact_mean': 0.36595,
+        'escaped_mean': 0.24611,
+        'intact_above_at_end': 4,
         'intact_samples_above': 16,
-        'max_intact_over_run': 0.4439,
-        'cancer_divisions': 53,
-        'divisions_total': 230,
+        'max_intact_over_run': 0.42191,
+        'cancer_divisions': 61,
+        'divisions_total': 238,
     },
 }
 
@@ -1258,7 +1336,11 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
     # when division_time_normal became 90 h (fewer normal cells, so
     # immune cells travel differently and the shared RNG stream shifts),
     # and it was re-measured rather than re-pinned: 15 kills, macrophage
-    # 9, NK 5, T cell 1.
+    # 9, NK 5, T cell 1. Since 2026-11-12 the macrophages make NO kills
+    # in this preset at all -- nothing marks the tumour, and that is the
+    # measured condition for phagocytosis (Dooling 2023) -- so the
+    # diluting lineage is NK, which reads class I by a graded rule
+    # rather than by the escape trait's own identity.
     #
     # The claim was never "T cells kill nothing"; it is that the arm
     # which can SEE the escape trait is a small minority of the killing,
@@ -1299,6 +1381,13 @@ def test_the_shipped_24h_run_is_not_enriched_for_escape():
         f'population null needs re-measuring')
     assert by_lineage['macrophage'] + by_lineage['NK_cell'] \
         >= 2 * by_lineage['T_cell'], dict(by_lineage)
+    # And the macrophages do nothing here, which is measured behaviour
+    # and not an oversight: a shipped run marks no tumour cell, so
+    # there is no phagocytosis to dilute anything with.
+    assert by_lineage['macrophage'] == 0, (
+        'macrophages killed in a run that marks no target; the licence '
+        'in kill_calibration has stopped doing what it was measured to '
+        'do (Dooling 2023, PMID 37095318)')
     # The one T-cell kill in this seed was on an ESCAPED cell, at a
     # moment when 0.5285 of living cancer cells were escaped. Against
     # that expectation a single draw distinguishes nothing, and it is
