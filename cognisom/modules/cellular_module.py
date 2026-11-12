@@ -118,6 +118,19 @@ DHT_INTRACRINE_FRACTION = 0.20
 #: run where nothing was withdrawn.
 AR_INTACT_ABOVE = 0.95
 
+#: Division periods on the MEASURED clock, hours: thymidine labelling
+#: index with a ~10 h S phase (Meyer 1982, PMID 6185700; the derivation is
+#: beside division_time_normal in CellularModule.__init__). Normal
+#: prostate epithelium ~347 days, adenocarcinoma ~46 days.
+#:
+#: The module's defaults (90 h and 12 h) are the same 7.5:1 ratio on a
+#: clock compressed ~93x so that a one-day run shows divisions. That is a
+#: choice about what a short run should show, and it puts growth on a
+#: clock 93x faster than killing and drug binding, which run in real
+#: time. A run that is meant to stand for days or weeks of a patient
+#: should use these.
+MEASURED_DIVISION_HOURS = {'normal': 8333.0, 'cancer': 1111.0}
+
 #: IFN-gamma raises surface MHC-I on tumour cells by a mean 50% (five
 #: glioma lines, Naganuma 1998, PMID 9821108; same direction in prostate,
 #: Martini 2010, PMID 20304037, magnitude not given). The GAIN is from a

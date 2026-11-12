@@ -117,6 +117,9 @@ _RUNNER_ARGS: Tuple[str, ...] = (
 _RUNNER_MERGED: Tuple[str, ...] = (
     'module_configs', 'modules_enabled', 'patient_inputs', 'treatment',
     'clonal_fractions',
+    # Labels, like treatment: their effect is already in module_configs
+    # (division periods, cell counts); these say which was asked for.
+    'clock', 'tumour_fraction',
 )
 
 #: Attributes expected to refuse pickling, i.e. the wiring and caches

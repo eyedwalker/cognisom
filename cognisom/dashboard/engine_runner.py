@@ -180,6 +180,11 @@ logger = logging.getLogger(__name__)
 
 #: Accepted values for EngineRunner(tissue=...).
 TISSUE_LAYOUTS = ("slab", "ring", "section")
+
+#: Which clock cell division runs on. 'compressed' is the historical
+#: default (cancer 12 h, normal 90 h); 'measured' is the labelling-index
+#: turnover (cancer ~46 days, normal ~347 days).
+CLOCKS = ("compressed", "measured")
 _IMMUNE_KEYS = ("n_t_cells", "n_nk_cells", "n_macrophages")
 #: The legacy Metastasis Risk ring was drawn through the margin of a
 #: ~17 um tumour: inner radius 10 um (0.6 of it), outer 60 um (43 um
@@ -553,7 +558,15 @@ class EngineRunner:
         patient: Optional[Any] = None,
         drugs: Optional[Any] = None,
         clonal_fractions: Optional[Dict[str, float]] = None,
+        clock: str = "compressed",
+        tumour_fraction: Optional[float] = None,
     ):
+        if clock not in CLOCKS:
+            raise ValueError(f"clock must be one of {CLOCKS}, not {clock!r}")
+        if tumour_fraction is not None and not 0.0 < tumour_fraction < 1.0:
+            raise ValueError(
+                "tumour_fraction is the share of tissue cells that are "
+                f"cancer and must be between 0 and 1, not {tumour_fraction!r}")
         if tissue not in TISSUE_LAYOUTS:
             raise ValueError(
                 f"tissue must be one of {TISSUE_LAYOUTS}, not {tissue!r}")
@@ -622,6 +635,34 @@ class EngineRunner:
             "cell_mechanics": {},
             "ar_signaling": {},
         }
+        # How much of the tissue is tumour. The presets seed a nodule of
+        # about 4% of the cells inside normal tissue, and size the
+        # infiltrate for the WHOLE tissue -- so 60 immune cells converge
+        # on 80 cancer cells, near one effector per target, and clear the
+        # tumour in a day or two whatever else is true. Measured on the
+        # demo patient (section, real clock, NK limit on): cleared by
+        # hour 48 at the preset's 4%; 1,500 -> 1,315 over a WEEK with the
+        # tumour at 74% of the tissue. A biopsy of a tumour is mostly
+        # tumour, so a run that stands for one should say how much.
+        # The total population is kept, so the tissue box, the vessels and
+        # the infiltrate are exactly the preset's.
+        #: Share of tissue cells that are cancer, or None for the preset's.
+        self.tumour_fraction = tumour_fraction
+        if tumour_fraction is not None:
+            cells = self.module_configs["cellular"]
+            total = int(cells["n_normal_cells"]) + int(cells["n_cancer_cells"])
+            n_cancer = min(total - 1, max(1, int(round(total * tumour_fraction))))
+            cells["n_cancer_cells"] = n_cancer
+            cells["n_normal_cells"] = total - n_cancer
+        # Which clock growth runs on; see MEASURED_DIVISION_HOURS.
+        #: 'compressed' (the default every preset was pinned on) or
+        #: 'measured'.
+        self.clock = clock
+        if clock == "measured":
+            from cognisom.modules.cellular_module import MEASURED_DIVISION_HOURS
+            self.module_configs["cellular"].update(
+                division_time_normal=MEASURED_DIVISION_HOURS['normal'],
+                division_time_cancer=MEASURED_DIVISION_HOURS['cancer'])
         # The patient goes in after the preset and before the caller's
         # overrides, so an explicit override still wins.
         if patient is not None:

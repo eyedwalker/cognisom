@@ -124,6 +124,15 @@ def main() -> int:
                          "is a SCENARIO: see "
                          "demo_patients.SU2C_AR_F877L_CLONALITY for what the "
                          "patient's data does and does not say.")
+    ap.add_argument("--clock", default="compressed",
+                    choices=("compressed", "measured"),
+                    help="which clock cells divide on. 'measured' is the "
+                         "labelling-index turnover (cancer ~46 days), for "
+                         "a run that stands for days or weeks of a patient")
+    ap.add_argument("--tumour-fraction", type=float, default=None,
+                    metavar="F",
+                    help="share of tissue cells that are cancer (the "
+                         "presets seed ~4%%). The total is kept")
     ap.add_argument("--stride", type=int, default=2,
                     help="use every Nth snapshot as a video frame")
     ap.add_argument("--fps", type=int, default=12)
@@ -163,7 +172,9 @@ def main() -> int:
         return EngineRunner(dt=args.dt, duration=args.duration,
                             scenario=args.scenario, tissue=args.tissue,
                             patient=patient, drugs=drugs or None,
-                            clonal_fractions=clonal or None)
+                            clonal_fractions=clonal or None,
+                            clock=args.clock,
+                            tumour_fraction=args.tumour_fraction)
 
     if args.compare_drug and not args.drug:
         ap.error("--compare-drug needs --drug: there is no recorded "
@@ -455,6 +466,8 @@ def main() -> int:
             "tissue_caption": tissue_caption(args.tissue),
             "duration_hours": args.duration,
             "dt_hours": args.dt,
+            "clock": args.clock,
+            "tumour_fraction": args.tumour_fraction,
             "patient_headline": subject.headline,
             "personalised": subject.personalised,
             "patient_id": subject.patient_id,
