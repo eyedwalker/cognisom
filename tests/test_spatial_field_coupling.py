@@ -397,8 +397,20 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # is the line below -- every death is an immune kill, none is hypoxic
     # -- and the two counts still agree with each other, which is the
     # part that matters.
-    assert cells.total_deaths == 11
-    assert _deaths(runner, "immune_killed", "cancer") == 11
+    #
+    # RE-MEASURED 2026-11-12, both scorers, when NK cells stopped being
+    # unlimited serial killers (an NK cell is now spent after a few
+    # kills; tests/test_an_nk_cell_is_spent_after_a_few_kills.py). The
+    # run is no longer the same under both: 11 deaths, 11 divisions and
+    # 308.79773 delivered under MHCflurry; 12, 12 and 308.33831 under the
+    # PWM fallback, where the last cancer cell survives long enough to
+    # divide once more. THE CLAIM holds under both and is asserted for
+    # both: every death is an immune kill, and no cancer cell is left.
+    from cognisom.genomics.mhcflurry_binding import is_mhcflurry_available
+    n_dead, o2_delivered = ((11, 308.80) if is_mhcflurry_available()
+                            else (12, 308.34))
+    assert cells.total_deaths == _deaths(runner, "immune_killed", "cancer")
+    assert cells.total_deaths == n_dead
     # 80 normal divisions -- each normal cell divides once, at a time
     # staggered over the day. The 5 cancer divisions that used to come
     # before the kill no longer happen.
@@ -412,7 +424,9 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # above. Before it, the saturated matrix held the infiltrate back
     # just long enough that no cancer cell divided, so this read 10 and
     # the normal-cell identity below it happened to work.
-    assert cells.total_divisions == 11
+    # 10 normal divisions plus one per cancer cell that divided: see the
+    # per-scorer note above.
+    assert cells.total_divisions == n_dead
     # 363.5638 / 0.0710 (were 363.1047 / 0.0619): on 2026-10-23 the
     # lymphatic module stopped rolling its dice at five sample points
     # per vessel and rolls once per exposed cell, so the shared RNG
@@ -457,7 +471,7 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # coupled to the cell count. The tolerance is UNCHANGED at 0.1 and
     # still spans both scorers; it was not widened to fit.
     assert runner.engine.modules["vascular"].total_O2_delivered == \
-        pytest.approx(308.32, abs=0.1)
+        pytest.approx(o2_delivered, abs=0.1)   # per scorer; not widened
     # The oxygen floor: no normal cell is near death -- nor even hypoxic.
     # THE PROPERTY is the two lines below: the floor sits above the
     # hypoxia flag and no cell is under it. The exact value is a pin and
@@ -482,7 +496,14 @@ def test_baseline_normal_cells_still_survive_24h(runs):
     # spans both scorers and says so.
     assert min(c.oxygen for c in alive) > 0.05          # the hypoxia flag
     assert sum(1 for c in alive if c.oxygen < 0.05) == 0
-    assert 0.060 < min(c.oxygen for c in alive) < 0.080
+    # The band's lower edge was 0.060. Measured 2026-11-12 with the NK
+    # serial-kill limit: 0.05716 (MHCflurry) and 0.05551 (PWM). This is
+    # the minimum over a population, an order statistic that one cell
+    # sets, and it has now moved for an RNG-stream reason three times.
+    # The property is the two lines above -- the floor is over the
+    # hypoxia flag and nobody is under it -- so the lower edge here IS
+    # that flag, and only the upper edge remains a band.
+    assert 0.05 < min(c.oxygen for c in alive) < 0.080
 
 
 def test_the_hypoxia_preset_still_produces_hypoxia(runs):

@@ -365,13 +365,22 @@ def build_catalog() -> List[CellEntry]:
                    "patient's HLA typing was measured from their reads, "
                    "a KIR–HLA licensing model decides engagement "
                    "instead. Each kill spends a few of the cell's "
-                   "granules."),
+                   "granules. After a few kills the cell is spent: it "
+                   "keeps moving but kills nothing until it recovers."),
         parameters=[
             contact("NK_cell", True), contact("NK_cell", False),
             kill("nk_graded_ceiling",
                  "Kill chance per contact, at most (MHC-I absent)"),
             kill("nk_kill_per_contact",
                  "Kill chance per contact, typical solid target"),
+            kill("nk_serial_kills_mean",
+                 "Targets killed before the cell is spent, mean"),
+            Parameter("Most targets one cell kills before it is spent",
+                      f"{kc.NK_SERIAL_KILLS_MAX}", "measured",
+                      "Prager 2019 (PMID 31270246); Bhat & Watzl 2007 "
+                      "(PMID 17389917)"),
+            kill("nk_recovery_hours",
+                 "Time a spent cell takes to kill again", "{:g} h"),
             Parameter("Granules carried", f"{reserve:g}", "measured",
                       "PMID 29592963"),
             Parameter("Granules spent per kill", f"{low}–{high}",
@@ -381,10 +390,12 @@ def build_catalog() -> List[CellEntry]:
             *movement("NK_cell"),
         ],
         missing=[
-            "Known over-killing, being worked on. Nothing limits how "
-            "many targets one NK cell kills, so in a two-week test run "
-            "6 NK cells made 51 of 80 kills (about 7 each per day) and "
-            "the tumour was cleared in 30 hours.",
+            "The kill limit is measured on NK cells activated with "
+            "IL-2 in a dish, which is the generous end; NK cells inside "
+            "a prostate tumour are not known to do as well.",
+            "Recovery in two days was measured with added IL-2, away "
+            "from targets. Inside a tumour it may be slower or not "
+            "happen.",
             "The size is the weakest in this table: a single mean with "
             "the underlying data not shown.",
             mix_note,

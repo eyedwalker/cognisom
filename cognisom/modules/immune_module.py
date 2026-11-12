@@ -101,8 +101,9 @@ from cognisom.engine.py.immune.lactate import (  # noqa: E402
 )
 from cognisom.engine.py.immune.kill_calibration import (  # noqa: E402
     HITS_PER_CONTACT, LETHAL_DAMAGE, MACROPHAGE_KILL_PER_CONTACT,
-    NK_GRADED_CEILING, NK_KILL_PER_CONTACT, calibration_report,
-    contact_hits, damage_now,
+    NK_GRADED_CEILING, NK_KILL_PER_CONTACT, NK_RECOVERY_HOURS,
+    NK_SERIAL_KILLS_MEAN, calibration_report, contact_hits, damage_now,
+    draw_serial_kill_capacity,
 )
 from cognisom.engine.py.immune.treg_suppression import (  # noqa: E402
     TREG_MAX_CYTOLYTIC_LOSS, TREG_RATIO_FULL_SUPPRESSION,
@@ -229,6 +230,16 @@ class ImmuneCell:
     # once, when the contact begins; see ImmuneModule._engage.
     contact_ends_at: Optional[float] = None
     contact_lethal: bool = False
+
+    # Serial killing, NK cells only. An NK cell kills a few targets and is
+    # then spent until it recovers; see kill_calibration.NK_SERIAL_KILLS_MEAN.
+    #: Targets this cell will kill before it is spent. None = unlimited
+    #: (every other lineage, and NK cells with the limit turned off).
+    serial_kill_capacity: Optional[int] = None
+    #: Kills made since it was last fresh.
+    serial_kills: int = 0
+    #: Module clock (hours) at which a spent cell can kill again, or None.
+    spent_until: Optional[float] = None
 
     # Clonal expansion (T cells). `first_engaged_h` is when this cell
     # FIRST recognised its antigen, which is the only trigger the
@@ -728,6 +739,21 @@ class ImmuneModule(SimulationModule):
         #: shape; reserves hitting zero would mean cells are emptying
         #: themselves, which the measurement says they do not.
         self.total_granules_released = 0
+        # How many targets one NK cell kills before it is spent, and how
+        # long it stays spent. On by default; False restores the
+        # unlimited serial killer every run had before 2026-11-12.
+        self.nk_serial_kill_limit = bool(
+            self.config.get('nk_serial_kill_limit', True))
+        self.nk_serial_kills_mean = float(self.config.get(
+            'nk_serial_kills_mean', NK_SERIAL_KILLS_MEAN.value))
+        self.nk_recovery_hours = float(_or_default(
+            self.config.get('nk_recovery_hours'), NK_RECOVERY_HOURS.value))
+        #: Its own stream, so drawing a capacity does not shift the
+        #: shared one that recognition and contacts consume.
+        self._nk_capacity_rng = np.random.default_rng(
+            self.config.get('nk_capacity_seed', 0x4E4B))
+        #: Times an NK cell ran out and went quiet.
+        self.total_nk_spent = 0
         self.total_tcell_kills = 0
         self.total_activations = 0
         self.total_recruited = 0
@@ -970,6 +996,9 @@ class ImmuneModule(SimulationModule):
             cell.kir_subset = draw_kir_subset(
                 self._nk_licensing, self._nk_rng,
             ).receptor.value
+
+        if cell_type == 'NK_cell' and self.nk_serial_kill_limit:
+            cell.serial_kill_capacity = self._draw_nk_capacity()
 
         self._patrol_speed_for(cell_type)
         # The granules it is loaded with, from the library. None where
@@ -1428,8 +1457,10 @@ class ImmuneModule(SimulationModule):
                 # inside effective_detection -- so the break below still
                 # takes the first RECOGNISED one, and _recognize is
                 # called on the same cells in the same sequence.
-                for cancer_id in self._cell_index.candidates_within(
-                        immune_cell.position, effective_detection):
+                # A spent NK cell looks at nothing: it walks on.
+                for cancer_id in (() if self._is_spent(immune_cell) else
+                                  self._cell_index.candidates_within(
+                        immune_cell.position, effective_detection)):
                     cancer_cell = cancer_cells.get(cancer_id)
                     if cancer_cell is None:
                         continue          # not cancer, or already killed
@@ -2216,8 +2247,36 @@ class ImmuneModule(SimulationModule):
                 'position': target_cell.position.tolist(),
             })
 
+        # An NK cell that has made its last kill is spent.
+        if immune_cell.serial_kill_capacity is not None:
+            immune_cell.serial_kills += 1
+            if immune_cell.serial_kills >= immune_cell.serial_kill_capacity:
+                immune_cell.spent_until = self.clock_h + self.nk_recovery_hours
+                self.total_nk_spent += 1
+
         # Deactivate immune cell
         self._release(immune_cell)
+
+    def _draw_nk_capacity(self) -> int:
+        return draw_serial_kill_capacity(
+            self._nk_capacity_rng.poisson, self.nk_serial_kills_mean)
+
+    def _is_spent(self, immune_cell: ImmuneCell) -> bool:
+        """Whether this cell has killed its fill and not yet recovered.
+
+        A spent cell keeps moving and is never engaged, which is what
+        Bhat & Watzl saw: the cells survive, depleted of perforin and
+        granzyme B. Recovery makes it a fresh cell with a new capacity.
+        """
+        until = immune_cell.spent_until
+        if until is None:
+            return False
+        if self.clock_h < until:
+            return True
+        immune_cell.spent_until = None
+        immune_cell.serial_kills = 0
+        immune_cell.serial_kill_capacity = self._draw_nk_capacity()
+        return False
 
     # ---- Macrophage M1/M2 polarization -------------------------
 
@@ -2475,6 +2534,11 @@ class ImmuneModule(SimulationModule):
             'n_macrophages': len(macrophages),
             'total_kills': self.total_kills,
             'total_granules_released': self.total_granules_released,
+            'nk_serial_kill_limit': self.nk_serial_kill_limit,
+            'total_nk_spent': self.total_nk_spent,
+            'n_nk_spent': sum(
+                1 for c in self.immune_cells.values()
+                if c.spent_until is not None and self.clock_h < c.spent_until),
             'lytic_reserves': {
                 c.cell_id: getattr(c, 'lytic_granules', None)
                 for c in self.immune_cells.values()

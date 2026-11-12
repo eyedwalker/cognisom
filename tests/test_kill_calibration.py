@@ -55,7 +55,10 @@ def test_every_kill_number_is_sourced_or_an_estimate_with_a_range():
     assert set(report) == {
         "tcell_hits_per_contact", "tcell_damage_half_life_min",
         "tcell_lethal_damage", "nk_kill_per_contact",
-        "nk_graded_ceiling", "macrophage_kill_per_contact"}
+        "nk_graded_ceiling", "macrophage_kill_per_contact",
+        # Added 2026-11-12 with the NK serial-kill limit; see
+        # tests/test_an_nk_cell_is_spent_after_a_few_kills.py.
+        "nk_serial_kills_mean", "nk_recovery_hours"}
     for name, entry in report.items():
         low, high = entry["range"]
         assert low <= entry["value"] <= high, name

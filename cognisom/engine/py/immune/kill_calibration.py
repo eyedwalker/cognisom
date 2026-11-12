@@ -165,6 +165,72 @@ NK_GRADED_CEILING = KillParameter(
     "opsonised lymphoma = maximal activation); chosen so the graded "
     "curve reproduces the flat 0.15 at the MHC-I the presets occupy")
 
+_PRAGER = "Prager 2019, PMID 31270246"
+_BHAT = "Bhat & Watzl 2007, PMID 17389917"
+
+#: Targets one NK cell kills before it is spent.
+#:
+#: Until 2026-11-12 nothing limited this. Each kill cost 2-4 of 63
+#: granules, a reserve that is never the binding constraint, so an NK cell
+#: beside a nodule of targets killed for as long as the run lasted.
+#: Measured on the demo patient (section, Baseline, real division clock):
+#: 6 NK cells made 51 of 80 kills in 30 h, 6.8 kills per cell per day,
+#: and the tumour was cleared in every arm. That, not the clock, is why no
+#: longer run could show a course of disease.
+#:
+#: What the imaging says (both read in full text):
+#:   Prager 2019 tracked 347 IL-2-activated primary human NK cells against
+#:   adherent HeLa-CD48 targets for 15-17 h: "an average of 2.53
+#:   kills/NK cell" (2.05 on CD95-knockout targets), "the majority of NK
+#:   cells killing three or fewer targets", serial killers reaching six.
+#:   Resting NK cells: "a maximum of four".
+#:   Bhat & Watzl 2007, bulk chromium release: "a single IL-2 activated NK
+#:   cell can kill four 221 target cells in a 16 hour assay", which the
+#:   authors call the maximal potential and a possible overestimate; by
+#:   microscopy "many NK cells only killed once or twice", a few up to 6.
+#:
+#: These are IL-2-ACTIVATED cells in a dish, so this is the generous end:
+#: an NK cell inside a prostate tumour is not known to do better.
+#: Vanherberghen 2013 (PMID 23287857, abstract only) found about half of
+#: NK cells kill nothing at all; that is NOT applied here, because the
+#: 2.53 average may already be over killers only and applying both could
+#: count the same heterogeneity twice.
+NK_SERIAL_KILLS_MEAN = KillParameter(
+    2.53, 2.05, 4.0, 'sourced',
+    f"{_PRAGER}: average 2.53 kills per IL-2-activated NK cell over "
+    f"15-17 h (2.05 on CD95-KO targets); high end {_BHAT}, 4 in 16 h")
+
+#: The most targets any one NK cell was seen to kill in either study.
+NK_SERIAL_KILLS_MAX = 6
+
+#: Hours a spent NK cell takes to kill again.
+#:
+#: Bhat & Watzl: spent ("exhausted") NK cells survive with reduced
+#: perforin and granzyme B, and "the killing ability of these cells was
+#: augmented in response to IL-2 treatment on day 2"; Prager restates it
+#: as "restored within 2 d by IL-2 or IL-15 treatment". Both are in a
+#: dish, away from targets, WITH added cytokine. Nothing measures
+#: recovery inside a tumour, where it may be slower or not happen, so 48 h
+#: is the fastest the evidence allows and is labelled an estimate.
+NK_RECOVERY_HOURS = KillParameter(
+    48.0, 48.0, float('inf'), 'ESTIMATE',
+    f"{_BHAT}: restored by day 2 with IL-2, after separation from "
+    "targets; no in-tissue measurement, so this is the fast end")
+
+
+def draw_serial_kill_capacity(rng_poisson,
+                              mean: float = NK_SERIAL_KILLS_MEAN.value,
+                              most: int = NK_SERIAL_KILLS_MAX) -> int:
+    """How many targets one NK cell will kill before it is spent.
+
+    At least one, a Poisson spread about the measured mean, never more
+    than the most ever observed. With the defaults about 80% of cells
+    draw three or fewer, which is the paper's "majority ... three or
+    fewer", and the cap moves the mean by under 1%.
+    """
+    return int(min(most, 1 + rng_poisson(max(0.0, mean - 1.0))))
+
+
 #: Per-contact phagocytic kill probability of a macrophage.
 MACROPHAGE_KILL_PER_CONTACT = KillParameter(
     0.05, 0.0, 0.2, 'ESTIMATE',
@@ -228,4 +294,6 @@ def calibration_report() -> Dict[str, Dict[str, object]]:
         'nk_kill_per_contact': NK_KILL_PER_CONTACT.as_dict(),
         'nk_graded_ceiling': NK_GRADED_CEILING.as_dict(),
         'macrophage_kill_per_contact': MACROPHAGE_KILL_PER_CONTACT.as_dict(),
+        'nk_serial_kills_mean': NK_SERIAL_KILLS_MEAN.as_dict(),
+        'nk_recovery_hours': NK_RECOVERY_HOURS.as_dict(),
     }

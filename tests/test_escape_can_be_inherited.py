@@ -1104,12 +1104,19 @@ def test_a_six_hour_slab_run_is_identical_with_escape_on_and_off():
     # scorers" stopped being true here and each is pinned on its own.
     # Cancer divisions stayed 11 under both, which is what the
     # expectation below is computed from.
+    #
+    # RE-MEASURED 2026-11-12, both scorers, with the NK serial-kill limit
+    # (tests/test_an_nk_cell_is_spent_after_a_few_kills.py). Was
+    # (2094, 81, 64, 10, 0, 11, 0.359673066) and
+    # (2092, 79, 64, 12, 0, 11, 0.359102551). Cancer divisions went 11 ->
+    # 12 under both, so the expectation below moved with them.
     from cognisom.genomics.mhcflurry_binding import is_mhcflurry_available
     measured = {
-        True: (2094, 81, 64, 10, 0, 11, 0.359673066),    # MHCflurry
-        False: (2092, 79, 64, 12, 0, 11, 0.359102551),   # PWM fallback
+        True: (2094, 81, 65, 11, 0, 12, 0.356417534),    # MHCflurry
+        False: (2090, 77, 65, 15, 0, 12, 0.355733008),   # PWM fallback
     }[bool(is_mhcflurry_available())]
     assert out[True][:7] == measured, out[True]
     # The point of this test: the draw WAS reached.
     assert out[True][5] > 0
-    assert ev.expected_events(out[True][5]) == pytest.approx(1.7047e-5, rel=0.01)
+    assert ev.expected_events(out[True][5]) == pytest.approx(
+        12 * 1.5497584e-06, rel=0.01)       # 12 cancer divisions
