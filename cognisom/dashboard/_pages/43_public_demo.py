@@ -59,8 +59,22 @@ facts = _load_facts()
 # ── Header ───────────────────────────────────────────────────────────
 
 st.title("A molecular digital twin, running")
+# The duration comes from the sidecar. It was the word "Twenty-four"
+# here, written when the recording was 24 h, and it stayed while the
+# recording became 72 h and then a week -- the exact drift this page is
+# built to avoid, in the one sentence nobody thought of as a number.
+#
+# Read defensively: the missing-sidecar guard is further down, and this
+# paragraph must not be what crashes the page before it is reached.
+_hours = (facts or {}).get("duration_hours")
+if not _hours:
+    _span = "A recording"
+elif _hours >= 48:
+    _span = f"{_hours / 24:.0f} simulated days"
+else:
+    _span = f"{_hours:.0f} simulated hours"
 st.markdown(
-    "Twenty-four simulated hours of a tumour and the immune cells "
+    f"{_span[0].upper() + _span[1:]} of a tumour and the immune cells "
     "hunting it, computed cell by cell from a **real patient callset**. "
     "This is a recording of one run — not an animation drawn to "
     "illustrate the idea."
@@ -96,13 +110,44 @@ else:
 # and the two are the SAME RUN, exported from one engine state by
 # `record_demo_run.py --usd`, not two runs that share a seed.
 if _RTX_VIDEO.exists():
-    st.subheader("The same run, ray-traced")
+    # Whether this really IS the recorded run is now a checked fact, not
+    # a sentence. The RTX video is rendered on another machine, so
+    # re-recording the 2D video without re-rendering this one used to
+    # leave the page pairing two different simulations with nothing able
+    # to notice. demo_provenance fingerprints the run; the manifest
+    # written beside this video carries the fingerprint it was rendered
+    # from. None means NO MANIFEST, which is not agreement.
+    from cognisom.dashboard.demo_provenance import videos_are_one_run
+
+    _same_run = videos_are_one_run(facts, _ASSETS) if facts else None
+    st.subheader("The same run, ray-traced" if _same_run
+                 else "The run, ray-traced")
     st.video(str(_RTX_VIDEO))
-    _rtx_bits = [
-        "The identical simulation, rendered in NVIDIA Isaac Sim (RTX) "
-        "from the Bio-USD stage the same run exported.",
-    ]
-    if facts and facts.get("usd_kill_markers") is not None:
+    if _same_run is False:
+        st.warning(
+            "**This render is of a different run from the recording "
+            "above.** The two are produced on different machines and "
+            "this one has not been re-rendered since the recording was "
+            "remade, so treat the two videos as two simulations of the "
+            "same patient rather than one simulation shown twice. The "
+            "numbers on this page are the recording's."
+        )
+    elif _same_run is None:
+        st.caption(
+            "Rendered from a Bio-USD stage this configuration exported. "
+            "No provenance manifest ships beside this video, so that it "
+            "is the very same run as the recording above is not "
+            "something this page can demonstrate to you."
+        )
+    _rtx_bits = []
+    if _same_run:
+        _rtx_bits.append(
+            "The identical simulation, rendered in NVIDIA Isaac Sim (RTX) "
+            "from the Bio-USD stage the same run exported — checked, not "
+            "asserted: the manifest beside this video carries the "
+            "recording's own run fingerprint."
+        )
+    if _same_run and facts and facts.get("usd_kill_markers") is not None:
         _rtx_bits.append(
             f"Both videos draw **{facts['usd_kill_markers']} kill markers**, "
             f"which is the engine's own kill count — so the crosses are "
@@ -268,8 +313,21 @@ if facts["cancer_end"] < facts["cancer_start"]:
         # With a subclone on a drug, most cancer cells are blocked and
         # barely dividing, so "outpacing the division rate" would credit
         # the immune system with what the drug is doing.
-        + ("The deaths are immune kills; the drug is what keeps most of "
-           "the tumour from replacing them, by blocking the cells with "
+        + (f"Most of that fall is the DRUG, not the immune system: of "
+           f"the {facts['deaths']:,} deaths, "
+           f"{facts['immune_kills']:,} were immune kills and almost "
+           "all the rest were cells with the ordinary receptor dying of "
+           "androgen withdrawal once enzalutamide blocked it — in a 48 h "
+           "count of the engine's own death events, 155 of the 157 "
+           "non-immune deaths, the other two being cells that left "
+           "through a lymphatic vessel. Immune killing is the SAME with "
+           "the drug and without it in that count (20 against 21), so "
+           "the fall here is the drug's own doing and not the immune "
+           "system's. The carriers are not blocked, which is the "
+           "section below."
+           if facts.get("subclone") and facts["deaths"] > facts["immune_kills"] * 2
+           else "The deaths are immune kills; the drug is what keeps most "
+           "of the tumour from replacing them, by blocking the cells with "
            "the ordinary receptor. The carriers are not blocked, which is "
            "the section below."
            if facts.get("subclone") else
@@ -323,13 +381,33 @@ if _confined:
         "this configuration. The recording has not been remade."
     )
 else:
-    st.markdown(
-        f"**The run settles.** The last cell division is at hour "
-        f"{facts['last_division_hour']:.1f} and the last kill at hour "
-        f"{facts['last_kill_hour']:.1f}. After that the populations stop "
-        "changing — a property of this configuration, not a prediction "
-        "about tumours."
-    )
+    # Whether the run settles is a FACT ABOUT THIS RECORDING, so it is
+    # read off the recording rather than asserted. The 72 h version of
+    # this page said "the run settles", which was true of it: a defect
+    # confined immune cells to a box and the last kill was at hour 14.7
+    # of 72. On a corrected engine over a simulated week, killing runs
+    # to the end, and saying otherwise would be describing the old bug.
+    _quiet_after = max(facts["last_kill_hour"], facts["last_death_hour"])
+    _ran_to_the_end = _quiet_after >= 0.9 * facts["duration_hours"]
+    if _ran_to_the_end:
+        st.markdown(
+            f"**The run does not settle.** The last kill is at hour "
+            f"{facts['last_kill_hour']:.0f} and the last cell death at "
+            f"hour {facts['last_death_hour']:.0f} of "
+            f"{facts['duration_hours']:.0f} — cells are still dividing "
+            f"and dying when the recording ends. An earlier version of "
+            "this recording went quiet a fifth of the way through; that "
+            "was a defect, since fixed, not the model reaching a steady "
+            "state."
+        )
+    else:
+        st.markdown(
+            f"**The run settles.** The last cell division is at hour "
+            f"{facts['last_division_hour']:.1f} and the last kill at hour "
+            f"{facts['last_kill_hour']:.1f}. After that the populations "
+            "stop changing — a property of this configuration, not a "
+            "prediction about tumours."
+        )
 
 # ── The drug ─────────────────────────────────────────────────────────
 #
@@ -447,9 +525,14 @@ if _recorded:
             "The carriers are spread evenly through the tumour at the "
             "start, where a real subclone is one contiguous patch. The "
             "activation factor is one published reporter measurement and "
-            "the blockade strength is an estimate. The engine's clock is "
-            "compressed by design, so these hours stand for a much longer "
-            "clinical course. One run per arm, one seed."
+            "the blockade strength is an estimate. "
+            + ("Cells divide on the measured turnover here, so the "
+               "simulated time is clinical time rather than standing "
+               "for it. "
+               if facts.get("clock") == "measured" else
+               "The engine's clock is compressed by design, so these "
+               "hours stand for a much longer clinical course. ")
+            + "One run per arm, one seed."
         )
     else:
         _none = next((a for a in _arms if not a["drugs"]), None)

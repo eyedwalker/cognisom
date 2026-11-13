@@ -139,7 +139,6 @@ def test_the_budget_is_fick_s_principle():
 
 
 def test_the_field_is_flat_and_the_kills_are_unchanged_in_baseline():
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(7)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline")

@@ -152,7 +152,6 @@ def _demo_patient():
     stand-in above cannot give it."""
     if not _PATIENT:
         import os
-        os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
         from cognisom.genomics.demo_patients import (
             DEFAULT_DEMO_PATIENT, load_demo_patient)
         with contextlib.redirect_stdout(io.StringIO()):
@@ -327,6 +326,33 @@ def test_the_committed_recording_matches_its_own_claims():
         facts["subclone"]["founding_fraction"], abs=0.02)
     assert arm["psa_tumour_low"] <= min(arm["psa_tumour_start"],
                                         arm["psa_tumour_end"])
-    assert arm["carrier_share_end"] >= CLONALITY["carrier_fraction_min"], (
-        "the page says the run ends inside the range the biopsy allows")
+    # THE CLAIM THIS FILE EXISTS FOR, asserted against the other arms
+    # rather than against an absolute: the agonist arm enriches the
+    # carriers, and the arms that do not drive them do not.
+    others = {a["label"]: a for a in facts["treatment_arms"]
+              if not a["recorded"]}
+    assert arm["carrier_share_end"] > arm["carrier_share_start"], arm
+    for label, other in others.items():
+        assert arm["carrier_share_end"] > other["carrier_share_end"], (
+            f"{label} ends with as many carriers as the arm that drives "
+            "them; the selection this page describes is not in the data")
+    # Darolutamide keeps its blockade on F877L, so it must not select.
+    _daro = others.get("Darolutamide")
+    if _daro:
+        assert _daro["carrier_share_end"] <= _daro["carrier_share_start"]
+
+    # WHERE THAT LANDS relative to the patient's own biopsy is a
+    # MEASUREMENT, not a requirement, and the page words it both ways
+    # ("inside"/"below" the range). It used to be asserted as >= the
+    # biopsy minimum, which held only because the previous recording was
+    # 72 h on 120 cancer cells and ended at 58% carriers. The same
+    # mechanism over a simulated week on a 1,500-cell tumour reaches
+    # 13.9%: the drug kills wild-type cells faster than the carriers can
+    # take over a tumour that size. Both are real; neither is the claim.
+    # If this moves, RE-MEASURE and move the number with it.
+    assert arm["carrier_share_end"] == pytest.approx(0.139, abs=0.005), (
+        "re-measure, do not re-pin", arm["carrier_share_end"])
+    assert arm["carrier_share_end"] < CLONALITY["carrier_fraction_min"], (
+        "the recording now ends INSIDE the range the biopsy allows; the "
+        "page's wording switches on that, so check it says 'inside'")
     assert facts["usd_kill_markers"] == facts["immune_kills"]

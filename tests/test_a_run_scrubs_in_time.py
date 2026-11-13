@@ -26,7 +26,6 @@ from cognisom.visualization.run_usd import (  # noqa: E402
 
 @pytest.fixture(scope="module")
 def run(tmp_path_factory):
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(3)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline",
                           snapshot_interval_hours=0.1)
@@ -56,7 +55,6 @@ def test_the_runner_attaches_a_recorder_and_it_saw_the_run(run):
 
 
 def test_the_recorder_is_cleared_when_a_run_restarts():
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(4)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=0.3, scenario="Baseline")
     with redirect_stdout(io.StringIO()):
@@ -77,7 +75,6 @@ def test_a_caller_that_drives_the_engine_itself_can_record():
     callback TissueEngine.run always had, and the runner's recorder is
     the thing to pass. (This was the only test of run(callback=...) and
     it lived in the parallel exporter's test file, which went with it.)"""
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(12345)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=1.0, scenario="Baseline",
                           snapshot_interval_hours=0.2)

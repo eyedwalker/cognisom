@@ -31,7 +31,6 @@ from cognisom.modules.vascular_module import (
 
 
 def _run(scenario, hours, seed=11, **overrides):
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(seed)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=hours, scenario=scenario,

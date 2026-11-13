@@ -255,7 +255,6 @@ def test_patient_engine_still_refuses_a_historically_numbered_ar_call():
 @pytest.fixture(scope="module")
 def prostate_profile():
     import os
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.genomics.demo_patients import load_demo_patient
     with contextlib.redirect_stdout(io.StringIO()):
         return load_demo_patient("su2c_prostate")

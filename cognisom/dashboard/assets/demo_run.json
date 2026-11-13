@@ -2,15 +2,18 @@
   "generated_by": "scripts/record_demo_run.py",
   "seed": 7,
   "video": "demo_run.mp4",
-  "video_mb": 0.45,
+  "video_mb": 0.99,
   "fps": 12,
-  "frames": 361,
-  "snapshot_stride": 2,
-  "scenario": "Immunotherapy",
+  "frames": 337,
+  "snapshot_stride": 5,
+  "scenario": "Baseline",
   "tissue": "section",
   "tissue_caption": "Occupancy taken from a measured human prostate section (10x Xenium): glands pack, lumens stay empty. ~5.0 neighbours per cell, which is the honest figure. The default.",
-  "duration_hours": 72.0,
+  "duration_hours": 168.0,
   "dt_hours": 0.05,
+  "clock": "measured",
+  "tumour_fraction": 0.7352941176470589,
+  "reactive_t_fraction": 0.1,
   "patient_headline": "Patient SC_9184_T \u2014 36 missense mutations on 6 HLA class-I alleles",
   "personalised": true,
   "patient_id": "SC_9184_T",
@@ -98,32 +101,32 @@
       "notes": [
         "Enzalutamide is an AGONIST on AR F877L, and that variant is in 10% of the founding cancer cells, not all of them. Those cells are driven at 3.05x the untreated baseline (Balbas 2013 PMID 23580326 (eLife, open access), AR-dependent EGFP reporter: F876L + enzalutamide 1051 vs vehicle 345 = 3.05x baseline, 62% of the DHT maximum (partial agonist)); every other cell has the wild-type receptor and is blocked as the drug class says"
       ],
-      "cancer_end": 48,
-      "immune_kills": 92,
+      "cancer_end": 1108,
+      "immune_kills": 64,
       "psa_start": 28.601,
-      "psa_end": 3.62,
-      "psa_tumour_start": 3432.1,
-      "psa_tumour_low": 674.0,
-      "psa_tumour_low_hour": 29.1,
-      "psa_tumour_end": 2499.0,
+      "psa_end": 10.698,
+      "psa_tumour_start": 42901.5,
+      "psa_tumour_low": 16109.1,
+      "psa_tumour_low_hour": 77.5,
+      "psa_tumour_end": 16159.3,
       "carrier_share_start": 0.1,
-      "carrier_share_end": 0.5833
+      "carrier_share_end": 0.139
     },
     {
       "label": "No drug",
       "drugs": [],
       "recorded": false,
       "notes": [],
-      "cancer_end": 218,
-      "immune_kills": 118,
+      "cancer_end": 1559,
+      "immune_kills": 63,
       "psa_start": 28.601,
-      "psa_end": 28.559,
-      "psa_tumour_start": 3432.1,
-      "psa_tumour_low": 1601.4,
+      "psa_end": 28.584,
+      "psa_tumour_start": 42901.5,
+      "psa_tumour_low": 42352.2,
       "psa_tumour_low_hour": 29.1,
-      "psa_tumour_end": 6232.3,
+      "psa_tumour_end": 44556.8,
       "carrier_share_start": 0.1,
-      "carrier_share_end": 0.1422
+      "carrier_share_end": 0.1013
     },
     {
       "label": "Darolutamide",
@@ -132,16 +135,16 @@
       ],
       "recorded": false,
       "notes": [],
-      "cancer_end": 24,
-      "immune_kills": 90,
+      "cancer_end": 1047,
+      "immune_kills": 61,
       "psa_start": 28.601,
       "psa_end": 2.858,
-      "psa_tumour_start": 3432.1,
-      "psa_tumour_low": 68.6,
-      "psa_tumour_low_hour": 72.0,
-      "psa_tumour_end": 68.6,
+      "psa_tumour_start": 42901.5,
+      "psa_tumour_low": 2994.0,
+      "psa_tumour_low_hour": 168.0,
+      "psa_tumour_end": 2994.0,
       "carrier_share_start": 0.1,
-      "carrier_share_end": 0.125
+      "carrier_share_end": 0.0984
     }
   ],
   "subclone": {
@@ -149,76 +152,39 @@
     "founding_fraction": 0.1
   },
   "presentation": [
-    "Presented on MHC-I: ZNF362_S217L, COL11A1_Y1622C, F13B_T192I, ARID4B_S235C, KCNMA1_G13S, MYO7A_P1053R, POSTN_R554L, TYRO3_R114P, DUOX1_V1392I, ABHD17C_A64T, TRPV1_V191F, SPOP_F133L, LAMA1_E2093D, ELANE_Q194E, ELANE_Q194P, ELANE_Q194H, TLE6_Y58C, VSIG10L_P243H, ZNF845_V45F, HK2_A458T, MRPS9_A339V, SRSF6_E180D, TBC1D5_G50E, EAF2_R233G, SLC25A4_F270V, FBXL17_D606V, PSMC2_P75R, PSMC2_P427L, UBN2_V547I, MSC_V34I, OC90_H62P, IFNA16_A99V, MOSPD2_E479G, AR_F877L \u2014 displayed by 120 of 120 founding cancer cells.",
+    "Presented on MHC-I: ZNF362_S217L, COL11A1_Y1622C, F13B_T192I, ARID4B_S235C, KCNMA1_G13S, MYO7A_P1053R, POSTN_R554L, TYRO3_R114P, DUOX1_V1392I, ABHD17C_A64T, TRPV1_V191F, SPOP_F133L, LAMA1_E2093D, ELANE_Q194E, ELANE_Q194P, ELANE_Q194H, TLE6_Y58C, VSIG10L_P243H, ZNF845_V45F, HK2_A458T, MRPS9_A339V, SRSF6_E180D, TBC1D5_G50E, EAF2_R233G, SLC25A4_F270V, FBXL17_D606V, PSMC2_P75R, PSMC2_P427L, UBN2_V547I, MSC_V34I, OC90_H62P, IFNA16_A99V, MOSPD2_E479G, AR_F877L \u2014 displayed by 1500 of 1500 founding cancer cells.",
     "Not presented \u2014 ENTPD3: no peptide bound.",
     "Not presented \u2014 CDH12: no peptide bound."
   ],
   "cells_start": 2040,
-  "cells_end": 3090,
-  "cancer_start": 120,
-  "cancer_end": 48,
-  "normal_start": 1920,
-  "normal_end": 3042,
-  "immune_end": 120,
-  "immune_kills": 92,
-  "divisions": 1148,
-  "deaths": 98,
-  "metastases": 0,
-  "hypoxic_end": 1,
+  "cells_end": 1657,
+  "cancer_start": 1500,
+  "cancer_end": 1108,
+  "normal_start": 540,
+  "normal_end": 549,
+  "immune_end": 62,
+  "immune_kills": 64,
+  "divisions": 24,
+  "deaths": 393,
+  "metastases": 14,
+  "hypoxic_end": 0,
   "event_kinds": [
     "activation",
     "death",
     "division",
-    "hypoxia",
     "kill",
+    "metastasis",
     "recruitment"
   ],
-  "kill_markers": 92,
-  "duplicate_kill_markers_dropped": 60,
-  "last_kill_hour": 14.65,
-  "last_division_hour": 59.95,
-  "last_death_hour": 65.5,
-  "oxygen_min": 0.0571,
+  "kill_markers": 64,
+  "duplicate_kill_markers_dropped": 12,
+  "last_kill_hour": 162.0,
+  "last_division_hour": 152.8,
+  "last_death_hour": 167.45,
+  "oxygen_min": 0.0708,
   "oxygen_max": 0.21,
   "predictor": "mhcflurry",
   "usd_stage": "demo_run.usdc",
-  "usd_kill_markers": 92,
-  "usd_duplicate_kills_suppressed": 60,
-  "immune_confined_to_box": {
-    "box_um": [
-      [
-        20,
-        20,
-        20
-      ],
-      [
-        180,
-        180,
-        80
-      ]
-    ],
-    "tissue_um": [
-      [
-        0,
-        0,
-        -4
-      ],
-      [
-        260,
-        260,
-        79
-      ]
-    ],
-    "fixed_in": "e215558",
-    "corrected_cancer_end": {
-      "Enzalutamide": 0,
-      "No drug": 0,
-      "Darolutamide": 0
-    },
-    "corrected_cleared_by_hour": {
-      "Enzalutamide": 15,
-      "No drug": 24,
-      "Darolutamide": 15
-    }
-  }
+  "usd_kill_markers": 64,
+  "usd_duplicate_kills_suppressed": 12
 }

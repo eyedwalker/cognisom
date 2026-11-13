@@ -223,7 +223,6 @@ def test_the_recording_script_goes_through_the_cohort_module():
 
 @pytest.fixture(scope="module")
 def subject():
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.sim_request import describe_subject
     from cognisom.genomics.demo_patients import load_demo_patient
     with contextlib.redirect_stdout(io.StringIO()):
@@ -276,7 +275,6 @@ def test_a_profile_built_without_the_cohort_module_carries_no_disclosures():
     the biopsy site. It is also why the recording script must go through
     the cohort module, which the test above asserts.
     """
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.sim_request import describe_subject
     from cognisom.genomics.patient_profile import PatientProfileBuilder
     with contextlib.redirect_stdout(io.StringIO()):

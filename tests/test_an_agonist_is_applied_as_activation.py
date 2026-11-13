@@ -296,7 +296,6 @@ SHIPPED_48H = {
 
 
 def _run(scenario, hours, overrides=None, seed=11):
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(seed)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=hours,

@@ -167,7 +167,6 @@ class _Arms:
         return self._done[drug]
 
     def _run(self, drug):
-        os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
         from cognisom.dashboard.engine_runner import EngineRunner
         from cognisom.genomics.demo_patients import (
             DEFAULT_DEMO_PATIENT, load_demo_patient)

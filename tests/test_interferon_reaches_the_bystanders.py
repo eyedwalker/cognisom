@@ -263,7 +263,6 @@ def test_in_the_shipped_preset_the_t_cell_path_now_reads_the_rise():
     field, 2 without, on this seed (NK 16 vs 20). One seed does not
     establish that the rise raises T-cell killing; what is pinned is that
     the path that reads the rise is live."""
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from collections import Counter
     from cognisom.core.event_bus import EventTypes
     from cognisom.dashboard.engine_runner import EngineRunner
@@ -343,7 +342,6 @@ def test_the_calibration_is_one_number_for_both_consumers():
 
 
 def test_a_run_carries_the_field_to_every_cell():
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     from cognisom.dashboard.engine_runner import EngineRunner
     np.random.seed(7)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline")

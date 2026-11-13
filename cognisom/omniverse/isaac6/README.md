@@ -70,6 +70,21 @@ camera, step the timeline one authored frame at a time, and write PNGs.
 documented way to lose an afternoon. The compose invocation and the ffmpeg
 line are in the header of `docker-compose.capture.yml`.
 
+**And stop the PREVIOUS CAPTURE, which `--rm` does not remove.** The
+capture script finishes, writes its frames and logs `DISTINCT n/m`, and
+then Kit stays up: the container is still `healthy`, so `docker compose
+run --rm` never reaches its cleanup. Measured 2026-11-12 -- a 25-frame
+dry run left a container holding 2.5 GB of GPU memory, and the real
+capture that followed ran at 1.76 frames/s against the dry run's 3.4
+while the two shared the device. Nothing fails; it is just slower, which
+is the kind of thing nobody looks for. Check `docker ps --filter
+name=isaac` before and after, and `docker rm -f` what is left:
+
+```bash
+docker ps --filter name=isaac --format '{{.Names}}|{{.CreatedAt}}'
+nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader
+```
+
 **The capture hashes its own output and logs `DISTINCT n/m`.** This is the
 one thing not to remove. An earlier capture in this project produced a GIF
 that was a single frame repeated, and it was published before anyone

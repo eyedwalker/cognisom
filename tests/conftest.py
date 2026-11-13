@@ -69,6 +69,26 @@ def _mhcflurry_usable() -> bool:
 
 
 def pytest_configure(config):
+    """Decide ONCE, here, whether the fallback is permitted.
+
+    THIS IS THE ONLY PLACE THAT MAY SET COGNISOM_ALLOW_PWM_FALLBACK, and
+    the `return` below is load-bearing: when MHCflurry is usable the
+    variable is deliberately left UNSET, so that a predictor which dies
+    part-way through a run -- out of memory under `-n 4`, a corrupt
+    weights file -- raises instead of quietly scoring the rest of the
+    suite with the approximation.
+
+    Fifteen test files used to call
+    `os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")` inside
+    their own run helpers, eighteen times between them. `setdefault`
+    does not override an existing value, so those calls looked harmless
+    -- but on a machine where MHCflurry WORKS the variable is unset, and
+    they set it, re-permitting the fallback for the whole worker process
+    from the first such test onward. Removed 2026-11-12 after
+    test_a_drug_reaches_the_patient_path failed once in four full-suite
+    runs and passed in isolation under both scorers, with its assertions
+    at comfortable margins (ratio 3.05 against a 2.5 threshold).
+    """
     if _mhcflurry_usable():
         config.stash["cognisom_binding_scorer"] = "mhcflurry"
         return

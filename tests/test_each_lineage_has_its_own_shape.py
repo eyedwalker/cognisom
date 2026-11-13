@@ -604,7 +604,6 @@ def test_the_extent_contains_every_visible_instance_on_every_frame(handmade):
 
 @pytest.fixture(scope="module")
 def ring_run(tmp_path_factory):
-    os.environ.setdefault("COGNISOM_ALLOW_PWM_FALLBACK", "1")
     np.random.seed(3)
     runner = EngineRunner(tissue="ring", dt=0.05, duration=2.0, scenario="Baseline",
                           snapshot_interval_hours=0.1)
