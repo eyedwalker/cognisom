@@ -348,7 +348,16 @@ class SpatialField:
         coeff = diffusion_number / n_sub
 
         if n_sub > self.MAX_SUBSTEPS:
-            self._warn_under_diffused(diffusion_number, n_sub, max_stable)
+            # The WARNING is conditional on the field holding something.
+            # THE CLAMP IS NOT: gating the whole block on that was a bug
+            # for the length of one test run -- an empty capped field
+            # then ran its full uncapped sub-step count, 57,600 of them
+            # per update for oxygen at dt=0.1, and
+            # test_driven_field_warns_once_per_field timed out rather
+            # than failing an assertion. `_cfl_warned` short-circuits
+            # the scan so it costs nothing after the first warning.
+            if not self._cfl_warned and self._carries_signal():
+                self._warn_under_diffused(diffusion_number, n_sub, max_stable)
             n_sub = self.MAX_SUBSTEPS
             # Each sub-step must still satisfy the stability limit --
             # spreading an over-limit coefficient across capped sub-steps
@@ -377,6 +386,17 @@ class SpatialField:
             if self._is_valid_index(idx):
                 self.concentration[idx] = value
 
+    #: Below this peak concentration a field is treated as carrying
+    #: nothing, for the purpose of deciding whether under-diffusing it
+    #: is worth reporting. It is an absolute floor on purpose: the
+    #: question is not "small relative to what it once was" but "is
+    #: there anything here to get wrong".
+    SIGNAL_FLOOR = 1e-9
+
+    def _carries_signal(self) -> bool:
+        """Is there anything in this field worth diffusing correctly?"""
+        return bool(np.any(self.concentration > self.SIGNAL_FLOOR))
+
     def _warn_under_diffused(self, diffusion_number, n_sub, max_stable):
         """Warn ONCE per field that the explicit path is under-diffusing.
 
@@ -385,6 +405,29 @@ class SpatialField:
         condition is a property of (D, dx, dt), which do not change
         between updates, so one record per field says everything the 720
         said.
+
+        AND IT MUST NOT FIRE ON AN EMPTY FIELD, which is what it did.
+        Measured 2026-11-13 on the section preset: the only field that
+        reached this branch was ifn_gamma, and it reached it on an early
+        step BEFORE any immune cell had engaged -- when the field was
+        identically zero. A field with nothing in it cannot be
+        under-diffused in any way that matters, and the warning's own
+        advice ("use an implicit or steady-state solve") was already
+        being followed on every step where the field carried anything:
+        ifn_gamma is undriven only while nothing secretes it, and the
+        moment a cell does, `_steady_state_applies` sends it to the
+        implicit solver.
+
+        That was checked rather than argued. Running the 24 h section
+        preset with the undriven-and-capped case ALSO routed to the
+        steady solve gave an identical result to five significant
+        figures -- same peak and mean field, same mean and max MHC-I,
+        same cancer count, same kills by lineage, and the same 135
+        factorisations -- so the branch this warning fires from changes
+        nothing it is warning about.
+
+        A warning that fires where it does not matter is not free: it
+        teaches the reader to scroll past the ones that do.
         """
         if self._cfl_warned:
             return

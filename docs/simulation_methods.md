@@ -264,9 +264,13 @@ Stated here so they are not discovered as surprises:
 
 1. The simulated vasculature is denser than real tumour vasculature
    (section 5). Three mechanisms are inert because of it.
-2. The IFN-γ field is **under-diffused**: it needs 1,200 explicit
-   sub-steps for stability and the cap is 512, so about 42.7% of its
-   transport is applied. The run logs this itself at the time.
+2. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
+   2026-11-13.** The run logged a warning saying so, but the field is
+   solved implicitly on every step where anything secretes IFN-γ; the
+   warning fired once, on an early step before the first immune
+   engagement, when the field was identically zero. Routing that case
+   to the steady solve too gives an identical run to five significant
+   figures. The warning no longer fires on an empty field.
 3. The demo patient's HLA typing is a population default, not derived
    from their reads. The NK licensing model refuses an unmeasured typing
    on purpose rather than inventing one.
