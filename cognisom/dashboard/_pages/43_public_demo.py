@@ -682,20 +682,26 @@ with st.expander("Reproduce this recording"):
 st.divider()
 st.markdown(
     "### See the rest\n"
-    "This run shows what the model does. What it leaves out matters as "
-    "much: the roadmap lists, layer by layer, what is built, what is "
-    "partial and what is not modelled yet, each built row linked to the "
-    "test that holds it. The cells in both videos are stored in Bio-USD, "
-    "an open format for biological cells in OpenUSD."
+    "This run shows what the model does; it cannot show how. The methods "
+    "page walks through what is computed each step, which of it actually "
+    "changes a result, where every number on the kill path comes from, "
+    "and what is known to be wrong. The roadmap lists, layer by layer, "
+    "what is built, what is partial and what is not modelled yet, each "
+    "built row linked to the test that holds it. The cells in both "
+    "videos are stored in Bio-USD, an open format for biological cells "
+    "in OpenUSD."
 )
-_r1, _r2, _r3 = st.columns(3)
+_r1, _r2, _r3, _r4 = st.columns(4)
 with _r1:
+    st.link_button("How it works, and how far to trust it",
+                   "/?page=methods", use_container_width=True)
+with _r2:
     st.link_button("What it simulates, and what it doesn't yet",
                    "/?page=roadmap", use_container_width=True)
-with _r2:
+with _r3:
     st.link_button("Bio-USD: the standard and its code", "/?page=biousd",
                    use_container_width=True)
-with _r3:
+with _r4:
     st.link_button("Open Cognisom", "/", type="primary",
                    use_container_width=True)
 st.caption(

@@ -37,20 +37,30 @@ than being told the model works.
 
 ## 1. The engine
 
-Nine modules, one clock, one event bus
+Ten modules, one clock, one event bus
 ([`cognisom/core/simulation_engine.py`](../cognisom/core/simulation_engine.py)).
+Nine of them change what a cell does. The tenth is listed with the rest
+because leaving it out is how a module that drives nothing stays
+invisible — the **Drives** column is the one to read first.
 
-| Module | What it computes | Source |
-|---|---|---|
-| `cellular` | Cell population: division, death, state, mutations, inheritance | [`cellular_module.py`](../cognisom/modules/cellular_module.py) |
-| `vascular` | Capillary network; per-cell oxygen and glucose delivery by Krogh geometry | [`vascular_module.py`](../cognisom/modules/vascular_module.py) |
-| `spatial` | Diffusing fields (oxygen, glucose, testosterone, lactate, IFN-γ, chemokine) | [`spatial_module.py`](../cognisom/modules/spatial_module.py) |
-| `immune` | T cell, NK cell and macrophage patrol, recognition, contact and killing | [`immune_module.py`](../cognisom/modules/immune_module.py) |
-| `ar_signaling` | Per-cell androgen receptor ODE → PSA output; drug action | [`ar_signaling_module.py`](../cognisom/modules/ar_signaling_module.py) |
-| `molecular` | Transcription, translation, exosome release | [`molecular_module.py`](../cognisom/modules/molecular_module.py) |
-| `circadian` | Per-cell clock phase, which gates division | [`circadian_module.py`](../cognisom/modules/circadian_module.py) |
-| `lymphatic` | Lymphatic vessels, intravasation, metastasis | [`lymphatic_module.py`](../cognisom/modules/lymphatic_module.py) |
-| `morphogen` | Secreted gradients: who secretes, how it decays, who reads it | [`morphogen_module.py`](../cognisom/modules/morphogen_module.py) |
+| Module | What it computes | Drives | Source |
+|---|---|---|---|
+| `cellular` | Cell population: division, death, state, mutations, inheritance | yes | [`cellular_module.py`](../cognisom/modules/cellular_module.py) |
+| `vascular` | Capillary network; per-cell oxygen and glucose delivery by Krogh geometry | yes | [`vascular_module.py`](../cognisom/modules/vascular_module.py) |
+| `spatial` | Diffusing fields (oxygen, glucose, testosterone, lactate, IFN-γ, chemokine) | yes | [`spatial_module.py`](../cognisom/modules/spatial_module.py) |
+| `immune` | T cell, NK cell and macrophage patrol, recognition, contact and killing | yes | [`immune_module.py`](../cognisom/modules/immune_module.py) |
+| `ar_signaling` | Per-cell androgen receptor ODE → PSA output; drug action | yes | [`ar_signaling_module.py`](../cognisom/modules/ar_signaling_module.py) |
+| `molecular` | Transcription, translation, exosome release | yes | [`molecular_module.py`](../cognisom/modules/molecular_module.py) |
+| `circadian` | Per-cell clock phase, which gates division | yes | [`circadian_module.py`](../cognisom/modules/circadian_module.py) |
+| `lymphatic` | Lymphatic vessels, intravasation, metastasis | yes | [`lymphatic_module.py`](../cognisom/modules/lymphatic_module.py) |
+| `morphogen` | Secreted gradients: who secretes, how it decays, who reads it | yes | [`morphogen_module.py`](../cognisom/modules/morphogen_module.py) |
+| `epigenetic` | Per-cell methylation and histone marks for five genes | **no** | [`epigenetic_module.py`](../cognisom/modules/epigenetic_module.py) |
+
+`cell_mechanics` is registered but **off by default**: its stiffnesses
+have nothing in the parameter library behind them, so enabling it would
+move every cell in every preset on a guess. Four solver back-ends
+(`ode`, `bngl`, `hybrid`, `smoldyn`) are alternative integrators rather
+than biology.
 
 Each step is explicit and ordered: `pre_step` on every module, then
 `update`, then `post_step`, then the event bus drains
@@ -285,6 +295,19 @@ Stated here so they are not discovered as surprises:
    subclone is one contiguous patch.
 9. No fibroblasts or stroma as cells; no nerves; no endocrine axis
    beyond the androgen pathway.
+10. **The epigenetic module computes state that nothing reads.**
+    Measured 2026-11-13: it tracks ~2,000 cells, costs ~2.5% of every
+    engine step and takes ~31,000 random draws per step (~104 million
+    over a week-long run), and
+    [`get_expression_modifier()`](../cognisom/modules/epigenetic_module.py)
+    — the one function by which methylation could reach transcription —
+    has no caller anywhere outside the module that defines it. The
+    "Avg Methylation" and "Silenced Genes" curves on the Simulation
+    page move; no cell's fate depends on them. Lifting this needs a
+    sourced magnitude for how much promoter methylation suppresses
+    expression, not just the wire. Held by
+    `tests/test_the_methods_page_matches_the_engine.py`, which fails
+    the day it acquires a caller.
 
 ---
 

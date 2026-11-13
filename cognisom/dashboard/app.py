@@ -1010,6 +1010,10 @@ if user is None:
                 "The cells: sizes, roles and how each is simulated",
                 "/?page=cells", use_container_width=True,
             )
+            st.link_button(
+                "How it works: every number, and how far to trust it",
+                "/?page=methods", use_container_width=True,
+            )
 
     # ── Hero Metrics Row ──────────────────────────────────────────
     m1, m2, m3, m4, m5, m6 = st.columns(6)

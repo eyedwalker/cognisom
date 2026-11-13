@@ -178,6 +178,7 @@ st.table(
 st.caption(
     "Every value on this page is read from the simulation's own code when "
     "the page loads; none is typed into the page. "
+    "[How it works](/?page=methods) · "
     "[What it simulates, and what it can't yet](/?page=roadmap) · "
     "[Recorded demo](/?page=demo)"
 )

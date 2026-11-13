@@ -85,7 +85,8 @@ with v2:
         st.caption("**The same run, ray-traced** in NVIDIA Isaac Sim from "
                    "the Bio-USD file the run exported.")
 st.markdown("[What am I looking at? The recorded demo, explained "
-            "→](/?page=demo)")
+            "→](/?page=demo) · [How each number is computed, and how far "
+            "to trust it →](/?page=methods)")
 
 st.divider()
 
