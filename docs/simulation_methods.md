@@ -107,11 +107,29 @@ exposure can also fall with distance from the nearest capillary
 ([`engine/py/pharmacology/exposure.py`](../cognisom/engine/py/pharmacology/exposure.py));
 it is uniform by default, for reasons given in that file's docstring.
 
-**Division.** Three gates compose. The cell's own clock must be in its
-permissive window (circadian gating of division, Matsuo 2003,
-PMID 12934012); AR signalling must be above the androgen-dependence
-threshold for an AR-dependent cell; and its division timer must have
-elapsed. Two clocks are available: a compressed one (12 h / 90 h) and
+**Division.** **Two** gates compose, and androgen is not one of them.
+The cell's division timer must have elapsed, and its clock must be in
+the permissive window (circadian gating of division, Matsuo 2003,
+PMID 12934012) — `cell.age >= division_time and
+_division_permitted(cell_id)`
+([`cellular_module.py:1079`](../cognisom/modules/cellular_module.py#L1079)).
+
+AR signalling does not gate division; it **stretches the interval**.
+Below a dead band of `AR_INTACT_ABOVE = 0.95` the division time is
+divided by the signalling fraction, so a cell at half signalling takes
+twice as long and one at 0.05 takes twenty times as long. The coupling
+is deliberately one-sided — above the dead band nothing speeds up —
+which is both the measured biology (Balbas) and why a Baseline run is
+bit-identical to one with the mechanism absent.
+
+Androgen reaches *fate* by a separate route: the AR-dependent subset of
+cancer cells carries a death hazard proportional to the signalling it
+has lost, `androgen_withdrawal_death_per_hour * (1 - s)`, drawn only
+while `s < 0.95` so an intact run's random stream is untouched. That is
+the `androgen_withdrawal` cause in the death table below, and it is
+what kills cells in the treated arm.
+
+Two clocks are available: a compressed one (12 h / 90 h) and
 the measured labelling-index turnover (`clock="measured"`: cancer
 1111 h, normal 8333 h). The *ratio* between normal and cancer, 7.5:1, is
 the measured part (Meyer 1982, PMID 6185700).

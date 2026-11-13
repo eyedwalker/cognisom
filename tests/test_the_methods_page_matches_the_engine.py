@@ -156,6 +156,42 @@ def test_every_limitation_says_what_would_lift_it():
         assert "more work" not in lim.to_lift_it.lower()
 
 
+def test_the_division_example_describes_the_code_that_runs():
+    """The page's headline worked example, held to the engine.
+
+    It first said "division needs three things at once: the clock, AR
+    signalling above the dependence threshold, and the timer". Wrong in
+    form: AR does not gate division at all. It STRETCHES the interval --
+    `division_time /= signalling` below a dead band -- so the gate is
+    two-way (timer and clock) and AR is a multiplier. The page now says
+    that, and this pins the parts a reader could check.
+    """
+    import inspect
+
+    from cognisom.modules import cellular_module as cm
+
+    row = next(m for m in MODULES if m.key == "cellular")
+    assert str(cm.AR_INTACT_ABOVE) in row.worked_example, (
+        f"the dead band is {cm.AR_INTACT_ABOVE} and the page's division "
+        "example does not name it")
+
+    src = inspect.getsource(cm.CellularModule)
+    # The one-sided test, and the division rather than multiplication.
+    assert "signalling < AR_INTACT_ABOVE" in src, (
+        "the AR/division coupling is no longer the one-sided test the "
+        "page describes")
+    assert "division_time = division_time / max(signalling" in src, (
+        "AR no longer stretches the division interval by dividing by "
+        "the signalling fraction, so the page's worked example -- 'a "
+        "cell at half signalling takes twice as long' -- is wrong")
+    # And the gate really is the timer AND the clock, nothing else.
+    assert "cell.age >= division_time and self._division_permitted" in src, (
+        "the division gate changed shape; re-read it and update the "
+        "page's example")
+    gate = inspect.getsource(cm.CellularModule._division_permitted)
+    assert "circadian" in gate and "can_divide" in gate
+
+
 def test_every_module_row_that_changes_a_run_shows_its_work():
     for row in modules_by_wiring(CHANGES):
         assert len(row.worked_example) > 80, (

@@ -90,11 +90,17 @@ MODULES: Tuple[ModuleRow, ...] = (
         "The cell population: division, death, state, mutations, and "
         "what a daughter inherits.",
         "cognisom/modules/cellular_module.py", CHANGES,
-        "Division needs three things at once: the cell's circadian clock "
-        "in its permissive window, androgen-receptor signalling above "
-        "the dependence threshold, and its own division timer elapsed. "
-        "Any one of them can hold a cell back, which is why androgen "
-        "deprivation slows growth here without killing outright.",
+        "Division needs two things at once: the cell's own timer "
+        "elapsed, and its circadian clock in the permissive window. "
+        "Androgen-receptor signalling does not gate it -- it STRETCHES "
+        "the timer. Below a dead band of 0.95 the interval is divided "
+        "by the signalling fraction, so a cell at half signalling takes "
+        "twice as long to divide and one at 0.05 takes twenty times as "
+        "long. The coupling is one-sided on purpose: above the dead "
+        "band nothing speeds up, which is both the measured biology and "
+        "why a Baseline run is unchanged by the mechanism existing. "
+        "That is how androgen deprivation slows growth here without "
+        "killing outright.",
         "Cell cycle is a timer with a gate, not a modelled "
         "G1/S/G2/M with checkpoints."),
     ModuleRow(
