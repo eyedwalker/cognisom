@@ -277,11 +277,42 @@ believability depends on knowing which parts are load-bearing:
   simulated week it does (14 metastases), but both its rates remain
   estimates.
 - Drug penetration cannot limit anything in any shipped preset: no cell
-  sits more than 44.5 µm from a capillary, against the 90–140 µm at which
-  Primeau 2005 found tumour cells seeing no detectable drug. The vessel
-  lattice is built so that no cell is outside a Krogh cylinder, so good
-  perfusion is guaranteed by construction. Same root cause as the inert
-  lactate gate.
+  sits more than 44.5 µm from a capillary across all layouts (~16 µm on
+  the default section), against the 90–140 µm at which Primeau 2005
+  found tumour cells seeing no detectable drug. The vessel lattice is
+  built so that no cell is outside a Krogh cylinder, so good perfusion
+  is guaranteed by construction. Same root cause as the inert lactate
+  gate.
+
+  **This is a default, not a missing capability** (measured
+  2026-11-13). `vascular.section.vessel_pitch` is already honoured. On
+  the section layout, 2,040 cells, five global seeds per pitch:
+
+  | pitch | vessels | worst cell→vessel (5 seeds) | spread |
+  |---|---|---|---|
+  | 22 µm (default) | 35 | 14.8 – 15.8 µm | 1.0 |
+  | 40 µm | 13 | 25.1 – 27.9 µm | 2.8 |
+  | 60 µm | 5 | 45.6 – 47.1 µm | 1.6 |
+  | 120 µm | 3 | 72.1 – 79.9 µm | 7.8 |
+  | 180 µm | 2 | 113.2 – 142.7 µm | **29.6** |
+  | 400 µm | 2 | 104.6 – 165.2 µm | **60.6** |
+
+  At 180 µm the worst cell lands inside Primeau's band. Two cautions.
+  `vessel_jitter` is a **fraction** of the pitch (0.12), so a sparse
+  lattice jitters in absolute terms by as much as the tissue is thick:
+  past ~180 µm the lattice is down to two vessels and which cells
+  starve depends more on the seed than on the pitch, so such a preset
+  must be reported across seeds rather than quoted from one. And the
+  Krogh calibration was anchored at the 22 µm pitch, so a sparse
+  lattice runs it exactly where it was never checked. Being able to
+  *set* poor perfusion is not the same as the model being right there.
+
+  Two claims were made and retracted while measuring this — that the
+  relationship was non-monotonic, and that it plateaued near 120 µm.
+  Both came from comparisons that did not hold the cell layout and the
+  RNG seed fixed. `tests/test_the_vessel_lattice_can_be_made_sparse.py`
+  records both, because each would otherwise have gone onto a public
+  page as a measurement.
 - 73% of one agent-generated set of literature citations failed
   re-retrieval, and only 2 of 34 stored kinetic constants survived
   re-checking against their papers. The library records that.
@@ -298,8 +329,11 @@ tolerance to make a test pass.
 
 Stated here so they are not discovered as surprises:
 
-1. The simulated vasculature is denser than real tumour vasculature
-   (section 5). Three mechanisms are inert because of it.
+1. Every shipped preset is better perfused than a real tumour
+   (section 5). Three mechanisms are nearly inert because of it. The
+   vessel pitch is a run parameter and a sparser lattice does produce
+   hypoxia and poor drug delivery — no shipped preset asks for one, and
+   the Krogh calibration has not been re-measured in that regime.
 2. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
    2026-11-13.** The run logged a warning saying so, but the field is
    solved implicitly on every step where anything secretes IFN-γ; the

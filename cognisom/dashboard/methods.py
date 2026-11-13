@@ -107,9 +107,11 @@ MODULES: Tuple[ModuleRow, ...] = (
         "to its nearest capillary, from a vessel treated as a finite "
         "reservoir rather than an infinite source. The field exists for "
         "the molecules that genuinely are transport-limited.",
-        "The vessel lattice is denser than a real tumour's: no cell in "
-        "any shipped preset sits more than about 45 um from a "
-        "capillary. See the limitations below."),
+        "At the default 22 um vessel pitch no cell is hypoxic and none "
+        "sits more than ~16 um from a capillary, which is better "
+        "perfused than any real tumour. The pitch is a run parameter "
+        "and a sparser lattice does produce hypoxia; no shipped preset "
+        "asks for one. See the limitations below."),
     ModuleRow(
         "spatial", "Diffusing signals",
         "The concentration fields, and which cells can sense them.",
@@ -236,18 +238,26 @@ class Limitation:
 
 LIMITATIONS: Tuple[Limitation, ...] = (
     Limitation(
-        "The simulated vasculature is denser than a real tumour's.",
-        "No cell sits more than about 45 um from a capillary, against "
-        "the 90-140 um at which Primeau 2005 found tumour cells seeing "
-        "no detectable doxorubicin. Three mechanisms are nearly inert "
-        "because of it: drug penetration, the lactate gate, and most "
-        "hypoxia. Measured across every shipped layout, the worst "
-        "exposure any cell sees is about half the vessel concentration, "
-        "and no cell falls below that.",
-        "A sparser vessel lattice. The current pitch is chosen so that "
-        "no cell falls outside a Krogh cylinder, so this is a "
-        "deliberate choice to revisit with its own evidence, not an "
-        "oversight to patch."),
+        "Every shipped preset is better perfused than a real tumour.",
+        "At the default 22 um vessel pitch no cell sits more than about "
+        "16 um from a capillary and none is hypoxic, against the "
+        "90-140 um at which Primeau 2005 found tumour cells seeing no "
+        "detectable doxorubicin. Three mechanisms are therefore nearly "
+        "inert in every preset: drug penetration, the lactate gate, and "
+        "most hypoxia. This is a DEFAULT, not a missing capability -- "
+        "the vessel pitch is already a run parameter, and measured on "
+        "the section layout a 60 um pitch puts the worst cell 46 um "
+        "from a vessel and a 180 um pitch puts it at 113-143 um across "
+        "five seeds, inside Primeau's band.",
+        "Not new code, but two things before trusting such a run. The "
+        "Krogh calibration was anchored at the 22 um pitch, where every "
+        "cell sits inside a Krogh cylinder; a sparse lattice runs it "
+        "exactly where it was never checked. And the vessel jitter is a "
+        "FRACTION of the pitch, so the worst distance varies by 1 um "
+        "across seeds at the default and by 60 um at a 400 um pitch -- "
+        "past about 180 um which cells starve depends more on the seed "
+        "than on the pitch, so a sparse preset has to be reported "
+        "across seeds rather than quoted from one."),
     Limitation(
         "Methylation is computed and read by nothing.",
         "The epigenetic module tracks five genes in every cell and "
