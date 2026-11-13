@@ -372,13 +372,45 @@ def test_the_page_says_which_modules_drive_nothing(rendered):
         assert row.caveat[:40] in text, row.key
 
 
-def test_the_page_states_the_one_external_validation_and_the_null(rendered):
+def test_the_page_states_the_external_validations_and_the_null(rendered):
     text = _all_text(rendered)
     assert "592 TCGA" in text, (
-        "the page must name the one falsifiable test that passed")
+        "the page must name the falsifiable test that passed")
+    assert "493 TCGA" in text, (
+        "the page must name the prostate replication -- the engine models "
+        "prostate, so a reader needs to know the mechanism was tested "
+        "there and not only in colorectal")
     assert "p = 0.55" in text, (
         "the page must name the pre-specified outcome test that was null; "
         "a methods page that reports only its successes is a brochure")
+
+
+def test_the_external_test_runs_the_same_way_on_every_cohort():
+    """The replication is only worth something if nothing was re-tuned.
+
+    Changing the cohort must change the cohort and nothing else: the
+    gene sets, the reference gene and the refutation rule are module
+    constants, and ``run`` takes the study as its only argument. A
+    per-cohort threshold or gene list would turn an out-of-sample test
+    into a search, and the capabilities note claims it is not one.
+    """
+    import inspect
+
+    from cognisom.validation import hypoxia_mhc1_tcga as v
+
+    assert set(v.COHORTS) == {"colorectal", "prostate"}, (
+        f"cohorts are now {sorted(v.COHORTS)}. Every cohort that is run "
+        "must be reported -- update the module docstring and the "
+        "capabilities note, which both say exactly two were run")
+    params = inspect.signature(v.run).parameters
+    assert list(params) == ["study"], (
+        "run() takes something other than the study alone, so a cohort "
+        "could be given its own parameters")
+    src = inspect.getsource(v.run)
+    for cohort in v.COHORTS.values():
+        assert cohort not in src, (
+            f"run() mentions {cohort!r} by name, so it can behave "
+            "differently per cohort")
 
 
 def test_the_page_starts_no_simulation_and_reads_no_patient(rendered):

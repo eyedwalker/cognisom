@@ -228,12 +228,38 @@ runs sharing a seed.
 
 ## 5. What has been tested against something outside the model
 
-**One external test passed.** A pre-specified, falsifiable prediction
-about hypoxia and MHC class I held on 592 TCGA colorectal tumours, using
-the same study, assay and statistic as the source paper
+**One external test passed, in two cohorts.** A pre-specified,
+falsifiable prediction about hypoxia and MHC class I held on 592 TCGA
+colorectal tumours, using the same study, assay and statistic as the
+source paper
 ([`cognisom/validation/hypoxia_mhc1_tcga.py`](../cognisom/validation/hypoxia_mhc1_tcga.py)).
 Four analysis traps on the way each produced a confident wrong answer
 first.
+
+It was then **replicated on 493 TCGA prostate tumours** (2026-11-13) —
+the tissue this engine actually models, which is the first place the
+mechanism should be checked. Nothing was re-tuned: same genes, same
+reference gene, same statistic, same refutation rule, only the cohort
+changed. No MHC-I transcript falls with hypoxia in prostate either
+(HLA-A −0.03, HLA-B +0.11, HLA-C +0.28, B2M +0.27, IFN-γ partialled
+out). Exactly two cohorts have been run and both are reported; adding
+cohorts until one fails would turn a test into a search.
+
+**What the replication does not add.** New tissue and new patients, but
+not a new method — the same ACTB ratio, signature definition and IFN-γ
+partialling are applied, so a methodological artefact would most likely
+survive into it. Two cohorts agreeing says the finding is not specific
+to colorectal; it does not say the analysis is right.
+
+**One thing neither source paper predicts.** In colorectal, TAP1/TAP2
+track hypoxia mostly *through* IFN-γ — TAP1 falls from +0.32 raw to
++0.12 once IFN-γ is partialled out. In prostate they barely move
+(+0.44 → +0.44, +0.50 → +0.49), so the peptide-loading machinery tracks
+hypoxia independently of IFN-γ there. That contradicts Sethumadhavan
+(hypoxia downregulates TAP1/2) more strongly than the colorectal data,
+and is not Estephan's IFN-γ reading either. The engine does not model
+TAP, so nothing in it turns on this; it is recorded rather than dropped
+for being hard to classify.
 
 **One outcome test was null.** The single pre-specified attempt to
 predict patient outcome, on the SU2C prostate cohort, came back **null

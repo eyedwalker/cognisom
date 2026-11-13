@@ -364,7 +364,11 @@ LAYERS: Tuple[Layer, ...] = (
         (
             C("Hypoxia and MHC class I, against human tumours", BUILT,
               "A falsifiable prediction held on 592 TCGA colorectal "
-              "tumours. The only external test passed so far.",
+              "tumours, then replicated out-of-sample on 493 TCGA "
+              "prostate tumours -- the tissue the engine models -- by "
+              "changing the cohort and nothing else. Two cohorts run, "
+              "two reported. Still the only mechanism with an external "
+              "test behind it.",
               ("cognisom/validation/hypoxia_mhc1_tcga.py",)),
             C("Every kill-path number carries its source or an estimate "
               "label", BUILT, "",

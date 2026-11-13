@@ -37,10 +37,51 @@ THE RESULT, with IFN-gamma partialled out: no MHC-I gene is negatively
 correlated with hypoxia. HLA-A, HLA-B, HLA-C and TAP2 sit at zero; B2M,
 TAP1 and PSMB8 remain positive. The prediction survives.
 
+REPLICATED IN PROSTATE, 2026-11-13. The engine models prostate, and the
+mechanism's only passing external test was in colorectal, so the first
+question a reviewer asks is whether it holds in the modelled tissue.
+Same genes, same reference, same statistic, same refutation rule --
+only ``STUDY`` changed, so this is out-of-sample rather than re-tuned.
+TCGA PRAD PanCancer Atlas, 493 tumours. Positive controls pass
+(CA9 +0.279, SLC2A1 +0.756, VEGFA +0.363). Partial correlations:
+
+    HLA-A -0.028 (p 0.53)   HLA-B +0.106   HLA-C +0.279   B2M +0.268
+    TAP1  +0.435            TAP2  +0.494   PSMB8 +0.175   PSMB9 -0.026
+
+The prediction survives in prostate too: nothing reaches the refutation
+threshold, and HLA-A and PSMB9 are the only negatives, both at zero.
+
+ONE REAL DIFFERENCE BETWEEN THE TISSUES, worth more than the pass.
+In colorectal, TAP1's correlation with hypoxia is mostly IFN-gamma:
++0.315 raw collapses to +0.116 once IFN-gamma is partialled out, and
+TAP2 collapses from +0.251 to +0.045. In prostate they barely move --
+TAP1 +0.436 raw to +0.435 partial, TAP2 +0.495 to +0.494 -- so the
+peptide-loading machinery tracks hypoxia INDEPENDENTLY of IFN-gamma
+there. That contradicts Sethumadhavan (hypoxia downregulates TAP1/2)
+more strongly than the colorectal data did, and it is not Estephan's
+reading either, in which they are an IFN-gamma response. Neither paper
+predicts it. The engine does not model TAP at all, so nothing in it
+turns on this; it is recorded because it is the kind of result that
+should not be quietly dropped for being inconvenient to classify.
+
+WHICH COHORTS HAVE BEEN RUN: exactly two, colorectal and prostate, and
+both are reported above. None was run and discarded. ``COHORTS`` is
+extensible, and adding cohorts until one fails would turn a test into
+a search -- so a new one should be added with a reason, the way
+prostate was.
+
 WHAT IT DOES NOT SHOW. mRNA is not protein, and the model's claim is about
 surface protein -- this tests only that the transcript does not fall. Bulk
 expression mixes tumour, stroma and immune cells. And a null is consistent
 with the model rather than confirmation of it.
+
+WHAT THE REPLICATION DOES NOT ADD. It is a new tissue and new patients,
+but not a new method: the same ACTB ratio, the same signature definition
+and the same IFN-gamma partialling are applied. A methodological artefact
+that produced the colorectal result would most likely produce this one
+too. Two cohorts agreeing raises confidence that the finding is not
+specific to colorectal; it does not raise confidence that the analysis
+is right.
 
 A BYPRODUCT WORTH KEEPING. The two source papers disagree about the
 presentation machinery: Sethumadhavan (PMID 29155844) reports hypoxia
@@ -60,7 +101,24 @@ from typing import Dict, List, Sequence, Tuple
 import numpy as np
 
 API = "https://www.cbioportal.org/api"
+
+#: The cohort the prediction was first tested on, and the one the source
+#: paper used. Kept as the default so every existing caller is unchanged.
 STUDY = "coadread_tcga_pan_can_atlas_2018"
+
+#: Other PanCancer Atlas cohorts the SAME pre-specified test can be run
+#: on, by name. Prostate is the one that matters: the engine models
+#: prostate, and the mechanism's only passing external test was in
+#: colorectal, so whether it generalises to the modelled tissue is the
+#: first question a reviewer asks.
+#:
+#: Nothing here is tuned per cohort. Same genes, same reference, same
+#: statistic, same refutation rule -- change the cohort and nothing
+#: else, or it stops being an out-of-sample test.
+COHORTS = {
+    "colorectal": "coadread_tcga_pan_can_atlas_2018",
+    "prostate": "prad_tcga_pan_can_atlas_2018",
+}
 
 #: Canonical HIF-1 targets, each chosen and nameable rather than lifted from
 #: a half-remembered signature. CA9 and SLC2A1 are the two markers the source
@@ -78,7 +136,7 @@ MACHINERY: Tuple[str, ...] = ("TAP1", "TAP2", "PSMB8", "PSMB9")
 REFERENCE = "ACTB"
 
 
-def fetch(genes: Sequence[str]) -> Dict[str, np.ndarray]:
+def fetch(genes: Sequence[str], study: str = STUDY) -> Dict[str, np.ndarray]:
     """Expression for ``genes`` across the study, aligned by sample."""
     import requests
 
@@ -87,10 +145,10 @@ def fetch(genes: Sequence[str]) -> Dict[str, np.ndarray]:
         json=list(genes), timeout=60).json()
     ids = {g["hugoGeneSymbol"]: g["entrezGeneId"] for g in found}
     rows = requests.post(
-        f"{API}/molecular-profiles/{STUDY}_rna_seq_v2_mrna/molecular-data/fetch",
+        f"{API}/molecular-profiles/{study}_rna_seq_v2_mrna/molecular-data/fetch",
         params={"projection": "SUMMARY"},
         json={"entrezGeneIds": list(ids.values()),
-              "sampleListId": f"{STUDY}_rna_seq_v2_mrna"}, timeout=240).json()
+              "sampleListId": f"{study}_rna_seq_v2_mrna"}, timeout=240).json()
 
     back = {v: k for k, v in ids.items()}
     table: Dict[str, Dict[str, float]] = {}
@@ -141,12 +199,12 @@ def partial_spearman(x: np.ndarray, y: np.ndarray,
     return float(out.statistic), float(out.pvalue)
 
 
-def run() -> Dict[str, object]:
+def run(study: str = STUDY) -> Dict[str, object]:
     from scipy.stats import spearmanr
 
     genes = (tuple(HYPOXIA) + tuple(INTERFERON) + tuple(MHC1)
              + tuple(MACHINERY) + (REFERENCE,))
-    expression = fetch(genes)
+    expression = fetch(genes, study)
     n = len(expression[REFERENCE])
 
     hypoxia = signature(expression, HYPOXIA)
@@ -170,6 +228,7 @@ def run() -> Dict[str, object]:
     refuted = [g for g, r in results.items()
                if g in MHC1 and r["partial_rho"] < -0.1 and r["partial_p"] < 0.05]
     return {
+        "study": study,
         "n_tumours": n,
         "hypoxia_vs_interferon": float(spearmanr(hypoxia, interferon).statistic),
         "positive_controls": controls,
@@ -180,7 +239,13 @@ def run() -> Dict[str, object]:
 
 
 if __name__ == "__main__":
-    out = run()
+    import sys
+
+    which = sys.argv[1] if len(sys.argv) > 1 else "colorectal"
+    if which not in COHORTS:
+        raise SystemExit(f"cohort must be one of {sorted(COHORTS)}")
+    out = run(COHORTS[which])
+    print(f"\n  {which.upper()} — {out['study']}")
     print(f"  {out['n_tumours']} tumours")
     print(f"  hypoxia vs IFN-gamma: rho {out['hypoxia_vs_interferon']:+.3f}"
           "   (the confounder this controls for)")
