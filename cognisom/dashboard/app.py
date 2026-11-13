@@ -297,6 +297,9 @@ _PUBLIC_PAGES = {
     "biousd": ("45_biousd.py", "Cognisom | Bio-USD"),
     # Reads the cell models' own parameters; starts no simulation.
     "cells": ("46_cells.py", "Cognisom | The cells"),
+    # Reads the engine's own module, signal and calibration tables;
+    # starts no simulation.
+    "methods": ("47_methods.py", "Cognisom | How it works"),
 }
 
 if _query.get("page") in _PUBLIC_PAGES:
@@ -968,14 +971,22 @@ if user is None:
     # video behind it. The recording is generated from a real run by
     # scripts/record_demo_run.py and served from the repo, so there is
     # no third-party player and nothing to keep in sync by hand.
-    _demo_video = Path(__file__).resolve().parent / "assets" / "demo_run.mp4"
+    _assets_dir = Path(__file__).resolve().parent / "assets"
+    _demo_video = _assets_dir / "demo_run.mp4"
     if _demo_video.exists():
         _v1, _v2, _v3 = st.columns([1, 3, 1])
         with _v2:
             st.video(str(_demo_video))
+            # From the recording's own sidecar, not typed here: this
+            # caption said "Twenty-four simulated hours" for a day after
+            # the demo was re-recorded as a simulated week.
+            from cognisom.dashboard.demo_provenance import (
+                duration_caption as _duration_caption, load_facts as _load_facts_)
+            _dur = _duration_caption(_load_facts_(_assets_dir))
+            _lead = f"{_dur} of" if _dur else "A recorded run of"
             st.markdown(
                 "<div style='text-align:center; font-size:0.85rem; opacity:0.7;'>"
-                "Twenty-four simulated hours of a tumour and its immune "
+                f"{_lead} a tumour and its immune "
                 "infiltrate, computed cell by cell from a real patient "
                 "callset.</div>",
                 unsafe_allow_html=True,

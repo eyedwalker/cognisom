@@ -142,6 +142,51 @@ def videos_are_one_run(facts: Dict[str, Any],
     return bool(recorded == run_fingerprint(facts))
 
 
+def load_facts(assets_dir: Path) -> Optional[Dict[str, Any]]:
+    """The recorded run's sidecar, or None when it is not there."""
+    path = Path(assets_dir) / "demo_run.json"
+    try:
+        return json.loads(path.read_text())
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def duration_caption(facts: Optional[Dict[str, Any]]) -> str:
+    """How long the recorded run covers, in words, from the sidecar.
+
+    Why this is a function and not a sentence in a page
+    ---------------------------------------------------
+    Three public places describe this video: the landing page, the
+    roadmap page and the demo page. Two of them said "Twenty-four
+    simulated hours" for a day after the demo was re-recorded as a
+    simulated WEEK, because the sentence was typed into each page by
+    hand and only the demo page was taught to read the sidecar.
+
+    Nobody noticed, because a wrong duration on a video still looks
+    like a video. So the words come from the recording's own facts, and
+    a run of any length describes itself correctly.
+
+    Returns "" when there is no sidecar, so a caller can leave the
+    claim out entirely rather than guess.
+    """
+    hours = (facts or {}).get("duration_hours")
+    try:
+        hours = float(hours)
+    except (TypeError, ValueError):
+        return ""
+    if hours <= 0:
+        return ""
+    if hours < 48:
+        return f"{hours:g} simulated hours"
+    days = hours / 24.0
+    if abs(days - round(days)) < 0.05:
+        days = int(round(days))
+        if days == 7:
+            return "A simulated week"
+        return f"{days} simulated days"
+    return f"{days:.1f} simulated days"
+
+
 def manifest_for(facts: Dict[str, Any], **extra: Any) -> Dict[str, Any]:
     """The manifest to write beside a freshly rendered RTX video."""
     payload: Dict[str, Any] = {

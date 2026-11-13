@@ -30,6 +30,7 @@ from cognisom.dashboard.capabilities import (
     ABSENT, BUILT, LAYERS, OUTCOME_MODEL_NOTE, PARTIAL, SCALE_NOTE,
     STATUS_MEANING, TARGETS, counts,
 )
+from cognisom.dashboard.demo_provenance import duration_caption, load_facts
 from cognisom.dashboard.page_config import safe_set_page_config
 
 safe_set_page_config(page_title="Cognisom | What it simulates",
@@ -70,7 +71,12 @@ v1, v2 = st.columns(2)
 with v1:
     if _VIDEO.exists():
         st.video(str(_VIDEO))
-        st.caption("**One run, plotted.** Twenty-four simulated hours of a "
+        # From the recording's sidecar, not typed here: this said
+        # "Twenty-four simulated hours" for a day after the demo was
+        # re-recorded as a simulated week.
+        _dur = duration_caption(load_facts(_ASSETS))
+        _lead = f"{_dur} of a" if _dur else "A recorded run of a"
+        st.caption(f"**One run, plotted.** {_lead} "
                    "tumour and its immune infiltrate, with the counts "
                    "beside it.")
 with v2:

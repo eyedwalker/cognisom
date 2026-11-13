@@ -126,3 +126,82 @@ def test_the_page_shows_both_and_says_which_is_which():
     assert "What the model computes" in page, (
         "the recording is not labelled as the computed result")
     assert "ray-traced" in page, "the render is not labelled as a render"
+
+
+# ── no page may type the recording's length by hand ──────────────────
+#
+# FOUND 2026-11-13, live on cognisom.com. The demo was re-recorded as a
+# simulated WEEK on 2026-11-12, and the demo page was taught to read its
+# duration from the sidecar. The landing page and the roadmap page were
+# not: both went on saying "Twenty-four simulated hours" under a video
+# of 168 of them, and nothing failed, because a wrong duration under a
+# video still looks like a video.
+#
+# The sentence now comes from demo_provenance.duration_caption(), and
+# these tests stop it being typed back in.
+
+from cognisom.dashboard.demo_provenance import (          # noqa: E402
+    duration_caption, load_facts,
+)
+
+PAGES = Path(__file__).resolve().parent.parent / "cognisom" / "dashboard"
+_SURFACES = {
+    "app.py (landing)": PAGES / "app.py",
+    "roadmap": PAGES / "_pages" / "44_roadmap.py",
+    "demo": PAGES / "_pages" / "43_public_demo.py",
+}
+
+
+def test_the_caption_describes_the_recording_that_shipped():
+    assert duration_caption(load_facts(ASSETS)) == "A simulated week", (
+        "the shipped recording is no longer a simulated week. That is "
+        "fine -- but re-measure what it IS and update this, rather than "
+        "widening the assertion")
+
+
+def _displayed_strings(path: Path) -> str:
+    """Every string literal in a page, lowercased and joined.
+
+    STRING LITERALS, not the file's text: a comment explaining why the
+    duration must not be typed in necessarily quotes the wrong sentence
+    it replaced, and a test that cannot tell a comment from a caption
+    would forbid writing that comment down.
+    """
+    import ast
+
+    tree = ast.parse(path.read_text())
+    return "\n".join(n.value.lower() for n in ast.walk(tree)
+                     if isinstance(n, ast.Constant)
+                     and isinstance(n.value, str))
+
+
+@pytest.mark.parametrize("name,path", sorted(_SURFACES.items()))
+def test_no_public_surface_hard_codes_a_simulated_duration(name, path):
+    text = _displayed_strings(path)
+    for phrase in ("twenty-four simulated hours", "24 simulated hours",
+                   "twenty-four hours of", "a simulated week of a tumour"):
+        assert phrase not in text, (
+            f"{name} states the recording's length in a string. Read it "
+            "from demo_provenance.duration_caption(facts) instead -- a "
+            "typed duration goes stale the next time the demo is "
+            "re-recorded, and nothing will fail")
+
+
+@pytest.mark.parametrize("hours,expected", [
+    (24.0, "24 simulated hours"),
+    (6.0, "6 simulated hours"),
+    (168.0, "A simulated week"),
+    (72.0, "3 simulated days"),
+    (96.0, "4 simulated days"),
+    (60.0, "2.5 simulated days"),
+])
+def test_a_run_of_any_length_describes_itself(hours, expected):
+    assert duration_caption({"duration_hours": hours}) == expected
+
+
+@pytest.mark.parametrize("facts", [None, {}, {"duration_hours": None},
+                                   {"duration_hours": "soon"},
+                                   {"duration_hours": 0}])
+def test_a_missing_duration_makes_no_claim_at_all(facts):
+    """Better a caption with no length than a caption with a wrong one."""
+    assert duration_caption(facts) == ""
