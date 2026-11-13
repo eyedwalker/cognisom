@@ -354,6 +354,24 @@ def test_the_page_renders_every_module_with_its_code_link(rendered):
         assert f"cognisom/blob/main/{row.source}" in text, row.source
 
 
+def test_every_worked_example_is_visible_on_the_page(rendered):
+    """The page's whole purpose, and it was invisible.
+
+    The worked examples sat inside st.expander. AppTest cannot see
+    st.markdown nested in one -- which is how a production render check
+    found them missing -- and nor can a reader who does not click
+    eleven times. They are open now, and this is what keeps them open.
+    """
+    text = _all_text(rendered)
+    for row in MODULES:
+        if not row.worked_example:
+            continue
+        assert row.worked_example[:60] in text, (
+            f"{row.key}'s worked example does not reach the rendered "
+            "page. If it went back inside an expander, take it out: "
+            "this is the content the page exists to show")
+
+
 def test_the_page_renders_every_limitation_in_full(rendered):
     """Visible, not folded away.
 

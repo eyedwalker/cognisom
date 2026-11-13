@@ -155,16 +155,18 @@ st.markdown("\n".join(lines))
 st.subheader("How each one gets its answer")
 st.caption(
     "The part a reader is most likely to want to check, and what to "
-    "distrust about it. Open a module to see both."
+    "distrust about it. These were behind expanders first. A methods "
+    "page whose method is eleven clicks deep is a methods page nobody "
+    "reads, so they are open."
 )
 for row in MODULES:
-    with st.expander(f"{row.title} — `{row.key}`"):
-        st.markdown(f"**What it computes.** {row.computes}")
-        if row.worked_example:
-            st.markdown(f"**How.** {row.worked_example}")
-        if row.caveat:
-            st.warning(f"**What to distrust.** {row.caveat}")
-        st.markdown(f"Code: {_link(row.source)}")
+    st.markdown(f"#### {row.title} &nbsp;·&nbsp; `{row.key}` "
+                f"&nbsp;{_WIRING_BADGE[row.wiring]}")
+    if row.worked_example:
+        st.markdown(f"**How.** {row.worked_example}")
+    if row.caveat:
+        st.warning(f"**What to distrust.** {row.caveat}")
+    st.caption(f"Code: {_link(row.source)}")
 
 # ── 2. How cells talk to each other ──────────────────────────────────
 
