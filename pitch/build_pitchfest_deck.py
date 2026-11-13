@@ -178,13 +178,15 @@ S.append(slide("4 · Proof on real patient data",
   "HCC1395 is a public tumour&ndash;normal reference pair, which is the point: anyone can re-run this. No patient data of our own is used, and none appears in this deck."))
 
 # 5. External validation, stated precisely
-S.append(slide("5 · The one external test we have run",
-  "A modelled mechanism was tested against human tumour data the model never saw, and the prediction survived. It is a surviving negative prediction, not a confirmation &mdash; and we say so.",
+S.append(slide("5 · The one external test we have run, in two cohorts",
+  "A modelled mechanism was tested against human tumour data the model never saw, and the prediction survived &mdash; then survived again, out-of-sample, in the tissue we actually model. It is a surviving negative prediction, not a confirmation &mdash; and we say so.",
   f'''<div class="cols">
 {card("The test", li([
   "<b>Prediction.</b> Our MHC-I mechanism encodes hypoxia destroying MHC-I <i>protein</i> through the unfolded protein response while HLA mRNA rises. If that is right, a hypoxia signature must <b>not</b> correlate negatively with HLA transcript abundance across human tumours.",
   "<b>Data.</b> 592 TCGA colorectal tumours, cBioPortal, RNA-Seq V2 &mdash; the same study, assay and statistic the source paper used.",
   "<b>Result.</b> With IFN-&gamma; partialled out, no MHC-I gene is negatively correlated with hypoxia. The prediction survives.",
+  "<b>Replicated in prostate.</b> 493 TCGA prostate tumours &mdash; the tissue our engine models. Same genes, same statistic, same refutation rule; only the cohort changed. HLA-A &minus;0.03, HLA-B +0.11, HLA-C +0.28, B2M +0.27. It survives there too.",
+  "<b>Two cohorts run, two reported.</b> None was run and discarded. Adding cohorts until one fails would make this a search rather than a test.",
   "<b>What it is not.</b> mRNA is not surface protein; bulk expression mixes tumour, stroma and immune cells; and a null is consistent with the model rather than proof of it."]))}
 {card("Three traps found while running it", li([
   "GAPDH was used as a negative control. It cannot be one &mdash; it is a glycolytic enzyme and a canonical HIF target &mdash; and it came out at rho +0.41 with the hypoxia score.",
@@ -193,7 +195,7 @@ S.append(slide("5 · The one external test we have run",
   "<b>Each of the three would have produced a confident wrong answer.</b>"]))}
 </div>
 <div class="ask"><b>We report our nulls on the same footing.</b> A separate pre-specified outcome test on a clinical cohort came back null at p = 0.55. It is on the record and has not been retired or re-specified. A platform whose negative results are visible is the only kind whose positive results mean anything.</div>''',
-  "This is the whole of our external validation. One mechanism, one cohort, one surviving negative prediction. Everything else in the system is internally consistent and externally untested &mdash; which is precisely the gap this programme would close."))
+  "This is the whole of our external validation. One mechanism, two cohorts, one surviving negative prediction &mdash; and the replication is a new tissue, not a new method, so an analysis artefact would survive into it. Everything else in the system is internally consistent and externally untested &mdash; which is precisely the gap this programme would close."))
 
 # 6. NVIDIA
 S.append(slide("6 · The NVIDIA stack, and what we contribute back",
