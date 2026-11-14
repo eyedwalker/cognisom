@@ -439,6 +439,59 @@ def test_the_page_states_the_external_validations_and_the_null(rendered):
         "a methods page that reports only its successes is a brochure")
 
 
+def test_the_ar_proliferation_test_is_still_pre_specified():
+    """A pre-specified test is worth something only while it is.
+
+    The AR/proliferation result (rho +0.41 on 493 TCGA prostate
+    tumours) is the engine's second external test and the only one
+    touching its drug arm. Its whole value rests on the prediction, the
+    confounder, the positive control and the refutation rule having
+    been fixed before the data was fetched. These check the structure
+    that makes that claim auditable.
+    """
+    import inspect
+
+    from cognisom.validation import ar_proliferation_tcga as v
+
+    # The refutation rule is a constant, not something derived from the
+    # data at run time.
+    assert v.REFUTE_RHO == -0.1 and v.REFUTE_P == 0.05, (
+        "the refutation rule moved. It was fixed before the data was "
+        "seen; changing it retroactively turns the test into a search")
+    src = inspect.getsource(v.run)
+    assert "REFUTE_RHO" in src and "REFUTE_P" in src, (
+        "run() no longer uses the declared refutation constants")
+
+    # Not circular: AR itself is the positive control and must not be
+    # inside the signature it validates.
+    assert v.AR_GENE not in v.AR_ACTIVITY, (
+        "AR is in its own activity signature, so the positive control "
+        "checks the signature against itself")
+
+    # No gene may sit in two of the three signatures, or the
+    # correlation would be partly a gene against itself.
+    sets = {"ar": set(v.AR_ACTIVITY), "proliferation": set(v.PROLIFERATION),
+            "stroma": set(v.STROMA)}
+    for a, b in (("ar", "proliferation"), ("ar", "stroma"),
+                 ("proliferation", "stroma")):
+        overlap = sets[a] & sets[b]
+        assert not overlap, f"{a} and {b} share {sorted(overlap)}"
+
+    # The confounder is partialled out, not merely mentioned.
+    assert "partial_spearman" in src and "stroma" in src
+
+    # The docstring has to carry the result AND the retraction, because
+    # the pre-specified confounder direction turned out to be wrong.
+    doc = v.__doc__ or ""
+    assert "WAS WRONG" in doc, (
+        "the docstring no longer records that the pre-specified "
+        "confounder direction was wrong; that correction is part of the "
+        "result, not a blemish on it")
+    assert "cannot show" in doc.lower() and "causal" in doc.lower(), (
+        "the docstring must keep saying this is cross-sectional and "
+        "does not establish the causal claim")
+
+
 def test_the_external_test_runs_the_same_way_on_every_cohort():
     """The replication is only worth something if nothing was re-tuned.
 

@@ -370,6 +370,18 @@ LAYERS: Tuple[Layer, ...] = (
               "two reported. Still the only mechanism with an external "
               "test behind it.",
               ("cognisom/validation/hypoxia_mhc1_tcga.py",)),
+            C("Androgen receptor and proliferation, against human "
+              "tumours", BUILT,
+              "The engine's drug arm rests on AR signalling stretching "
+              "the division interval. Pre-specified on 493 TCGA "
+              "prostate tumours: AR activity tracks proliferation at "
+              "rho +0.41 (p = 6e-21) with a stromal signature "
+              "partialled out, 8/8 proliferation genes and 7/7 AR "
+              "targets agreeing. The sign the engine integrates is "
+              "right. Cross-sectional, so it does not establish the "
+              "causal claim -- and the graded association sits awkwardly "
+              "with the model's wide flat zone above 95% signalling.",
+              ("cognisom/validation/ar_proliferation_tcga.py",)),
             C("Every kill-path number carries its source or an estimate "
               "label", BUILT, "",
               ("tests/test_kill_calibration.py",

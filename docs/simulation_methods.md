@@ -279,6 +279,38 @@ and is not Estephan's IFN-γ reading either. The engine does not model
 TAP, so nothing in it turns on this; it is recorded rather than dropped
 for being hard to classify.
 
+**A second mechanism tested, and this one positively.** The engine's
+drug arm rests entirely on AR signalling stretching the division
+interval (section 2), and nothing outside the model had ever been asked
+whether that sign is right. Pre-specified on 493 TCGA prostate tumours
+([`cognisom/validation/ar_proliferation_tcga.py`](../cognisom/validation/ar_proliferation_tcga.py)),
+2026-11-14: AR activity tracks proliferation at **ρ = +0.41,
+p = 6×10⁻²¹**, with a stromal signature partialled out and the AR gene
+itself held out of the signature as a positive control (ρ +0.50). It is
+not one gene — 8/8 proliferation genes and 7/7 AR targets are positive,
+and leave-one-out moves ρ only between +0.355 and +0.452.
+
+Three things are recorded with it rather than smoothed over:
+
+- **The pre-specified confounder direction was wrong.** The design said
+  stromal dilution would manufacture a spurious *positive*. Measured,
+  AR vs stroma is −0.250 and proliferation vs stroma is +0.121, so the
+  confound was *suppressing* the relationship and controlling for it
+  moved ρ **up** (+0.356 → +0.406). The stromal signature is acting
+  partly as a grade proxy, not purely a purity proxy. The control was
+  worth having; the stated reason for it was not the operative one.
+- **It is cross-sectional, so it does not establish the causal claim.**
+  The engine's claim is within a cell — block this receptor, this cell
+  divides slower. A correlation across tumours is a different quantity.
+- **It puts the dead band under tension.** `AR_INTACT_ABOVE = 0.95`
+  gives androgen no effect on division above 95% of eugonadal, a flat
+  zone covering most of the intact range, and it was set there to keep
+  the Baseline run bit-identical. Treatment-naive tumours should mostly
+  sit inside it, yet the association is graded across the normal range.
+  The tension is qualitative — the signature is a z-score and does not
+  map onto the engine's 0–1 fraction — so it says the flat zone is hard
+  to justify, not where it should move to. See limitation 2.
+
 **One outcome test was null.** The single pre-specified attempt to
 predict patient outcome, on the SU2C prostate cohort, came back **null
 at p = 0.55**. It is reported on the capabilities page as `ABSENT`, not
@@ -352,28 +384,37 @@ Stated here so they are not discovered as surprises:
    vessel pitch is a run parameter and a sparser lattice does produce
    hypoxia and poor drug delivery — no shipped preset asks for one, and
    the Krogh calibration has not been re-measured in that regime.
-2. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
+2. **The androgen dead band was chosen for convenience, not measured.**
+   `AR_INTACT_ABOVE = 0.95` was set so the Baseline run stays
+   bit-identical. The one external test of that coupling (section 5)
+   found AR activity and proliferation graded together across the
+   normal range, which is hard to reconcile with a flat zone covering
+   most of it. Lifting it needs a measurement of where the coupling
+   saturates — ideally paired pre/post-deprivation biopsies, which
+   would test the causal claim too. It must not be dialled to fit a
+   correlation: narrowing it moves every pinned division count.
+3. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
    2026-11-13.** The run logged a warning saying so, but the field is
    solved implicitly on every step where anything secretes IFN-γ; the
    warning fired once, on an early step before the first immune
    engagement, when the field was identically zero. Routing that case
    to the steady solve too gives an identical run to five significant
    figures. The warning no longer fires on an empty field.
-3. The demo patient's HLA typing is a population default, not derived
+4. The demo patient's HLA typing is a population default, not derived
    from their reads. The NK licensing model refuses an unmeasured typing
    on purpose rather than inventing one.
-4. The T-cell receptor repertoire is generated, not sequenced.
-5. No CD4 helper T cells and no lymph-node priming: T cells arrive
+5. The T-cell receptor repertoire is generated, not sequenced.
+6. No CD4 helper T cells and no lymph-node priming: T cells arrive
    already able to kill.
-6. The macrophage per-contact rate's *magnitude* is unsourced, though
+7. The macrophage per-contact rate's *magnitude* is unsourced, though
    the gate in front of it is measured.
-7. The share of T cells that recognise the tumour (~10%, Scheper 2019)
+8. The share of T cells that recognise the tumour (~10%, Scheper 2019)
    is from four patients in ovarian and colorectal cancer, not prostate.
-8. Subclones are seeded spread evenly through the tumour; a real
+9. Subclones are seeded spread evenly through the tumour; a real
    subclone is one contiguous patch.
-9. No fibroblasts or stroma as cells; no nerves; no endocrine axis
+10. No fibroblasts or stroma as cells; no nerves; no endocrine axis
    beyond the androgen pathway.
-10. **The epigenetic module computes state that nothing reads.**
+11. **The epigenetic module computes state that nothing reads.**
     Measured 2026-11-13: it tracks ~2,000 cells, costs ~2.5% of every
     engine step and takes ~31,000 random draws per step (~104 million
     over a week-long run), and

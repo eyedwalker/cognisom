@@ -265,6 +265,21 @@ LIMITATIONS: Tuple[Limitation, ...] = (
         "than on the pitch, so a sparse preset has to be reported "
         "across seeds rather than quoted from one."),
     Limitation(
+        "The androgen dead band was chosen for convenience, not "
+        "measured.",
+        "AR_INTACT_ABOVE = 0.95 means androgen signalling has no effect "
+        "on division anywhere above 95% of eugonadal. It was set there "
+        "to keep the Baseline run bit-identical. The one external test "
+        "of this coupling -- 493 TCGA prostate tumours -- found AR "
+        "activity and proliferation graded together at rho +0.41 across "
+        "the normal range, which is hard to reconcile with a flat zone "
+        "covering most of it.",
+        "A measurement of where the coupling actually saturates, "
+        "ideally paired biopsies before and after androgen "
+        "deprivation, which would test the causal claim at the same "
+        "time. Narrowing the band moves every pinned division count in "
+        "the suite, so it must not be dialled to fit a correlation."),
+    Limitation(
         "Methylation is computed and read by nothing.",
         "The epigenetic module tracks five genes in every cell and "
         "plots two curves, and no cell's behaviour depends on either. A "
