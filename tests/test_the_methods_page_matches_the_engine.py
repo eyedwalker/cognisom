@@ -492,6 +492,55 @@ def test_the_ar_proliferation_test_is_still_pre_specified():
         "does not establish the causal claim")
 
 
+def test_the_paired_adt_test_uses_the_same_signatures():
+    """The two AR tests are only comparable while they share gene sets.
+
+    The paired pre/post-ADT test (rho +0.49 on 24 matched pairs) exists
+    to put the cross-sectional result under a within-patient design.
+    That comparison is worth nothing if the signatures drifted, so the
+    paired module must IMPORT them rather than retype them.
+    """
+    import inspect
+
+    from cognisom.validation import ar_proliferation_paired_adt as paired
+    from cognisom.validation import ar_proliferation_tcga as cross
+
+    assert paired.AR_ACTIVITY is cross.AR_ACTIVITY, (
+        "the paired test no longer shares the AR signature object with "
+        "the cross-sectional one, so the two results are not comparable")
+    assert paired.PROLIFERATION is cross.PROLIFERATION
+    assert paired.REFUTE_RHO is cross.REFUTE_RHO
+    assert paired.REFUTE_P is cross.REFUTE_P
+
+    src = inspect.getsource(paired)
+    # The alias trap: it must use the canonical lookup, never xrefs,
+    # and must verify the symbol that comes back.
+    assert "lookup/symbol" in src and "xrefs/symbol" not in paired.ENSEMBL, (
+        "gene resolution must use Ensembl's canonical lookup; xrefs "
+        "returns aliases, where AR matches amphiregulin")
+    assert "display_name" in src, (
+        "resolve_genes no longer checks that Ensembl returned the symbol "
+        "that was asked for -- that check is what stops a silent "
+        "substitution of KLKB1 for KLK3")
+
+    doc = paired.__doc__ or ""
+    assert "CORRECTION" in doc, (
+        "the docstring no longer carries the correction that specimen "
+        "type is not PERFECTLY confounded with timepoint; that was a "
+        "pre-specified claim that turned out wrong and it stays on the "
+        "record")
+    assert "NOT RULED OUT" in doc, (
+        "the docstring must keep saying the specimen confound is argued "
+        "to cancel rather than shown to")
+
+    # The data is fetched, not vendored, like the cBioPortal tests.
+    repo_copy = REPO / "cognisom" / "data" / "GSE111177"
+    assert not repo_copy.exists(), (
+        "the GEO series was vendored into the repository. The other "
+        "external tests fetch live; a committed third-party dataset "
+        "also needs a NOTICE entry for its licence")
+
+
 def test_the_external_test_runs_the_same_way_on_every_cohort():
     """The replication is only worth something if nothing was re-tuned.
 

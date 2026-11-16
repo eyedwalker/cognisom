@@ -382,6 +382,18 @@ LAYERS: Tuple[Layer, ...] = (
               "causal claim -- and the graded association sits awkwardly "
               "with the model's wide flat zone above 95% signalling.",
               ("cognisom/validation/ar_proliferation_tcga.py",)),
+            C("The same coupling, WITHIN patients across androgen "
+              "deprivation", BUILT,
+              "The nearest available thing to the engine's causal "
+              "claim: 24 patient-matched pre/post-ADT pairs (GEO "
+              "GSE111177). ADT suppressed AR targets (mean -1.07, "
+              "p = 1e-05), and patients whose AR activity fell further "
+              "showed a larger fall in proliferation -- rho +0.49, "
+              "p = 0.015, 24/24 positive under leave-one-out. Specimen "
+              "type changes with timepoint in 21 of 24 pairs, so the "
+              "confound is argued to cancel from a correlation of "
+              "deltas rather than demonstrated to.",
+              ("cognisom/validation/ar_proliferation_paired_adt.py",)),
             C("Every kill-path number carries its source or an estimate "
               "label", BUILT, "",
               ("tests/test_kill_calibration.py",

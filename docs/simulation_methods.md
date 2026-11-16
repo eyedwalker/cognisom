@@ -246,10 +246,16 @@ runs sharing a seed.
 
 ## 5. What has been tested against something outside the model
 
-**One external test passed, in two cohorts.** A pre-specified,
-falsifiable prediction about hypoxia and MHC class I held on 592 TCGA
-colorectal tumours, using the same study, assay and statistic as the
-source paper
+**Two mechanisms have external evidence, across four tests.** Counted
+honestly: hypoxia/MHC-I and the AR/division coupling are two
+mechanisms; each has been tested twice, in a different cohort or under
+a different design. Four tests of two mechanisms is not four
+mechanisms, and everything else in the engine remains internally
+consistent and externally untested.
+
+First, a pre-specified, falsifiable prediction about hypoxia and MHC
+class I held on 592 TCGA colorectal tumours, using the same study,
+assay and statistic as the source paper
 ([`cognisom/validation/hypoxia_mhc1_tcga.py`](../cognisom/validation/hypoxia_mhc1_tcga.py)).
 Four analysis traps on the way each produced a confident wrong answer
 first.
@@ -310,6 +316,40 @@ Three things are recorded with it rather than smoothed over:
   The tension is qualitative — the signature is a z-score and does not
   map onto the engine's 0–1 fraction — so it says the flat zone is hard
   to justify, not where it should move to. See limitation 2.
+
+**And the same coupling tested WITHIN patients, across the drug.** The
+cross-sectional result above is a correlation across tumours, which is
+not the engine's claim. The nearest available thing to that claim is
+the same patients before and after androgen deprivation: GEO GSE111177,
+**24 patient-matched pre/post-ADT pairs**
+([`ar_proliferation_paired_adt.py`](../cognisom/validation/ar_proliferation_paired_adt.py)),
+with the gene sets *imported* from the cross-sectional test so the two
+designs stay comparable.
+
+- **Positive control passes.** ADT suppressed AR target genes, mean
+  change **−1.07** (Wilcoxon p = 1×10⁻⁵). AR *itself* rose slightly
+  (+0.12) while its targets fell — the receptor upregulation ADT is
+  known to provoke, and a sign the signature measures pathway output
+  rather than receptor abundance.
+- **The test: ρ = +0.49, p = 0.015, n = 24.** Patients whose AR
+  activity fell further showed a larger fall in proliferation.
+  Leave-one-patient-out gives +0.421 to +0.564, **24/24 positive**.
+- **The mean change in proliferation is null** (+0.05, p = 0.83), and
+  that is what the confound predicts rather than a problem: a specimen
+  shift common to all patients destroys the mean and cancels from a
+  correlation of deltas. The pre-specification said so before the data
+  was read.
+- **The confound is not ruled out.** Specimen type changes with
+  timepoint in 21 of 24 pairs (20 Bx→RP, 1 Bx→TURP); only 3 pairs are
+  TURP→TURP. Within the 21 changed pairs the correlation holds
+  (ρ +0.447, p = 0.042). In the 3 unchanged pairs AR activity *rose*
+  — reported because it is the only confound-free window in the cohort
+  and it does not support the result, though n = 3 carries nothing. A
+  design with the same specimen type at both timepoints would settle it.
+- A pre-specified claim was **wrong** and is on the record: the design
+  said specimen type was *perfectly* confounded with timepoint. It is
+  not — three pairs have no specimen change. Corrected in the module
+  docstring rather than quietly fixed.
 
 **One outcome test was null.** The single pre-specified attempt to
 predict patient outcome, on the SU2C prostate cohort, came back **null
