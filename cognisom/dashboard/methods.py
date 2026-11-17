@@ -265,20 +265,35 @@ LIMITATIONS: Tuple[Limitation, ...] = (
         "than on the pitch, so a sparse preset has to be reported "
         "across seeds rather than quoted from one."),
     Limitation(
-        "The androgen dead band was chosen for convenience, not "
-        "measured.",
-        "AR_INTACT_ABOVE = 0.95 means androgen signalling has no effect "
-        "on division anywhere above 95% of eugonadal. It was set there "
-        "to keep the Baseline run bit-identical. The one external test "
-        "of this coupling -- 493 TCGA prostate tumours -- found AR "
-        "activity and proliferation graded together at rho +0.41 across "
-        "the normal range, which is hard to reconcile with a flat zone "
-        "covering most of it.",
-        "A measurement of where the coupling actually saturates, "
-        "ideally paired biopsies before and after androgen "
-        "deprivation, which would test the causal claim at the same "
-        "time. Narrowing the band moves every pinned division count in "
-        "the suite, so it must not be dialled to fit a correlation."),
+        "Every cell in a treatment arm has the same androgen "
+        "signalling.",
+        "MEASURED, 2026-11-17. AR signalling takes about four discrete "
+        "values, set by treatment and genotype -- 1.00 untreated, 0.50 "
+        "under castration, 0.10 under enzalutamide, and 3.05 in a cell "
+        "carrying the AR F877L that turns that drug into an agonist -- "
+        "and within any one of them the cells agree to about one part "
+        "in ten thousand. In the shipped demo's treated tumour, 1,247 "
+        "ordinary cancer cells span 0.09996 to 0.10000 and 147 carriers "
+        "span 3.04877 to 3.05000, with no cell anywhere in between. The "
+        "external evidence for this coupling (493 TCGA prostate "
+        "tumours, rho +0.41; 24 paired pre/post-ADT biopsies, rho "
+        "+0.49) is a GRADED association across the normal range, and "
+        "the engine has nothing graded across cells to correspond to "
+        "it. A run can tell you what a drug does to a tumour; it cannot "
+        "yet tell you that the cells with more AR drive are the ones "
+        "dividing faster, because they all have the same AR drive.",
+        "Cell-to-cell variation in AR drive -- NOT a different "
+        "threshold. The 0.95 dead band (AR_INTACT_ABOVE) was the "
+        "suspect here, and was swept across 0.80-1.00 over both arms "
+        "and three seeds to find out: under a drug it changes nothing "
+        "whatever, every band returning runs identical to every digit "
+        "of mean PSA, because it falls in the empty gap between the two "
+        "modes above; untreated it moves the mean cancer count by 0.70% "
+        "and divisions by 0.40%, each smaller than changing the seed. "
+        "So the band is not what flattens this coupling. Narrowing it "
+        "would grade nothing -- there is nothing in its range to "
+        "grade -- while moving every pinned division count in the "
+        "suite, so it must not be dialled to fit a correlation."),
     Limitation(
         "Methylation is computed and read by nothing.",
         "The epigenetic module tracks five genes in every cell and "

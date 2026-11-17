@@ -352,6 +352,40 @@ def test_the_same_drug_suppresses_one_receptor_and_drives_the_other(
 
 @pytest.mark.slow
 @pytest.mark.timeout(600)
+def test_the_arm_mean_is_a_fair_summary_of_every_cell_in_it(three_arms):
+    """``_signalling`` averages an arm, and the assertions in this file
+    read that mean as though it described each cell -- most sharply
+    ``_signalling(f877l) >= AR_INTACT_ABOVE``, which is the stated
+    reason an exact equality in cancer counts is "the gate's doing".
+    That reading is sound only while an arm is uniform.
+
+    MEASURED, 2026-11-17: it is, to about one part in ten thousand. All
+    of the engine's AR variation is BETWEEN arms (0.10 blocked, 1.00
+    untreated, 3.05 agonist-driven) and essentially none is between
+    cells -- which is limitation 2 on ``?page=methods``. If the engine
+    ever gains real cell-to-cell variation in AR drive, an arm mean
+    will start hiding cells on the far side of the dead band and these
+    assertions will quietly mean something weaker than they say. This
+    is the test that should fail first when that happens.
+    """
+    for name, runner in zip(("untreated", "wild_type", "f877l"), three_arms):
+        ar = runner.engine.modules["ar_signaling"]
+        sig = np.asarray([ar.signalling_fraction(c) for c in ar.ids],
+                         dtype=float)
+        assert sig.size, f"{name}: no mapped cells, nothing measured"
+        spread = float(sig.max() - sig.min())
+        tolerance = 0.01 * max(1.0, float(np.mean(sig)))
+        assert spread <= tolerance, (
+            f"{name}: AR signalling now spans {spread:.3e} across cells, "
+            f"over the {tolerance:.3e} that lets an arm mean stand in "
+            "for a cell. Re-read every assertion here that treats "
+            "_signalling() as per-cell, and update limitation 2 on "
+            "?page=methods -- real cell-to-cell variation is what that "
+            "limitation asks for, so this failing may be good news.")
+
+
+@pytest.mark.slow
+@pytest.mark.timeout(600)
 def test_psa_rises_on_treatment_which_is_the_clinical_picture(three_arms):
     """The reporter is what the clinic follows, and it goes the wrong way."""
     def psa(runner):

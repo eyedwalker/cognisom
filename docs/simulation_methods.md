@@ -308,14 +308,22 @@ Three things are recorded with it rather than smoothed over:
 - **It is cross-sectional, so it does not establish the causal claim.**
   The engine's claim is within a cell — block this receptor, this cell
   divides slower. A correlation across tumours is a different quantity.
-- **It puts the dead band under tension.** `AR_INTACT_ABOVE = 0.95`
-  gives androgen no effect on division above 95% of eugonadal, a flat
-  zone covering most of the intact range, and it was set there to keep
-  the Baseline run bit-identical. Treatment-naive tumours should mostly
-  sit inside it, yet the association is graded across the normal range.
-  The tension is qualitative — the signature is a z-score and does not
-  map onto the engine's 0–1 fraction — so it says the flat zone is hard
-  to justify, not where it should move to. See limitation 2.
+- **It put the dead band under tension, and measuring the band moved
+  the problem elsewhere.** `AR_INTACT_ABOVE = 0.95` gives androgen no
+  effect on division above 95% of eugonadal, a flat zone covering most
+  of the intact range, and it was set there to keep the Baseline run
+  bit-identical. Treatment-naive tumours should mostly sit inside it,
+  yet the association is graded across the normal range. Sweeping the
+  band across 0.80–1.00, over both arms and three seeds (2026-11-17),
+  showed it is **not** what flattens the coupling: under a drug no band
+  changes anything at all, and untreated the full range moves the mean
+  cancer count by 0.70% and divisions by 0.40%, each smaller than
+  changing the seed. What flattens it is that every cell in an arm has
+  the same AR signalling to about one part in ten thousand, so there is
+  no graded quantity across cells for a graded association to
+  correspond to. The tension is also qualitative — the signature is a
+  z-score and does not map onto the engine's 0–1 fraction. See
+  limitation 2.
 
 **And the same coupling tested WITHIN patients, across the drug.** The
 cross-sectional result above is a correlation across tumours, which is
@@ -424,15 +432,25 @@ Stated here so they are not discovered as surprises:
    vessel pitch is a run parameter and a sparser lattice does produce
    hypoxia and poor drug delivery — no shipped preset asks for one, and
    the Krogh calibration has not been re-measured in that regime.
-2. **The androgen dead band was chosen for convenience, not measured.**
-   `AR_INTACT_ABOVE = 0.95` was set so the Baseline run stays
-   bit-identical. The one external test of that coupling (section 5)
-   found AR activity and proliferation graded together across the
-   normal range, which is hard to reconcile with a flat zone covering
-   most of it. Lifting it needs a measurement of where the coupling
-   saturates — ideally paired pre/post-deprivation biopsies, which
-   would test the causal claim too. It must not be dialled to fit a
-   correlation: narrowing it moves every pinned division count.
+2. **Every cell in a treatment arm has the same androgen signalling.**
+   Measured 2026-11-17: AR signalling takes about four discrete values,
+   set by treatment and genotype — 1.00 untreated, 0.50 under
+   castration, 0.10 under enzalutamide, 3.05 in a cell carrying the AR
+   F877L that turns that drug into an agonist — and within any one of
+   them the cells agree to about one part in ten thousand. In the
+   shipped demo's treated tumour, 1,247 ordinary cancer cells span
+   0.09996–0.10000 and 147 carriers span 3.04877–3.05000, with no cell
+   anywhere in between. The external evidence (section 5) is a *graded*
+   association across the normal range, and the engine has nothing
+   graded across cells to correspond to it. Lifting it needs
+   cell-to-cell variation in AR drive, **not** a different threshold:
+   the 0.95 dead band was the suspect, and sweeping it 0.80–1.00 showed
+   that under a drug it changes nothing whatever — it falls in the
+   empty gap between the two modes — while untreated it moves the mean
+   cancer count by 0.70% and divisions by 0.40%, each smaller than
+   changing the seed. It must not be dialled to fit a correlation:
+   narrowing it would grade nothing, and would move every pinned
+   division count.
 3. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
    2026-11-13.** The run logged a warning saying so, but the field is
    solved implicitly on every step where anything secretes IFN-γ; the
