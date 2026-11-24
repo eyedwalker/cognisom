@@ -198,6 +198,13 @@ def arms():
 
 
 @pytest.mark.slow
+# The FIRST test to request `arms` pays for both of its runs: ~60 s
+# on a laptop, and past the suite's 120 s limit on a nightly runner
+# about twice as slow. It passed five nights running on one commit
+# and timed out on the sixth (2026-11-24), which is a limit set too
+# close to the cost rather than a wrong answer. Same allowance the
+# multi-arm fixtures in test_an_agonist_is_applied_as_activation get.
+@pytest.mark.timeout(600)
 def test_enzalutamide_drives_this_patients_receptor(arms):
     untreated, enza = arms[None], arms["Enzalutamide"]
     assert enza["signalling"] > 2.5 * untreated["signalling"], (
