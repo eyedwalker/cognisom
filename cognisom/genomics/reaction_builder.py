@@ -271,10 +271,14 @@ class ReactionNetworkBuilder:
         system.species_initial = [s.initial_value for s in species_list]
         system._species_index = {s.name: i for i, s in enumerate(species_list)}
 
-        # Parameters — from entity physics_params with fallbacks
+        # Parameters. Every rate that is not read from the entity
+        # library comes from ar_pathway_parameters, which says what
+        # each one rests on and what it implies -- no inline literals.
+        from cognisom.genomics import ar_pathway_parameters as arp
         system.parameters = {
             # AR transcription/translation/degradation
-            "k_ar_tx": ar_pp.get("transcription_rate_mrna_per_hour", 5.0),
+            "k_ar_tx": ar_pp.get("transcription_rate_mrna_per_hour",
+                                 arp.K_AR_TRANSCRIPTION_FALLBACK.value),
             # Via the resolver, not ar_pp["half_life_hours"] directly: the
             # library writes half-lives under several unit-suffixed names
             # and this read saw only one of them. The previous expression
@@ -283,25 +287,25 @@ class ReactionNetworkBuilder:
             # stated fallback never applied.
             "k_ar_m_deg": (degradation_rate_per_hour(ar_pp)
                            if degradation_rate_per_hour(ar_pp) is not None
-                           else 0.5),
-            "k_ar_tl": 20.0,  # translation rate
-            "k_ar_deg": 0.1,  # protein degradation
+                           else arp.K_AR_MRNA_DEGRADATION_FALLBACK.value),
+            "k_ar_tl": arp.K_AR_TRANSLATION.value,
+            "k_ar_deg": arp.K_AR_DEGRADATION.value,
 
             # AR-DHT binding — from entity interacts_with
             "k_bind": _get_binding_rate(ar, "DHT", default_on=100.0),
             "k_unbind": _get_unbinding_rate(ar, "DHT", default_off=10.0),
 
             # DHT dynamics
-            "DHT_input": 1.0,
-            "k_dht_deg": 0.2,
-            "k_complex_deg": 0.05,
+            "DHT_input": arp.DHT_INPUT.value,
+            "k_dht_deg": arp.K_DHT_DEGRADATION.value,
+            "k_complex_deg": arp.K_COMPLEX_DEGRADATION.value,
 
             # PSA dynamics
-            "k_psa_tx": 2.0,
+            "k_psa_tx": arp.K_PSA_TRANSCRIPTION.value,
             "K_psa": AR_ARE_APPARENT_KD_NM,
-            "k_psa_m_deg": 1.0,
-            "k_psa_tl": 30.0,
-            "k_psa_deg": 0.2,
+            "k_psa_m_deg": arp.K_PSA_MRNA_DEGRADATION.value,
+            "k_psa_tl": arp.K_PSA_TRANSLATION.value,
+            "k_psa_deg": arp.K_PSA_DEGRADATION.value,
         }
 
         # Reactions

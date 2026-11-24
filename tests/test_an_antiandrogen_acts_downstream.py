@@ -75,14 +75,23 @@ def test_cutting_the_binding_rate_does_not_reduce_ar_signalling():
 
     base = steady()
     blocked = steady(k_bind=system.parameters["k_bind"] / 100.0)
-    assert blocked["AR_DHT"] == pytest.approx(base["AR_DHT"], rel=2e-3), (
+    # THE CLAIM: a 100-fold affinity cut moves the complex and PSA by
+    # well under 1%, because the complex is supply-bound.
+    complex_shift = abs(blocked["AR_DHT"] / base["AR_DHT"] - 1.0)
+    psa_shift = abs(blocked["PSA"] / base["PSA"] - 1.0)
+    assert complex_shift < 0.01, (
         "a 100-fold affinity cut barely moves the complex: it is supply-bound")
-    # PSA moves 0.1% -- not nothing, because since the Km was sourced the
-    # induction term is no longer saturated, so the sliver of complex the
-    # affinity cut does remove is now visible. 0.1% against a drug that
-    # should abolish signalling is still "inert".
-    assert blocked["PSA"] == pytest.approx(base["PSA"], rel=2e-3)
-    assert abs(blocked["PSA"] / base["PSA"] - 1.0) < 0.01
+    assert psa_shift < 0.01
+    # THE NUMBERS, re-measured 2026-11-24 when k_ar_deg took its sourced
+    # value (Gregory 2001: AR t1/2 3 h, where the old literal implied
+    # 6.9 h). Faster turnover leaves 2.3x less free AR (43,274 -> 18,729
+    # at steady state), so the supply-bound regime is shallower and the
+    # sliver the cut removes grew from 0.10% to 0.24% of the complex and
+    # from 0.09% to 0.22% of PSA. Still inert against a drug that should
+    # abolish signalling. If these move again, the AR excess has changed
+    # -- find out why before touching them.
+    assert complex_shift == pytest.approx(0.00240, abs=0.0004)
+    assert psa_shift == pytest.approx(0.00217, abs=0.0004)
     # and the reason: free DHT rises instead, by the same factor
     assert blocked["DHT"] > 50 * base["DHT"]
 

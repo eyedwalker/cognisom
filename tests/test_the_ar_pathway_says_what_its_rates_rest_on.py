@@ -138,3 +138,38 @@ def test_the_pathway_has_no_undeclared_rate_left():
         f"AR-pathway rates with no provenance anywhere: {undeclared}. "
         "Declare each in ar_pathway_parameters, with what its value "
         "implies biologically, or source it in the entity library.")
+
+
+# ── the one sourced rate, and no literals creeping back ────────────
+
+
+def test_the_ar_half_life_is_the_measured_three_hours():
+    """Gregory 2001 (PMID 11306464), PubMed record read directly:
+    unliganded AR in androgen-dependent LNCaP, t1/2 3 h at 37 C. The
+    literal it replaced implied 6.9 h, which is that paper's figure for
+    lines from RECURRENT tumours."""
+    p = arp.K_AR_DEGRADATION
+    assert p.status == arp.SOURCED
+    assert p.half_life_hours == pytest.approx(3.0, abs=1e-9)
+    assert "11306464" in p.source
+    assert "androgen-DEPENDENT" in p.note, (
+        "the caveat that recurrent lines measure 6-7 h and >12 h has to "
+        "stay with the number, or a castration-resistant run inherits "
+        "a half-life measured in the wrong disease state")
+
+
+def test_the_pathway_builder_carries_no_inline_rate():
+    """One source of truth. A literal typed back into the builder would
+    run while the declaration beside it described something else."""
+    import inspect
+    import re
+    from cognisom.genomics.reaction_builder import ReactionNetworkBuilder
+
+    src = inspect.getsource(ReactionNetworkBuilder.build_ar_signaling)
+    block = src[src.index("system.parameters = {"):src.index("# Reactions")]
+    code = "\n".join(line.split("#", 1)[0] for line in block.splitlines())
+    literals = re.findall(r'"(\w+)":\s*(-?\d+(?:\.\d+)?)\s*,', code)
+    assert not literals, (
+        f"inline numeric rates in build_ar_signaling: {literals}. "
+        "Declare them in ar_pathway_parameters instead.")
+    assert code.count("arp.") >= 11
