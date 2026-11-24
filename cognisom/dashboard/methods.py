@@ -293,7 +293,20 @@ LIMITATIONS: Tuple[Limitation, ...] = (
         "So the band is not what flattens this coupling. Narrowing it "
         "would grade nothing -- there is nothing in its range to "
         "grade -- while moving every pinned division count in the "
-        "suite, so it must not be dialled to fit a correlation."),
+        "suite, so it must not be dialled to fit a correlation. The "
+        "magnitude of the variation that IS needed is now sourced "
+        "(MEASURED, 2026-11-24): across 24 hormone-therapy-naive "
+        "prostate cancers -- 3,147 malignant cells in 9 donors -- AR "
+        "programme activity varies between cancer cells inside a "
+        "single tumour at a coefficient of variation of about 0.46, "
+        "with 4.4x the variance of an expression-matched null gene "
+        "set in 9 of 9 donors, against 1.1x for a housekeeping "
+        "control. Against the engine's present between-cell spread of "
+        "about 0.0003 that is three orders of magnitude. It is an "
+        "UPPER BOUND on the spread of the signalling fraction, since "
+        "it measures the transcriptional readout rather than receptor "
+        "occupancy. See "
+        "cognisom/validation/ar_heterogeneity_singlecell.py."),
     Limitation(
         "Methylation is computed and read by nothing.",
         "The epigenetic module tracks five genes in every cell and "

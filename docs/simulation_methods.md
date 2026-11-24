@@ -450,7 +450,18 @@ Stated here so they are not discovered as surprises:
    cancer count by 0.70% and divisions by 0.40%, each smaller than
    changing the seed. It must not be dialled to fit a correlation:
    narrowing it would grade nothing, and would move every pinned
-   division count.
+   division count. **The magnitude of the variation that is needed is
+   now sourced** (measured 2026-11-24): across 24 hormone-therapy-naive
+   prostate cancers — 3,147 malignant cells in 9 donors — AR programme
+   activity varies between cancer cells inside a single tumour at a
+   coefficient of variation of about 0.46 (σ ≈ 0.34 on a log scale),
+   carrying 4.4× the variance of an expression-matched null gene set in
+   9 of 9 donors against 1.1× for a housekeeping control. Against the
+   engine's present between-cell spread of ~0.0003 that is three orders
+   of magnitude. It is an **upper bound** on the spread of the
+   signalling fraction, because it measures the transcriptional readout
+   rather than receptor occupancy. See
+   `cognisom/validation/ar_heterogeneity_singlecell.py`.
 3. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
    2026-11-13.** The run logged a warning saying so, but the field is
    solved implicitly on every step where anything secretes IFN-γ; the
