@@ -335,7 +335,38 @@ class ARSignalingModule(SimulationModule):
         # androgen-withdrawal hazard only fires below a threshold, so an
         # agonist-driven cell correctly does not die of deprivation.
         ceiling = max(1.0, activity)
-        return float(min(ceiling, max(0.0, active)))
+        suppressed = float(min(ceiling, max(0.0, active)))
+        # Intrinsic per-cell drive, applied LAST so the clamp above
+        # keeps meaning what it meant: the ceiling is about what the
+        # DRUG can do to this receptor, and a cell's own drive is a
+        # separate multiplier on top. 1.0 for every cell unless a run
+        # sets ar_drive_sigma, so this is identity by default.
+        return suppressed * self._drive_of(cell_id)
+
+    def _drive_of(self, cell_id: int) -> float:
+        """This cell's intrinsic AR drive multiplier, or 1.0."""
+        cells = getattr(self.cellular_module, 'cells', None) or {}
+        cell = cells.get(cell_id)
+        return float(getattr(cell, 'ar_drive', 1.0) or 1.0) if cell else 1.0
+
+    def suppression_fraction(self, cell_id: int) -> Optional[float]:
+        """How far TREATMENT has pushed this cell below its own
+        baseline, with intrinsic drive divided out.
+
+        ``signalling_fraction`` answers "how AR-driven is this cell",
+        which is what proliferation should follow. This answers "how
+        much has this cell been deprived", which is what an
+        androgen-withdrawal death hazard should follow. They are the
+        same number until a run gives cells different drives, and then
+        they must not be confused: a cell with intrinsically low drive
+        is not a cell in withdrawal, and keying the hazard on the
+        former would kill cells of deprivation in an untreated tumour.
+        """
+        value = self.signalling_fraction(cell_id)
+        if value is None:
+            return None
+        drive = self._drive_of(cell_id)
+        return value / drive if drive > 0 else value
 
     def activity_of(self, cell_id: int) -> float:
         """What the drug does to THIS cell's AR-driven transcription.

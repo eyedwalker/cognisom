@@ -321,7 +321,11 @@ Three things are recorded with it rather than smoothed over:
   changing the seed. What flattens it is that every cell in an arm has
   the same AR signalling to about one part in ten thousand, so there is
   no graded quantity across cells for a graded association to
-  correspond to. The tension is also qualitative — the signature is a
+  correspond to. That verdict on the band is **conditional on the engine
+  being uniform**: at a drive spread of 0.34, 44% of cells fall below
+  0.95 and the band becomes the knee of a saturating response rather
+  than an empty gap, at which point it would need sourcing on its own.
+  The tension is also qualitative — the signature is a
   z-score and does not map onto the engine's 0–1 fraction. See
   limitation 2.
 
@@ -462,6 +466,31 @@ Stated here so they are not discovered as surprises:
    signalling fraction, because it measures the transcriptional readout
    rather than receptor occupancy. See
    `cognisom/validation/ar_heterogeneity_singlecell.py`.
+
+   **The mechanism now exists, off by default** (`ar_drive_sigma=0`).
+   Each cancer cell can carry an intrinsic AR drive multiplier, assigned
+   deterministically from its id so that no random draw moves a pinned
+   count, and inherited exactly by its daughters. Division reads
+   absolute signalling (drive included); the androgen-withdrawal death
+   hazard reads a separate `suppression_fraction` with drive divided
+   out, because a cell with intrinsically low drive is not a cell in
+   withdrawal. Switched on at the sourced 0.34, a 48 h untreated
+   section run grades the way the external data says it should — mean
+   clone size 5.6 / 11.0 / 15.9 / 15.9 across drive quartiles, Spearman
+   ρ 0.85 over 1,500 clones against a permutation null of 0.00 ± 0.03,
+   with 4 deaths in 18,126 cells, so division and not death is doing
+   it. The flat top quartile is the one-sided gate saturating, which is
+   correct.
+
+   What keeps it off is a **calibration** gap rather than doubt about
+   the magnitude. The gate only ever slows cells, so E[rate] ≤ 1 for any
+   spread and heterogeneity necessarily lowers the population growth
+   rate — to 0.75 of the homogeneous run by 72 h. No constant can
+   correct that: a growing population is a compounding mixture, so
+   scaling every interval by the mean rate also speeds up the 56%
+   already at the cap and overshoots, measured at ×1.05, ×1.20 and
+   ×1.50 at 24, 48 and 72 h. The base division time has to be re-derived
+   against the measured doubling with the spread on.
 3. ~~The IFN-γ field is under-diffused.~~ **Measured and withdrawn
    2026-11-13.** The run logged a warning saying so, but the field is
    solved implicitly on every step where anything secretes IFN-γ; the

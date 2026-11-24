@@ -15,6 +15,7 @@ Features:
 
 import math
 import sys
+from statistics import NormalDist
 sys.path.insert(0, '..')
 
 import numpy as np
@@ -118,6 +119,114 @@ DHT_INTRACRINE_FRACTION = 0.20
 #: run where nothing was withdrawn.
 AR_INTACT_ABOVE = 0.95
 
+#: One instance, reused: constructing a NormalDist per cell is
+#: needless work when every call wants the standard normal.
+_NORMAL = NormalDist()
+
+#: Spread of intrinsic AR drive between cancer cells in ONE tumour, as
+#: the sigma of a lognormal multiplier on AR signalling. SOURCED,
+#: 2026-11-24: 24 hormone-therapy-naive localised prostate cancers
+#: (CELLxGENE 881e0e6b), 3,147 malignant cells in 9 donors. AR
+#: programme activity carried 4.4x the across-cell variance of an
+#: expression-matched null gene set in 9 of 9 donors, against 1.1x for
+#: a housekeeping control. See
+#: cognisom/validation/ar_heterogeneity_singlecell.py, which fetches
+#: the data and re-derives this.
+#:
+#: 0.34 is the sigma of the log-scale estimator. The same data's
+#: LINEAR coefficient of variation is 0.456, and a lognormal with
+#: sigma 0.34 has a CV of 0.350 -- so the real distribution is
+#: heavier-tailed than lognormal and matching the linear CV instead
+#: would want sigma 0.435. The log-scale figure is used because it is
+#: the less outlier-sensitive of the two (one donor sits at CV 1.004),
+#: and the disagreement is the honest uncertainty on this number.
+#:
+#: UPPER BOUND, not a point estimate: the measurement is of the AR
+#: programme's transcriptional readout, while this multiplies receptor
+#: occupancy. The null absorbs gene-specific transcriptional noise --
+#: it is built from equally independent genes -- so what is left is
+#: variance shared coherently across the AR targets, which is the best
+#: available proxy for drive. Shared POST-receptor amplification is
+#: still in it.
+AR_DRIVE_SIGMA_SOURCED = 0.34
+
+
+def ar_drive_from_id(cell_id: int, sigma: float) -> float:
+    """A cell's intrinsic AR drive multiplier, from its id alone.
+
+    DETERMINISTIC, and that is the point: ``ar_dependent`` above is
+    assigned by ``cell_id % 3`` for the same reason, so that adding a
+    per-cell property does not consume the shared RNG stream and shift
+    every later draw in the run. A random draw here would move every
+    pinned count in the suite for reasons unrelated to AR.
+
+    splitmix64 on the id gives a well-spread uniform without numpy, and
+    the normal quantile turns it into a lognormal multiplier with
+    median 1. Returns exactly 1.0 when sigma is 0, so a run with the
+    feature off is bit-identical to one from before it existed.
+    """
+    if sigma <= 0.0:
+        return 1.0
+    x = (int(cell_id) + 0x9E3779B97F4A7C15) & 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+    x ^= x >> 31
+    u = (x >> 11) / float(1 << 53)
+    u = min(max(u, 1e-12), 1.0 - 1e-12)
+    return math.exp(sigma * _NORMAL.inv_cdf(u))
+
+
+def ar_drive_rate_correction(sigma: float,
+                             band: float = AR_INTACT_ABOVE) -> float:
+    """The mean per-cell division-rate multiplier under spread drive.
+
+    DIAGNOSTIC ONLY. It is deliberately NOT applied to the division
+    interval, and the reason is worth keeping because the obvious thing
+    is wrong.
+
+    The coupling is ONE-SIDED -- below the band the interval stretches,
+    above it nothing changes (Balbas 2013; see
+    test_an_agonist_is_applied_as_activation). So spreading cells around
+    1.0 only ever SLOWS them: at sigma 0.34, 44% land below the band and
+    this mean rate falls to 0.890. The population division rate is
+    anchored to ~46 days for adenocarcinoma (Meyer 1982, via
+    MEASURED_DIVISION_HOURS), so scaling every interval by 0.890 looks
+    like the fix.
+
+    MEASURED, 2026-11-24 -- it is not. A growing population is a
+    COMPOUNDING MIXTURE, and its growth rate is not the mean of its
+    cells' rates: the fastest clones take an ever-larger share. Scaling
+    all intervals also speeds up the 56% already at the cap, and those
+    then dominate exponentially. Ring, untreated, cancer count against
+    the homogeneous run:
+
+        horizon   uncorrected   scaled by this factor
+          24 h       0.85             1.05
+          48 h       0.80             1.20
+          72 h       0.75             1.50
+
+    The overshoot GROWS with the horizon, so no constant fixes it. Nor
+    can one exist: E[g] <= 1 for any spread, with equality only when no
+    cell is below the band, so under a one-sided cap any heterogeneity
+    must reduce the population rate. Making the coupling two-sided
+    would fix the arithmetic and contradict Balbas, which is why it is
+    not done.
+
+    What this leaves is a real, stated calibration gap: with the spread
+    on, a 72 h untreated run reaches 0.75 of the homogeneous cancer
+    count, so the base division time needs re-deriving against the
+    measured doubling WITH heterogeneity before the spread is defaulted
+    on. That is why ar_drive_sigma defaults to 0.
+
+    E[g] for g(d) = d below the band and 1 at or above it, with
+    d lognormal(0, sigma). Returns 1.0 at sigma 0.
+    """
+    if sigma <= 0.0:
+        return 1.0
+    a = math.log(band) / sigma
+    return (math.exp(sigma * sigma / 2.0) * _NORMAL.cdf(a - sigma)
+            + (1.0 - _NORMAL.cdf(a)))
+
 #: Division periods on the MEASURED clock, hours: thymidine labelling
 #: index with a ~10 h S phase (Meyer 1982, PMID 6185700; the derivation is
 #: beside division_time_normal in CellularModule.__init__). Normal
@@ -207,6 +316,21 @@ class CellState:
     # draw moves the pinned runs. The split is per tumour in the paper
     # and per cell here: ESTIMATE.
     ar_dependent: bool = False
+
+    # This cell's INTRINSIC AR drive, as a multiplier on its androgen
+    # signalling: receptor abundance, coactivators and chromatin state
+    # rolled into one number. 1.0 is the population median, and 1.0 for
+    # every cell is the old behaviour. Assigned deterministically from
+    # cell_id (see ar_drive_from_id) and inherited clonally, so it is a
+    # property of the lineage rather than a per-step roll.
+    #
+    # It multiplies the DIVISION coupling but deliberately NOT the
+    # androgen-withdrawal death hazard, which keys on treatment-induced
+    # suppression instead (AR module's suppression_fraction). A cell
+    # that always ran at 70% of median drive is not withdrawing from
+    # anything, and keying the hazard on absolute signalling would kill
+    # cells of "androgen withdrawal" in an untreated tumour.
+    ar_drive: float = 1.0
 
     # Sublethal cytotoxic damage from T-cell perforin hits, in hits, as it
     # stood at cytotoxic_damage_at_h (the immune module's clock). It decays
@@ -354,6 +478,22 @@ class CellularModule(SimulationModule):
         # alone -- Page 2006 (PMID 16882745) found benign proliferation and
         # apoptosis unchanged 28 days into castration.
         self.ar_dependent_fraction = float(self.config.get('ar_dependent_fraction', 1.0 / 3.0))
+        # Spread of intrinsic AR drive between cancer cells. DEFAULT 0,
+        # which is the old behaviour exactly: every cell at 1.0, no
+        # correction, bit-identical runs. AR_DRIVE_SIGMA_SOURCED (0.34)
+        # is the measured value, and limitation 2 on ?page=methods is
+        # what asks for it. It is off by default only because turning it
+        # on moves pinned division counts across the suite and that
+        # re-measurement is a separate step -- not because the magnitude
+        # is in doubt.
+        self.ar_drive_sigma = float(self.config.get('ar_drive_sigma', 0.0))
+        # Reported, not applied: the mean per-cell rate multiplier the
+        # spread implies. ar_drive_rate_correction explains why scaling
+        # intervals by it is wrong for a compounding population, and
+        # why the resulting calibration gap is the reason the spread
+        # is off by default.
+        self._ar_drive_rate_correction = ar_drive_rate_correction(
+            self.ar_drive_sigma)
         self.androgen_withdrawal_death_per_hour = float(
             self.config.get('androgen_withdrawal_death_per_hour', 0.01))   # ESTIMATE, /h at full withdrawal
         self.anoxic_death_per_hour = float(
@@ -1001,6 +1141,8 @@ class CellularModule(SimulationModule):
 
         if cell.cell_type == 'cancer' and self.ar_dependent_fraction > 0:
             cell.ar_dependent = (cell_id % max(1, round(1.0 / self.ar_dependent_fraction))) == 0
+        if cell.cell_type == 'cancer' and self.ar_drive_sigma > 0.0:
+            cell.ar_drive = ar_drive_from_id(cell_id, self.ar_drive_sigma)
         self.cells[cell_id] = cell
         return cell_id
 
@@ -1076,6 +1218,9 @@ class CellularModule(SimulationModule):
             signalling = self._ar_signalling(cell_id) if cell.cell_type == 'cancer' else None
             if signalling is not None and signalling < AR_INTACT_ABOVE:
                 division_time = division_time / max(signalling, 0.05)
+            # NO population-rate correction here, and that is a
+            # measured decision rather than an omission -- see
+            # ar_drive_rate_correction for why a constant cannot do it.
             if cell.age >= division_time and self._division_permitted(cell_id):
                 cells_to_divide.append(cell_id)
             
@@ -1090,7 +1235,16 @@ class CellularModule(SimulationModule):
             # intact, so an intact run's random stream is untouched.
             if (cell.cell_type == 'cancer' and cell.ar_dependent
                     and cell_id not in cells_to_die):
-                s = self._ar_signalling(cell_id)
+                # SUPPRESSION, not absolute signalling: how far this
+                # cell has been pushed below its OWN baseline by
+                # treatment, with intrinsic drive divided out. A cell
+                # that always ran at 70% of median drive is not
+                # withdrawing from anything, and keying this on
+                # absolute signalling would invent androgen-withdrawal
+                # deaths in an untreated tumour as soon as drive was
+                # spread. Identical to _ar_signalling while every cell
+                # sits at drive 1.0.
+                s = self._ar_suppression(cell_id)
                 if s is not None and s < AR_INTACT_ABOVE:
                     hazard = self.androgen_withdrawal_death_per_hour * (1.0 - s)
                     if np.random.random() < -np.expm1(-hazard * dt):
@@ -1257,6 +1411,17 @@ class CellularModule(SimulationModule):
         daughter.dht_nM = parent.dht_nM
         daughter.testosterone_nM = parent.testosterone_nM
         daughter.ar_dependent = parent.ar_dependent
+        # ar_drive -- clonal, inherited EXACTLY, and not re-drawn. It
+        # stands for receptor abundance and chromatin state, which a
+        # daughter carries out of mitosis; re-drawing it per cell would
+        # make it per-cell noise instead of a lineage property, and a
+        # clone could then not out-grow another. Drift between
+        # generations is NOT modelled, so a clone's drive is fixed for
+        # the run. One consequence is used deliberately: every cell in
+        # a clone shares its founder's value, so grouping the final
+        # population by ar_drive recovers the founding clones without
+        # any lineage bookkeeping.
+        daughter.ar_drive = parent.ar_drive
         daughter.mutations = parent.mutations.copy()
         daughter.mhc1_expression = parent.mhc1_expression
         # ...and the level it returns to without IFN-gamma, or a daughter
@@ -1859,9 +2024,27 @@ class CellularModule(SimulationModule):
         self.ar_module = ar_module
 
     def _ar_signalling(self, cell_id: int):
+        """ABSOLUTE androgen signalling, intrinsic drive included.
+
+        This is what the division coupling reads: a cell with more AR
+        drive is more AR-driven, which is the graded relationship the
+        TCGA and paired-ADT tests found.
+        """
         ar = self.ar_module
         if ar is None:
             return None
+        return ar.signalling_fraction(cell_id)
+
+    def _ar_suppression(self, cell_id: int):
+        """Treatment-induced suppression only, intrinsic drive divided
+        out. This is what the withdrawal-death hazard reads -- see the
+        comment at the call site for why the two must differ.
+        """
+        ar = self.ar_module
+        if ar is None:
+            return None
+        if hasattr(ar, "suppression_fraction"):
+            return ar.suppression_fraction(cell_id)
         return ar.signalling_fraction(cell_id)
 
     def _division_permitted(self, cell_id: int) -> bool:
