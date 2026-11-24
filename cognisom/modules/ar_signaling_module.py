@@ -51,6 +51,7 @@ import numpy as np
 from cognisom.core.event_bus import EventTypes
 from cognisom.core.module_base import SimulationModule
 from cognisom.engine.py.pharmacology.exposure import (
+    accumulation_fraction,
     exposure_fraction,
     penetration_report,
     scale_activity,
@@ -167,6 +168,20 @@ class ARSignalingModule(SimulationModule):
         # argument and what is NOT known).
         half = self.config.get('drug_half_distance_um', None)
         self.drug_half_distance_um = None if half is None else float(half)
+        # How long the drug takes to reach steady state, in days. None
+        # means "already at steady state at hour 0", which is what every
+        # run did before this existed and is still the default -- the
+        # same convention drug_half_distance_um uses for uniform
+        # penetration. ENZALUTAMIDE_PK['half_life_days'] (5.8, Gibbons
+        # 2015) is the value to pass for a run long enough to care; see
+        # accumulation_fraction for why a week-long run at full effect
+        # overstates the drug.
+        accum = self.config.get('drug_accumulation_half_life_days', None)
+        self.drug_accumulation_half_life_days = (
+            None if accum is None else float(accum))
+        # The module's own clock. Modules are not given one, so the
+        # elapsed hours are accumulated in update().
+        self._elapsed_hours = 0.0
         if (self.drug_half_distance_um is not None
                 and self.drug_half_distance_um <= 0.0):
             raise ValueError(
@@ -223,23 +238,43 @@ class ARSignalingModule(SimulationModule):
         uniform and this module behaves exactly as it did."""
         self.vascular_module = vascular_module
 
+    def accumulated_fraction(self) -> float:
+        """Fraction of steady-state plasma level reached by now.
+
+        1.0 unless the run asked for pharmacokinetics, so this is
+        identity by default. Separate from drug_exposure_of because the
+        two are different quantities -- one is WHEN, the other is
+        WHERE -- and a single number could not report both.
+        """
+        return accumulation_fraction(
+            self._elapsed_hours, self.drug_accumulation_half_life_days)
+
     def drug_exposure_of(self, cell_id: int) -> float:
         """Fraction of the plasma drug level this cell sees, in [0, 1].
 
-        Exactly 1.0 when no half-distance is configured, so every run
-        that does not ask for penetration limits is unchanged. Also 1.0
-        when no vascular module is linked: a run with no vessels at all
-        has no geometry to answer with, and inventing a gradient from
-        nothing would be worse than the uniform assumption it replaces.
+        WHERE times WHEN. The spatial term is the fraction of the
+        perivascular level at this cell's distance from a capillary; the
+        temporal term is the fraction of steady state the plasma level
+        has itself reached. They are independent and multiply: a cell
+        far from a vessel on day 1 sees little of a little.
+
+        Exactly 1.0 when neither is configured, so every run that asks
+        for neither penetration limits nor pharmacokinetics is
+        unchanged. The spatial term alone is 1.0 when no half-distance
+        is given, and also when no vascular module is linked: a run with
+        no vessels has no geometry to answer with, and inventing a
+        gradient from nothing would be worse than the uniform
+        assumption it replaces.
         """
+        in_time = self.accumulated_fraction()
         if self.drug_half_distance_um is None:
-            return 1.0
+            return in_time
         if self.vascular_module is None:
-            return 1.0
+            return in_time
         cells = getattr(self.cellular_module, 'cells', None) or {}
         cell = cells.get(cell_id)
         if cell is None:
-            return 1.0
+            return in_time
         # _serving_capillary, NOT _nearest_capillary: the cached one.
         # The assignment is a fact about geometry and the vascular
         # module already solves it once per cell per position -- its own
@@ -248,7 +283,8 @@ class ARSignalingModule(SimulationModule):
         # per step, so taking the raw loop here would have put that cost
         # back, twice over.
         _cap, distance = self.vascular_module._serving_capillary(cell)
-        return exposure_fraction(distance, self.drug_half_distance_um)
+        return exposure_fraction(
+            distance, self.drug_half_distance_um) * in_time
 
     def dht_input_for(self, dht_nM: float) -> float:
         """The supply rate whose complex bound is this tissue DHT."""
@@ -386,7 +422,14 @@ class ARSignalingModule(SimulationModule):
             if cell is not None and self.variant_label in (
                     getattr(cell, 'mutations', None) or []):
                 activity = float(self.variant_activity)
-        if self.drug_half_distance_um is None:
+        # Either term alone is enough to scale the drug's effect. The
+        # gate used to test the half-distance only, so a run that asked
+        # for pharmacokinetics but not penetration limits would have
+        # computed the accumulation and then never applied it -- the
+        # exact shape of defect this project calls "built but never
+        # connected".
+        if (self.drug_half_distance_um is None
+                and self.drug_accumulation_half_life_days is None):
             return activity
         return scale_activity(activity, self.drug_exposure_of(cell_id))
 
@@ -445,6 +488,11 @@ class ARSignalingModule(SimulationModule):
         return self._sparsity
 
     def update(self, dt: float):
+        # Advanced before the early returns: the drug keeps
+        # accumulating in a step where this module has nothing to
+        # solve, and a clock that stalled would make the ramp depend on
+        # how many cells happened to be mapped.
+        self._elapsed_hours += float(dt)
         if self.rhs is None or self.cellular_module is None:
             return
         dht = self._dht_of_live_cells()

@@ -99,6 +99,46 @@ ENZALUTAMIDE_PK: Dict[str, object] = {
 }
 
 
+def accumulation_fraction(hours: float,
+                          half_life_days: Optional[float]) -> float:
+    """Fraction of STEADY-STATE plasma level reached after ``hours``.
+
+    ``1 - 2**(-t/half_life)``, the standard approach to steady state
+    under repeated dosing, DERIVED from a sourced half-life rather than
+    fitted. Exactly 1.0 when ``half_life_days`` is None, which means
+    "already at steady state" -- the same convention
+    ``half_distance_um=None`` uses for uniform penetration, so a run
+    that does not ask for pharmacokinetics is unchanged to the bit.
+
+    WHY THIS EXISTS. Everything else in this module is spatial: the
+    engine applies a drug as a step at build time and
+    ``exposure_fraction`` varies only with distance. Over a day that is
+    a fair simplification. Over the months of clinical response the
+    engine wants to reach it is not -- ENZALUTAMIDE_PK above gives a
+    5.8-day half-life and steady state by day 28, so a 90-day run
+    beginning at full effect omits a ramp covering a third of itself,
+    and the early PSA decline is the part a clinic watches.
+
+    The two sourced numbers cross-check each other: the curve from a
+    5.8-day half-life reaches 96.5% on day 28, which is independently
+    where Gibbons 2015 says steady state is. A one-week run sits near
+    57%, so treating a week as steady state OVERSTATES early drug
+    effect -- a known-wrong simplification, not a neutral one.
+
+    What this does NOT model: a loading dose, missed doses, the
+    peak-to-trough swing within a dose interval (1.25, small enough
+    that a mean is fair), or washout after stopping.
+    """
+    if half_life_days is None:
+        return 1.0
+    if half_life_days <= 0.0:
+        raise ValueError("a half-life must be positive; None means "
+                         "already at steady state")
+    if hours <= 0.0:
+        return 0.0
+    return 1.0 - 2.0 ** (-(hours / 24.0) / float(half_life_days))
+
+
 @dataclass(frozen=True)
 class DrugPenetration:
     """A drug's tissue penetration, and how far it can be trusted."""

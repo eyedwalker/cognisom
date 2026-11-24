@@ -399,10 +399,30 @@ LIMITATIONS: Tuple[Limitation, ...] = (
         "The longest shipped run is a simulated week. Resistance, "
         "castration escape and radiographic response all play out over "
         "months, so nothing here can be compared to a clinical endpoint "
-        "directly.",
-        "Longer runs, which cost roughly 2.1 seconds per simulated hour "
-        "at 2,000 cells -- or a coarser representation above the cell "
-        "for the slow part."),
+        "directly. And the horizon hides a drug assumption: the engine "
+        "applied treatment as a step at full effect from hour 0, which "
+        "is fair over a day and not over months, because "
+        "enzalutamide's own sourced pharmacokinetics (Gibbons 2015, "
+        "PMID 25917876) give a 5.8-day half-life and steady state only "
+        "by day 28. A simulated WEEK is near 57% of steady-state "
+        "exposure, so the shipped default OVERSTATES early drug "
+        "effect.",
+        "Cost is not the obstacle it was assumed to be: MEASURED "
+        "2026-11-24, a full-module section run on the measured clock "
+        "costs about 7.9 seconds per simulated hour, and because that "
+        "clock divides cancer roughly every 46 days the cell count "
+        "barely grows, so 90 days extrapolates to a few hours of wall "
+        "clock rather than being out of reach. What a long run needs "
+        "instead is the pharmacology to be time-dependent, and that "
+        "part now EXISTS and is off by default: pass "
+        "drug_accumulation_half_life_days (5.8 for enzalutamide) and "
+        "exposure follows 1 - 2^(-t/half-life) instead of starting at "
+        "full effect. The curve is a cross-check rather than an "
+        "assumption -- built from the sourced half-life it reaches "
+        "96.5% on day 28, independently where the same paper puts "
+        "steady state. Still missing for a true months-long run: a "
+        "loading dose, missed doses, washout after stopping, and NK "
+        "and T-cell dynamics over months rather than days."),
 )
 
 
