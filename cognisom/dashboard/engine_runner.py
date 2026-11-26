@@ -434,6 +434,10 @@ class SimulationSnapshot:
     avg_psa: float = 0.0
     psa_total: float = 0.0
     psa_cancer_total: float = 0.0
+    # Serum PSA as a fold change from the run's start: the tumour total
+    # passed through blood clearance (pharmacology.serum_marker). This
+    # is the quantity clinical PSA criteria are defined on.
+    serum_psa_relative: float = 0.0
     # A subclonal mutation (EngineRunner(clonal_fractions=...)): live
     # cancer cells that carry it and that do not. Their ratio moving
     # under a drug IS selection; both stay 0 when no subclone was given.
@@ -1099,6 +1103,8 @@ class EngineRunner:
         snap.avg_psa = state.get("ar_signaling", {}).get("psa_mean", 0.0)
         snap.psa_total = state.get("ar_signaling", {}).get("psa_total", 0.0)
         snap.psa_cancer_total = state.get("ar_signaling", {}).get("psa_cancer_total", 0.0)
+        snap.serum_psa_relative = state.get("ar_signaling", {}).get(
+            "serum_psa_relative_to_start", 0.0)
         snap.avg_glucose = cs.get("avg_glucose", 0)
         if self.clonal_fractions:
             cellular = self.engine.modules.get("cellular")
@@ -1418,6 +1424,7 @@ class EngineRunner:
             "n_cells", "n_cancer", "n_normal",
             "total_divisions", "total_deaths", "total_transformations",
             "avg_oxygen", "avg_glucose", "avg_dht_nM", "avg_psa", "psa_total", "psa_cancer_total",
+            "serum_psa_relative",
             "n_subclone_carriers", "n_subclone_others",
             "n_immune", "n_activated", "n_t_cells", "n_nk_cells", "n_macrophages",
             "total_kills",

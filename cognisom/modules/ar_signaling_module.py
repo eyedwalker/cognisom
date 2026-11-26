@@ -56,6 +56,11 @@ from cognisom.engine.py.pharmacology.exposure import (
     penetration_report,
     scale_activity,
 )
+from cognisom.engine.py.pharmacology.serum_marker import (
+    SERUM_PSA_HALF_LIFE_DAYS,
+    advance_serum,
+    serum_report,
+)
 from cognisom.modules.cellular_module import TISSUE_DHT_REFERENCE_NM
 
 log = logging.getLogger(__name__)
@@ -182,6 +187,19 @@ class ARSignalingModule(SimulationModule):
         # The module's own clock. Modules are not given one, so the
         # elapsed hours are accumulated in update().
         self._elapsed_hours = 0.0
+        # Serum PSA: what a blood test reads, as against what the cells
+        # hold. See pharmacology.serum_marker. It is an OUTPUT only --
+        # nothing in the engine reads it back, so it cannot move a run.
+        # None means no clearance lag (serum tracks the tumour pool).
+        self.serum_psa_half_life_days = self.config.get(
+            'serum_psa_half_life_days', SERUM_PSA_HALF_LIFE_DAYS)
+        if (self.serum_psa_half_life_days is not None
+                and float(self.serum_psa_half_life_days) <= 0.0):
+            raise ValueError(
+                "serum_psa_half_life_days must be positive; None means "
+                "serum PSA tracks the tumour pool with no lag")
+        self.serum_psa: Optional[float] = None
+        self.serum_psa_start: Optional[float] = None
         if (self.drug_half_distance_um is not None
                 and self.drug_half_distance_um <= 0.0):
             raise ValueError(
@@ -495,6 +513,37 @@ class ARSignalingModule(SimulationModule):
         self._elapsed_hours += float(dt)
         if self.rhs is None or self.cellular_module is None:
             return
+        try:
+            self._solve_cells(dt)
+        finally:
+            # After the cells, on every path out of the solve: a step
+            # with no cells left still clears serum PSA, and that decay
+            # after the last cell dies is the half-life a clinic
+            # measures after surgery.
+            self._advance_serum(dt)
+
+    def _cancer_psa_total(self) -> float:
+        """PSA summed over live cancer cells: the serum pool's source."""
+        if not self.ids:
+            return 0.0
+        cells = getattr(self.cellular_module, 'cells', None) or {}
+        cancer = np.array([getattr(cells.get(c), 'cell_type', '') == 'cancer'
+                           for c in self.ids])
+        if not cancer.any():
+            return 0.0
+        return float(self.Y[:, self._i["PSA"]][cancer].sum())
+
+    def _advance_serum(self, dt: float) -> None:
+        source = self._cancer_psa_total()
+        if self.serum_psa is None:
+            # In balance with the tumour that existed before the run.
+            self.serum_psa = source
+            self.serum_psa_start = source
+            return
+        self.serum_psa = advance_serum(
+            self.serum_psa, source, dt, self.serum_psa_half_life_days)
+
+    def _solve_cells(self, dt: float) -> None:
         dht = self._dht_of_live_cells()
         n = len(self.ids)
         if n == 0:
@@ -591,12 +640,22 @@ class ARSignalingModule(SimulationModule):
             # too and a tumour's share is the number a clinic follows.
             psa = self.Y[:, self._i["PSA"]]
             state['psa_total'] = float(psa.sum())
-            cells = getattr(self.cellular_module, 'cells', None) or {}
-            cancer = np.array([getattr(cells.get(c), 'cell_type', '') == 'cancer' for c in self.ids])
-            state['psa_cancer_total'] = float(psa[cancer].sum()) if cancer.any() else 0.0
+            state['psa_cancer_total'] = self._cancer_psa_total()
             state['psa_max'] = float(self.Y[:, self._i["PSA"]].max())
             state['psa_relative_to_eugonadal'] = (
                 state['psa_mean'] / state['eugonadal_psa'] if state['eugonadal_psa'] else 0.0)
         else:
             state.update(psa_mean=0.0, ar_dht_mean=0.0, ar_mean=0.0, psa_total=0.0, psa_cancer_total=0.0)
+        # Serum PSA: the quantity a clinic follows. Before the first
+        # step the pool is in balance with the tumour, so it reads as
+        # the tumour total and the ratio as 1.
+        serum = (self.serum_psa if self.serum_psa is not None
+                 else state['psa_cancer_total'])
+        start = (self.serum_psa_start if self.serum_psa_start is not None
+                 else state['psa_cancer_total'])
+        state['serum_psa'] = float(serum)
+        state['serum_psa_relative_to_start'] = (
+            float(serum / start) if start else 0.0)
+        state['serum_psa_half_life_days'] = self.serum_psa_half_life_days
+        state['serum_psa_source'] = serum_report()
         return state
