@@ -148,6 +148,13 @@ class KillOutcome:
     #: rather than as a separate additive term, so this is the only place
     #: its effect is visible in the decomposition.
     effective_costimulation: float = 0.0
+    #: Share of the target's MHC-I carrying THIS peptide, from its
+    #: predicted binding affinity. 1.0 means "not modelled", which is
+    #: the default and what every caller got before occupancy existed.
+    #: Kept separate from `mhc_level` so the decomposition does not
+    #: conflate how much class I the cell has with how much of it holds
+    #: one peptide. See mhc_loading.occupancy_from_ic50.
+    peptide_occupancy: float = 1.0
 
 
 def kill_probability(
@@ -159,13 +166,20 @@ def kill_probability(
     hill_slope: float = DEFAULT_HILL_SLOPE,
     is_exhausted: bool = False,
     exhaustion_multiplier: float = 0.1,
+    peptide_occupancy: float = 1.0,
 ) -> float:
     """Probability that this TCR-pMHC encounter results in cell death.
 
     All inputs are clamped to [0, 1]. The combined signal is
 
         c_eff  = min(1, costimulation * (1 + PD1_CD28_RELIEF * block))  [precursor only]
-        signal = affinity * mhc_level * c_eff
+        signal = affinity * mhc_level * c_eff * peptide_occupancy
+
+    ``peptide_occupancy`` is the share of the target's class I carrying
+    this particular peptide, from its predicted binding affinity. It
+    defaults to 1.0, which is "not modelled" and reproduces every result
+    from before it existed. See mhc_loading.occupancy_from_ic50 for the
+    model and its provenance.
 
     Checkpoint rescue is GATED on the engaging T cell being a PD-1-lo
     precursor; exhausted PD-1-hi clones are not rescuable by ICB
@@ -198,7 +212,8 @@ def kill_probability(
     b = _clamp01(checkpoint_block)
     mult = _clamp01(exhaustion_multiplier)
 
-    signal, _ = _combined_signal(a, m, c, b, is_exhausted)
+    signal, _ = _combined_signal(a, m, c, b, is_exhausted,
+                                 occupancy=peptide_occupancy)
 
     if signal <= 0:
         return 0.0
@@ -221,6 +236,7 @@ def kill_outcome(
     hill_slope: float = DEFAULT_HILL_SLOPE,
     is_exhausted: bool = False,
     exhaustion_multiplier: float = 0.1,
+    peptide_occupancy: float = 1.0,
 ) -> KillOutcome:
     """Same as ``kill_probability`` but returns the full decomposition."""
     a = _clamp01(affinity)
@@ -228,13 +244,15 @@ def kill_outcome(
     c = _clamp01(costimulation)
     b = _clamp01(checkpoint_block)
     mult = _clamp01(exhaustion_multiplier)
-    signal, c_eff = _combined_signal(a, m, c, b, is_exhausted)
+    occ = _clamp01(peptide_occupancy)
+    signal, c_eff = _combined_signal(a, m, c, b, is_exhausted, occupancy=occ)
     p = kill_probability(
         a, m, c, b,
         hill_threshold=hill_threshold,
         hill_slope=hill_slope,
         is_exhausted=is_exhausted,
         exhaustion_multiplier=exhaustion_multiplier,
+        peptide_occupancy=occ,
     )
     return KillOutcome(
         affinity=a,
@@ -246,6 +264,7 @@ def kill_outcome(
         is_exhausted=is_exhausted,
         exhaustion_multiplier=mult,
         effective_costimulation=c_eff,
+        peptide_occupancy=occ,
     )
 
 
@@ -260,6 +279,7 @@ def _combined_signal(
     b: float,
     is_exhausted: bool,
     relief: float = PD1_CD28_RELIEF,
+    occupancy: float = 1.0,
 ) -> tuple:
     """(signal fed to the Hill curve, effective costimulation).
 
@@ -275,7 +295,14 @@ def _combined_signal(
         c_eff = c
     else:
         c_eff = min(1.0, c * (1.0 + max(0.0, relief) * b))
-    signal = max(0.0, min(1.0, a * m * c_eff))
+    # Occupancy multiplies here rather than scaling the affinity: the
+    # affinity also decides recognition, and grading it would turn a
+    # weakly presented peptide into an invisible one at the threshold.
+    # It multiplies rather than adds for the same reason checkpoint
+    # relief does -- it cannot manufacture a kill where there is nothing
+    # presented, and an occupancy of 0 gives signal 0 at any affinity.
+    occ = _clamp01(occupancy)
+    signal = max(0.0, min(1.0, a * m * c_eff * occ))
     return signal, c_eff
 
 

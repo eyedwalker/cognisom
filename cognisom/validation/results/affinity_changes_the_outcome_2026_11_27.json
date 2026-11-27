@@ -1,0 +1,252 @@
+{
+  "experiment": "does predicted binding affinity change the outcome of targeting a peptide, with cell coverage held constant",
+  "recorded": "2026-11-27",
+  "config": {
+    "tissue": "ring",
+    "hours": 24,
+    "dt": 0.05,
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "patient": "SU2C SC_9184_T (su2c_prostate)",
+    "modules_on": [
+      "cellular",
+      "spatial",
+      "vascular",
+      "ar_signaling",
+      "immune",
+      "molecular"
+    ],
+    "tcr_specificity": "cognate",
+    "tcell_tumour_reactive_fraction": 1.0,
+    "subclone": "none -- every cancer cell displays every peptide",
+    "tight": {
+      "peptide": "YLVSCKITV",
+      "gene": "FBXL17",
+      "ic50_nm": 12.1,
+      "occupancy": 1.0
+    },
+    "loose": {
+      "peptide": "MLENYRNLF",
+      "gene": "ZNF845",
+      "ic50_nm": 480.3,
+      "occupancy": 0.189
+    }
+  },
+  "arms": {
+    "none": [
+      {
+        "seed": 1,
+        "cancer": 4,
+        "kills": 16,
+        "divisions": 28,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 2,
+        "cancer": 23,
+        "kills": 9,
+        "divisions": 40,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 3,
+        "cancer": 14,
+        "kills": 13,
+        "divisions": 35,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 4,
+        "cancer": 9,
+        "kills": 15,
+        "divisions": 32,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 5,
+        "cancer": 9,
+        "kills": 13,
+        "divisions": 30,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      }
+    ],
+    "tight_on": [
+      {
+        "seed": 1,
+        "cancer": 0,
+        "kills": 15,
+        "divisions": 23,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 2,
+        "cancer": 1,
+        "kills": 16,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 3,
+        "cancer": 0,
+        "kills": 14,
+        "divisions": 22,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 4,
+        "cancer": 0,
+        "kills": 17,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 5,
+        "cancer": 0,
+        "kills": 19,
+        "divisions": 27,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      }
+    ],
+    "loose_on": [
+      {
+        "seed": 1,
+        "cancer": 1,
+        "kills": 17,
+        "divisions": 26,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 2,
+        "cancer": 10,
+        "kills": 14,
+        "divisions": 32,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 3,
+        "cancer": 7,
+        "kills": 14,
+        "divisions": 29,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 4,
+        "cancer": 2,
+        "kills": 20,
+        "divisions": 30,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 5,
+        "cancer": 10,
+        "kills": 16,
+        "divisions": 34,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      }
+    ],
+    "tight_off": [
+      {
+        "seed": 1,
+        "cancer": 0,
+        "kills": 15,
+        "divisions": 23,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 2,
+        "cancer": 1,
+        "kills": 16,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 3,
+        "cancer": 0,
+        "kills": 14,
+        "divisions": 22,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 4,
+        "cancer": 0,
+        "kills": 17,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 5,
+        "cancer": 0,
+        "kills": 19,
+        "divisions": 27,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      }
+    ],
+    "loose_off": [
+      {
+        "seed": 1,
+        "cancer": 0,
+        "kills": 15,
+        "divisions": 23,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 2,
+        "cancer": 1,
+        "kills": 16,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 3,
+        "cancer": 0,
+        "kills": 14,
+        "divisions": 22,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 4,
+        "cancer": 0,
+        "kills": 17,
+        "divisions": 25,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      },
+      {
+        "seed": 5,
+        "cancer": 0,
+        "kills": 19,
+        "divisions": 27,
+        "coverage_tight": 10,
+        "coverage_loose": 10
+      }
+    ]
+  }
+}

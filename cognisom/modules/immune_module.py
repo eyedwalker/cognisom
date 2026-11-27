@@ -37,7 +37,10 @@ from dataclasses import dataclass, field
 
 from cognisom.core.module_base import SimulationModule
 from cognisom.core.event_bus import EventTypes
-from cognisom.engine.py.immune.mhc_loading import MHCPresentation
+from cognisom.engine.py.immune.mhc_loading import (
+    MHCPresentation,
+    occupancy_from_ic50,
+)
 from cognisom.engine.py.immune.tcr_repertoire import (
     EXHAUSTION_ONSET_HOURS,
     SPECIFICITY_COGNATE,
@@ -720,6 +723,22 @@ class ImmuneModule(SimulationModule):
         # one target distinguishable from another.
         self.tcr_specificity = str(
             self.config.get('tcr_specificity', SPECIFICITY_HASH))
+        # Whether a peptide's predicted binding affinity scales how much
+        # of the target's class I carries it, and so how strong the kill
+        # signal is. See mhc_loading.occupancy_from_ic50.
+        #
+        # OFF BY DEFAULT, and the reason is a measurement rather than
+        # caution: in a ring run on the demo patient, 976 of the 1048
+        # displayed peptide-MHC pairs (93.1%) are weak binders by the
+        # loader's own 50 nM cut, median IC50 168.7 nM, median occupancy
+        # 0.457. So turning this on changes the kill probability for
+        # almost every displayed peptide and re-baselines the kill
+        # counts of every shipped preset. That is a correction -- the
+        # engine has been treating weak binders as strong -- but it is
+        # not one to make silently inside a release, so it is a flag
+        # and the default path stays bit-identical.
+        self.peptide_occupancy_enabled = bool(
+            self.config.get('peptide_occupancy', False))
         # The peptides this patient's T cells are specific for, by
         # sequence. Only used under 'cognate'; a run that names none
         # recognises nothing, which is the honest reading of a
@@ -2206,6 +2225,17 @@ class ImmuneModule(SimulationModule):
                 # LIVE from the repertoire rather than from the cached
                 # TCRMatch -- see _live_is_exhausted for why.
                 is_exhausted=self._live_is_exhausted(match),
+                # How much of this cell's class I carries the peptide
+                # this clone is specific for, from its predicted
+                # affinity. Without it a cognate pair killed the same
+                # whether the peptide bound at 12 nM or 12,000, so
+                # predicted binding contributed nothing to the outcome
+                # of choosing a target. 1.0 when the presentation
+                # carries no IC50, which is the pre-existing behaviour.
+                peptide_occupancy=(
+                    occupancy_from_ic50(
+                        getattr(match.presentation, 'ic50_nm', None))
+                    if self.peptide_occupancy_enabled else 1.0),
             )
             # Sympathetic suppression (Upgrade 7): β2AR drive scales
             # T-cell function down; β-blocker rescues. Composes with

@@ -218,6 +218,115 @@ class MHCLoader:
 # Helpers
 # ---------------------------------------------------------------------------
 
+# ─── how much of a cell's MHC-I carries ONE peptide ──────────────────
+#
+# WHY THIS EXISTS. The T-cell kill signal is
+# ``affinity * mhc_level * costimulation`` through a Hill curve with
+# EC50 0.3 and slope 4. Under cognate specificity the affinity is a
+# fixed value for an assigned pair, so before this, a T cell targeting a
+# peptide that binds at 12 nM and one targeting a peptide that barely
+# binds at 12,000 nM killed identically. Predicted binding contributed
+# nothing to a simulated target ranking.
+#
+# WHY NOT GRADE THE AFFINITY. Measured 2026-11-27: above the 0.7
+# recognition threshold the Hill curve is saturated -- affinity 0.70
+# gives kill probability 0.967 and 0.95 gives 0.990 -- so grading inside
+# the recognised band changes nothing, and grading below it flips
+# ``is_recognized`` off and makes the peptide invisible instead of
+# weakly presented. That is a cliff inside the range it decides, the
+# same defect already corrected once in the NK path. Binding strength
+# belongs where it acts: in how much of the cell's class I actually
+# carries this peptide. Occupancy multiplies into the same signal and
+# leaves recognition to the cognate assignment.
+#
+# THE MODEL. Single-site (Langmuir) occupancy, which is the standard
+# form for a peptide competing for a binding groove:
+#
+#     theta(IC50) = 1 / (1 + IC50 / [P])
+#
+# reported relative to a strong binder, so a peptide at the
+# conventional 50 nM strong-binder cut sits at 1.0 and the current
+# behaviour is preserved there:
+#
+#     occupancy = min(1, theta(IC50) / theta(STRONG_CUT))
+#
+# PROVENANCE. The DIRECTION is sourced: in the TESLA consortium's
+# benchmark, peptides T cells recognised had significantly stronger MHC
+# binding affinity (Wells 2020, Cell 183:818, PMID 33038342, abstract
+# read directly 2026-11-27), and counting their Table S4 directly gives
+# 25 of 224 peptides validated below 50 nM measured affinity (11.2%)
+# against 37 of 608 overall (6.1%). The FUNCTIONAL FORM is the standard
+# single-site isotherm. The MAGNITUDE is an ESTIMATE: the effective
+# peptide concentration below is the one free parameter and no source
+# was found for it. It is a single named knob so an external test can
+# discipline it; do not tune it to make a simulation come out well.
+#
+# WHAT IT CANNOT DO. The normalisation caps a tighter-than-50 nM binder
+# at 1.0, so this does not distinguish 1 nM from 50 nM. Both saturate,
+# which is the point of the strong-binder cut, but it means the model is
+# blind to differences among strong binders.
+
+#: Effective peptide concentration, in nM. ESTIMATE -- the one free
+#: parameter of the occupancy model, and the only unsourced number in
+#: it. Set equal to the strong-binder cut so a peptide at that cut sits
+#: at half-maximal single-site occupancy.
+PEPTIDE_CONCENTRATION_NM: float = 50.0
+
+#: The affinity an occupancy of 1.0 refers to: the conventional
+#: NetMHCpan strong-binder cut, already used throughout this module.
+OCCUPANCY_REFERENCE_IC50_NM: float = 50.0
+
+OCCUPANCY_STATUS = "ESTIMATE"
+
+OCCUPANCY_SOURCE = (
+    "single-site (Langmuir) occupancy normalised to the 50 nM "
+    "strong-binder cut; direction sourced from Wells 2020, Cell "
+    "183:818, PMID 33038342 (recognised peptides had significantly "
+    "stronger MHC binding; Table S4 gives 11.2% validated below 50 nM "
+    "against a 6.1% base rate), but the effective peptide "
+    "concentration is an ESTIMATE with no source"
+)
+
+
+def occupancy_from_ic50(
+    ic50_nm: Optional[float],
+    peptide_concentration_nm: float = PEPTIDE_CONCENTRATION_NM,
+    reference_ic50_nm: float = OCCUPANCY_REFERENCE_IC50_NM,
+) -> float:
+    """Share of a cell's MHC-I carrying this peptide, relative to a strong binder.
+
+    Returns 1.0 when ``ic50_nm`` is None, so a presentation with no
+    predicted affinity behaves exactly as it did before this existed
+    rather than being silently penalised for a missing measurement.
+    """
+    if ic50_nm is None:
+        return 1.0
+    ic50 = float(ic50_nm)
+    if ic50 <= 0.0:
+        return 1.0
+    p = max(1e-9, float(peptide_concentration_nm))
+    theta = 1.0 / (1.0 + ic50 / p)
+    theta_ref = 1.0 / (1.0 + max(0.0, float(reference_ic50_nm)) / p)
+    if theta_ref <= 0.0:
+        return 1.0
+    return max(0.0, min(1.0, theta / theta_ref))
+
+
+def occupancy_report() -> Dict[str, object]:
+    """What the occupancy step contributes, for the methods page."""
+    return {
+        "quantity": "share of a cell's MHC-I carrying one peptide",
+        "model": "single-site (Langmuir), normalised to a strong binder",
+        "peptide_concentration_nm": PEPTIDE_CONCENTRATION_NM,
+        "reference_ic50_nm": OCCUPANCY_REFERENCE_IC50_NM,
+        "status": OCCUPANCY_STATUS,
+        "source": OCCUPANCY_SOURCE,
+        "cannot_distinguish": (
+            "affinities tighter than the reference cut: they all "
+            "saturate at 1.0"),
+    }
+
+
 def _canonical_allele(allele: str) -> str:
     """Normalize allele string to 'HLA-A*02:01' form, matching the
     PWM table at cognisom.genomics.hla_typer.HLA_BINDING_PROPERTIES.
