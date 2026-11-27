@@ -245,7 +245,10 @@ def test_suppression_equals_signalling_while_every_cell_is_median():
 # ── the calibration gap, measured and stated ───────────────────────
 
 
+# The 72 h case runs two arms and took over the default 120 s on the
+# nightly runner (2026-11-27), though it passes locally in under that.
 @pytest.mark.slow
+@pytest.mark.timeout(600)
 @pytest.mark.parametrize("hours", sorted(MEASURED_GROWTH_RATIO))
 def test_the_spread_slows_population_growth_by_the_measured_amount(hours):
     """Not a bug and not correctable by a constant.
