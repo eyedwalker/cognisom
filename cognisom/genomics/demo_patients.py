@@ -200,6 +200,80 @@ SU2C_AR_F877L_CLONALITY: Dict[str, object] = {
     "measured_after_treatment": True,
 }
 
+#: The demo patient's sample, in the form the cancer-cell fraction
+#: calculation takes. Built from the constants above so it works without
+#: the cohort, which is gitignored: ``scripts/su2c_ar_clonality.py``
+#: derived those numbers from `data/cbioportal/prad_su2c_2019` once, and
+#: `genomics/cancer_cell_fraction.py` reproduces them from this profile.
+#:
+#: AR sits on the single X of a male sample, so a normal cell contributes
+#: ONE copy, not two. Getting that wrong inflates the tumour copy number
+#: and shrinks the carrier fraction.
+#:
+#: Only AR is listed. Every other gene in this callset gets no fraction
+#: rather than an assumed diploid state, because assuming diploid at an
+#: amplified locus is exactly the mistake this whole calculation exists
+#: to avoid. Add a gene here when its copy number has actually been read.
+SU2C_SAMPLE_COPY_PROFILE: Any = None  # built lazily by su2c_sample_profile()
+
+
+def su2c_sample_profile():
+    """The demo patient's purity and copy states.
+
+    Lazy so that importing this module does not pull in the fraction
+    machinery, and memoised so callers can compare identity.
+    """
+    global SU2C_SAMPLE_COPY_PROFILE
+    if SU2C_SAMPLE_COPY_PROFILE is None:
+        from cognisom.genomics.cancer_cell_fraction import (
+            HEMIZYGOUS_NORMAL_COPIES,
+            CopyState,
+            SampleCopyProfile,
+        )
+        c = SU2C_AR_F877L_CLONALITY
+        SU2C_SAMPLE_COPY_PROFILE = SampleCopyProfile(
+            purity=c["purity"],
+            purity_source=(
+                "SU2C prad_su2c_2019 SC_9184_T: median VAF of three clonal "
+                "SNVs on the single X at normal copy number, where "
+                "VAF = purity in a male; 26 clonal heterozygous autosomal "
+                "SNVs agree at "
+                f"{c['purity_from_autosomes']}. Derived by "
+                "scripts/su2c_ar_clonality.py, 2026-11-11"),
+            copy_states={
+                "AR": CopyState(
+                    total_tumour_copies=c["ar_copies_per_tumour_cell"],
+                    normal_copies=HEMIZYGOUS_NORMAL_COPIES,
+                    source=(
+                        "SU2C prad_su2c_2019 data_cna_hg19.seg, chrX segment "
+                        "containing the F877L call: log2 1.934 over only 3 "
+                        "markers, so this is the weakest input to the "
+                        "fraction"),
+                ),
+            },
+        )
+    return SU2C_SAMPLE_COPY_PROFILE
+
+
+def su2c_ar_cell_fraction():
+    """What share of this tumour's cancer cells carries AR F877L.
+
+    An interval. The biopsy was taken after abiraterone/enzalutamide
+    exposure, so it bounds the fraction AFTER selection and says nothing
+    about how rare the variant was before treatment.
+    """
+    from cognisom.genomics.cancer_cell_fraction import cancer_cell_fraction
+    c = SU2C_AR_F877L_CLONALITY
+    alt, depth = 190, 817          # the read counts behind the VAF above
+    return cancer_cell_fraction(
+        vaf=c["vaf"],
+        purity=c["purity"],
+        copy_state=su2c_sample_profile().copy_states["AR"],
+        alt_count=alt,
+        depth=depth,
+    )
+
+
 DEMO_PATIENTS: Dict[str, DemoPatient] = {
     SU2C_PROSTATE.key: SU2C_PROSTATE,
     SEQC2_BREAST.key: SEQC2_BREAST,

@@ -26,6 +26,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from .cancer_cell_fraction import (
+    CancerCellFraction,
+    SampleCopyProfile,
+    clonality_label,
+)
 from .gene_protein_mapper import GeneProteinMapper, ProteinInfo
 from .hla_typer import HLA_BINDING_PROPERTIES
 from .vcf_parser import Variant
@@ -136,11 +141,25 @@ class Neoantigen:
     string "high", which every record asserted regardless of data."""
 
     clonality: Optional[str] = None
-    """Clonal or subclonal. None because cancer-cell fraction needs
-    tumour purity and allele-specific copy number, neither of which this
-    pipeline computes; allele frequency alone does not determine it. It
-    previously defaulted to "clonal" for every record. Use
-    `variant_allele_frequency` for what is actually measured."""
+    """``"subclonal"``, ``"possibly clonal"``, or None.
+
+    Filled only when ``predict`` was given a ``SampleCopyProfile`` with a
+    purity and a copy state for this gene; otherwise None, because
+    allele frequency alone does not determine it. There is deliberately
+    no plain ``"clonal"`` value: bulk sequencing of one sample rarely
+    proves a variant is in every cancer cell, and this field used to
+    default to that string for every record. See
+    ``genomics/cancer_cell_fraction.py``."""
+
+    cancer_cell_fraction: Optional[CancerCellFraction] = None
+    """The interval bounding what share of cancer cells carry this
+    variant, when purity and local copy number were supplied. Never a
+    point estimate: from bulk reads the carrier fraction and the mutant
+    copies per carrier only enter as their product.
+
+    This is the quantity the engine's own experiment found decides the
+    outcome of targeting a peptide, so a candidate list without it is
+    ranked on presentation alone."""
 
     # Vaccine design
     vaccine_priority: int = 0       # 1=highest priority
@@ -171,6 +190,11 @@ class Neoantigen:
             "variant_allele_frequency": (
                 round(self.variant_allele_frequency, 4)
                 if self.variant_allele_frequency is not None else None
+            ),
+            "clonality": self.clonality,
+            "cancer_cell_fraction": (
+                self.cancer_cell_fraction.as_dict()
+                if self.cancer_cell_fraction is not None else None
             ),
             "vaccine_priority": self.vaccine_priority,
             "include_in_vaccine": self.include_in_vaccine,
@@ -208,6 +232,19 @@ class PredictionDiagnostics:
 
     genes_with_partial_reference: List[str] = field(default_factory=list)
     mismatch_details: List[str] = field(default_factory=list)
+
+    variants_with_a_cell_fraction: int = 0
+    """How many variants a cancer-cell fraction could be computed for.
+
+    Zero while no ``SampleCopyProfile`` is passed, which is the default.
+    Read it beside ``variants_considered``: a candidate list where this
+    is zero carries no coverage information at all, however good its
+    binding predictions are."""
+
+    cell_fraction_unavailable_reason: str = ""
+    """Why no fraction was computed, when none was. Distinguishes "no
+    sample profile was passed" from "the profile had no purity" from
+    "no copy state covered these genes"."""
 
     ranking_basis: str = ""
     """Which quantity put the candidate list in the order it is in:
@@ -402,6 +439,7 @@ class NeoantigenPredictor:
         hla_alleles: List[str],
         peptide_lengths: Optional[List[int]] = None,
         max_neoantigens: int = 50,
+        sample: Optional[SampleCopyProfile] = None,
     ) -> List[Neoantigen]:
         """Predict neoantigens from mutations and HLA alleles.
 
@@ -411,6 +449,11 @@ class NeoantigenPredictor:
             hla_alleles: Patient HLA alleles (e.g., ["HLA-A*02:01", ...]).
             peptide_lengths: Peptide lengths to consider (default [8, 9, 10, 11]).
             max_neoantigens: Maximum neoantigens to return.
+            sample: The sequenced sample's purity and local copy number.
+                When given, each record carries a cancer-cell fraction
+                interval and a clonality label; when omitted, both stay
+                None and the list is ranked on presentation alone.
+                Omitting it changes nothing else about the result.
 
         Returns:
             Neoantigen objects, best first. Ranked on the trained scorer's
@@ -424,10 +467,27 @@ class NeoantigenPredictor:
             peptide_lengths = [8, 9, 10, 11]
 
         all_neoantigens: List[Neoantigen] = []
-        # (gene, mutation, protein_change, windows) awaiting scoring.
-        pending: List[Tuple[str, str, str, List]] = []
+        # (gene, mutation, protein_change, windows, variant) awaiting
+        # scoring. The variant travels in the tuple because the second
+        # pass needs its allele frequency and its copy state, and it is
+        # NOT in scope there: reading the loop variable from the first
+        # pass gave every record in the run the LAST variant's allele
+        # frequency, which also silently reordered candidates through
+        # the ranking tie-break. Measured and fixed 2026-11-27; pinned
+        # by tests/test_each_record_carries_its_own_variant.py.
+        pending: List[Tuple[str, str, str, List, Variant]] = []
         diag = PredictionDiagnostics()
         self.diagnostics = diag
+        if sample is None:
+            diag.cell_fraction_unavailable_reason = (
+                "no SampleCopyProfile was passed, so no variant's share of "
+                "the cancer cells is known")
+        elif sample.purity is None:
+            diag.cell_fraction_unavailable_reason = (
+                "the sample profile carries no purity estimate")
+        elif not sample.copy_states:
+            diag.cell_fraction_unavailable_reason = (
+                "the sample profile carries no copy states")
 
         for variant in cancer_mutations:
             diag.variants_considered += 1
@@ -549,20 +609,34 @@ class NeoantigenPredictor:
                     wt_aa, mut_aa, pep_len))
                 for pep_len in peptide_lengths
             ]
-            pending.append((gene, clean_mut, mutation_str, windows))
+            pending.append((gene, clean_mut, mutation_str, windows, variant))
 
         # One batched prediction for the entire run.
         self._warm_binding_cache(
             [peptide
-             for _, _, _, windows in pending
+             for _, _, _, windows, _ in pending
              for _, peps in windows
              for triple in peps
              for peptide in triple[:2]],
             hla_alleles,
         )
 
-        for gene, clean_mut, mutation_str, windows in pending:
+        for gene, clean_mut, mutation_str, windows, variant in pending:
             before = len(all_neoantigens)
+
+            # Once per variant, not once per peptide: every peptide from
+            # one mutation is carried by exactly the same cells.
+            variant_af = getattr(variant, "tumor_af", None)
+            ccf = None
+            if sample is not None:
+                ccf = sample.fraction_for_gene(
+                    gene, variant_af,
+                    alt_count=getattr(variant, "tumor_alt_count", None),
+                    depth=getattr(variant, "tumor_depth", None),
+                )
+                if ccf is not None:
+                    diag.variants_with_a_cell_fraction += 1
+            variant_clonality = clonality_label(ccf)
 
             for pep_len, peptides in windows:
                 for mut_pep, wt_pep, mut_pos_in_pep in peptides:
@@ -627,8 +701,9 @@ class NeoantigenPredictor:
                         binding_level=level,
                         agretopicity=agretopicity,
                         foreignness=foreignness,
-                        variant_allele_frequency=getattr(
-                            variant, "tumor_af", None),
+                        variant_allele_frequency=variant_af,
+                        clonality=variant_clonality,
+                        cancer_cell_fraction=ccf,
                         binding_method=self._binding_method,
                     )
                     all_neoantigens.append(neo)
