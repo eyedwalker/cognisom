@@ -120,3 +120,57 @@ def test_nadir_is_found_where_the_curve_turns():
     week, value = pk.nadir(t, s)
     assert week == pytest.approx(10.0, abs=0.2)
     assert value < 0.1
+
+
+# ── the recorded result, re-scored from the stored series ──────────
+
+
+def test_the_carrier_free_arm_passes_and_by_how_much():
+    v = pk.stored_verdict("naive")
+    assert v["verdict"] == "PASS", v
+    p1 = v["P1_decline_at_week_25"]
+    assert len(p1["per_seed"]) == 5
+    assert p1["median"] == pytest.approx(0.956, abs=2e-3)
+    assert v["P2_no_progression_by_week_25"]["seeds_progressed"] == 0
+
+
+def test_the_pass_rests_mostly_on_an_estimated_number():
+    """The claim the result must be reported WITH. The week-25 reading
+    is (transcription the drug leaves) x (cells left): 0.10 x 656/1499.
+    The 0.10 is an ESTIMATE in the drug mapping, and on its own it
+    clears the 80% bar. If this stops holding, the description of what
+    the pass is worth has to be rewritten, not just this number."""
+    import json
+    from pathlib import Path
+
+    data = json.loads((Path(pk.__file__).parent / pk.RESULTS_FILE).read_text())
+    run = data["arms"]["naive"]["seeds"]["1"]
+    cells_left = run["n_cancer"][-1] / run["n_cancer"][0]
+    serum_left = run["serum_psa_relative"][-1]
+    block_left = 0.10
+    assert serum_left == pytest.approx(block_left * cells_left, rel=0.02)
+    assert 1.0 - block_left >= pk.TOMBAL_DECLINE, (
+        "the estimated block alone clears the bar; say so")
+    from cognisom.workflow.treatment import resolve_treatment
+    block = resolve_treatment(("Enzalutamide",)).module_configs[
+        "ar_signaling"]["ar_transcriptional_block"]
+    assert 1.0 - float(block) == pytest.approx(block_left)
+
+
+def test_the_ten_percent_carrier_arm_fails_both_criteria():
+    v = pk.stored_verdict("carrier")
+    assert v["verdict"] == "FAIL", v
+    assert v["P1_decline_at_week_25"]["passed"] is False
+    assert v["P1_decline_at_week_25"]["median"] < 0, (
+        "serum PSA is ABOVE baseline at week 25 in this arm")
+    assert v["P2_no_progression_by_week_25"]["seeds_progressed"] == 5
+    s = pk.summarise("carrier", pk.stored_runs("carrier"))
+    assert 0.55 < min(s.best) and max(s.best) < 0.62
+    assert all(7.5 < w < 9.5 for w in s.progression_week)
+
+
+def test_the_untreated_arm_is_too_short_to_be_judged_and_says_so():
+    s = pk.summarise("none", pk.stored_runs("none"))
+    assert pk.primary_verdict(s)["verdict"] == "NOT JUDGED"
+    # recorded, not scored: no sourced clinical doubling time was found
+    assert all(75 < d < 90 for d in s.doubling_days)

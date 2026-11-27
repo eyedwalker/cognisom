@@ -394,6 +394,23 @@ LAYERS: Tuple[Layer, ...] = (
               "confound is argued to cancel from a correlation of "
               "deltas rather than demonstrated to.",
               ("cognisom/validation/ar_proliferation_paired_adt.py",)),
+            C("Serum PSA under enzalutamide, against a trial", PARTIAL,
+              "The first comparison with a clinical measurement on its "
+              "own quantity. Rule fixed before the runs: serum PSA at "
+              "least 80% below baseline at week 25 with no rise from "
+              "its lowest point, as in 92.5% of hormone-naive men on "
+              "enzalutamide alone (Tombal 2014). A tumour without the "
+              "resistant AR variant PASSES, 95.6% below in all five "
+              "seeds. But about nine-tenths of that fall is one "
+              "ESTIMATED number, the 0.9 transcriptional block, which "
+              "clears the bar with no cell dying -- so this tests the "
+              "curve, not the cell-fate mechanism, and is not counted "
+              "as a validated mechanism. The shipped demo tumour, 10% "
+              "resistant carriers, FAILS: best fall 57-60%, rising "
+              "again by week 8-9. One genome, so the seeds' agreement "
+              "is not patient-to-patient variation.",
+              ("cognisom/validation/psa_kinetics.py",
+               "tests/test_psa_kinetics_are_judged_by_a_prespecified_rule.py")),
             C("Every kill-path number carries its source or an estimate "
               "label", BUILT, "",
               ("tests/test_kill_calibration.py",

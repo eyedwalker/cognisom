@@ -230,3 +230,55 @@ def primary_verdict(summary: ArmSummary) -> Dict[str, object]:
         "source": TOMBAL_SOURCE,
         "durability_source": TOMBAL_DURABILITY_SOURCE,
     }
+
+
+# ── the recorded result ────────────────────────────────────────────
+#
+# WHAT HAPPENED, 2026-11-27. Five seeds per treated arm, 25 weeks.
+#
+#   naive    PASS. Serum PSA 95.5-95.7% below baseline at week 25 in
+#            every seed, no progression.
+#   carrier  FAIL on both. Best fall 57-60% near week 3.9, progression
+#            by week 7.9-9.3, serum PSA about 2x baseline at week 25.
+#
+# HOW MUCH THE PASS IS WORTH, which is less than the word suggests.
+# The naive arm's week-25 reading is 0.0438 of baseline, and that is
+# almost exactly (transcription left by the drug) x (cells left):
+# 0.10 x 656/1499 = 0.0438. The 0.10 is the drug mapping's
+# ar_transcriptional_block of 0.9, which parameter_bridge labels an
+# ESTIMATE. So nine-tenths of the fall is that one estimated number
+# and would have cleared the 80% bar with no cell dying at all. The
+# test COULD have failed -- a block below about 0.55 with this cell
+# loss would have -- but it was never a test of the cell-fate
+# mechanism, and it does not turn the 0.9 into a measured value.
+# P2 is weaker still: the arm has no resistance mechanism to rebound
+# through, so "no progression" was close to guaranteed.
+#
+# What the pass does establish: with its estimated block, the engine's
+# hormone-naive serum PSA curve is not inconsistent with Tombal 2014,
+# on the quantity and at the week the trial reported. What the fail
+# establishes is firmer: a tumour seeded with 10% F877L carriers does
+# not behave like a hormone-naive patient, as it should not.
+#
+# The five seeds agree to the third decimal. That is the engine's
+# stochastic spread on ONE genome and ONE tissue layout; it is not
+# patient-to-patient variation and must not be read as a confidence
+# interval on a patient.
+
+RESULTS_FILE = "results/psa_kinetics_2026_11_27.json"
+
+
+def stored_runs(arm: str) -> List[Tuple[List[float], List[float]]]:
+    """The recorded serum series for one arm, one entry per seed."""
+    import json
+    from pathlib import Path
+
+    data = json.loads((Path(__file__).parent / RESULTS_FILE).read_text())
+    seeds = data["arms"][arm]["seeds"]
+    return [(seeds[k]["time_h"], seeds[k]["serum_psa_relative"])
+            for k in sorted(seeds)]
+
+
+def stored_verdict(arm: str) -> Dict[str, object]:
+    """Re-apply the pre-specified rule to the recorded runs."""
+    return primary_verdict(summarise(arm, stored_runs(arm)))

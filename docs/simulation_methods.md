@@ -253,6 +253,26 @@ a different design. Four tests of two mechanisms is not four
 mechanisms, and everything else in the engine remains internally
 consistent and externally untested.
 
+Separately, and NOT counted among those: one comparison of a simulated
+outcome curve with a clinical trial, on the trial's own quantity. The
+engine now reports serum PSA (tumour output passed through blood
+clearance, half-life 2.2 days, Stamey 1987), and the rule was fixed in
+`cognisom/validation/psa_kinetics.py` before the runs: at least 80%
+below baseline at week 25 with no rise from the lowest point, as 92.5%
+of hormone-naive men on enzalutamide alone showed (Tombal 2014). A
+tumour without the resistant AR variant passes, 95.6% below baseline in
+five of five seeds. About nine-tenths of that fall is a single
+estimated number -- the drug's 0.9 transcriptional block -- which would
+clear the bar with no cell dying, so the pass says the curve is not
+inconsistent with the trial and does not test the cell-fate mechanism.
+The shipped demo tumour, seeded with 10% resistant carriers, fails:
+best fall 57-60%, rising again by week 8-9, about twice baseline at
+week 25. The castration-resistant trials (AFFIRM, PREVAIL) are the
+wrong population for the engine's hormone-sensitive tumour and are not
+scored. Running this comparison is also what exposed a defect: on the
+measured clock a drug's scripted division time made a treated tumour
+divide sixty times faster than an untreated one.
+
 First, a pre-specified, falsifiable prediction about hypoxia and MHC
 class I held on 592 TCGA colorectal tumours, using the same study,
 assay and statistic as the source paper
