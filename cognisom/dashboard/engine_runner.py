@@ -701,6 +701,7 @@ class EngineRunner:
                 clonal_fractions=self.clonal_fractions or None)
             for mod, params in self.treatment.module_configs.items():
                 if mod in self.module_configs:
+                    params = self._drug_never_speeds_division(mod, params)
                     self.module_configs[mod].update(params)
                 else:
                     # e.g. the bridge's 'ode' config: no preset registers
@@ -1416,6 +1417,48 @@ class EngineRunner:
                         node["mutations"].append(label)
 
         return {"nodes": list(nodes.values()), "edges": edges}
+
+    def _drug_never_speeds_division(self, mod: str,
+                                    params: Dict[str, Any]) -> Dict[str, Any]:
+        """Keep a drug's scripted division time from SHORTENING the clock.
+
+        The drug mappings in ``parameter_bridge`` carry a scripted
+        cancer division time (18 h for an anti-androgen, 24 h for
+        chemotherapy). Each was written as a SLOWDOWN against the
+        compressed clock, whose untreated tumour divides every 8-12 h.
+        On the measured clock the untreated tumour divides every 1,111
+        h, and the same number applied verbatim made a treated tumour
+        divide sixty times FASTER than an untreated one: a wild-type-AR
+        patient on enzalutamide went from 1,499 to 15,693 cancer cells
+        in four simulated days (found 2026-11-27 on the first run of
+        that configuration longer than a week).
+
+        A division time that is shorter than the one already in force
+        is therefore dropped, and the run says so. This is the
+        conservative half of a fix, not the whole of one: the mapping's
+        intended slowdown is not re-applied as a ratio, because the
+        baseline each number was written against is not recorded. With
+        the AR module on, an anti-androgen's slowdown is computed from
+        AR signalling anyway; for a drug class with no such mechanism
+        in the engine, the measured clock now carries NO division
+        effect from it, which is a stated gap rather than a wrong sign.
+        """
+        if mod != "cellular":
+            return params
+        kept = dict(params)
+        for key in ("division_time_cancer", "division_time_normal"):
+            if key not in kept:
+                continue
+            current = self.module_configs["cellular"].get(key)
+            if current is not None and float(kept[key]) < float(current):
+                self.treatment.notes.append(
+                    f"the drug mapping's scripted {key} of {kept[key]} h "
+                    f"was NOT applied: it is shorter than the {current} h "
+                    f"already in force on the {self.clock} clock, and a "
+                    f"number written as a slowdown must not speed "
+                    f"division up")
+                del kept[key]
+        return kept
 
     def get_time_series(self) -> Dict[str, list]:
         """Return dict of lists suitable for Plotly / DataFrame."""
