@@ -212,6 +212,76 @@ def affinity(tcr: TCR, presentation: MHCPresentation) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Specificity: which peptides a repertoire can actually tell apart
+# ---------------------------------------------------------------------------
+#
+# WHAT WAS MEASURED, 2026-11-27. The hash embedding above gives every
+# TCR and every pMHC an independent random unit vector in 16
+# dimensions, so a cosine between any pair is noise with a standard
+# deviation near 1/sqrt(16) = 0.25, and the BEST match over a
+# repertoire is an order statistic of that noise. It therefore depends
+# on how many clones there are and on nothing else:
+#
+#   repertoire 10    200 random 9-mers: 180/200 recognised
+#   repertoire 100   200 random 9-mers: 200/200, affinity 0.810-0.969
+#   repertoire 1000  200 random 9-mers: 200/200, affinity 0.917-0.969
+#
+# At the shipped size of 1000 the gate says yes to everything. All 50
+# of the demo patient's predicted neoantigens are recognised, at
+# affinities 0.917-0.965 against a threshold of 0.7 -- and so are 200
+# peptides drawn at random, a non-mutant self peptide, and a peptide on
+# an invented HLA allele. The predicted binding affinity does not
+# enter: the same peptide scores an identical 0.9297 at an IC50 of
+# 1 nM and of 50,000 nM, and identically at presentation scores 0.0 and
+# 0.99.
+#
+# WHAT THAT COSTS. MHCflurry's per-peptide predictions reach the
+# displayed pool and are then discarded at the recognition step, so a
+# simulation cannot be asked which neoantigen is worth targeting: every
+# displayed peptide is equally visible, and a run with a different
+# target would come out the same. The module docstring is right that
+# the closed LOOP is what it set out to demonstrate; what it cannot
+# support is a comparison between targets.
+#
+# WHAT COGNATE MODE CHANGES. A clone recognises a peptide only if it
+# has been ASSIGNED to it. Everything else sits at a background that
+# cannot reach the threshold, however large the repertoire. That makes
+# the question "which peptide is this T cell specific for?" answerable,
+# and it is the hook a target-by-target comparison needs:
+# ``assign_cognate(sequence)`` gives the repertoire specificity for one
+# peptide, and arms differing only in that call differ only in the
+# target.
+#
+# It is deliberately NOT the default: every pinned immune result in
+# this repository was measured under the hash gate, and a repertoire
+# built without an assignment recognises nothing at all in cognate
+# mode, which is the honest reading of "this patient has no clone for
+# any of these peptides" but is not the behaviour those results
+# describe.
+
+#: Recognition decided by the hash embedding: the shipped behaviour,
+#: which the measurement above shows is saturated at any realistic
+#: repertoire size.
+SPECIFICITY_HASH: str = "hash"
+
+#: Recognition decided by explicit cognate assignment.
+SPECIFICITY_COGNATE: str = "cognate"
+
+SPECIFICITIES: Tuple[str, ...] = (SPECIFICITY_HASH, SPECIFICITY_COGNATE)
+
+#: Affinity given to an assigned cognate pair. Above any sane
+#: threshold; the point of cognate mode is that specificity is a
+#: statement about WHICH pairs, not a tuned number.
+COGNATE_AFFINITY: float = 0.95
+
+#: Ceiling on a non-cognate affinity, as a fraction of the recognition
+#: threshold. 0.9 keeps the background ordered and visible for
+#: diagnostics while guaranteeing it cannot clear the gate at any
+#: repertoire size -- the property the hash gate lacks.
+BACKGROUND_CEILING_FRACTION: float = 0.9
+
+
+# ---------------------------------------------------------------------------
 # Repertoire
 # ---------------------------------------------------------------------------
 
@@ -241,9 +311,19 @@ class TCRRepertoire:
         exhaustion_threshold: int = EXHAUSTION_ENCOUNTER_THRESHOLD,
         exhaustion_onset_hours: Optional[float] = None,
         initial_exhausted_fraction: Optional[float] = None,
+        specificity: str = SPECIFICITY_HASH,
     ):
         self.size = int(size)
         self.recognition_threshold = float(recognition_threshold)
+        if specificity not in SPECIFICITIES:
+            raise ValueError(
+                f"specificity must be one of {SPECIFICITIES}, not "
+                f"{specificity!r}")
+        #: See the SPECIFICITY notes above. 'hash' is the shipped gate
+        #: and is saturated; 'cognate' recognises only assigned pairs.
+        self.specificity = specificity
+        #: peptide sequence -> the clone ids assigned to it.
+        self._cognate: Dict[str, List[str]] = {}
         self.exhaustion_threshold = int(exhaustion_threshold)
         #: When set, a clone exhausts this many hours after its first
         #: engagement instead of at exhaustion_threshold encounters. See
@@ -365,6 +445,8 @@ class TCRRepertoire:
         feats = np.stack([t.features for t in self.tcrs])
         cosines = feats @ pmhc_vec
         affinities = 1.0 / (1.0 + np.exp(-_SIGMOID_SCALE * cosines))
+        if self.specificity == SPECIFICITY_COGNATE:
+            return self._cognate_match(presentation, affinities)
         idx = int(np.argmax(affinities))
         aff = float(affinities[idx])
         chosen = self.tcrs[idx]
@@ -373,6 +455,80 @@ class TCRRepertoire:
             presentation=presentation,
             affinity=aff,
             is_recognized=aff >= self.recognition_threshold,
+            exhaustion_state=self._states[chosen.tcr_id],
+            encounter_count=self._encounters[chosen.tcr_id],
+        )
+
+    # ----- cognate specificity ----------------------------------------
+
+    def assign_cognate(self, peptide_sequence: str,
+                       n_clones: int = 1) -> List[str]:
+        """Give this repertoire clones specific for one peptide.
+
+        Returns the clone ids assigned. Deterministic: the clones are
+        chosen by hashing the sequence, so two runs that target the same
+        peptide use the same clones and two runs that target different
+        peptides differ only in the target. Nothing is drawn, so no
+        shared random stream moves and the assignment cannot shift
+        every later event in the run.
+
+        Assigning in ``hash`` mode is refused rather than ignored: the
+        hash gate already recognises everything, so an assignment there
+        would read as a targeting experiment while changing nothing.
+        """
+        if self.specificity != SPECIFICITY_COGNATE:
+            raise ValueError(
+                "assign_cognate needs specificity='cognate'; under the "
+                "hash gate every peptide is already recognised, so an "
+                "assignment would promise a targeting experiment and "
+                "deliver nothing")
+        seq = str(peptide_sequence)
+        if not seq:
+            raise ValueError("a cognate peptide needs a sequence")
+        if n_clones < 1:
+            raise ValueError("n_clones must be at least 1")
+        if not self.tcrs:
+            return []
+        digest = hashlib.sha256(seq.encode("utf-8")).digest()
+        start = int.from_bytes(digest[4:8], "big") % len(self.tcrs)
+        ids = [self.tcrs[(start + i) % len(self.tcrs)].tcr_id
+               for i in range(min(n_clones, len(self.tcrs)))]
+        existing = self._cognate.setdefault(seq, [])
+        for tcr_id in ids:
+            if tcr_id not in existing:
+                existing.append(tcr_id)
+        return list(ids)
+
+    def cognate_targets(self) -> Dict[str, List[str]]:
+        """Which peptides this repertoire has clones for."""
+        return {seq: list(ids) for seq, ids in self._cognate.items()}
+
+    def _cognate_match(self, presentation: MHCPresentation,
+                       affinities: np.ndarray) -> TCRMatch:
+        """Recognition by assignment, with a background that cannot
+        reach the threshold at any repertoire size."""
+        assigned = self._cognate.get(presentation.peptide.sequence)
+        if assigned:
+            by_id = {t.tcr_id: t for t in self.tcrs}
+            # The most abundant assigned clone, so a target with several
+            # clones behaves like one clone rather than averaging.
+            chosen = max((by_id[i] for i in assigned if i in by_id),
+                         key=lambda t: t.clone_frequency, default=None)
+            if chosen is not None:
+                return TCRMatch(
+                    tcr=chosen, presentation=presentation,
+                    affinity=COGNATE_AFFINITY,
+                    is_recognized=COGNATE_AFFINITY >= self.recognition_threshold,
+                    exhaustion_state=self._states[chosen.tcr_id],
+                    encounter_count=self._encounters[chosen.tcr_id],
+                )
+        idx = int(np.argmax(affinities))
+        chosen = self.tcrs[idx]
+        ceiling = BACKGROUND_CEILING_FRACTION * self.recognition_threshold
+        aff = float(min(float(affinities[idx]), ceiling))
+        return TCRMatch(
+            tcr=chosen, presentation=presentation, affinity=aff,
+            is_recognized=False,
             exhaustion_state=self._states[chosen.tcr_id],
             encounter_count=self._encounters[chosen.tcr_id],
         )

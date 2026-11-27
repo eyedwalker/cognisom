@@ -40,6 +40,8 @@ from cognisom.core.event_bus import EventTypes
 from cognisom.engine.py.immune.mhc_loading import MHCPresentation
 from cognisom.engine.py.immune.tcr_repertoire import (
     EXHAUSTION_ONSET_HOURS,
+    SPECIFICITY_COGNATE,
+    SPECIFICITY_HASH,
     ExhaustionState,
     TCRMatch,
     TCRRepertoire,
@@ -710,6 +712,34 @@ class ImmuneModule(SimulationModule):
             self.config.get('tcr_recognition_threshold', 0.7)
         )
         self.tcr_seed = int(self.config.get('tcr_seed', 0))
+        # How recognition is decided. 'hash' is the shipped gate, which
+        # was measured to recognise every peptide at any realistic
+        # repertoire size -- see the SPECIFICITY notes in
+        # tcr_repertoire. 'cognate' recognises only peptides this
+        # repertoire has been assigned clones for, which is what makes
+        # one target distinguishable from another.
+        self.tcr_specificity = str(
+            self.config.get('tcr_specificity', SPECIFICITY_HASH))
+        # The peptides this patient's T cells are specific for, by
+        # sequence. Only used under 'cognate'; a run that names none
+        # recognises nothing, which is the honest reading of a
+        # repertoire with no cognate clone rather than a silent
+        # fallback to the saturated gate.
+        targets = self.config.get('tcell_target_peptides') or ()
+        if isinstance(targets, str):
+            raise ValueError(
+                "tcell_target_peptides is a sequence of peptide "
+                "sequences, not one string")
+        self.tcell_target_peptides = tuple(str(t) for t in targets)
+        if (self.tcell_target_peptides
+                and self.tcr_specificity != SPECIFICITY_COGNATE):
+            raise ValueError(
+                "tcell_target_peptides needs "
+                f"tcr_specificity={SPECIFICITY_COGNATE!r}: under the "
+                "hash gate every peptide is already recognised, so "
+                "naming a target would change nothing")
+        self.tcell_target_clones = int(
+            self.config.get('tcell_target_clones', 1))
         # Exhaustion on a clock (days of antigen exposure, Philip 2017),
         # not on a count of contacts shared by every T cell of a clone.
         # None restores the count rule.
@@ -887,7 +917,11 @@ class ImmuneModule(SimulationModule):
             seed=self.tcr_seed,
             exhaustion_onset_hours=self.tcell_exhaustion_onset_hours,
             initial_exhausted_fraction=self.t_cell_initial_exhaustion,
+            specificity=self.tcr_specificity,
         )
+        for peptide in self.tcell_target_peptides:
+            self._tcr_repertoire.assign_cognate(
+                peptide, n_clones=self.tcell_target_clones)
 
         # Subscribe to events
         self.subscribe(EventTypes.CELL_TRANSFORMED, self.on_cell_transformed)
