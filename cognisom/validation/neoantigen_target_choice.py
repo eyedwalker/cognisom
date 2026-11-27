@@ -146,3 +146,48 @@ def coverage_verdict(none: Arm, clonal: Arm,
             "construction, so this checks the wiring and its sign, not "
             "a discovered fact"),
     }
+
+
+# ── the recorded result ────────────────────────────────────────────
+#
+# WHAT HAPPENED, 2026-11-27. Ring, 24 h, 5 seeds, every T cell
+# tumour-reactive, cognate specificity, F13B T192I set to 30% of
+# founders. Clonal target VVPYPILAL (ZNF362 S217L, displayed by 10/10
+# cells); subclonal target KKIEEVECL (F13B T192I, 3/10 cells).
+#
+#   cancer cells left   no target  [4, 23, 14, 9, 9]   median 9
+#                       clonal     [0,  1,  0, 0, 0]   median 0
+#                       subclonal  [4, 15,  7, 0, 1]   median 4
+#
+# C1, C2 and C3 all pass. The sharpest number is not in the medians:
+# the subclonal arm ended with ZERO carriers in ALL FIVE seeds and
+# every survivor a non-carrier, so the target was not merely less
+# effective -- it cleared exactly the cells displaying it and left the
+# rest untouched. That is selection by the target, and it is the thing
+# a ranking by predicted binding cannot see.
+#
+# Read with the limits in this module's docstring: 10 founding cancer
+# cells, one genome, one tissue layout, and an effect that follows from
+# how presentation is wired. Two of the five subclonal seeds happened
+# to clear as well (0 and 1 cells left), which at this population size
+# is noise, not a finding.
+
+RESULTS_FILE = "results/neoantigen_target_choice_2026_11_27.json"
+
+
+def stored_arms() -> Dict[str, Arm]:
+    """The recorded runs, one Arm per target choice."""
+    import json
+    from pathlib import Path
+
+    data = json.loads((Path(__file__).parent / RESULTS_FILE).read_text())
+    return {name: arm_from_records(name, records)
+            for name, records in data["arms"].items()}
+
+
+def stored_verdict() -> Dict[str, object]:
+    """Re-apply C1-C3 to the recorded runs."""
+    arms = stored_arms()
+    return coverage_verdict(arms["none"], arms["clonal"],
+                            arms["subclonal"])
+

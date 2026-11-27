@@ -206,3 +206,67 @@ def test_the_module_refuses_a_target_it_could_not_honour():
     with pytest.raises(ValueError, match="not one string"):
         ImmuneModule({"tcell_target_peptides": "SIINFEKLY",
                       "tcr_specificity": SPECIFICITY_COGNATE})
+
+
+# ── the pre-specified coverage test, re-scored from stored runs ─────
+
+
+def test_the_coverage_rule_can_say_no():
+    """NON-VACUITY for the verdict below. Hand it arms where the
+    subclonal target did BETTER and it must fail."""
+    from cognisom.validation import neoantigen_target_choice as ntc
+
+    def arm(name, cancer, carriers, others):
+        return ntc.Arm(name, cancer, carriers, others)
+
+    none = arm("none", [10, 10, 10], [3, 3, 3], [7, 7, 7])
+    clonal = arm("clonal", [8, 8, 8], [2, 2, 2], [6, 6, 6])
+    subclonal = arm("subclonal", [2, 2, 2], [0, 0, 0], [2, 2, 2])
+    v = ntc.coverage_verdict(none, clonal, subclonal)
+    assert v["verdict"] == "FAIL"
+    assert v["C2_clonal_beats_subclonal"]["passed"] is False
+    # and too few seeds is not judged
+    thin = arm("none", [1], [0], [1])
+    assert ntc.coverage_verdict(thin, thin, thin)["verdict"] == "NOT JUDGED"
+
+
+def test_a_subclonal_target_leaves_non_carriers_behind():
+    """C3's arithmetic, without a run: survivors enriched for the cells
+    that never displayed the target."""
+    from cognisom.validation import neoantigen_target_choice as ntc
+
+    sub = ntc.Arm("subclonal", [4, 5, 4], [0, 1, 0], [4, 4, 4])
+    assert sub.median_non_carrier_share() > 1.0 - ntc.SUBCLONAL_FRACTION
+
+
+def test_the_recorded_coverage_experiment_passes_all_three_criteria():
+    from cognisom.validation import neoantigen_target_choice as ntc
+
+    v = ntc.stored_verdict()
+    assert v["verdict"] == "PASS", v
+    arms = ntc.stored_arms()
+    assert all(a.n_seeds == 5 for a in arms.values())
+    assert arms["clonal"].median_cancer() < arms["subclonal"].median_cancer()
+    assert arms["subclonal"].median_cancer() < arms["none"].median_cancer()
+
+
+def test_the_subclonal_target_cleared_exactly_its_carriers():
+    """The sharpest part of the result: selection by the target, in
+    every seed, rather than a weaker version of the same effect."""
+    from cognisom.validation import neoantigen_target_choice as ntc
+
+    sub = ntc.stored_arms()["subclonal"]
+    assert sub.carriers_end == [0] * 5, sub.carriers_end
+    assert sub.median_non_carrier_share() == 1.0
+    # NON-VACUITY: untargeted runs kept carriers, so zero is a result
+    none = ntc.stored_arms()["none"]
+    assert all(c and c > 0 for c in none.carriers_end), none.carriers_end
+
+
+def test_the_recorded_result_says_it_is_not_external_validation():
+    from cognisom.validation import neoantigen_target_choice as ntc
+
+    v = ntc.stored_verdict()
+    assert "construction" in str(v["not_external_validation"])
+    assert "26940869" in str(v["direction_source"])
+

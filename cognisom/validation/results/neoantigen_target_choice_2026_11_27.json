@@ -1,0 +1,207 @@
+{
+ "recorded": "2026-11-27",
+ "engine_commit": "2dd03f4",
+ "prespecified_in": "cognisom/validation/neoantigen_target_choice.py",
+ "config": {
+  "tissue": "ring",
+  "hours": 24,
+  "dt": 0.05,
+  "patient": "SU2C SC_9184_T (demo)",
+  "modules": "cellular+spatial+vascular+ar_signaling+immune+molecular",
+  "tcell_tumour_reactive_fraction": 1.0,
+  "tcr_specificity": "cognate",
+  "clonal_fractions": {
+   "F13B_T192I": 0.3
+  },
+  "clonal_target": "VVPYPILAL (ZNF362 S217L, 10/10 cells)",
+  "subclonal_target": "KKIEEVECL (F13B T192I, 3/10 cells)"
+ },
+ "arms": {
+  "clonal": [
+   {
+    "mode": "clonal",
+    "seed": 1,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 0,
+    "kills": 15,
+    "divisions": 23,
+    "carriers_end": 0,
+    "non_carriers_end": 0
+   },
+   {
+    "mode": "clonal",
+    "seed": 2,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 1,
+    "kills": 16,
+    "divisions": 25,
+    "carriers_end": 0,
+    "non_carriers_end": 1
+   },
+   {
+    "mode": "clonal",
+    "seed": 3,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 0,
+    "kills": 14,
+    "divisions": 22,
+    "carriers_end": 0,
+    "non_carriers_end": 0
+   },
+   {
+    "mode": "clonal",
+    "seed": 4,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 0,
+    "kills": 17,
+    "divisions": 25,
+    "carriers_end": 0,
+    "non_carriers_end": 0
+   },
+   {
+    "mode": "clonal",
+    "seed": 5,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 0,
+    "kills": 19,
+    "divisions": 27,
+    "carriers_end": 0,
+    "non_carriers_end": 0
+   }
+  ],
+  "subclonal": [
+   {
+    "mode": "subclonal",
+    "seed": 1,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 4,
+    "kills": 15,
+    "divisions": 27,
+    "carriers_end": 0,
+    "non_carriers_end": 4
+   },
+   {
+    "mode": "subclonal",
+    "seed": 2,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 15,
+    "kills": 11,
+    "divisions": 34,
+    "carriers_end": 0,
+    "non_carriers_end": 15
+   },
+   {
+    "mode": "subclonal",
+    "seed": 3,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 7,
+    "kills": 12,
+    "divisions": 27,
+    "carriers_end": 0,
+    "non_carriers_end": 7
+   },
+   {
+    "mode": "subclonal",
+    "seed": 4,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 0,
+    "kills": 15,
+    "divisions": 23,
+    "carriers_end": 0,
+    "non_carriers_end": 0
+   },
+   {
+    "mode": "subclonal",
+    "seed": 5,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 1,
+    "kills": 17,
+    "divisions": 26,
+    "carriers_end": 0,
+    "non_carriers_end": 1
+   }
+  ],
+  "none": [
+   {
+    "mode": "none",
+    "seed": 1,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 4,
+    "kills": 16,
+    "divisions": 28,
+    "carriers_end": 2,
+    "non_carriers_end": 2
+   },
+   {
+    "mode": "none",
+    "seed": 2,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 23,
+    "kills": 9,
+    "divisions": 40,
+    "carriers_end": 6,
+    "non_carriers_end": 17
+   },
+   {
+    "mode": "none",
+    "seed": 3,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 14,
+    "kills": 13,
+    "divisions": 35,
+    "carriers_end": 3,
+    "non_carriers_end": 11
+   },
+   {
+    "mode": "none",
+    "seed": 4,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 9,
+    "kills": 15,
+    "divisions": 32,
+    "carriers_end": 5,
+    "non_carriers_end": 4
+   },
+   {
+    "mode": "none",
+    "seed": 5,
+    "coverage_clonal": 10,
+    "coverage_subclonal": 3,
+    "cancer0": 10,
+    "cancer": 9,
+    "kills": 13,
+    "divisions": 30,
+    "carriers_end": 2,
+    "non_carriers_end": 7
+   }
+  ]
+ }
+}
