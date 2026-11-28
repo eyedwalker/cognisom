@@ -320,6 +320,11 @@ def test_the_arginase_gate_multiplies_onto_the_tcell_hill_rule():
         affinity = 0.9
         is_exhausted = False
         tcr = None
+        # TCRMatch.presentation is a required field, so a real match
+        # always has one. None here means "no IC50 to read", which the
+        # occupancy model treats as full occupancy -- this test is about
+        # the arginase gate, not about binding strength.
+        presentation = None
 
     tcell.active_tcr_match = _Match()
     target = _Target(mhc1=0.9)

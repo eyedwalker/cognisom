@@ -164,7 +164,20 @@ def test_occupancy_is_clamped_in_the_decomposition():
 # ── and the module keeps it off unless asked ──────────────────────
 
 def test_the_immune_module_leaves_occupancy_off_by_default():
-    """93% of displayed peptides are weak binders, so this is not idle."""
+    """OFF, and 2026-11-28 measured what turning it on costs.
+
+    It was switched on that day and reverted the same day. Measured on
+    Immunotherapy, slab, 12 h, seeds 1-3: the preset stops controlling
+    the tumour -- cancer 120 -> 159/164/160 against 113/87/100 with it
+    off, about the untreated growth rate -- and T-cell kills fall
+    47/57/61 -> 18/16/15.
+
+    So this flag decides the SIGN of the simulated treatment effect,
+    and the number that decides it (the effective peptide
+    concentration) has no source. That is why it is off: not because
+    the generous default is right, but because an unsourced magnitude
+    must not determine whether the modelled drug works.
+    """
     from cognisom.modules.immune_module import ImmuneModule
     assert ImmuneModule({}).peptide_occupancy_enabled is False
 
@@ -173,6 +186,21 @@ def test_the_immune_module_can_be_asked_for_it():
     from cognisom.modules.immune_module import ImmuneModule
     assert ImmuneModule(
         {'peptide_occupancy': True}).peptide_occupancy_enabled is True
+
+
+def test_the_magnitude_is_still_declared_unsourced():
+    """The reason the default is off must stay visible in the model.
+
+    If OCCUPANCY_STATUS is ever promoted, the argument for keeping this
+    off disappears with it, so the two must move together.
+    """
+    from cognisom.engine.py.immune.mhc_loading import (
+        OCCUPANCY_SOURCE, OCCUPANCY_STATUS, PEPTIDE_CONCENTRATION_NM)
+    assert OCCUPANCY_STATUS == "ESTIMATE"
+    assert "ESTIMATE" in OCCUPANCY_SOURCE
+    assert PEPTIDE_CONCENTRATION_NM == 50.0, (
+        "the concentration moved; the measured consequences in the test "
+        "above were taken at 50 nM and need re-measuring")
 
 
 # ── the recorded experiment ───────────────────────────────────────

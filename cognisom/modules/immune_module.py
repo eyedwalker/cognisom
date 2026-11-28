@@ -727,16 +727,44 @@ class ImmuneModule(SimulationModule):
         # of the target's class I carries it, and so how strong the kill
         # signal is. See mhc_loading.occupancy_from_ic50.
         #
-        # OFF BY DEFAULT, and the reason is a measurement rather than
-        # caution: in a ring run on the demo patient, 976 of the 1048
-        # displayed peptide-MHC pairs (93.1%) are weak binders by the
-        # loader's own 50 nM cut, median IC50 168.7 nM, median occupancy
-        # 0.457. So turning this on changes the kill probability for
-        # almost every displayed peptide and re-baselines the kill
-        # counts of every shipped preset. That is a correction -- the
-        # engine has been treating weak binders as strong -- but it is
-        # not one to make silently inside a release, so it is a flag
-        # and the default path stays bit-identical.
+        # OFF BY DEFAULT, and the reason is now measured on both
+        # settings rather than cautious.
+        #
+        # Why it is tempting to turn on: in a ring run on the demo
+        # patient, 976 of the 1048 displayed peptide-MHC pairs (93.1%)
+        # are weak binders by the loader's own 50 nM cut, median IC50
+        # 168.7 nM, median occupancy 0.457. With this off the engine
+        # scores all 976 as though they bound as tightly as a 50 nM
+        # peptide. The default is NOT neutral: it is wrong in the
+        # generous direction and every kill count it produces is an
+        # overestimate.
+        #
+        # Why it is nevertheless off. Turned on and measured 2026-11-28,
+        # Immunotherapy on the slab, 12 h, seeds 1-3: the preset stops
+        # controlling the tumour. Cancer 120 -> 159/164/160 against
+        # 113/87/100 with it off, which is about the untreated growth
+        # rate; T-cell kills fall 47/57/61 -> 18/16/15 and the T-cell
+        # share of kills drops from 67/67/73% to 50/44/37%, so
+        # "under anti-PD1 the T cells do most of the killing" stops
+        # being true.
+        #
+        # That is the SIGN of the simulated treatment effect changing,
+        # and it is decided by the effective peptide concentration,
+        # which has no source -- 50 nM is ours. An unsourced number must
+        # not decide whether the modelled drug works. Two further
+        # reasons not to read the flip as a fix: the engine's TCR gate
+        # recognises every peptide regardless of IC50 and every T cell
+        # is tumour-reactive by default, so these errors were partly
+        # cancelling and removing one leaves the others; and while
+        # tumour growth under checkpoint blockade does match prostate
+        # cancer clinically, that agreement is qualitative and cannot
+        # license the magnitude that produced it.
+        #
+        # What would settle it: the TESLA table -- 608 peptides with
+        # measured affinity and measured T-cell recognition, already
+        # parsed, training overlap checked at 1 of 605. Score the
+        # ranking against it, then set this from data instead of choice.
+        # Pass peptide_occupancy=True to use it meanwhile.
         self.peptide_occupancy_enabled = bool(
             self.config.get('peptide_occupancy', False))
         # The peptides this patient's T cells are specific for, by
