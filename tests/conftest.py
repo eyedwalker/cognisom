@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 # One BLAS thread per test process.
 #
 # OpenBLAS starts a thread per core. This suite is run under xdist, so on
@@ -108,3 +110,41 @@ def pytest_report_header(config):
         "predictor. mhcflurry 2.0.6 requires Python <= 3.12, and its weights "
         "come from `mhcflurry-downloads fetch models_class1_presentation`."
     )
+
+
+# ── the `network` tests are opt-in, and that is now enforced ───────────
+#
+# pytest.ini has always CALLED the marker "deselected by default" and
+# nothing deselected it, so any run that did not spell out
+# `-m "not network"` reached bionumbers.hms.harvard.edu. deploy.yml's push
+# lane was given that exclusion on 2026-11-06. The nightly runs a bare
+# `pytest`, so it kept reaching out, and was red on 2026-11-25, 26, 27 and
+# 28 -- every time with the same two failures, a 30 s read timeout against
+# that host, against 4,542 of our own tests passing. Memory records an
+# earlier stretch of 30+ unseen red nights from the same cause.
+#
+# The cost is not the flake, it is the camouflage: a lane that cries wolf
+# nightly is a lane nobody reads, and that is how a real crash underneath
+# it stayed hidden.
+#
+# A marker exclusion alone does not fix it. `-m` takes a single
+# expression, so `pytest -m "not slow"` silently re-includes these. A skip
+# applied at collection cannot be defeated by a selection expression, so
+# that is where this lives. `--run-network` is the one way in.
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-network", action="store_true", default=False,
+        help="run the tests marked `network`, which re-fetch cited records "
+             "from bionumbers.hms.harvard.edu over the internet")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-network"):
+        return
+    skip = pytest.mark.skip(
+        reason="needs the internet; pass --run-network to re-fetch the cited "
+               "records from BioNumbers")
+    for item in items:
+        if "network" in item.keywords:
+            item.add_marker(skip)

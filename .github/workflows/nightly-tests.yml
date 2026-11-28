@@ -51,6 +51,15 @@ jobs:
           print(f'MHCflurry usable: {len(p.supported_alleles)} alleles')
           "
 
+      # The live BioNumbers re-fetch is NOT in here. pytest.ini called the
+      # `network` marker "deselected by default" and nothing deselected
+      # it, so this bare `pytest` reached a third-party host every night
+      # and went red on 2026-11-25, 26, 27 and 28 -- each time with the
+      # same two read timeouts against 4,542 of our own tests passing.
+      # tests/conftest.py now skips those at collection unless
+      # --run-network is passed, so this job's verdict is about our code.
+      # The re-fetch has its own job below, where its verdict means
+      # something.
       - name: Run full suite (both trees, including slow tests)
         run: python -m pytest --tb=short -q --durations=20
 
@@ -93,3 +102,35 @@ jobs:
           files="$(bash scripts/usd_matrix.sh --list)"
           test -n "$files"
           python -m pytest --tb=short -q -p no:cacheprovider $files
+
+  # ── The curated values, against their source ───────────────────────
+  # Separate from the full suite ON PURPOSE. This job asks a question
+  # about our DATA -- does a stored parameter still match the BioNumbers
+  # record it cites -- and the answer depends on a host we do not run.
+  # Sharing a verdict with the full suite meant one slow night from
+  # Harvard looked identical to a broken engine.
+  #
+  # It cannot go red merely because the host is unreachable: the tests
+  # skip on a transport error and fail only when the source ANSWERS and
+  # disagrees. Measured 2026-11-28: the host is up (TCP in 0.05 s) but a
+  # record page does not answer within 35 s and it sits behind Imperva,
+  # so a skipped run here is the expected state while that lasts, and a
+  # FAILED run is a real drift worth reading.
+  curation-refetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Re-fetch a sample of cited records from BioNumbers
+        run: |
+          python -m pytest -m network --run-network \
+            --tb=short -q -rs -p no:cacheprovider

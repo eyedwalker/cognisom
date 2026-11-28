@@ -183,7 +183,40 @@ def test_a_cell_lifespan_and_division_time_are_not_both_written(sourced):
     assert not both, f"both temporal parameters written on: {both}"
 
 
-# ── live checks: run after a pass with  pytest -m network ───────────────
+# ── live checks: run with  pytest --run-network -m network ──────────────
+#
+# UNREACHABLE IS NOT THE SAME FINDING AS WRONG, and these tests used to
+# report it as the same one. Both failed on 2026-11-25/26/27/28 and
+# locally on 2026-11-28 with nothing but `ReadTimeout` -- no assertion
+# ever evaluated. Checked from outside the suite the same day: TCP
+# connects in 0.05 s, the site root takes 30.8 s to answer a 302, and a
+# record page does not answer within 35 s at all (curl exit 28). The host
+# resolves to `turghin.ng.impervadns.net`, so automated requests are
+# being throttled by bot mitigation rather than hitting a blip.
+#
+# A read timeout says NOTHING about whether a stored value still matches
+# its record, so it must not produce the verdict that a real drift
+# produces. `_fetch_or_skip` turns an unreachable source into a skip
+# naming the host, and leaves every other failure -- a record that no
+# longer parses, a value that disagrees, a citation that resolves
+# elsewhere -- a hard failure. Retrying was the alternative and would not
+# help: this is reproducible, not transient.
+
+
+def _fetch_or_skip(call, what):
+    """Run a live fetch; skip if the source cannot be reached.
+
+    Only transport failures become skips. Anything the source actually
+    says that we disagree with stays a failure, which is the whole point
+    of these two tests.
+    """
+    import requests
+    try:
+        return call()
+    except requests.exceptions.RequestException as exc:
+        pytest.skip(f"BioNumbers unreachable ({what}): "
+                    f"{type(exc).__name__}. The stored value is unverified "
+                    f"by this run, not contradicted by it.")
 
 @pytest.mark.network
 def test_a_sample_of_records_refetch_to_the_stored_value(sourced):
@@ -199,7 +232,7 @@ def test_a_sample_of_records_refetch_to_the_stored_value(sourced):
     sample = sourced[:: max(1, len(sourced) // 12)][:12]
     for entity, name, pv in sample:
         bnid = BNID_IN_SOURCE.search(pv.source).group(1)
-        record = fetch(bnid)
+        record = _fetch_or_skip(lambda: fetch(bnid), f"BNID {bnid}")
         assert record.value is not None, f"BNID {bnid} no longer parses"
         m = re.search(r"[x×]\s*([0-9.]+(?:e-?\d+)?)", pv.conditions or "")
         factor = float(m.group(1)) if m else 1.0
@@ -223,7 +256,9 @@ def test_a_sample_of_citations_name_the_cited_paper(sourced):
     sample = sourced[:: max(1, len(sourced) // 8)][:8]
     for entity, name, pv in sample:
         bnid = BNID_IN_SOURCE.search(pv.source).group(1)
-        pmid, _ = resolve_pmid(fetch(bnid).reference)
+        record = _fetch_or_skip(lambda: fetch(bnid), f"BNID {bnid}")
+        pmid, _ = _fetch_or_skip(
+            lambda: resolve_pmid(record.reference), f"PMID for BNID {bnid}")
         assert f"PMID:{pmid}" == pv.citation, (
             f"{entity.name} {name} cites {pv.citation} but BNID {bnid}'s "
             f"reference resolves to PMID:{pmid}")
