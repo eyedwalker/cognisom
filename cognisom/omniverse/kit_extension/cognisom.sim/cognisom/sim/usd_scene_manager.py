@@ -45,6 +45,7 @@ the Kit API calls themselves, which only a GPU box can exercise.
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
 import time
 from collections import deque
@@ -105,6 +106,21 @@ class UsdSceneManager:
         Runs on the HTTP thread: it only touches the filesystem, never
         USD. The name is rebuilt by ``safe_stage_name`` because it
         arrived over the network.
+
+        It writes a sibling and RENAMES it into place rather than
+        opening the destination for writing, and that is load-bearing
+        rather than tidiness. ``open(path, "wb")`` TRUNCATES, and pxr
+        memory-maps an open ``.usdc``: truncating the file under a
+        stage the main thread still has open invalidates its mapped
+        pages, so the next USD read dies with SIGBUS -- the whole Kit
+        process, not an exception anything can catch. Uploading a
+        stage under a name already loaded is the ordinary case (the
+        same run, re-exported), so this was reachable from one HTTP
+        request. It took CI down on 2026-11-27 inside
+        ``navigate_camera``. ``os.replace`` leaves the old inode in
+        place for whoever still has it mapped, and publishes the new
+        bytes atomically, so no reader ever sees a half-written stage
+        either.
         """
         if not body:
             raise ValueError("empty body: expected the bytes of a USD stage")
@@ -114,8 +130,18 @@ class UsdSceneManager:
                 f"{MAX_UPLOAD_BYTES / 1e6:.0f} MB limit")
         os.makedirs(self._stage_dir, exist_ok=True)
         path = os.path.join(self._stage_dir, safe_stage_name(name))
-        with open(path, "wb") as handle:
-            handle.write(body)
+        descriptor, partial = tempfile.mkstemp(
+            dir=self._stage_dir, prefix=".incoming-", suffix=".usd")
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(body)
+            os.replace(partial, path)
+        except BaseException:
+            try:
+                os.unlink(partial)
+            except OSError:
+                pass
+            raise
         carb.log_info(f"[cognisom.usd] saved {len(body)} bytes to {path}")
         return path
 

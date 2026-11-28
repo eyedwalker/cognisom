@@ -758,3 +758,94 @@ def test_an_oversized_upload_is_refused_before_it_reaches_the_disk(box):
         assert box.manager.save_upload(b"x" * 32, name="small.usdc")
     finally:
         module.MAX_UPLOAD_BYTES = original
+
+
+# ── an upload must not truncate a stage that is open ──────────────
+#
+# This took CI down on 2026-11-27 with ``Fatal Python error: Bus
+# error``, a core dump rather than a test failure, which SKIPPED
+# ``build-and-push`` and so left nothing in ECR to deploy. The crashing
+# thread was in ``navigate_camera``; the other thread was on the
+# ``open(path, "wb")`` inside ``save_upload``. pxr memory-maps an open
+# ``.usdc``, so truncating the file under a loaded stage invalidates
+# its mapped pages and the next USD read takes SIGBUS -- uncatchable,
+# process-wide. Re-uploading a run under a name already loaded is the
+# ordinary case, so one HTTP request could kill Kit on the box.
+
+
+def test_an_upload_replaces_the_file_rather_than_writing_in_place(box):
+    """The property that keeps an already-mapped stage valid.
+
+    A truncating write reuses the inode, so pxr's mapping of the old
+    contents is destroyed under it. A write-then-rename gives the name
+    a NEW inode and leaves the old one alive for whoever still holds
+    it -- which is why the stale reader below must still see the old
+    bytes. Both halves are asserted: the inode moving is the mechanism,
+    the stale read is what the mechanism buys.
+    """
+    first = box.manager.save_upload(b"the first export of this run",
+                                    name="reupload.usdc")
+    inode_before = os.stat(first).st_ino
+
+    held = open(first, "rb")          # stands in for pxr's open stage
+    try:
+        second = box.manager.save_upload(
+            b"the second export, a different length entirely",
+            name="reupload.usdc")
+        assert second == first, "the same name must land on the same path"
+        assert os.stat(second).st_ino != inode_before, (
+            "the destination was written in place -- that is the "
+            "truncate that SIGBUSes a stage the main thread has open")
+        assert held.read() == b"the first export of this run", (
+            "a reader holding the file from before the upload must "
+            "still see the old bytes; an mmap survives on exactly this")
+    finally:
+        held.close()
+
+    with open(first, "rb") as handle:
+        assert handle.read() == (
+            b"the second export, a different length entirely"), (
+            "and the new bytes are what the name resolves to afterwards")
+
+
+def test_an_upload_leaves_no_half_written_stage_behind(box):
+    """A guard on the new write path, not a reproduction of the old bug.
+
+    The rename is atomic, so no reader can see a partial file -- but it
+    introduces a temporary one, and the stage directory is what the box
+    lists. Nothing may survive a successful upload.
+    """
+    box.manager.save_upload(b"a" * 512, name="tidy.usdc")
+    leftovers = [n for n in os.listdir(box.stage_dir)
+                 if n.startswith(".incoming-")]
+    assert not leftovers, f"temporary uploads left behind: {leftovers}"
+
+
+def test_a_refused_upload_leaves_the_loaded_stage_untouched(box):
+    """A refusal must not be a destructive act, nor a littering one.
+
+    Both checks already came before any write and this passes against
+    the old code too -- it is here because the rename gave the function
+    a temporary file to leak. Move either check below the ``mkstemp``
+    and a refused upload starts leaving ``.incoming-`` files in the
+    directory the box lists as its stages.
+    """
+    module = sys.modules["kitsim.usd_scene_manager"]
+    path = box.manager.save_upload(b"the stage that is loaded",
+                                   name="keeper.usdc")
+
+    with pytest.raises(ValueError, match="bytes of a USD stage"):
+        box.manager.save_upload(b"", name="keeper.usdc")
+
+    original = module.MAX_UPLOAD_BYTES
+    module.MAX_UPLOAD_BYTES = 8
+    try:
+        with pytest.raises(ValueError, match="over the"):
+            box.manager.save_upload(b"far too many bytes", name="keeper.usdc")
+    finally:
+        module.MAX_UPLOAD_BYTES = original
+
+    with open(path, "rb") as handle:
+        assert handle.read() == b"the stage that is loaded"
+    assert not [n for n in os.listdir(box.stage_dir)
+                if n.startswith(".incoming-")]
